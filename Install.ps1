@@ -63,24 +63,38 @@ $pathAllUsers  = "$env:ProgramFiles\WindowsPowerShell\Modules\sqmSQLTool"
 $existsUser    = Test-Path $pathUser
 $existsAll     = Test-Path $pathAllUsers
 
-if ($existsUser -and $existsAll) {
+if ($existsUser -and $existsAll -and $Scope -eq 'AllUsers') {
+    # Running as Admin installing AllUsers — remove the CurrentUser copy automatically
+    Write-Host "Both installations detected. Removing CurrentUser copy..." -ForegroundColor Yellow
+    Write-Host "  $pathUser" -ForegroundColor Gray
+    Remove-Item $pathUser -Recurse -Force
+    Write-Host "CurrentUser installation removed." -ForegroundColor Green
+    Write-Host ""
+    $existsUser = $false
+
+} elseif ($existsUser -and $existsAll) {
+    # CurrentUser install, both exist — warn, cannot auto-remove AllUsers without Admin
     Write-Warning "sqmSQLTool is installed in BOTH locations:"
     Write-Warning "  CurrentUser : $pathUser"
     Write-Warning "  AllUsers    : $pathAllUsers"
-    Write-Warning "PowerShell always loads the CurrentUser version — the AllUsers version is ignored."
-    Write-Warning "Remove one installation to avoid confusion:"
-    Write-Warning "  Remove-Item '$pathAllUsers' -Recurse -Force   (requires Admin)"
-    Write-Warning "  Remove-Item '$pathUser' -Recurse -Force"
+    Write-Warning "PowerShell loads the CurrentUser version — the AllUsers copy is ignored."
+    Write-Warning "To remove the AllUsers copy (requires Admin):"
+    Write-Warning "  Remove-Item '$pathAllUsers' -Recurse -Force"
     Write-Host ""
+
 } elseif ($Scope -eq 'CurrentUser' -and $existsAll) {
     Write-Warning "An AllUsers installation already exists at: $pathAllUsers"
     Write-Warning "After this install, PowerShell will load the CurrentUser version and ignore AllUsers."
     Write-Host ""
+
 } elseif ($Scope -eq 'AllUsers' -and $existsUser) {
-    Write-Warning "A CurrentUser installation already exists at: $pathUser"
-    Write-Warning "PowerShell will continue to load the CurrentUser version — the AllUsers install will be ignored."
-    Write-Warning "To fix: Remove-Item '$pathUser' -Recurse -Force"
+    # Running as Admin — remove the CurrentUser copy automatically
+    Write-Host "CurrentUser installation detected. Removing to avoid conflicts..." -ForegroundColor Yellow
+    Write-Host "  $pathUser" -ForegroundColor Gray
+    Remove-Item $pathUser -Recurse -Force
+    Write-Host "CurrentUser installation removed." -ForegroundColor Green
     Write-Host ""
+    $existsUser = $false
 }
 
 # ---------------------------------------------------------------------------
