@@ -157,6 +157,13 @@ function Test-sqmModuleUpdate
 		Write-Verbose "Kein Update-Repository konfiguriert."
 		return $false
 	}
+	# Guard: check if the repository root is reachable before any path operations.
+	# This prevents Join-Path from throwing when a drive letter (e.g. W:) does not exist.
+	if (-not (Test-Path -Path $RepositoryPath -ErrorAction SilentlyContinue))
+	{
+		Write-Verbose "Update-Repository nicht erreichbar: $RepositoryPath"
+		return $false
+	}
 	try
 	{
 		$remoteVersionFile = Join-Path $RepositoryPath 'ModuleVersion.txt'
@@ -257,23 +264,25 @@ function Update-sqmModule
 	}
 }
 
-# Automatisches Update beim Modulimport (nur wenn AutoUpdate = $true und Repository konfiguriert)
+# Auto-update on module import (only when AutoUpdate = $true, repository is configured and reachable)
 if ($script:sqmModuleConfig['AutoUpdate'] -and $script:sqmModuleConfig['UpdateRepository'])
 {
 	$noUpdate = $env:MSSQLTOOLS_SKIP_AUTO_UPDATE -eq '1'
-	if (-not $noUpdate)
+	$repoPath = $script:sqmModuleConfig['UpdateRepository']
+	$repoReachable = Test-Path -Path $repoPath -ErrorAction SilentlyContinue
+	if (-not $noUpdate -and $repoReachable)
 	{
 		try
 		{
 			if (Test-sqmModuleUpdate)
 			{
-				Write-Host "Neue Modulversion verfuegbar. Fuehre Update durch..." -ForegroundColor Cyan
+				Write-Host "New module version available. Running update..." -ForegroundColor Cyan
 				Update-sqmModule -Force -Backup
 			}
 		}
 		catch
 		{
-			Write-Warning "Automatische Update-Pruefung fehlgeschlagen: $($_.Exception.Message)"
+			Write-Verbose "Auto-update check failed: $($_.Exception.Message)"
 		}
 	}
 }
