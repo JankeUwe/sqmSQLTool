@@ -78,10 +78,10 @@
 
 .NOTES
     Requires: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath
-    Benoetigt: sysadmin auf der Instanz
-    AlwaysOn: Nach Erneuerung muss das neue Zertifikat (.cer) auf alle Replikate uebertragen
-    und dort per CREATE CERTIFICATE ... FROM FILE installiert werden (Install-sqmCertificate).
-    TDE: Key-Wechsel laeuft online, Datenbank bleibt verfuegbar.
+    Requires: sysadmin on the instance.
+    AlwaysOn: After renewal the new certificate (.cer) must be distributed to all replicas
+    and installed there via CREATE CERTIFICATE ... FROM FILE (Install-sqmCertificate).
+    TDE: Key rotation runs online, the database remains available.
 #>
 function New-sqmSqlCertificate
 {

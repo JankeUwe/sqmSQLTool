@@ -314,27 +314,27 @@ function _sqmSplunk_ForList {
 function Invoke-sqmSplunkConfiguration {
     <#
     .SYNOPSIS
-        Konfiguriert den Splunk Universal Forwarder auf SQL Server Hosts.
+        Configures the Splunk Universal Forwarder on SQL Server hosts.
     .DESCRIPTION
-        Ermittelt alle SQL Server Instanzen, setzt maschinenweite Umgebungsvariablen
-        fuer den ErrorLog-Pfad (MSSQL1_Log, MSSQL2_Log, ...) und verwaltet den
-        SplunkForwarder-Dienst - lokal oder remote auf beliebig vielen Servern.
-        Umgebungsvariablen werden nicht ueberschrieben wenn bereits vorhanden.
+        Detects all SQL Server instances, sets machine-wide environment variables
+        for the ErrorLog path (MSSQL1_Log, MSSQL2_Log, ...) and manages the
+        SplunkForwarder service — locally or remotely on any number of servers.
+        Existing environment variables are not overwritten.
     .PARAMETER Mode
-        Set  - Umgebungsvariablen setzen und SplunkForwarder starten/restarten (Standard).
-        Test - Nur Pruefung ohne Aenderungen.
+        Set  - Set environment variables and start/restart SplunkForwarder (default).
+        Test - Check only, no changes.
     .PARAMETER Remote
-        Remote-Ausfuehrung per AD-OU-Suche. Kombinieren mit -SearchOU.
+        Remote execution via AD OU search. Combine with -SearchOU.
     .PARAMETER SearchOU
-        Distinguished Name oder einfacher OU-Name. Standard: OUServDatabase.
+        Distinguished Name or simple OU name. Default: OUServDatabase.
     .PARAMETER ComputerList
-        Explizite Server-Liste: String-Array oder Pfad zu Textdatei (# = Kommentar).
+        Explicit server list: string array or path to a text file (# = comment).
     .PARAMETER Credential
-        Anmeldeinformationen fuer AD und Remoting.
+        Credentials for AD and remoting.
     .PARAMETER LogPath
-        Verzeichnis fuer Logdateien. Standard: sqmSQLTool LogPath-Konfiguration.
+        Directory for log files. Default: sqmSQLTool LogPath configuration.
     .PARAMETER LogCallback
-        Optionaler ScriptBlock fuer GUI-Logging.
+        Optional ScriptBlock for GUI logging.
     .EXAMPLE
         Invoke-sqmSplunkConfiguration
     .EXAMPLE
@@ -346,9 +346,9 @@ function Invoke-sqmSplunkConfiguration {
     .EXAMPLE
         Invoke-sqmSplunkConfiguration -ComputerList "C:\Listen\db-server.txt" -Mode Test
     .NOTES
-        Set-Modus benoetigt lokale Administratorrechte.
-        Remote: WinRM muss auf Ziel-Servern aktiv sein.
-        AD-OU-Modus: ActiveDirectory-Modul wird ggf. automatisch installiert.
+        Set mode requires local administrator rights.
+        Remote: WinRM must be active on target servers.
+        AD OU mode: ActiveDirectory module is automatically installed if needed.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Local')]
     param(

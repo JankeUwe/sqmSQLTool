@@ -1,4 +1,43 @@
-﻿function Test-sqmTsmConnection
+﻿<#
+.SYNOPSIS
+    Tests the connection to an IBM Spectrum Protect (TSM) server using dsmadmc.
+
+.DESCRIPTION
+    Locates dsmadmc.exe on the local or remote computer, reads the TSM configuration
+    from dsm.opt (server name, user name, password) if not provided explicitly,
+    and executes a 'show version' command to verify that the TSM server is reachable.
+
+.PARAMETER ComputerName
+    Target computer on which the connection test is performed. Default: current computer name.
+
+.PARAMETER DsmadmcPath
+    Full path to dsmadmc.exe. Determined automatically from the registry if not specified.
+
+.PARAMETER UserName
+    TSM user name (USERID from dsm.opt if not specified).
+
+.PARAMETER Password
+    TSM password as SecureString (PASSWORD from dsm.opt if not specified).
+
+.PARAMETER ServerName
+    TSM server address (TCPServeraddress from dsm.opt if not specified).
+
+.PARAMETER DsmOptPath
+    Full path to dsm.opt. Determined automatically if not specified.
+
+.PARAMETER Credential
+    PSCredential for remote access (WinRM).
+
+.PARAMETER EnableException
+    Throw exceptions immediately.
+
+.EXAMPLE
+    Test-sqmTsmConnection
+
+.EXAMPLE
+    Test-sqmTsmConnection -ComputerName "SQL01" -UserName "tsm_admin" -Password (Read-Host -AsSecureString)
+#>
+function Test-sqmTsmConnection
 {
 	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]
 	[OutputType([PSCustomObject])]

@@ -1,4 +1,62 @@
-﻿function Invoke-sqmMonitoringKey
+﻿<#
+.SYNOPSIS
+    Gets or sets monitoring registry values for the sqmSQLTool on one or more computers.
+
+.DESCRIPTION
+    Reads or writes the registry key HKLM:\<RegistryBase>\dtcSoftware\sqmSQLTool on
+    the specified computers. The key controls which monitoring components are active:
+    SQL monitoring level (None/Standard/Full), SQLFreeSpaceVersion (Standard/Cluster),
+    and TSM backup monitoring (0/1).
+
+    When -Operation is 'Set', the specified values are written to the registry.
+    The key is created automatically if it does not exist.
+    The current values are always read and returned after a write operation.
+
+    Remote access uses Invoke-Command (WinRM). Provide -Credential for remote computers
+    if required.
+
+.PARAMETER ComputerName
+    Target computer(s). Pipeline-capable. Default: current computer name.
+
+.PARAMETER Operation
+    'Get' (default) reads the current values; 'Set' writes the specified values.
+
+.PARAMETER SQL
+    SQL monitoring level: 'None', 'Standard', or 'Full'.
+    Stored as DWORD (0/1/2) in the registry.
+
+.PARAMETER SQLFreeSpaceVersion
+    Free-space monitoring variant: 'Standard' (standalone) or 'Cluster' (AlwaysOn AG).
+
+.PARAMETER TSM
+    TSM backup monitoring: 0 = inactive, 1 = active.
+
+.PARAMETER RegistryBase
+    Registry hive path base under HKLM. Default: 'System'.
+
+.PARAMETER AutoDetectSQLFreeSpaceVersion
+    When set (and -Operation Set), automatically detects whether the instance belongs to
+    an AlwaysOn AG and sets SQLFreeSpaceVersion accordingly (Cluster/Standard).
+
+.PARAMETER Credential
+    PSCredential for remote computer access.
+
+.PARAMETER ContinueOnError
+    Continue with the next computer on error.
+
+.PARAMETER EnableException
+    Throw exceptions immediately (overrides ContinueOnError).
+
+.EXAMPLE
+    Invoke-sqmMonitoringKey
+
+.EXAMPLE
+    Invoke-sqmMonitoringKey -Operation Set -SQL Standard -TSM 1 -AutoDetectSQLFreeSpaceVersion
+
+.EXAMPLE
+    "SQL01","SQL02" | Invoke-sqmMonitoringKey -Operation Set -SQL Full -TSM 1
+#>
+function Invoke-sqmMonitoringKey
 {
 	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]
 	[OutputType([PSCustomObject])]

@@ -1,76 +1,76 @@
 ﻿<#
 .SYNOPSIS
-    Konfiguriert die IBM Spectrum Protect (TSM) Client-Optionsdatei dsm.opt
-    fuer den Einsatz mit SQL Server-Backup-Verzeichnissen.
+    Configures the IBM Spectrum Protect (TSM) client options file dsm.opt
+    for use with SQL Server backup directories.
 
 .DESCRIPTION
-    Liest die vorhandene dsm.opt, ergaenzt oder ersetzt die relevanten
-    Eintraege und schreibt die Datei zurueck. Vor jeder aenderung wird
-    automatisch eine Sicherungskopie (dsm.opt.bak) angelegt.
+    Reads the existing dsm.opt, adds or replaces the relevant entries,
+    and writes the file back. Before each change a backup copy (dsm.opt.bak)
+    is automatically created.
 
-    Konfigurierte Bereiche:
-    - EXCLUDE fuer SQL Server-Datenbankdateien (*.mdf, *.ndf, *.ldf)
-    - INCLUDE fuer Backup-Verzeichnisse (User-db, Sys-db, zusaetzliche Pfade)
-    - MANAGEMENTCLASS fuer die Backup-Dateien (Aufbewahrungsdauer)
+    Configured sections:
+    - EXCLUDE for SQL Server database files (*.mdf, *.ndf, *.ldf)
+    - INCLUDE for backup directories (User-db, Sys-db, additional paths)
+    - MANAGEMENTCLASS for backup files (retention period)
 
-    Bei Verwendung von -UseDiff wird die Management-Klasse auf
-    MC_B_NL.NL_42.42.NA erzwungen (42 Tage Aufbewahrung).
+    When -UseDiff is set, the management class is forced to
+    MC_B_NL.NL_42.42.NA (42-day retention).
 
-    Der Verwaltungsblock in der dsm.opt wird durch die Marker
-    '* --- dtcSqlTools BEGIN ---' und '* --- dtcSqlTools END ---'
-    begrenzt. Manuelle Eintraege ausserhalb bleiben erhalten.
+    The managed block in dsm.opt is delimited by the markers
+    '* --- dtcSqlTools BEGIN ---' and '* --- dtcSqlTools END ---'.
+    Manual entries outside this block are preserved.
 
 .PARAMETER ComputerName
-    Zielrechner (TSM-Client). Standard: aktueller Computername.
+    Target computer (TSM client). Default: current computer name.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz zur Ermittlung des Backup-Verzeichnisses.
-    Standard: $ComputerName.
+    SQL Server instance used to determine the backup directory.
+    Default: $ComputerName.
 
 .PARAMETER DsmOptPath
-    Vollstaendiger Pfad zur dsm.opt auf dem Zielrechner.
-    Wird automatisch ermittelt, wenn nicht angegeben.
+    Full path to the dsm.opt on the target computer.
+    Determined automatically when not specified.
 
 .PARAMETER BackupDirectory
-    Basis-Backup-Verzeichnis. Es werden die Unterverzeichnisse
-    \User-db und \Sys-db als INCLUDE eingetragen.
-    Standard: wird aus der SQL-Instanz ausgelesen (BackupDirectory).
+    Base backup directory. The subdirectories \User-db and \Sys-db
+    are added as INCLUDE entries.
+    Default: read from the SQL instance (BackupDirectory property).
 
 .PARAMETER AdditionalIncludePaths
-    Weitere Verzeichnisse, die als INCLUDE eingetragen werden sollen.
+    Additional directories to be added as INCLUDE entries.
 
 .PARAMETER ManagementClass
-    TSM Management-Klasse fuer die Backup-Dateien.
-    Erlaubt: MC_B_NL.NL_10.10.NA, MC_B_NL.NL_35.35.NA,
-             MC_B_NL.NL_42.42.NA, MC_B_NL.NL_62.62.NA,
-             MC_B_NL.NL_96.96.NA, MC_B_NL.NL_370.370.NA.
-    Standard: MC_B_NL.NL_42.42.NA.
+    TSM management class for the backup files.
+    Allowed values: MC_B_NL.NL_10.10.NA, MC_B_NL.NL_35.35.NA,
+                    MC_B_NL.NL_42.42.NA, MC_B_NL.NL_62.62.NA,
+                    MC_B_NL.NL_96.96.NA, MC_B_NL.NL_370.370.NA.
+    Default: MC_B_NL.NL_42.42.NA.
 
 .PARAMETER UseDiff
-    Wenn gesetzt, wird die Management-Klasse auf MC_B_NL.NL_42.42.NA
-    erzwungen (Pflicht fuer Diff-Backup-Strategie).
+    When set, forces the management class to MC_B_NL.NL_42.42.NA
+    (required for diff backup strategy).
 
 .PARAMETER SqlCredential
-    PSCredential fuer die SQL-Verbindung (zum Auslesen des Backup-Verzeichnisses).
+    PSCredential for the SQL connection (to read the backup directory).
 
 .PARAMETER Credential
-    PSCredential fuer Remote-Dateizugriff (Copy-Item, Test-Path) auf dem Zielrechner.
+    PSCredential for remote file access (Copy-Item, Test-Path) on the target computer.
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer den Konfigurationsbericht.
-    Standard: Get-sqmDefaultOutputPath.
+    Output directory for the configuration report.
+    Default: Get-sqmDefaultOutputPath.
 
 .PARAMETER ContinueOnError
-    Bei Fehler mit naechstem Schritt fortfahren (hier nicht zutreffend, da keine Schleife).
+    Continue on error (not applicable here as there is no loop).
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen (statt stiller Fehlerobjekte).
+    Throw exceptions immediately (instead of silent error objects).
 
 .PARAMETER Confirm
-    Bestaetigung vor dem Schreiben der dsm.opt anfordern.
+    Request confirmation before writing the dsm.opt.
 
 .PARAMETER WhatIf
-    Nur anzeigen, was passieren wuerde.
+    Shows what would happen without making any changes.
 
 .EXAMPLE
     Invoke-sqmTsmConfiguration -ManagementClass MC_B_NL.NL_42.42.NA
@@ -82,7 +82,7 @@
     Invoke-sqmTsmConfiguration -ComputerName "SQL01" -AdditionalIncludePaths "E:\Archive"
 
 .OUTPUTS
-    PSCustomObject mit ComputerName, DsmOptPath, BackupDirectory,
+    PSCustomObject with ComputerName, DsmOptPath, BackupDirectory,
     ManagementClass, UseDiff, ExcludesWritten, IncludesWritten,
     BackupCreated, Status, Message, ReportPath.
 #>
