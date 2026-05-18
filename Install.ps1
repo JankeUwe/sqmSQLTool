@@ -55,7 +55,36 @@ if (-not $Destination) {
 }
 
 # ---------------------------------------------------------------------------
-# 2. Admin-Check nur bei AllUsers
+# 2. Doppel-Installation erkennen und warnen
+# ---------------------------------------------------------------------------
+$docsPath_     = [Environment]::GetFolderPath('MyDocuments')
+$pathUser      = Join-Path $docsPath_ "WindowsPowerShell\Modules\sqmSQLTool"
+$pathAllUsers  = "$env:ProgramFiles\WindowsPowerShell\Modules\sqmSQLTool"
+$existsUser    = Test-Path $pathUser
+$existsAll     = Test-Path $pathAllUsers
+
+if ($existsUser -and $existsAll) {
+    Write-Warning "sqmSQLTool is installed in BOTH locations:"
+    Write-Warning "  CurrentUser : $pathUser"
+    Write-Warning "  AllUsers    : $pathAllUsers"
+    Write-Warning "PowerShell always loads the CurrentUser version — the AllUsers version is ignored."
+    Write-Warning "Remove one installation to avoid confusion:"
+    Write-Warning "  Remove-Item '$pathAllUsers' -Recurse -Force   (requires Admin)"
+    Write-Warning "  Remove-Item '$pathUser' -Recurse -Force"
+    Write-Host ""
+} elseif ($Scope -eq 'CurrentUser' -and $existsAll) {
+    Write-Warning "An AllUsers installation already exists at: $pathAllUsers"
+    Write-Warning "After this install, PowerShell will load the CurrentUser version and ignore AllUsers."
+    Write-Host ""
+} elseif ($Scope -eq 'AllUsers' -and $existsUser) {
+    Write-Warning "A CurrentUser installation already exists at: $pathUser"
+    Write-Warning "PowerShell will continue to load the CurrentUser version — the AllUsers install will be ignored."
+    Write-Warning "To fix: Remove-Item '$pathUser' -Recurse -Force"
+    Write-Host ""
+}
+
+# ---------------------------------------------------------------------------
+# 3. Admin-Check nur bei AllUsers (Nummer bleibt, intern konsistent)
 # ---------------------------------------------------------------------------
 if ($Scope -eq 'AllUsers') {
     $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
@@ -68,7 +97,7 @@ if ($Scope -eq 'AllUsers') {
 }
 
 # ---------------------------------------------------------------------------
-# 3. Modul kopieren
+# 4. Modul kopieren
 #    /COPY:DAT  -> no Alternate Data Streams (no Zone.Identifier)
 #    /XD .git   -> exclude git directory
 #    /XF        -> exclude meta files
@@ -83,7 +112,7 @@ robocopy $Source $Destination /E /PURGE /NJH /NJS /NDL /COPY:DAT `
           "coverage.xml" "testresults.xml"
 
 # ---------------------------------------------------------------------------
-# 4. Zone.Identifier auf dem Ziel entfernen
+# 5. Zone.Identifier auf dem Ziel entfernen
 # ---------------------------------------------------------------------------
 Write-Host "Unblocking files..." -ForegroundColor Cyan
 Get-ChildItem -Path $Destination -Recurse -File | ForEach-Object {
@@ -91,7 +120,7 @@ Get-ChildItem -Path $Destination -Recurse -File | ForEach-Object {
 }
 
 # ---------------------------------------------------------------------------
-# 5. Import testen
+# 6. Import testen
 # ---------------------------------------------------------------------------
 Write-Host "Testing module import..." -ForegroundColor Cyan
 try {
