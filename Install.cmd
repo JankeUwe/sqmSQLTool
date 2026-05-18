@@ -1,20 +1,24 @@
 @echo off
 :: sqmSQLTool Installer
-:: Startet Install.ps1 mit ExecutionPolicy Bypass
-:: Empfohlen wenn das Modul von einem cross-domain Share installiert wird
+:: Runs Install.ps1 with ExecutionPolicy Bypass (recommended for cross-domain shares)
 ::
-:: Aufruf: Install.cmd
-:: Optionaler Zielpfad: Install.cmd "D:\Modules\sqmSQLTool"
+:: Usage:
+::   Install.cmd                   -> installs for current user (no Admin required)
+::   Install.cmd AllUsers          -> installs system-wide (requires Admin)
+::   Install.cmd AllUsers "D:\Modules\sqmSQLTool"  -> system-wide, custom path
 
 setlocal
 
 set "SCRIPT_DIR=%~dp0"
-set "DESTINATION=%~1"
+set "SCOPE=%~1"
+set "DESTINATION=%~2"
+
+if "%SCOPE%"=="" set "SCOPE=CurrentUser"
 
 if "%DESTINATION%"=="" (
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%Install.ps1"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%Install.ps1" -Scope "%SCOPE%"
 ) else (
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%Install.ps1" -Destination "%DESTINATION%"
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%Install.ps1" -Scope "%SCOPE%" -Destination "%DESTINATION%"
 )
 
 endlocal
