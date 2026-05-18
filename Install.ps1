@@ -2,12 +2,9 @@
 <#
 .SYNOPSIS
     Installiert das sqmSQLTool-Modul in den systemweiten PowerShell-Modulpfad.
-.DESCRIPTION
-    Entsperrt alle Skriptdateien (Unblock-File), kopiert das Modul nach
-    %ProgramFiles%\WindowsPowerShell\Modules\sqmSQLTool und prueft den Import.
 .NOTES
-    Muss als Administrator ausgefuehrt werden.
-    Aufruf: .\Install.ps1
+    Aufruf direkt:     .\Install.ps1
+    Aufruf vom Share:  Install.cmd   (empfohlen bei cross-domain Shares)
     Optionaler Zielpfad: .\Install.ps1 -Destination "D:\Modules\sqmSQLTool"
 #>
 param(
@@ -16,19 +13,22 @@ param(
 )
 
 # ---------------------------------------------------------------------------
-# 1. Alle Dateien entsperren (entfernt Zone.Identifier ADS)
-#    Verhindert "execution policy overridden" beim Import auf dem Zielserver
-# ---------------------------------------------------------------------------
-Write-Host "Entsperre Dateien..." -ForegroundColor Cyan
-Get-ChildItem -Path $Source -Recurse -File | ForEach-Object {
-    Unblock-File -Path $_.FullName -ErrorAction SilentlyContinue
-}
-
-# ---------------------------------------------------------------------------
-# 2. Modul in Zielpfad kopieren
+# 1. Modul in Zielpfad kopieren
+#    /COPY:DAT  -> keine Alternate Data Streams kopieren (kein Zone.Identifier)
+#    /XD .git   -> git-Verzeichnis ausschliessen
+#    /XF        -> Meta-Dateien ausschliessen
 # ---------------------------------------------------------------------------
 Write-Host "Kopiere nach: $Destination" -ForegroundColor Cyan
-robocopy $Source $Destination /E /PURGE /NJH /NJS /NDL /XD .git /XF .gitignore README.md LICENSE
+robocopy $Source $Destination /E /PURGE /NJH /NJS /NDL /COPY:DAT /XD .git /XF .gitignore README.md LICENSE Install.cmd
+
+# ---------------------------------------------------------------------------
+# 2. Zone.Identifier auf dem ZIEL entfernen
+#    (Dateien von cross-domain Shares bekommen Zone 3 "Internet" - auch ohne ADS)
+# ---------------------------------------------------------------------------
+Write-Host "Entsperre Dateien im Zielverzeichnis..." -ForegroundColor Cyan
+Get-ChildItem -Path $Destination -Recurse -File | ForEach-Object {
+    Unblock-File -Path $_.FullName -ErrorAction SilentlyContinue
+}
 
 # ---------------------------------------------------------------------------
 # 3. Import testen
