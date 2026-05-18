@@ -1,0 +1,84 @@
+﻿<Project Synchronized="False" SyncFilter="*.ps1;*.psm1;*.psd1;*.ps1xml;*.psf;*.pss;*.xml;*.help.txt" AutoExportFunctions="False" AutoExportPS1XMLFiles="True">
+  <Version>2.1</Version>
+  <FileID>c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6</FileID>
+  <ProjectType>1</ProjectType>
+  <Folders>
+    <Folder>Private</Folder>
+    <Folder>Public</Folder>
+  </Folders>
+  <Files>
+    <File Build="2">sqmSQLTool.psd1</File>
+    <File Build="0" ExportFunctions="True">sqmSQLTool.psm1</File>
+    <File Build="1" Shared="False" ReferenceFunction="Invoke-Test-Module_ps1" ExportFunctions="False">Test-Module.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmLogging_ps1" ExportFunctions="False">Private\Invoke-sqmLogging.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Tester_ps1" ExportFunctions="False">Tester.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Test-sqmLoggingPath_ps1" ExportFunctions="False">Private\Test-sqmLoggingPath.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Set-sqmConfig_ps1" ExportFunctions="False">Public\Set-sqmConfig.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmSqlAlwaysOnAutoseeding_ps1" ExportFunctions="False">Public\Invoke-sqmSqlAlwaysOnAutoseeding.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmUserDatabaseBackup_ps1" ExportFunctions="False">Public\Invoke-sqmUserDatabaseBackup.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmServerSetting_ps1" ExportFunctions="False">Public\Get-sqmServerSetting.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmSetDatabaseRecoveryMode_ps1" ExportFunctions="False">Public\Invoke-sqmSetDatabaseRecoveryMode.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmRenameSaAccount_ps1" ExportFunctions="False">Public\Invoke-sqmRenameSaAccount.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmRestoreDatabase_ps1" ExportFunctions="False">Public\Invoke-sqmRestoreDatabase.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Remove-sqmDatabaseFromAG_ps1" ExportFunctions="False">Public\Remove-sqmDatabaseFromAG.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmAddDatabaseToAG_ps1" ExportFunctions="False">Public\Invoke-sqmAddDatabaseToAG.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Repair-sqmAlwaysOnDatabases_ps1" ExportFunctions="False">Public\Repair-sqmAlwaysOnDatabases.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-New-sqmAlwaysOnRepairJob_ps1" ExportFunctions="False">Public\New-sqmAlwaysOnRepairJob.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmSQLInstanceCheck_ps1" ExportFunctions="False">Public\Get-sqmSQLInstanceCheck.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmOperationStatus_ps1" ExportFunctions="False">Public\Get-sqmOperationStatus.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmAutoGrowthReport_ps1" ExportFunctions="False">Public\Get-sqmAutoGrowthReport.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmInstanceInventory_ps1" ExportFunctions="False">Public\Invoke-sqmInstanceInventory.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmAgHealthReport_ps1" ExportFunctions="False">Public\Get-sqmAgHealthReport.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmDiskSpaceReport_ps1" ExportFunctions="False">Public\Get-sqmDiskSpaceReport.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmDatabaseHealth_ps1" ExportFunctions="False">Public\Get-sqmDatabaseHealth.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmSysadminAccounts_ps1" ExportFunctions="False">Public\Get-sqmSysadminAccounts.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmConfig_ps1" ExportFunctions="False">Public\Get-sqmConfig.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Copy-sqmToCentralPath_ps1" ExportFunctions="False">Public\Copy-sqmToCentralPath.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmLoginAudit_ps1" ExportFunctions="False">Public\Invoke-sqmLoginAudit.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmLogShrink_ps1" ExportFunctions="False">Public\Invoke-sqmLogShrink.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmSaObfuscation_ps1" ExportFunctions="False">Public\Invoke-sqmSaObfuscation.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Test-sqmOlaInstallation_ps1" ExportFunctions="False">Public\Test-sqmOlaInstallation.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-New-sqmOlaMaintenanceJobs_ps1" ExportFunctions="False">Public\New-sqmOlaMaintenanceJobs.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-New-sqmOlaSysDbBackupJob_ps1" ExportFunctions="False">Public\New-sqmOlaSysDbBackupJob.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Install-sqmOlaMaintenanceSolution_ps1" ExportFunctions="False">Public\Install-sqmOlaMaintenanceSolution.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmMonitoringKey_ps1" ExportFunctions="False">Public\Invoke-sqmMonitoringKey.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Set-sqmSqlPolicyState_ps1" ExportFunctions="False">Public\Set-sqmSqlPolicyState.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmSsisConfiguration_ps1" ExportFunctions="False">Public\Invoke-sqmSsisConfiguration.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Set-sqmSsrsConfiguration_ps1" ExportFunctions="False">Public\Set-sqmSsrsConfiguration.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmCollationChange_ps1" ExportFunctions="False">Public\Invoke-sqmCollationChange.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Sync-sqmAgNode_ps1" ExportFunctions="False">Public\Sync-sqmAgNode.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Test-sqmSsasDirectoryPermissions_ps1" ExportFunctions="False">Public\Test-sqmSsasDirectoryPermissions.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmClusterInfo_ps1" ExportFunctions="False">Public\Get-sqmClusterInfo.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmTsmConfiguration_ps1" ExportFunctions="False">Public\Invoke-sqmTsmConfiguration.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Test-sqmTsmConnection_ps1" ExportFunctions="False">Public\Test-sqmTsmConnection.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmTsmConfiguration_ps1" ExportFunctions="False">Public\Get-sqmTsmConfiguration.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmUpdateStatistics_ps1" ExportFunctions="False">Public\Invoke-sqmUpdateStatistics.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmADAccountStatus_ps1" ExportFunctions="False">Public\Get-sqmADAccountStatus.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmAgentJobHistory_ps1" ExportFunctions="False">Public\Get-sqmAgentJobHistory.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmIndexFragmentation_ps1" ExportFunctions="False">Public\Get-sqmIndexFragmentation.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmTempDbRecommendation_ps1" ExportFunctions="False">Public\Get-sqmTempDbRecommendation.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Test-sqmBackupIntegrity_ps1" ExportFunctions="False">Public\Test-sqmBackupIntegrity.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmLinkedServerUsage_ps1" ExportFunctions="False">Public\Get-sqmLinkedServerUsage.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Compare-sqmServerConfiguration_ps1" ExportFunctions="False">Public\Compare-sqmServerConfiguration.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Find-sqmDatabaseObject_ps1" ExportFunctions="False">Public\Find-sqmDatabaseObject.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmHelpers_ps1" ExportFunctions="False">Private\Invoke-sqmHelpers.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmBlockingReport_ps1" ExportFunctions="False">Public\Get-sqmBlockingReport.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmLongRunningQueries_ps1" ExportFunctions="False">Public\Get-sqmLongRunningQueries.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmDeadlockReport_ps1" ExportFunctions="False">Public\Get-sqmDeadlockReport.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmCertificateReport_ps1" ExportFunctions="False">Public\Get-sqmCertificateReport.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-New-sqmSqlCertificate_ps1" ExportFunctions="False">Public\New-sqmSqlCertificate.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-New-sqmCertificateRequest_ps1" ExportFunctions="False">Public\New-sqmCertificateRequest.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Install-sqmCertificate_ps1" ExportFunctions="False">Public\Install-sqmCertificate.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Set-sqmDatabaseOwner_ps1" ExportFunctions="False">Public\Set-sqmDatabaseOwner.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmMissingIndexes_ps1" ExportFunctions="False">Public\Get-sqmMissingIndexes.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Export-sqmDatabaseDocumentation_ps1" ExportFunctions="False">Public\Export-sqmDatabaseDocumentation.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Copy-sqmLogins_ps1" ExportFunctions="False">Public\Copy-sqmLogins.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Install-sqmAdModule_ps1" ExportFunctions="False">Public\Install-sqmAdModule.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Install-sqmSsrsReportServer_ps1" ExportFunctions="False">Public\Install-sqmSsrsReportServer.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Invoke-sqmFormatDrive64k_ps1" ExportFunctions="False">Public\Invoke-sqmFormatDrive64k.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Test-sqmSQLFirewall_ps1" ExportFunctions="False">Public\Test-sqmSQLFirewall.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-Get-sqmHpuAllowGroup_ps1" ExportFunctions="False">Public\Get-sqmHpuAllowGroup.ps1</File>
+    <File Build="2" Shared="True" ReferenceFunction="Invoke-New-sqmOlaUsrDbBackupJob_ps1" ExportFunctions="False">Public\New-sqmOlaUsrDbBackupJob.ps1</File>
+  </Files>
+  <StartupScript>Test-Module.ps1</StartupScript>
+</Project>

@@ -1,0 +1,23 @@
+# Build output
+bin/
+*.exe
+*.exe.config
+
+# PowerShell build artifacts
+*.psbuild
+*.psprojs
+
+# PowerShell Studio temporary/restore files
+*.TempPoint.ps1
+*.TempPoint.psd1
+*.TempPoint.psm1
+*.RestorePoint.ps1
+*.RestorePoint.psd1
+*.RestorePoint.psm1
+mssSQLTool.*
+
+# IDE / Tools
+.vs/
+*.user
+Thumbs.db
+desktop.ini
