@@ -23,16 +23,16 @@
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
 	
 	# Author of this module
-	Author				   = 'Janke'
-	
+	Author				   = 'Uwe Janke'
+
 	# Company or vendor of this module
 	CompanyName		       = 'dtcSoftware'
-	
+
 	# Copyright statement for this module
-	Copyright			   = '(c) 2026. All rights reserved.'
-	
+	Copyright			   = '(c) 2026 Uwe Janke. MIT License.'
+
 	# Description of the functionality provided by this module
-	Description		       = 'SQL Admin Toolset mit dbatools Integration'
+	Description		       = 'SQL Server administration toolkit built on dbatools. Provides reporting, health checks, maintenance automation and security auditing for SQL Server environments.'
 	
 	# KORREKTUR #8: Minimum PS-Version auf 5.1 angehoben
 	# (Modul nutzt Generic.List, dbatools, Hashtable-Methoden - alles setzt PS 5.1 voraus)
@@ -88,19 +88,23 @@
 	PrivateData		       = @{
 		PSData = @{
 			# Tags applied to this module. These help with module discovery in online galleries.
-			# Tags = @()
-			
+			Tags = @(
+				'SQLServer', 'DBA', 'dbatools', 'Administration',
+				'HealthCheck', 'Reporting', 'Maintenance', 'AlwaysOn',
+				'Backup', 'Security', 'Automation', 'MSSQL'
+			)
+
 			# A URL to the license for this module.
-			# LicenseUri = ''
-			
+			LicenseUri = 'https://github.com/JankeUwe/sqmSQLTool/blob/main/LICENSE'
+
 			# A URL to the main website for this project.
-			# ProjectUri = ''
-			
+			ProjectUri = 'https://github.com/JankeUwe/sqmSQLTool'
+
 			# A URL to an icon representing this module.
 			# IconUri = ''
-			
+
 			# ReleaseNotes of this module
-			# ReleaseNotes = ''
+			ReleaseNotes = 'v1.0.0 - Initial public release. Removed environment-specific defaults, added Pester 5 test suite, integrated NTFS permission management.'
 		}
 	}
 }

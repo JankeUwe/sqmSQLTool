@@ -16,6 +16,10 @@ bin/
 *.RestorePoint.psm1
 mssSQLTool.*
 
+# Pester-Artefakte (generiert, nicht versionieren)
+tests/coverage.xml
+tests/testresults.xml
+
 # IDE / Tools
 .vs/
 *.user
