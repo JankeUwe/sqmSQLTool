@@ -375,7 +375,7 @@ function Invoke-sqmSplunkConfiguration {
 
     if (-not $LogPath) {
         $LogPath = Get-sqmConfig -Key 'LogPath'
-        if (-not $LogPath) { $LogPath = 'C:\System\WinSrvLog\MSSQL' }
+        if (-not $LogPath) { $LogPath = '$env:ProgramData\sqmSQLTool\Logs' }
     }
 
     _sqmSplunkGuiLog "Invoke-sqmSplunkConfiguration | Modus: $Mode | ParameterSet: $($PSCmdlet.ParameterSetName)" $LogCallback

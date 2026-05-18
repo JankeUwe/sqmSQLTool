@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Erstellt drei SQL Agent Jobs fuer Ola Hallengrens Wartungsloesung:
     IndexOptimize (User-DBs) und IntegrityCheck (User- und System-DBs).
@@ -108,9 +108,9 @@
 
 .NOTES
     Modulkonfigurationsschluessel:
-        OlaJobNameIndexOpt   (Default: 'FITS IndexOptimize - USER_DATABASES')
-        OlaJobNameIntUserDb  (Default: 'FITS IntegrityCheck - USER_DATABASES')
-        OlaJobNameIntSysDb   (Default: 'FITS IntegrityCheck - SYSTEM_DATABASES')
+        OlaJobNameIndexOpt   (Default: 'OlaHH IndexOptimize - USER_DATABASES')
+        OlaJobNameIntUserDb  (Default: 'OlaHH IntegrityCheck - USER_DATABASES')
+        OlaJobNameIntSysDb   (Default: 'OlaHH IntegrityCheck - SYSTEM_DATABASES')
     Voraussetzung: dbatools, Invoke-sqmLogging, Get-sqmConfig, Test-sqmOlaInstallation, Get-sqmSaLogin
 #>
 function New-sqmOlaMaintenanceJobs
@@ -229,7 +229,7 @@ function New-sqmOlaMaintenanceJobs
 		if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
 		
 		$logDir = $cfg['LogPath']
-		if (-not $logDir) { $logDir = 'C:\system\WinSrvLog\MSSQL' }
+		if (-not $logDir) { $logDir = '$env:ProgramData\sqmSQLTool\Logs' }
 		$maintenanceLogDir = Join-Path $logDir 'MaintenanceLog'
 		$centralLogDir = $cfg['CentralPath']
 		

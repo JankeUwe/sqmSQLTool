@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Liest und analysiert Deadlock-Ereignisse aus der System Health Extended Event Session.
 
@@ -49,7 +49,7 @@
 
 .EXAMPLE
     # Deadlocks als XDL-Dateien fuer SSMS speichern
-    Get-sqmDeadlockReport -SqlInstance "SQL01" -OutputPath "C:\System\WinSrvLog\MSSQL\Deadlocks"
+    Get-sqmDeadlockReport -SqlInstance "SQL01" -OutputPath "$env:ProgramData\sqmSQLTool\Logs\Deadlocks"
 
 .EXAMPLE
     # Nur Deadlocks der letzten Stunde, Anzahl betroffener Statements anzeigen

@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Ermittelt lang laufende Queries auf einer SQL Server-Instanz.
 
@@ -58,7 +58,7 @@
 
 .EXAMPLE
     # Regelmaessiger Snapshot via Agent-Job
-    Get-sqmLongRunningQueries -MinDurationSeconds 120 -OutputPath "C:\System\WinSrvLog\MSSQL\LongRunning"
+    Get-sqmLongRunningQueries -MinDurationSeconds 120 -OutputPath "$env:ProgramData\sqmSQLTool\Logs\LongRunning"
 
 .NOTES
     Erfordert: dbatools, Invoke-sqmLogging

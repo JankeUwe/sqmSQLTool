@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Ermittelt freien Speicherplatz aller SQL-relevanten Volumes und
     schaetzt den Zeitpunkt bis zur Erschoepfung basierend auf Wachstumsdaten.
@@ -30,7 +30,7 @@
     Zeitraum fuer Wachstumsberechnung in Tagen. Standard: 30.
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer die Berichtsdateien. Standard: C:\System\WinSrvLog\MSSQL
+    Ausgabeverzeichnis fuer die Berichtsdateien. Standard: $env:ProgramData\sqmSQLTool\Logs
 
 .PARAMETER ContinueOnError
     Bei Fehler auf einer Instanz fortfahren (ansonsten wird der Fehler ausgeloest).
@@ -53,7 +53,7 @@
 .NOTES
     Autor:   MSSQLTools
     Voraussetzungen: dbatools, Invoke-sqmLogging
-    Standard-Ausgabepfad: C:\System\WinSrvLog\MSSQL
+    Standard-Ausgabepfad: $env:ProgramData\sqmSQLTool\Logs
     Die Wachstumsberechnung basiert auf dem Default Trace (falls aktiviert).
     Ist der Trace deaktiviert, wird kein Wachstumswert ermittelt.
 #>
@@ -75,7 +75,7 @@ function Get-sqmDiskSpaceReport
 		[Parameter(Mandatory = $false)]
 		[int]$HistoryDays = 30,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = 'C:\System\WinSrvLog\MSSQL',
+		[string]$OutputPath = '$env:ProgramData\sqmSQLTool\Logs',
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]

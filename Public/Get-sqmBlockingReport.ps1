@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Ermittelt aktuelle Blockierungsketten auf einer SQL Server-Instanz.
 
@@ -47,7 +47,7 @@
 
 .EXAMPLE
     # Regelmaessiger Snapshot via Agent-Job
-    Get-sqmBlockingReport -SqlInstance "SQL01" -OutputPath "C:\System\WinSrvLog\MSSQL\Blocking"
+    Get-sqmBlockingReport -SqlInstance "SQL01" -OutputPath "$env:ProgramData\sqmSQLTool\Logs\Blocking"
 
 .NOTES
     Erfordert: dbatools, Invoke-sqmLogging

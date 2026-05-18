@@ -15,16 +15,16 @@
 # (muss vor dem Laden der Funktionen und vor Get-sqmConfig-Aufrufen stehen)
 # =============================================================================
 $script:sqmModuleConfig = @{
-	LogPath               = "C:\system\WinSrvLog\MSSQL"
-	OutputPath            = "C:\System\WinSrvLog\MSSQL"
+	LogPath               = "$env:ProgramData\sqmSQLTool\Logs"
+	OutputPath            = "$env:ProgramData\sqmSQLTool\Logs"
 	CentralPath           = $null
-	OlaJobNameFull        = "FITS-UserDatabases-FULL"
-	OlaJobNameDiff        = "FITS-UserDatabases-DIFF"
-	OlaJobNameLog         = "FITS-UserDatabases-LOG"
-	OlaJobNameIndexOpt    = "FITS IndexOptimize - USER_DATABASES"
-	OlaJobNameIntUserDb   = "FITS IntegrityCheck - USER_DATABASES"
-	OlaJobNameIntSysDb    = "FITS IntegrityCheck - SYSTEM_DATABASES"
-	OlaJobNameSysDbBackup = "FITS-SystemDatabases-FULL"
+	OlaJobNameFull        = "OlaHH-UserDatabases-FULL"
+	OlaJobNameDiff        = "OlaHH-UserDatabases-DIFF"
+	OlaJobNameLog         = "OlaHH-UserDatabases-LOG"
+	OlaJobNameIndexOpt    = "OlaHH IndexOptimize - USER_DATABASES"
+	OlaJobNameIntUserDb   = "OlaHH IntegrityCheck - USER_DATABASES"
+	OlaJobNameIntSysDb    = "OlaHH IntegrityCheck - SYSTEM_DATABASES"
+	OlaJobNameSysDbBackup = "OlaHH-SystemDatabases-FULL"
 	BackupDirectory       = $null
 	HpuDomainGroupMap     = @()
 	SsrsInstallerPath     = $null

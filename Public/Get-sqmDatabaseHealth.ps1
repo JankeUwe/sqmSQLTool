@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Sammelbericht zum Gesundheitszustand aller Datenbanken auf einer Instanz.
 
@@ -37,7 +37,7 @@
     System-Datenbanken (ausser tempdb) einbeziehen. Standard: $false.
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer die Berichtsdateien. Standard: C:\System\WinSrvLog\MSSQL
+    Ausgabeverzeichnis fuer die Berichtsdateien. Standard: $env:ProgramData\sqmSQLTool\Logs
 
 .PARAMETER ContinueOnError
     Bei Fehler auf einer Instanz fortfahren (ansonsten wird der Fehler ausgeloest).
@@ -60,7 +60,7 @@
 .NOTES
     Autor:   MSSQLTools
     Voraussetzungen: dbatools, Invoke-sqmLogging
-    Standard-Ausgabepfad: C:\System\WinSrvLog\MSSQL
+    Standard-Ausgabepfad: $env:ProgramData\sqmSQLTool\Logs
     VLF-Abfrage benoetigt SQL Server 2016+ (sys.dm_db_log_info). Bei aelteren Versionen wird VLF-Status als 'Unknown' angezeigt.
 #>
 function Get-sqmDatabaseHealth
@@ -83,7 +83,7 @@ function Get-sqmDatabaseHealth
 		[Parameter(Mandatory = $false)]
 		[switch]$IncludeSystemDatabases,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = 'C:\System\WinSrvLog\MSSQL',
+		[string]$OutputPath = '$env:ProgramData\sqmSQLTool\Logs',
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]

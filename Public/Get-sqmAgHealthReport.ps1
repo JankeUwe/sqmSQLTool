@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Erstellt einen detaillierten Zustandsbericht aller Always On-Verfuegbarkeitsgruppen auf einer Instanz.
 
@@ -27,7 +27,7 @@
     Warnschwelle fuer die Send-Queue in MB. Standard: 50.
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer die Berichtsdateien. Standard: C:\System\WinSrvLog\MSSQL
+    Ausgabeverzeichnis fuer die Berichtsdateien. Standard: $env:ProgramData\sqmSQLTool\Logs
 
 .PARAMETER ContinueOnError
     Bei Fehler auf einer Instanz fortfahren (ansonsten wird der Fehler ausgeloest).
@@ -50,7 +50,7 @@
 .NOTES
     Autor:   MSSQLTools
     Voraussetzungen: dbatools, Invoke-sqmLogging
-    Standard-Ausgabepfad: C:\System\WinSrvLog\MSSQL
+    Standard-Ausgabepfad: $env:ProgramData\sqmSQLTool\Logs
 #>
 function Get-sqmAgHealthReport
 {
@@ -66,7 +66,7 @@ function Get-sqmAgHealthReport
 		[Parameter(Mandatory = $false)]
 		[int]$MaxSendQueueMB = 50,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = 'C:\System\WinSrvLog\MSSQL',
+		[string]$OutputPath = '$env:ProgramData\sqmSQLTool\Logs',
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]

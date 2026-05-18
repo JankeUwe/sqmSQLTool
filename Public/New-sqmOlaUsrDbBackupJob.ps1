@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Erstellt SQL Agent Jobs fuer FULL-, DIFF- und/oder LOG-Backup der
     User-Datenbanken via Ola Hallengrens DatabaseBackup.
@@ -10,9 +10,9 @@
 
     Backups werden in <BackupDirectory>\Usr-db abgelegt.
     Job-Namen werden aus der Modulkonfiguration gelesen:
-        OlaJobNameFull  (Default: 'FITS-UserDatabases-FULL')
-        OlaJobNameDiff  (Default: 'FITS-UserDatabases-DIFF')
-        OlaJobNameLog   (Default: 'FITS-UserDatabases-LOG')
+        OlaJobNameFull  (Default: 'OlaHH-UserDatabases-FULL')
+        OlaJobNameDiff  (Default: 'OlaHH-UserDatabases-DIFF')
+        OlaJobNameLog   (Default: 'OlaHH-UserDatabases-LOG')
 
 .PARAMETER SqlInstance
     SQL Server-Instanz. Standard: aktueller Computername.
@@ -153,9 +153,9 @@
 .NOTES
     Voraussetzungen: dbatools, Invoke-sqmLogging, Get-sqmConfig, Test-sqmOlaInstallation, Get-sqmSaLogin
     Konfigurationsschluessel:
-        OlaJobNameFull  (Default: 'FITS-UserDatabases-FULL')
-        OlaJobNameDiff  (Default: 'FITS-UserDatabases-DIFF')
-        OlaJobNameLog   (Default: 'FITS-UserDatabases-LOG')
+        OlaJobNameFull  (Default: 'OlaHH-UserDatabases-FULL')
+        OlaJobNameDiff  (Default: 'OlaHH-UserDatabases-DIFF')
+        OlaJobNameLog   (Default: 'OlaHH-UserDatabases-LOG')
     Backup-Unterverzeichnis: <BackupDirectory>\Usr-db
 #>
 function New-sqmOlaUsrDbBackupJob
@@ -266,15 +266,15 @@ function New-sqmOlaUsrDbBackupJob
 		$cfg = Get-sqmConfig
 		
 		# Job-Namen aus Konfiguration oder Default
-		$effFullJobName = if ($FullJobName) { $FullJobName } elseif ($cfg['OlaJobNameFull']) { $cfg['OlaJobNameFull'] } else { 'FITS-UserDatabases-FULL' }
-		$effDiffJobName = if ($DiffJobName) { $DiffJobName } elseif ($cfg['OlaJobNameDiff']) { $cfg['OlaJobNameDiff'] } else { 'FITS-UserDatabases-DIFF' }
-		$effLogJobName  = if ($LogJobName)  { $LogJobName }  elseif ($cfg['OlaJobNameLog'])  { $cfg['OlaJobNameLog'] }  else { 'FITS-UserDatabases-LOG' }
+		$effFullJobName = if ($FullJobName) { $FullJobName } elseif ($cfg['OlaJobNameFull']) { $cfg['OlaJobNameFull'] } else { 'OlaHH-UserDatabases-FULL' }
+		$effDiffJobName = if ($DiffJobName) { $DiffJobName } elseif ($cfg['OlaJobNameDiff']) { $cfg['OlaJobNameDiff'] } else { 'OlaHH-UserDatabases-DIFF' }
+		$effLogJobName  = if ($LogJobName)  { $LogJobName }  elseif ($cfg['OlaJobNameLog'])  { $cfg['OlaJobNameLog'] }  else { 'OlaHH-UserDatabases-LOG' }
 		
 		$connParams = @{ SqlInstance = $SqlInstance }
 		if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
 		
 		$logDir = $cfg['LogPath']
-		if (-not $logDir) { $logDir = 'C:\system\WinSrvLog\MSSQL' }
+		if (-not $logDir) { $logDir = '$env:ProgramData\sqmSQLTool\Logs' }
 		$maintenanceLogDir = Join-Path $logDir 'MaintenanceLog'
 		$centralLogDir = $cfg['CentralPath']
 		

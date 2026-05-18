@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Erstellt eine CSR (Certificate Signing Request) und ein Bestelldatenblatt fuer ein
     CA-signiertes Zertifikat auf Basis eines bestehenden SQL Server-Zertifikats.
@@ -57,7 +57,7 @@
     Gueltige Werte: AlwaysOn, TDE, SSL, ServiceBroker, UserDefined.
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer CSR, INF und Bestelldatenblatt. Standard: C:\System\WinSrvLog\MSSQL\Cert
+    Ausgabeverzeichnis fuer CSR, INF und Bestelldatenblatt. Standard: $env:ProgramData\sqmSQLTool\Logs\Cert
 
 .PARAMETER Organization
     Organisationsname fuer das Zertifikat (O=). Standard: aus bestehendem Zertifikat oder Computername.

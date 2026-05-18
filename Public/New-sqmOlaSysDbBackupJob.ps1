@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Erstellt einen SQL Agent Job fuer das taegliche Full-Backup der
     SQL Server System-Datenbanken via Ola Hallengrens DatabaseBackup.
@@ -9,7 +9,7 @@
     Unterverzeichnis \Sys-db abgelegt: <BackupDirectory>\Sys-db.
 
     Job-Name wird aus der Modulkonfiguration (OlaJobNameSysDbBackup) gelesen.
-    Standard: 'FITS-SystemDatabases-FULL'.
+    Standard: 'OlaHH-SystemDatabases-FULL'.
 
 .PARAMETER SqlInstance
     SQL Server-Instanz. Standard: aktueller Computername.
@@ -71,7 +71,7 @@
 
 .NOTES
     Voraussetzungen: dbatools, Invoke-sqmLogging, Get-sqmConfig, Test-sqmOlaInstallation, Get-sqmSaLogin
-    Konfigurationsschluessel: OlaJobNameSysDbBackup (Default: 'FITS-SystemDatabases-FULL')
+    Konfigurationsschluessel: OlaJobNameSysDbBackup (Default: 'OlaHH-SystemDatabases-FULL')
 #>
 function New-sqmOlaSysDbBackupJob
 {
@@ -129,7 +129,7 @@ function New-sqmOlaSysDbBackupJob
 		$cfg = Get-sqmConfig
 		$effJobName = if ($JobName) { $JobName }
 		else { $cfg['OlaJobNameSysDbBackup'] }
-		if (-not $effJobName) { $effJobName = 'FITS-SystemDatabases-FULL' }
+		if (-not $effJobName) { $effJobName = 'OlaHH-SystemDatabases-FULL' }
 		
 		$result = [PSCustomObject]@{
 			SqlInstance	    = $SqlInstance
@@ -145,7 +145,7 @@ function New-sqmOlaSysDbBackupJob
 		if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
 		
 		$logDir = $cfg['LogPath']
-		if (-not $logDir) { $logDir = 'C:\system\WinSrvLog\MSSQL' }
+		if (-not $logDir) { $logDir = '$env:ProgramData\sqmSQLTool\Logs' }
 		$maintenanceLogDir = Join-Path $logDir 'MaintenanceLog'
 		$centralLogDir = $cfg['CentralPath']
 	}

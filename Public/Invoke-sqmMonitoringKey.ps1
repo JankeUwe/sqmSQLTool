@@ -33,7 +33,7 @@
 	begin
 	{
 		$functionName = $MyInvocation.MyCommand.Name
-		$regSubKey = "$RegistryBase\FITS\SystemCenter"
+		$regSubKey = "$RegistryBase\dtcSoftware\sqmSQLTool"
 		$regPath = "HKLM:\$regSubKey"
 		
 		$sqlToDword = @{ 'None' = 0; 'Standard' = 1; 'Full' = 2 }
