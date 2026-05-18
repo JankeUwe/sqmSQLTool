@@ -98,16 +98,32 @@ if ($existsUser -and $existsAll -and $Scope -eq 'AllUsers') {
 }
 
 # ---------------------------------------------------------------------------
-# 3. Admin-Check nur bei AllUsers (Nummer bleibt, intern konsistent)
+# 3. Scope-Hinweis und Admin-Check
 # ---------------------------------------------------------------------------
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+             [Security.Principal.WindowsBuiltInRole]'Administrator')
+
 if ($Scope -eq 'AllUsers') {
-    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
-                 [Security.Principal.WindowsBuiltInRole]'Administrator')
     if (-not $isAdmin) {
         Write-Warning "Scope 'AllUsers' requires Administrator rights."
         Write-Warning "Run Install.cmd as Administrator, or use:  .\Install.ps1  (installs for current user only)"
         exit 1
     }
+} else {
+    # CurrentUser — Hinweis auf systemweite Installation
+    Write-Host ""
+    if ($isAdmin) {
+        Write-Host "INFO: You are running as Administrator." -ForegroundColor Cyan
+        Write-Host "      Installing for the current user only ($env:USERNAME)." -ForegroundColor Cyan
+        Write-Host "      To install system-wide for ALL users, run:" -ForegroundColor Cyan
+        Write-Host "        Install.cmd AllUsers" -ForegroundColor White
+    } else {
+        Write-Host "INFO: Installing for the current user only ($env:USERNAME)." -ForegroundColor Cyan
+        Write-Host "      To install system-wide for ALL users, re-run as Administrator:" -ForegroundColor Cyan
+        Write-Host "        Right-click Install.cmd > 'Run as administrator'" -ForegroundColor White
+        Write-Host "        or: Install.cmd AllUsers  (in an elevated PowerShell)" -ForegroundColor White
+    }
+    Write-Host ""
 }
 
 # ---------------------------------------------------------------------------
