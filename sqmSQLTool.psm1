@@ -29,7 +29,7 @@ $script:sqmModuleConfig = @{
 	HpuDomainGroupMap     = @()
 	SsrsInstallerPath     = $null
 	AutoUpdate            = $true
-	UpdateRepository      = $null
+	UpdateRepository      = 'W:\75084-Datenbanken\MSSQL\DEV\sqmSQLTool'
 	ModuleVersion         = '1.0.0'
 	Language              = 'de-DE'
 }
