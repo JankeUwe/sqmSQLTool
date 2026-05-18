@@ -1,42 +1,41 @@
 ﻿<#
 .SYNOPSIS
-    Verschleiert das SA-Konto auf einer SQL Server-Instanz durch Umbenennung,
-    Deaktivierung und Setzen eines zufaelligen Kennworts.
+    Obfuscates the SA account on a SQL Server instance by renaming it, disabling it, and setting a random password.
 
 .DESCRIPTION
-    Fuehrt folgende Schritte aus:
-    1. Prueft, ob mindestens ein weiteres aktives Login mit sysadmin-Rechten existiert (sonst Abbruch).
-    2. Ermittelt das SA-Konto ueber die feste SID 0x01 (umbenennungssicher).
-    3. Generiert ein sicheres Zufallskennwort (konfigurierbare Laenge).
-    4. Setzt das neue Kennwort.
-    5. Benennt das Konto um (Standard 'sqmsa').
-    6. Deaktiviert das Konto.
+    Performs the following steps:
+    1. Checks that at least one other active login with sysadmin rights exists (aborts otherwise).
+    2. Identifies the SA account via its fixed SID 0x01 (rename-safe).
+    3. Generates a secure random password (configurable length).
+    4. Sets the new password.
+    5. Renames the account (default: 'sqmsa').
+    6. Disables the account.
 
-    Das generierte Kennwort wird im Rueckgabeobjekt zurueckgegeben - der Aufrufer ist fuer die sichere Verwahrung verantwortlich.
+    The generated password is returned in the output object — the caller is responsible for storing it securely.
 
 .PARAMETER SqlInstance
-    Ziel-SQL-Instanz(en). Pipeline-faehig. Standard: aktueller Computername.
+    Target SQL Server instance(s). Pipeline-capable. Default: current computer name.
 
 .PARAMETER SqlCredential
-    Optionales PSCredential fuer die SQL-Verbindung.
+    Optional PSCredential for the SQL connection.
 
 .PARAMETER NewName
-    Neuer Name fuer das SA-Konto. Standard: 'sqmsa'.
+    New name for the SA account. Default: 'sqmsa'.
 
 .PARAMETER PasswordLength
-    Laenge des zufaelligen Kennworts (12-128). Standard: 18.
+    Length of the random password (12-128). Default: 18.
 
 .PARAMETER ContinueOnError
-    Bei Fehler auf einer Instanz fortfahren (ansonsten Abbruch).
+    Continue with the next instance on error (otherwise aborts).
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen (ueberschreibt ContinueOnError).
+    Throw exceptions immediately (overrides ContinueOnError).
 
 .PARAMETER Confirm
-    Fordert Bestaetigung vor kritischen aenderungen an (Standard: aus).
+    Prompts for confirmation before critical changes (default: off).
 
 .PARAMETER WhatIf
-    Zeigt, was passieren wuerde, ohne aenderungen vorzunehmen.
+    Shows what would happen without making any changes.
 
 .EXAMPLE
     Invoke-sqmSaObfuscation -SqlInstance "SQL01"
@@ -45,8 +44,8 @@
     Invoke-sqmSaObfuscation -SqlInstance "SQL01" -NewName "hidden_sa" -PasswordLength 24
 
 .NOTES
-    Voraussetzungen: dbatools, Invoke-sqmLogging
-    Das generierte Kennwort wird nur im Rueckgabeobjekt ausgegeben - nicht in Dateien speichern!
+    Prerequisites: dbatools, Invoke-sqmLogging
+    The generated password is only returned in the output object — do not store it in files!
 #>
 function Invoke-sqmSaObfuscation
 {

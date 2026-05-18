@@ -2,100 +2,98 @@
 {
     <#
     .SYNOPSIS
-        Konfiguriert SQL Server Reporting Services (SSRS) vollautomatisch.
-        Unterstuetzt lokale und Remote-Installation sowie AlwaysOn-Umgebungen.
+        Configures SQL Server Reporting Services (SSRS) fully automatically.
+        Supports local and remote installation as well as AlwaysOn environments.
 
     .DESCRIPTION
-        Fuehrt eine vollstaendige SSRS-Erst- oder Neukonfiguration durch.
-        Unterstuetzt Native Mode und SharePoint Integrated Mode (automatische Erkennung).
+        Performs a complete initial or re-configuration of SSRS.
+        Supports Native Mode and SharePoint Integrated Mode (automatic detection).
 
-        Konfigurierte Bereiche (einzeln deaktivierbar):
-        - Dienstkonto (SetWindowsServiceIdentity)
-        - Datenbank (anlegen, Rechte vergeben, Verbindung setzen)
-        - URLs (ReportServer Web Service + Portal, nur Native Mode)
-        - Verschluesselungsschluessel (BackupEncryptionKey)
+        Configurable areas (individually disableable):
+        - Service account (SetWindowsServiceIdentity)
+        - Database (create, grant permissions, set connection)
+        - URLs (ReportServer Web Service + Portal, Native Mode only)
+        - Encryption key (BackupEncryptionKey)
 
-        Bei AlwaysOn Availability Groups (AG) wird der Datenbankserver automatisch
-        als Listener erkannt; die DB-Erstellung erfolgt auf dem Primary-Replikat,
-        die Verbindung wird auf den Listener konfiguriert.
+        For AlwaysOn Availability Groups (AG), the database server is automatically
+        detected as a listener; the DB is created on the primary replica and the
+        connection is configured to point to the listener.
 
-        Optional kann eine Policy-Based Management (PBM) Policy (z.B. 'Password Policy')
-        vor der Datenbankerstellung deaktiviert und danach wieder aktiviert werden.
+        Optionally, a Policy-Based Management (PBM) policy (e.g. 'Password Policy')
+        can be disabled before database creation and re-enabled after successful configuration.
 
     .PARAMETER ComputerName
-        SSRS-Server (lokal oder remote). Standard: $env:COMPUTERNAME.
+        SSRS server (local or remote). Default: $env:COMPUTERNAME.
 
     .PARAMETER InstanceName
-        SSRS-Instanzname. Standard: 'MSSQLSERVER'.
+        SSRS instance name. Default: 'MSSQLSERVER'.
 
     .PARAMETER DatabaseServer
-        SQL Server-Instanz oder AG-Listener fuer die ReportServer-Datenbank.
-        Standard: $ComputerName.
+        SQL Server instance or AG listener for the ReportServer database.
+        Default: $ComputerName.
 
     .PARAMETER DatabaseName
-        Name der ReportServer-Hauptdatenbank. Standard: 'ReportServer'.
+        Name of the ReportServer main database. Default: 'ReportServer'.
 
     .PARAMETER ReportServerUrl
-        URL fuer den ReportServer Web Service. Standard: 'http://+:80/ReportServer'
+        URL for the ReportServer Web Service. Default: 'http://+:80/ReportServer'
 
     .PARAMETER ReportsUrl
-        URL fuer den Reports-Manager / Web Portal. Standard: 'http://+:80/Reports'
+        URL for the Reports Manager / Web Portal. Default: 'http://+:80/Reports'
 
     .PARAMETER ServiceAccount
-        Windows-Dienstkonto fuer SSRS (z.B. 'DOMAIN\user' oder 'NT SERVICE\...').
+        Windows service account for SSRS (e.g. 'DOMAIN\user' or 'NT SERVICE\...').
 
     .PARAMETER ServiceAccountPassword
-        Kennwort fuer -ServiceAccount (SecureString). Nicht noetig bei Dienstkonten.
+        Password for -ServiceAccount (SecureString). Not needed for managed service accounts.
 
     .PARAMETER DatabaseAuthType
-        Authentifizierung fuer die DB-Verbindung: 'Windows' (Standard) oder 'SQL'.
+        Authentication for the DB connection: 'Windows' (default) or 'SQL'.
 
     .PARAMETER DatabaseCredential
-        PSCredential fuer SQL-Authentifizierung (nur bei -DatabaseAuthType SQL).
+        PSCredential for SQL authentication (only with -DatabaseAuthType SQL).
 
     .PARAMETER EncryptionKeyFile
-        Pfad fuer das Encryption Key Backup (.snk). Ohne Angabe wird die Datei
-        im OutputPath mit Namen 'SsrsEncryptionKey_<Instanz>_<Datum>.snk' abgelegt.
+        Path for the encryption key backup (.snk). If not specified, the file is stored
+        in OutputPath with the name 'SsrsEncryptionKey_<Instance>_<Date>.snk'.
 
     .PARAMETER EncryptionKeyPassword
-        Kennwort zum Schutz der Schluesseldatei (SecureString). Pflicht wenn
-        ein Backup erstellt werden soll.
+        Password to protect the key file (SecureString). Required when a backup is to be created.
 
     .PARAMETER PbmPolicyName
-        Name einer Policy-Based Management Policy (z.B. 'Password Policy'), die
-        vor dem Erstellen der Datenbank deaktiviert und nach erfolgreicher
-        Konfiguration wieder aktiviert wird.
+        Name of a Policy-Based Management policy (e.g. 'Password Policy') that is
+        disabled before database creation and re-enabled after successful configuration.
 
     .PARAMETER SkipDatabase
-        Datenbankkonfiguration ueberspringen.
+        Skip database configuration.
 
     .PARAMETER SkipUrls
-        URL-Konfiguration ueberspringen (nur Native Mode).
+        Skip URL configuration (Native Mode only).
 
     .PARAMETER SkipServiceAccount
-        Dienstkonto-Konfiguration ueberspringen.
+        Skip service account configuration.
 
     .PARAMETER SkipEncryptionKeyBackup
-        Encryption Key Backup ueberspringen.
+        Skip encryption key backup.
 
     .PARAMETER Credential
-        PSCredential fuer die WinRM-Verbindung (nur bei Remote-Betrieb).
+        PSCredential for the WinRM connection (remote operation only).
 
     .PARAMETER OutputPath
-        Ausgabeverzeichnis fuer den Konfigurationsbericht und ggf. Schluesseldatei.
-        Standard: Get-sqmDefaultOutputPath.
+        Output directory for the configuration report and optionally the key file.
+        Default: Get-sqmDefaultOutputPath.
 
     .PARAMETER ContinueOnError
-        Bei Fehler mit naechstem Schritt fortfahren (selten verwendet).
+        Continue with the next step on error (rarely used).
 
     .PARAMETER EnableException
-        Ausnahmen sofort ausloesen.
+        Throw exceptions immediately.
 
     .PARAMETER Confirm
-        Bestaetigung vor der Ausfuehrung anfordern.
+        Request confirmation before execution.
 
     .PARAMETER WhatIf
-        Zeigt, was passieren wuerde, ohne aenderungen vorzunehmen.
+        Shows what would happen without making any changes.
 
     .EXAMPLE
         Set-sqmSsrsConfiguration
@@ -104,8 +102,8 @@
         Set-sqmSsrsConfiguration -ComputerName "SSRS01" -DatabaseServer "AG_Listener" -PbmPolicyName "Password Policy"
 
     .NOTES
-        Voraussetzungen: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Get-sqmConfig, Set-sqmSqlPolicyState
-        WMI-Namespace: root\Microsoft\SqlServer\ReportServer\<Instanz>\v<Version>\Admin
+        Prerequisites: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Get-sqmConfig, Set-sqmSqlPolicyState
+        WMI namespace: root\Microsoft\SqlServer\ReportServer\<Instance>\v<Version>\Admin
     #>
 	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]
 	[OutputType([PSCustomObject])]

@@ -1,17 +1,17 @@
 ﻿<#
 .SYNOPSIS
-    Gibt die aktuelle Modulkonfiguration zurueck.
+    Returns the current module configuration.
 
 .DESCRIPTION
-    Ohne Parameter wird die gesamte Konfiguration als Hashtable zurueckgegeben.
-    Mit -Key wird der Wert des angeforderten Schluessels geliefert.
-    Existiert der Schluessel nicht, erscheint eine Warnung und es wird $null zurueckgegeben.
+    Without parameters, the entire configuration is returned as a hashtable.
+    With -Key, the value of the requested key is returned.
+    If the key does not exist, a warning is shown and $null is returned.
 
-    HINWEIS: Die Initialisierung von $script:sqmModuleConfig erfolgt ausschliesslich
-    in sqmSQLTool.psm1. Diese Datei enthaelt nur die Funktion Get-sqmConfig.
+    NOTE: Initialization of $script:sqmModuleConfig is performed exclusively
+    in sqmSQLTool.psm1. This file contains only the Get-sqmConfig function.
 
 .PARAMETER Key
-    Name des Konfigurationsschluessels (z. B. 'LogPath', 'OutputPath', 'CentralPath').
+    Name of the configuration key (e.g. 'LogPath', 'OutputPath', 'CentralPath').
 
 .EXAMPLE
     Get-sqmConfig

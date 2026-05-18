@@ -1,38 +1,38 @@
 ﻿<#
 .SYNOPSIS
-    Fuehrt einen kontrollierten AlwaysOn AG-Failover mit Pre- und Post-Checks durch.
+    Performs a controlled AlwaysOn AG failover with pre- and post-checks.
 
 .DESCRIPTION
-    Prueft vor dem Failover: Synchronisierungsstatus, Redo-Queue-Groesse.
-    Fuehrt den Failover durch: ALTER AVAILABILITY GROUP ... FAILOVER auf dem Ziel-Sekundaer.
-    Prueft nach dem Failover: Neue Primary erreichbar, alle DBs SYNCHRONIZED.
+    Checks before failover: synchronization status, redo queue size.
+    Performs the failover: ALTER AVAILABILITY GROUP ... FAILOVER on the target secondary.
+    Checks after failover: new primary reachable, all DBs SYNCHRONIZED.
 
 .PARAMETER SqlInstance
-    Aktuelle PRIMARY-Instanz.
+    Current PRIMARY instance.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER AvailabilityGroup
-    Name der Availability Group.
+    Name of the availability group.
 
 .PARAMETER TargetReplica
-    Instanzname des Ziel-Replikats. Wenn nicht angegeben, wird das erste
-    SYNCHRONIZED Sekundaer-Replikat automatisch gewaehlt.
+    Instance name of the target replica. If not specified, the first
+    SYNCHRONIZED secondary replica is selected automatically.
 
 .PARAMETER MaxRedoQueueMB
-    Maximale Redo-Queue-Groesse in MB. Failover wird abgebrochen wenn ueberschritten.
-    Standard: 50 MB.
+    Maximum redo queue size in MB. Failover is aborted if exceeded.
+    Default: 50 MB.
 
 .PARAMETER WaitAfterFailoverSeconds
-    Wartezeit in Sekunden nach dem Failover-Befehl, bevor Post-Checks laufen.
-    Standard: 30 Sekunden.
+    Wait time in seconds after the failover command before post-checks run.
+    Default: 30 seconds.
 
 .PARAMETER ContinueOnError
-    Fehler nicht werfen, sondern im Ergebnisobjekt zurueckgeben.
+    Do not throw errors; return them in the result object instead.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
     Invoke-sqmFailover -SqlInstance "SQL01" -AvailabilityGroup "AG_Prod" -WhatIf
@@ -42,9 +42,9 @@
         -TargetReplica "SQL02" -MaxRedoQueueMB 10
 
 .NOTES
-    Erfordert: dbatools, Invoke-sqmLogging
-    Benoetigt ALTER AVAILABILITY GROUP auf der Instanz.
-    Fuehrt einen MANUELLEN Failover durch (kein Forced/Emergency Failover).
+    Requires: dbatools, Invoke-sqmLogging
+    Needs ALTER AVAILABILITY GROUP on the instance.
+    Performs a MANUAL failover (no forced/emergency failover).
 #>
 function Invoke-sqmFailover
 {

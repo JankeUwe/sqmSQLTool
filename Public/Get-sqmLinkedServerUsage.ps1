@@ -1,31 +1,31 @@
 ﻿<#
 .SYNOPSIS
-    Analysiert, welche Datenbankobjekte (Prozeduren, Funktionen, Sichten, Trigger, SQL Agent Jobs) auf Linked Server zugreifen.
+    Analyzes which database objects (procedures, functions, views, triggers, SQL Agent jobs) access linked servers.
 
 .DESCRIPTION
-    Durchsucht die Definitionen aller Benutzerdatenbanken nach Verweisen auf Linked Server.
-    Zeigt den aufgerufenen Linked Server, das Objekt und die Datenbank. Optional auch abhaengige Jobs.
+    Searches the definitions of all user databases for references to linked servers.
+    Shows the referenced linked server, the object and the database. Optionally includes dependent jobs.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (Standard: aktueller Computername).
+    SQL Server instance (default: current computer name).
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER LinkedServer
-    Name des Linked Servers (oder Wildcard). Standard: Alle.
+    Name of the linked server (or wildcard). Default: all.
 
 .PARAMETER IncludeJobs
-    Prueft auch SQL Agent Job-Schritte auf T?SQL mit Verwendung des Linked Servers.
+    Also checks SQL Agent job steps for T-SQL using the linked server.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
     Get-sqmLinkedServerUsage -SqlInstance "SQL01" -LinkedServer "PROD_SRV"
 
 .NOTES
-    Durchsucht sys.sql_modules und sys.syscomments mittels LIKE '%LinkedServer%'.
+    Searches sys.sql_modules and sys.syscomments using LIKE '%LinkedServer%'.
 #>
 function Get-sqmLinkedServerUsage
 {

@@ -1,55 +1,55 @@
 <#
 .SYNOPSIS
-    Sammelbericht zum Gesundheitszustand aller Datenbanken auf einer Instanz.
+    Aggregated health report for all databases on an instance.
 
 .DESCRIPTION
-    Prueft pro Datenbank:
-    - Recovery-Modell
-    - Letzte DBCC CHECKDB-Ausfuehrung und ob fehlerfrei
-    - Letzte Backup-Zeiten (Full / Diff / Log)
-    - AutoGrowth-Ereignisse der letzten -HistoryDays Tage (via Default Trace)
-    - VLF-Anzahl (uebermaessig fragmentierte Transaction-Log-Dateien)
-    - Datenbankgroesse (Data + Log)
-    - Datenbankstatus (Online, Suspect, Restoring, ...)
+    Checks per database:
+    - Recovery model
+    - Last DBCC CHECKDB execution and whether it was error-free
+    - Last backup times (Full / Diff / Log)
+    - AutoGrowth events in the last -HistoryDays days (via default trace)
+    - VLF count (excessively fragmented transaction log files)
+    - Database size (data + log)
+    - Database status (Online, Suspect, Restoring, ...)
 
-    Die Ergebnisse werden als TXT-Bericht und CSV-Datei im angegebenen Verzeichnis gespeichert.
-    Zusaetzlich gibt die Funktion ein Objekt mit den Detaildaten und den Dateipfaden zurueck.
+    Results are saved as TXT report and CSV file in the specified directory.
+    The function also returns an object with the detail data and file paths.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz(en). Pipeline-faehig. Standard: aktueller Computername.
+    SQL Server instance(s). Pipeline-capable. Default: current computer name.
 
 .PARAMETER SqlCredential
-    Optionales PSCredential fuer die Verbindung.
+    Optional PSCredential for the connection.
 
 .PARAMETER MaxCheckDbAgeDays
-    Maximales Alter der letzten fehlerfreien DBCC CHECKDB in Tagen. Standard: 14.
+    Maximum age in days of the last error-free DBCC CHECKDB. Default: 14.
 
 .PARAMETER MaxVlfCount
-    Warnschwelle fuer VLF-Anzahl pro Datenbank. Standard: 200.
+    Warning threshold for VLF count per database. Default: 200.
 
 .PARAMETER HistoryDays
-    Zeitraum fuer AutoGrowth-Auswertung in Tagen. Standard: 30.
+    Time range for AutoGrowth evaluation in days. Default: 30.
 
 .PARAMETER ExcludeDatabase
-    Datenbanken ausschliessen. Wildcards erlaubt.
+    Databases to exclude. Wildcards allowed.
 
 .PARAMETER IncludeSystemDatabases
-    System-Datenbanken (ausser tempdb) einbeziehen. Standard: $false.
+    Include system databases (except tempdb). Default: $false.
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer die Berichtsdateien. Standard: $env:ProgramData\sqmSQLTool\Logs
+    Output directory for report files. Default: $env:ProgramData\sqmSQLTool\Logs
 
 .PARAMETER ContinueOnError
-    Bei Fehler auf einer Instanz fortfahren (ansonsten wird der Fehler ausgeloest).
+    Continue on error for an instance (otherwise the error is thrown).
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen (ueberschreibt ContinueOnError).
+    Throw exceptions immediately (overrides ContinueOnError).
 
 .PARAMETER Confirm
-    Fordert vor dem Schreiben der Dateien eine Bestaetigung an.
+    Request confirmation before writing files.
 
 .PARAMETER WhatIf
-    Zeigt, welche Dateien erstellt wuerden, ohne sie tatsaechlich zu schreiben.
+    Shows which files would be created without actually writing them.
 
 .EXAMPLE
     Get-sqmDatabaseHealth
@@ -58,10 +58,10 @@
     Get-sqmDatabaseHealth -SqlInstance "SQL01" -IncludeSystemDatabases -OutputPath "D:\Reports"
 
 .NOTES
-    Autor:   MSSQLTools
-    Voraussetzungen: dbatools, Invoke-sqmLogging
-    Standard-Ausgabepfad: $env:ProgramData\sqmSQLTool\Logs
-    VLF-Abfrage benoetigt SQL Server 2016+ (sys.dm_db_log_info). Bei aelteren Versionen wird VLF-Status als 'Unknown' angezeigt.
+    Author:       MSSQLTools
+    Prerequisites: dbatools, Invoke-sqmLogging
+    Default output path: $env:ProgramData\sqmSQLTool\Logs
+    VLF query requires SQL Server 2016+ (sys.dm_db_log_info). On older versions VLF status is shown as 'Unknown'.
 #>
 function Get-sqmDatabaseHealth
 {

@@ -1,49 +1,46 @@
 ﻿<#
 .SYNOPSIS
-Aktiviert Automatic Seeding auf allen Replikaten einer Always On-Verfuegbarkeitsgruppe.
+Enables Automatic Seeding on all replicas of an Always On Availability Group.
 
 .DESCRIPTION
-Diese Funktion konfiguriert den Seeding-Modus aller Replikate einer oder mehrerer
-Verfuegbarkeitsgruppen auf "Automatic". Mit dem Schalter -All werden zwingend alle
-Verfuegbarkeitsgruppen auf der Instanz bearbeitet.
+Configures the seeding mode of all replicas of one or more Availability Groups to
+"Automatic". Using the -All switch forces processing of all Availability Groups on
+the instance.
 
-Wenn kein SqlInstance-Parameter angegeben wird, wird standardmaessig der aktuelle
-Computername ($env:COMPUTERNAME) verwendet. Diese Regel gilt fuer alle zukuenftigen
-Versionen.
+If the SqlInstance parameter is not specified, the current computer name
+($env:COMPUTERNAME) is used by default. This rule applies to all future versions.
 
 .PARAMETER SqlInstance
-Die Ziel-SQL Server-Instanz (z.B. "localhost", "SQL01\INSTANCE"). 
-Wenn nicht angegeben, wird der aktuelle Computername verwendet.
+The target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE").
+If not specified, the current computer name is used.
 
 .PARAMETER SqlCredential
-Alternative Anmeldeinformationen (PSCredential). Wenn nicht angegeben, wird
-Windows-Authentifizierung verwendet.
+Alternative credentials (PSCredential). If not specified, Windows authentication is used.
 
 .PARAMETER AvailabilityGroup
-Name der Verfuegbarkeitsgruppe(n). Wird ignoriert, wenn -All gesetzt ist.
+Name of the Availability Group(s). Ignored when -All is set.
 
 .PARAMETER All
-Wenn gesetzt, werden alle Verfuegbarkeitsgruppen auf der Instanz verarbeitet.
+When set, all Availability Groups on the instance are processed.
 
 .PARAMETER EnableException
-Schalter, um Ausnahmen durchzulassen (standardmaessig werden Fehler als Warnung
-protokolliert).
+Switch to propagate exceptions immediately (by default errors are logged as warnings).
 
 .EXAMPLE
-# Verwendet den aktuellen Computernamen als Standard
+# Uses the current computer name as default
 Invoke-sqmSqlAlwaysOnAutoseeding
 
 .EXAMPLE
-# Explizite Angabe einer Instanz
+# Explicit instance specification
 Invoke-sqmSqlAlwaysOnAutoseeding -SqlInstance "SQL01\INSTANCE"
 
 .EXAMPLE
-# Alle Gruppen auf dem aktuellen Computer
+# All groups on the current computer
 Invoke-sqmSqlAlwaysOnAutoseeding -All
 
 .NOTES
-Erfordert dbatools-Modul und eine vorhandene Funktion Invoke-sqmLogging.
-Default fuer SqlInstance: $env:COMPUTERNAME (gilt fuer alle zukuenftigen Versionen).
+Requires the dbatools module and an existing Invoke-sqmLogging function.
+Default for SqlInstance: $env:COMPUTERNAME (applies to all future versions).
 #>
 
 function Invoke-sqmSqlAlwaysOnAutoseeding

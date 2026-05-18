@@ -1,83 +1,83 @@
 ﻿<#
 .SYNOPSIS
-    Erstellt ein neues selbstsigniertes SQL Server-Zertifikat als Erneuerung eines bestehenden.
+    Creates a new self-signed SQL Server certificate as a renewal of an existing one.
 
 .DESCRIPTION
-    Liest alle relevanten Eigenschaften des bestehenden Zertifikats (Subject, Verwendungszweck,
-    Endpoint-Bindung, TDE-Bindung) und erstellt auf dieser Basis ein neues selbstsigniertes
-    Zertifikat direkt in SQL Server per CREATE CERTIFICATE.
+    Reads all relevant properties of the existing certificate (Subject, purpose,
+    endpoint binding, TDE binding) and creates a new self-signed certificate directly
+    in SQL Server using CREATE CERTIFICATE.
 
-    Ablauf:
-      1. Bestehendes Zertifikat lesen und Verwendungszweck ermitteln
-      2. Altes Zertifikat als .cer + Private Key als .pvk sichern (BackupPath)
-      3. Neues Zertifikat mit gleichen Eigenschaften, neuem Ablaufdatum erstellen
-      4. Je nach Zweck automatisch einbinden:
-           AlwaysOn  ? ALTER ENDPOINT ... AUTHENTICATION = CERTIFICATE <neu>
-           TDE       ? ALTER DATABASE ... SET ENCRYPTION KEY ... CERTIFICATE <neu>
-           Broker    ? ALTER ENDPOINT ... AUTHENTICATION = CERTIFICATE <neu>
-      5. Altes Zertifikat umbenennen (Suffix _OLD_<datum>) - nicht loeschen
-      6. Bestelldatenblatt als TXT ausgeben (Subject, Thumbprint alt/neu, Bindungen)
+    Process:
+      1. Read existing certificate and determine its purpose
+      2. Back up old certificate as .cer + private key as .pvk (BackupPath)
+      3. Create new certificate with same properties and new expiry date
+      4. Automatically bind based on purpose:
+           AlwaysOn  -> ALTER ENDPOINT ... AUTHENTICATION = CERTIFICATE <new>
+           TDE       -> ALTER DATABASE ... SET ENCRYPTION KEY ... CERTIFICATE <new>
+           Broker    -> ALTER ENDPOINT ... AUTHENTICATION = CERTIFICATE <new>
+      5. Rename old certificate (suffix _OLD_<date>) — do not delete
+      6. Output order data sheet as TXT (Subject, thumbprint old/new, bindings)
 
-    HINWEIS: Fuer AlwaysOn muss das neue Zertifikat anschliessend auf alle Replikat-Instanzen
-    verteilt werden. Die Funktion gibt die notwendigen Schritte als Anleitung aus.
+    NOTE: For AlwaysOn, the new certificate must subsequently be distributed to all
+    replica instances. The function outputs the necessary steps as instructions.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (Standard: aktueller Computername).
+    SQL Server instance (default: current computer name).
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER CertificateName
-    Name des zu erneuernden Zertifikats (exakter Name aus sys.certificates).
+    Name of the certificate to renew (exact name from sys.certificates).
 
 .PARAMETER Database
-    Datenbank in der das Zertifikat liegt. Standard: master.
+    Database where the certificate resides. Default: master.
 
 .PARAMETER NewCertificateName
-    Name des neuen Zertifikats. Standard: <AlterName>_<Jahr> (z.B. AG_CERT_2027).
+    Name of the new certificate. Default: <OldName>_<Year> (e.g. AG_CERT_2027).
 
 .PARAMETER ValidityYears
-    Gueltigkeitsdauer des neuen Zertifikats in Jahren. Standard: 5.
+    Validity period of the new certificate in years. Default: 5.
 
 .PARAMETER BackupPath
-    Pfad fuer die Sicherung des alten Zertifikats (.cer und .pvk).
-    Standard: aus Modulkonfiguration (OutputPath).
+    Path for backing up the old certificate (.cer and .pvk).
+    Default: from module configuration (OutputPath).
 
 .PARAMETER BackupEncryptionPassword
-    Passwort fuer die Verschluesselung des exportierten Private Keys (.pvk).
-    Pflichtfeld wenn das alte Zertifikat einen Private Key hat.
+    Password for encrypting the exported private key (.pvk).
+    Required when the old certificate has a private key.
 
 .PARAMETER RenameOldCertificate
-    Altes Zertifikat nach der Erneuerung umbenennen (Suffix _OLD_<datum>). Standard: $true.
+    Rename the old certificate after renewal (suffix _OLD_<date>). Default: $true.
 
 .PARAMETER BindEndpoint
-    Neues Zertifikat automatisch an den bestehenden Endpoint binden (AlwaysOn/Broker).
-    Standard: $false - explizit bestaetigen.
+    Automatically bind the new certificate to the existing endpoint (AlwaysOn/Broker).
+    Default: $false — must be explicitly confirmed.
 
 .PARAMETER BindTde
-    Neues Zertifikat automatisch fuer TDE-verschluesselte Datenbanken aktivieren.
-    Standard: $false - explizit bestaetigen.
+    Automatically activate the new certificate for TDE-encrypted databases.
+    Default: $false — must be explicitly confirmed.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
-    # Einfache Erneuerung ohne automatische Bindung
+    # Simple renewal without automatic binding
     New-sqmSqlCertificate -SqlInstance "SQL01" -CertificateName "AG_CERT" -BackupEncryptionPassword (Read-Host -AsSecureString)
 
 .EXAMPLE
-    # Mit automatischer Endpoint-Bindung und 10 Jahren Laufzeit
+    # With automatic endpoint binding and 10-year validity
     New-sqmSqlCertificate -SqlInstance "SQL01" -CertificateName "AG_CERT" `
         -ValidityYears 10 -BindEndpoint `
         -BackupEncryptionPassword (Read-Host -AsSecureString "Backup-Passwort")
 
 .EXAMPLE
-    # TDE-Zertifikat erneuern
+    # Renew TDE certificate
     New-sqmSqlCertificate -SqlInstance "SQL01" -CertificateName "TDE_PROD" `
         -BindTde -BackupEncryptionPassword (Read-Host -AsSecureString "Backup-Passwort")
 
 .NOTES
-    Erfordert: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath
+    Requires: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath
     Benoetigt: sysadmin auf der Instanz
     AlwaysOn: Nach Erneuerung muss das neue Zertifikat (.cer) auf alle Replikate uebertragen
     und dort per CREATE CERTIFICATE ... FROM FILE installiert werden (Install-sqmCertificate).

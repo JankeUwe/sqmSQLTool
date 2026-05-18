@@ -1,44 +1,44 @@
 ﻿<#
 .SYNOPSIS
-    Erstellt eine vollstaendige Inventarisierung einer SQL Server-Instanz als strukturierten Bericht (TXT + CSV).
+    Creates a complete inventory of a SQL Server instance as a structured report (TXT + CSV).
 
 .DESCRIPTION
-    Dokumentiert folgende Bereiche:
-    - Instanz (Version, Edition, Patch-Level, Collation, Speicher, CPU, sp_configure)
-    - Datenbanken (Name, Status, Recovery, Groesse, letzte Backups, Owner, Collation)
-    - Logins (Name, Typ, Status, Serverrollen)
-    - Linked Server
-    - SQL Agent Jobs (Name, Status, Owner, Schedules, letzte Ausfuehrung)
-    - Always On (AGs, Replikate, Listener)
+    Documents the following areas:
+    - Instance (version, edition, patch level, collation, memory, CPU, sp_configure)
+    - Databases (name, status, recovery, size, last backups, owner, collation)
+    - Logins (name, type, status, server roles)
+    - Linked servers
+    - SQL Agent jobs (name, status, owner, schedules, last execution)
+    - Always On (AGs, replicas, listeners)
 
-    Die Ausgabe erfolgt als:
-    - TXT-Datei mit lesbarem Bericht
-    - CSV-Datei mit der Datenbankliste
+    Output is generated as:
+    - TXT file with readable report
+    - CSV file with the database list
 
-    Standard-Ausgabepfad wird aus der Modulkonfiguration (OutputPath) gelesen.
-    Wenn konfiguriert, werden die Dateien zusaetzlich in den CentralPath kopiert.
+    Default output path is read from the module configuration (OutputPath).
+    If configured, files are additionally copied to CentralPath.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz(en). Pipeline-faehig. Standard: aktueller Computername.
+    SQL Server instance(s). Pipeline-capable. Default: current computer name.
 
 .PARAMETER SqlCredential
-    Optionaler PSCredential fuer die Verbindung.
+    Optional PSCredential for the connection.
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer die Berichtsdateien.
-    Standard: Wert aus Modulkonfiguration (Get-sqmDefaultOutputPath).
+    Output directory for report files.
+    Default: value from module configuration (Get-sqmDefaultOutputPath).
 
 .PARAMETER ContinueOnError
-    Bei Fehler auf einer Instanz fortfahren (sonst Abbruch).
+    Continue on error for an instance (otherwise abort).
 
 .PARAMETER EnableException
-    Ausnahmen durchlassen (fuer erweiterte Fehlerbehandlung).
+    Allow exceptions to pass through (for advanced error handling).
 
 .PARAMETER Confirm
-    Bestaetigung vor der Erstellung anfordern.
+    Request confirmation before creation.
 
 .PARAMETER WhatIf
-    Nur testen, keine Dateien schreiben.
+    Test only, do not write files.
 
 .EXAMPLE
     Invoke-sqmInstanceInventory
@@ -47,8 +47,8 @@
     Invoke-sqmInstanceInventory -SqlInstance "SQL01", "SQL02" -ContinueOnError
 
 .NOTES
-    Erfordert dbatools und Invoke-sqmLogging.
-    Die Funktion erstellt automatisch das Ausgabeverzeichnis, falls es nicht existiert.
+    Requires dbatools and Invoke-sqmLogging.
+    The function automatically creates the output directory if it does not exist.
 #>
 function Invoke-sqmInstanceInventory
 {

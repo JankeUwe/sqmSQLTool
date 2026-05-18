@@ -1,60 +1,60 @@
 ﻿<#
 .SYNOPSIS
-    Erstellt einen vollstaendigen Bericht ueber SQL Server-Zertifikate und deren Ablaufdaten.
+    Creates a comprehensive report on SQL Server certificates and their expiration dates.
 
 .DESCRIPTION
-    Prueft auf einer oder mehreren Instanzen alle sicherheitsrelevanten Zertifikate:
+    Checks all security-relevant certificates on one or more instances:
 
     MASTER KEY
-      - Prueft ob ein Database Master Key in master vorhanden ist (Voraussetzung fuer Zertifikate)
-      - Prueft ob der DMK mit dem Service Master Key verschluesselt ist (wichtig fuer automatischen Start)
+      - Checks whether a Database Master Key exists in master (required for certificates)
+      - Checks whether the DMK is encrypted by the Service Master Key (important for automatic startup)
 
-    INSTANZ-ZERTIFIKATE (sys.certificates in master)
-      - AlwaysOn-Endpoint-Zertifikate (Hadr_endpoint)
-      - Service Broker-Zertifikate
-      - Backup-Verschluesselungszertifikate
-      - Alle weiteren Zertifikate in master
+    INSTANCE CERTIFICATES (sys.certificates in master)
+      - AlwaysOn endpoint certificates (Hadr_endpoint)
+      - Service Broker certificates
+      - Backup encryption certificates
+      - All other certificates in master
 
-    TDE-ZERTIFIKATE (Transparent Data Encryption)
-      - Pro verschluesselter Datenbank: welches Zertifikat, Ablaufdatum, Encryption State
+    TDE CERTIFICATES (Transparent Data Encryption)
+      - Per encrypted database: which certificate, expiration date, encryption state
 
-    DATENBANK-ZERTIFIKATE
-      - Zertifikate in User-Datenbanken (z.B. fuer Column Encryption, Signing)
+    DATABASE CERTIFICATES
+      - Certificates in user databases (e.g. for column encryption, signing)
 
-    PRO ZERTIFIKAT:
-      - Name, Typ, Aussteller, Subject
-      - Ablaufdatum mit Ampel-Status (OK / Warning / Critical / Expired)
-      - Verbleibende Tage bis Ablauf
-      - Verwendungszweck (AlwaysOn / TDE / ServiceBroker / Backup / UserDefined)
-      - Ob der private Schluessel vorhanden und verschluesselt ist
+    PER CERTIFICATE:
+      - Name, type, issuer, subject
+      - Expiration date with traffic-light status (OK / Warning / Critical / Expired)
+      - Remaining days until expiration
+      - Purpose (AlwaysOn / TDE / ServiceBroker / Backup / UserDefined)
+      - Whether the private key is present and encrypted
       - Thumbprint
 
-    Die Ergebnisse werden als TXT-Bericht und CSV im konfigurierten OutputPath gespeichert.
-    Zusaetzlich wird eine gefilterte CSV nur mit ablaufenden/abgelaufenen Zertifikaten erzeugt.
+    Results are saved as TXT report and CSV in the configured OutputPath.
+    An additional filtered CSV is generated containing only expiring/expired certificates.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz(en). Pipeline-faehig. Standard: aktueller Computername.
+    SQL Server instance(s). Pipeline-capable. Default: current computer name.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER WarningThresholdDays
-    Zertifikate die in weniger als diesem Wert ablaufen, erhalten Status 'Warning'. Standard: 90.
+    Certificates expiring in less than this number of days receive status 'Warning'. Default: 90.
 
 .PARAMETER CriticalThresholdDays
-    Zertifikate die in weniger als diesem Wert ablaufen, erhalten Status 'Critical'. Standard: 30.
+    Certificates expiring in less than this number of days receive status 'Critical'. Default: 30.
 
 .PARAMETER IncludeUserDatabases
-    Auch Zertifikate in User-Datenbanken einbeziehen. Standard: $false.
+    Also include certificates in user databases. Default: $false.
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer Berichtsdateien. Standard: aus Modulkonfiguration.
+    Output directory for report files. Default: from module configuration.
 
 .PARAMETER ContinueOnError
-    Bei Fehler auf einer Instanz fortfahren statt abzubrechen.
+    Continue on error for an instance instead of aborting.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
     Get-sqmCertificateReport
@@ -63,21 +63,21 @@
     Get-sqmCertificateReport -SqlInstance "SQL01","SQL02" -WarningThresholdDays 180
 
 .EXAMPLE
-    # Nur ablaufende Zertifikate anzeigen
+    # Show only expiring certificates
     Get-sqmCertificateReport -SqlInstance "SQL01" |
         Select-Object -ExpandProperty Certificates |
         Where-Object { $_.ExpiryStatus -ne 'OK' } |
         Select-Object SqlInstance, DatabaseName, CertificateName, ExpiryDate, DaysRemaining, ExpiryStatus, Purpose
 
 .EXAMPLE
-    # Pipeline ueber mehrere Instanzen
+    # Pipeline across multiple instances
     'SQL01','SQL02','SQL03' | Get-sqmCertificateReport -OutputPath "D:\Reports\Certs"
 
 .NOTES
-    Erfordert: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath
-    Benoetigt VIEW ANY DEFINITION und VIEW SERVER STATE.
-    TDE-Pruefung liest sys.dm_database_encryption_keys (benoetigt VIEW DATABASE STATE).
-    AlwaysOn-Endpoint-Erkennung ueber sys.database_mirroring_endpoints und sys.service_broker_endpoints.
+    Requires: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath
+    Needs VIEW ANY DEFINITION and VIEW SERVER STATE.
+    TDE check reads sys.dm_database_encryption_keys (requires VIEW DATABASE STATE).
+    AlwaysOn endpoint detection via sys.database_mirroring_endpoints and sys.service_broker_endpoints.
 #>
 function Get-sqmCertificateReport
 {

@@ -1,37 +1,37 @@
 ﻿<#
 .SYNOPSIS
-Fuegt eine oder mehrere Datenbanken zu einer Always On-Verfuegbarkeitsgruppe hinzu (AutoSeed).
+Adds one or more databases to an Always On availability group (AutoSeed).
 
 .DESCRIPTION
-- Prueft, ob die Datenbank bereits in einer AG ist.
-- Stellt den Recovery-Modus auf Full (falls noetig).
-- Loescht vorhandene Datenbanken auf allen sekundaeren Replikaten.
-- Fuegt die Datenbank mit Automatic Seeding zur AG hinzu.
-- Bei -All werden die Datenbanken sequentiell hinzugefuegt, um Last zu vermeiden.
+- Checks whether the database is already in an AG.
+- Sets recovery mode to Full (if necessary).
+- Drops existing databases on all secondary replicas.
+- Adds the database to the AG using Automatic Seeding.
+- With -All, databases are added sequentially to avoid load spikes.
 
 .PARAMETER SqlInstance
-Primaere SQL-Instanz (Standard: Computername).
+Primary SQL instance (default: computer name).
 
 .PARAMETER SqlCredential
-Anmeldeinformationen.
+Credentials.
 
 .PARAMETER AvailabilityGroup
-Name der Ziel-Verfuegbarkeitsgruppe (Pflicht).
+Name of the target availability group (mandatory).
 
 .PARAMETER Database
-Name oder Array von Datenbanken. Wird ignoriert, wenn -All gesetzt ist.
+Name or array of databases. Ignored when -All is set.
 
 .PARAMETER All
-Alle Benutzerdatenbanken (die noch nicht in einer AG sind) hinzufuegen.
+Add all user databases that are not yet in an AG.
 
 .PARAMETER EnableException
-Ausnahmen durchlassen.
+Allow exceptions to pass through.
 
 .PARAMETER Confirm
-Bestaetigung anfordern.
+Request confirmation.
 
 .PARAMETER WhatIf
-Nur testen.
+Test only (no changes).
 
 .EXAMPLE
 Add-sqmDatabaseToAvailabilityGroup -AvailabilityGroup "AG1" -Database "SalesDB"
@@ -40,7 +40,7 @@ Add-sqmDatabaseToAvailabilityGroup -AvailabilityGroup "AG1" -Database "SalesDB"
 Add-sqmDatabaseToAvailabilityGroup -AvailabilityGroup "AG1" -All
 
 .NOTES
-Setzt Automatic Seeding auf allen Replikaten voraus (kann separat mit Invoke-sqmSqlAlwaysOnAutoseeding aktiviert werden).
+Requires Automatic Seeding on all replicas (can be enabled separately with Invoke-sqmSqlAlwaysOnAutoseeding).
 #>
 function Invoke-sqmAddDatabaseToAG
 	

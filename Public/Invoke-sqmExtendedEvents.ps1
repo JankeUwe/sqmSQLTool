@@ -1,117 +1,117 @@
 ﻿<#
 .SYNOPSIS
-    Verwaltet Extended Events Sessions fuer die Performance-Analyse auf SQL Server.
+    Manages Extended Events sessions for performance analysis on SQL Server.
 
 .DESCRIPTION
-    Erstellt, startet, stoppt, liest und wertet Extended Events Sessions aus.
+    Creates, starts, stops, reads and evaluates Extended Events sessions.
 
-    Betriebsarten (Switches, kombinierbar):
-      -Create    Legt eine neue XEvent-Session anhand eines Templates an.
-      -Start     Startet eine vorhandene (oder neu erstellte) Session.
-      -Stop      Stoppt eine laufende Session.
-      -Read      Liest Ereignisse aus dem XEL-Ringpuffer oder einer Datei aus.
-      -Diagnose  Aggregiert Ereignisse und erkennt Muster (Top Waits, Blocking-Ketten,
-                 Slow Queries, Deadlocks).
-      -Drop      Entfernt eine Session vollstaendig (inkl. XEL-Dateien).
+    Operating modes (switches, combinable):
+      -Create    Creates a new XEvent session based on a template.
+      -Start     Starts an existing (or newly created) session.
+      -Stop      Stops a running session.
+      -Read      Reads events from the XEL ring buffer or a file.
+      -Diagnose  Aggregates events and detects patterns (top waits, blocking chains,
+                 slow queries, deadlocks).
+      -Drop      Removes a session completely (including XEL files).
 
-    Wenn kein Switch angegeben wird, werden -Read und -Diagnose ausgefuehrt.
+    If no switch is specified, -Read and -Diagnose are executed.
 
-    Verfuegbare Session-Templates:
-      SlowQueries   sql_statement_completed > Schwellwert (Standard: 1000 ms)
+    Available session templates:
+      SlowQueries   sql_statement_completed > threshold (default: 1000 ms)
       Blocking      blocked_process_report
-      Waits         wait_info mit konfigurierbarer Warteliste
+      Waits         wait_info with configurable wait list
       Deadlocks     xml_deadlock_report
-      AllInOne      Kombiniert alle vier Templates in einer Session
+      AllInOne      Combines all four templates in one session
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz. Standard: aktueller Computername.
+    SQL Server instance. Default: current computer name.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER SessionName
-    Name der XEvent-Session. Standard: 'sqmPerformance'.
+    Name of the XEvent session. Default: 'sqmPerformance'.
 
 .PARAMETER Template
-    Session-Template beim Erstellen. Werte: SlowQueries, Blocking, Waits, Deadlocks, AllInOne.
-    Standard: AllInOne.
+    Session template when creating. Values: SlowQueries, Blocking, Waits, Deadlocks, AllInOne.
+    Default: AllInOne.
 
 .PARAMETER SlowQueryThresholdMs
-    Minimale Ausfuehrungsdauer in Millisekunden fuer SlowQueries-Capture. Standard: 1000.
+    Minimum execution duration in milliseconds for SlowQueries capture. Default: 1000.
 
 .PARAMETER WaitTypes
-    Komma-getrennte Liste von Wait Types fuer das Waits-Template.
-    Standard: LCK_M_X,LCK_M_S,LCK_M_U,PAGEIOLATCH_SH,PAGEIOLATCH_EX,CXPACKET,SOS_SCHEDULER_YIELD
+    Comma-separated list of wait types for the Waits template.
+    Default: LCK_M_X,LCK_M_S,LCK_M_U,PAGEIOLATCH_SH,PAGEIOLATCH_EX,CXPACKET,SOS_SCHEDULER_YIELD
 
 .PARAMETER TargetType
-    Zieltyp fuer die Ereignisspeicherung: RingBuffer oder File. Standard: RingBuffer.
+    Target type for event storage: RingBuffer or File. Default: RingBuffer.
 
 .PARAMETER TargetFilePath
-    Verzeichnis fuer XEL-Dateien (nur bei TargetType = File).
-    Standard: aus Modulkonfiguration OutputPath + \XEvents.
+    Directory for XEL files (only for TargetType = File).
+    Default: from module configuration OutputPath + \XEvents.
 
 .PARAMETER MaxFileSizeMB
-    Maximale Groesse einer XEL-Datei (MB). Standard: 100.
+    Maximum size of an XEL file (MB). Default: 100.
 
 .PARAMETER MaxRolloverFiles
-    Anzahl der XEL-Rollover-Dateien. Standard: 5.
+    Number of XEL rollover files. Default: 5.
 
 .PARAMETER RingBufferMaxMB
-    Maximale Groesse des RingBuffers (MB). Standard: 50.
+    Maximum size of the ring buffer (MB). Default: 50.
 
 .PARAMETER MaxEventsRead
-    Maximale Anzahl Ereignisse beim Lesen. Standard: 10000.
+    Maximum number of events when reading. Default: 10000.
 
 .PARAMETER LookbackMinutes
-    Zeitfenster fuer Diagnose-Aggregation in Minuten. Standard: 60.
+    Time window for diagnostic aggregation in minutes. Default: 60.
 
 .PARAMETER TopN
-    Anzahl der Top-Eintraege in Diagnose-Tabellen. Standard: 25.
+    Number of top entries in diagnostic tables. Default: 25.
 
 .PARAMETER OutputPath
-    Verzeichnis fuer gespeicherte Berichte. Standard: aus Modulkonfiguration + \XEvents.
+    Directory for saved reports. Default: from module configuration + \XEvents.
 
 .PARAMETER Create
-    Session anlegen.
+    Create session.
 
 .PARAMETER Start
-    Session starten.
+    Start session.
 
 .PARAMETER Stop
-    Session stoppen.
+    Stop session.
 
 .PARAMETER Read
-    Ereignisse lesen.
+    Read events.
 
 .PARAMETER Diagnose
-    Ereignisse aggregieren und Probleme erkennen.
+    Aggregate events and detect issues.
 
 .PARAMETER Drop
-    Session entfernen.
+    Remove session.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
-    # AllInOne-Session erstellen und sofort starten
+    # Create AllInOne session and start immediately
     Invoke-sqmExtendedEvents -SqlInstance SQL01 -Create -Start
 
 .EXAMPLE
-    # Slow Queries > 2 Sekunden aufzeichnen, in Datei speichern
+    # Record Slow Queries > 2 seconds, save to file
     Invoke-sqmExtendedEvents -SqlInstance SQL01 -Template SlowQueries -SlowQueryThresholdMs 2000 -TargetType File -Create -Start
 
 .EXAMPLE
-    # Laufende Session auslesen und Bericht erstellen
+    # Read running session and create report
     Invoke-sqmExtendedEvents -SqlInstance SQL01 -Read -Diagnose
 
 .EXAMPLE
-    # Session stoppen und entfernen
+    # Stop session and remove it
     Invoke-sqmExtendedEvents -SqlInstance SQL01 -Stop -Drop
 
 .NOTES
-    Erfordert: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath
-    Benoetigt VIEW SERVER STATE auf der Instanz.
-    XEL-Datei-Lesen erfordert direkten Zugriff auf den SQL Server-Pfad.
+    Requires: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath
+    Needs VIEW SERVER STATE on the instance.
+    Reading XEL files requires direct access to the SQL Server path.
 #>
 function Invoke-sqmExtendedEvents
 {

@@ -1,57 +1,57 @@
 ﻿<#
 .SYNOPSIS
-    Erstellt, vergleicht oder listet Performance-Baselines (Wait Stats + Perf Counters).
+    Creates, compares or lists performance baselines (wait stats + perf counters).
 
 .DESCRIPTION
-    Capture: Speichert aktuellen Snapshot von sys.dm_os_wait_stats und
-    sys.dm_os_performance_counters als JSON-Datei.
-    Compare: Berechnet das Delta zwischen zwei Baselines.
-    List:    Listet alle gespeicherten Baseline-Dateien auf.
+    Capture: Saves the current snapshot of sys.dm_os_wait_stats and
+    sys.dm_os_performance_counters as a JSON file.
+    Compare: Calculates the delta between two baselines.
+    List:    Lists all saved baseline files.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz. Standard: lokaler Computername.
+    SQL Server instance. Default: local computer name.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER Action
-    Capture | Compare | List. Standard: Capture.
+    Capture | Compare | List. Default: Capture.
 
 .PARAMETER BaselineName
-    Bezeichnung fuer den Snapshot (wird im Dateinamen verwendet).
-    Standard: Timestamp.
+    Label for the snapshot (used in the file name).
+    Default: timestamp.
 
 .PARAMETER BaselineA
-    Pfad oder Dateiname (ohne Pfad) der ersten Baseline fuer den Vergleich.
-    Standard: die vorletzte Datei im OutputPath.
+    Path or file name (without path) of the first baseline for comparison.
+    Default: the second-to-last file in OutputPath.
 
 .PARAMETER BaselineB
-    Pfad oder Dateiname der zweiten (neueren) Baseline.
-    Standard: die neueste Datei im OutputPath.
+    Path or file name of the second (newer) baseline.
+    Default: the most recent file in OutputPath.
 
 .PARAMETER OutputPath
-    Verzeichnis fuer Baseline-JSON-Dateien.
-    Standard: aus Modulkonfiguration + \PerfBaseline.
+    Directory for baseline JSON files.
+    Default: from module configuration + \PerfBaseline.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
-    # Baseline aufnehmen
-    Invoke-sqmPerfBaseline -SqlInstance "SQL01" -BaselineName "vor_patch"
+    # Capture baseline
+    Invoke-sqmPerfBaseline -SqlInstance "SQL01" -BaselineName "before_patch"
 
 .EXAMPLE
-    # Baseline nach Aenderung aufnehmen und vergleichen
-    Invoke-sqmPerfBaseline -SqlInstance "SQL01" -BaselineName "nach_patch"
+    # Capture baseline after change and compare
+    Invoke-sqmPerfBaseline -SqlInstance "SQL01" -BaselineName "after_patch"
     Invoke-sqmPerfBaseline -SqlInstance "SQL01" -Action Compare
 
 .EXAMPLE
-    # Alle Baselines auflisten
+    # List all baselines
     Invoke-sqmPerfBaseline -SqlInstance "SQL01" -Action List
 
 .NOTES
-    Erfordert: Invoke-sqmLogging, Get-sqmDefaultOutputPath
-    Benoetigt VIEW SERVER STATE.
+    Requires: Invoke-sqmLogging, Get-sqmDefaultOutputPath
+    Needs VIEW SERVER STATE.
 #>
 function Invoke-sqmPerfBaseline
 {

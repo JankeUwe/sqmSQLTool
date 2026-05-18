@@ -1,40 +1,40 @@
 ﻿<#
 .SYNOPSIS
-ueberprueft alle AlwaysOn-Datenbanken auf Probleme und repariert sie (Remove ? Cleanup ? Add).
+Checks all AlwaysOn databases for problems and repairs them (Remove -> Cleanup -> Add).
 
 .DESCRIPTION
-- Ermittelt alle Datenbanken in allen Verfuegbarkeitsgruppen.
-- Prueft, ob eine Datenbank problematisch ist (Synchronisationsstatus ungleich 'HEALTHY' oder 'SYNCHRONIZED').
-- Stellt sicher, dass Automatic Seeding auf allen Replikaten aktiviert ist (ruft Invoke-sqmSqlAlwaysOnAutoseeding auf).
-- Bei Problemen: Datenbank aus AG entfernen, auf allen Secondaries loeschen, wieder mit AutoSeed hinzufuegen.
-- Jede Reparatur wird im Eventlog (ueber Invoke-sqmLogging und Windows Eventlog) vermerkt.
-- Erstellt selbststaendig die Eventlog-Quelle "sqmAlwaysOn", falls nicht vorhanden.
+- Determines all databases in all Availability Groups.
+- Checks whether a database is problematic (synchronization status not 'HEALTHY' or 'SYNCHRONIZED').
+- Ensures that Automatic Seeding is enabled on all replicas (calls Invoke-sqmSqlAlwaysOnAutoseeding).
+- On problems: removes database from AG, deletes it from all secondaries, re-adds it with AutoSeed.
+- Each repair is recorded in the event log (via Invoke-sqmLogging and Windows Event Log).
+- Automatically creates the event log source "sqmAlwaysOn" if it does not exist.
 
 .PARAMETER SqlInstance
-Primaere SQL-Instanz (Standard: Computername).
+Primary SQL instance (default: computer name).
 
 .PARAMETER SqlCredential
-Anmeldeinformationen.
+Credentials.
 
 .PARAMETER Force
-Auch Datenbanken reparieren, die als gesund gelten (z.B. um einen Refresh zu erzwingen).
+Also repair databases that are considered healthy (e.g. to force a refresh).
 
 .PARAMETER EnableException
-Ausnahmen durchlassen.
+Propagate exceptions immediately.
 
 .PARAMETER WhatIf
-Nur testen.
+Test only.
 
 .EXAMPLE
-Repariert automatisch alle problematischen AG-Datenbanken.
+Automatically repairs all problematic AG databases.
 Repair-sqmAlwaysOnDatabases
 
 .EXAMPLE
-Erzwingt Reparatur aller AG-Datenbanken (auch gesunder).
+Forces repair of all AG databases (including healthy ones).
 Repair-sqmAlwaysOnDatabases -Force
 
 .NOTES
-Setzt die Funktion Invoke-sqmSqlAlwaysOnAutoseeding voraus.
+Requires the Invoke-sqmSqlAlwaysOnAutoseeding function.
 #>
 function Repair-sqmAlwaysOnDatabases
 {

@@ -1,36 +1,36 @@
 ﻿<#
 .SYNOPSIS
-    Liest und analysiert SQL Server Wait Statistics aus sys.dm_os_wait_stats.
+    Reads and analyzes SQL Server wait statistics from sys.dm_os_wait_stats.
 
 .DESCRIPTION
-    Liest die kumulierten Wait Statistics der Instanz, filtert bekannte idle Waits heraus
-    und gibt die Top-N Waits mit Kategorie und Handlungsempfehlung zurueck.
-    Optional: Snapshot-Vergleich (vorher/nachher) ueber -SnapshotBefore/-SaveSnapshot.
+    Reads the cumulative wait statistics of the instance, filters out known idle waits
+    and returns the top-N waits with category and recommended action.
+    Optional: snapshot comparison (before/after) via -SnapshotBefore/-SaveSnapshot.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz. Standard: lokaler Computername.
+    SQL Server instance. Default: local computer name.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER TopN
-    Anzahl der zurueckgegebenen Top-Wait-Types. Standard: 25.
+    Number of top wait types to return. Default: 25.
 
 .PARAMETER IncludeIdle
-    Idle-Waits (SLEEP_*, WAITFOR etc.) einschliessen. Standard: aus.
+    Include idle waits (SLEEP_*, WAITFOR, etc.). Default: off.
 
 .PARAMETER SnapshotBefore
-    PSCustomObject-Array eines frueheren Snapshots (Ausgabe von -SaveSnapshot).
-    Wenn angegeben, wird nur das Delta berechnet.
+    PSCustomObject array of an earlier snapshot (output of -SaveSnapshot).
+    If specified, only the delta is calculated.
 
 .PARAMETER SaveSnapshot
-    Gibt einen Snapshot-Array zurueck, der spaeter als SnapshotBefore verwendet werden kann.
+    Returns a snapshot array that can later be used as SnapshotBefore.
 
 .PARAMETER OutputPath
-    Wenn angegeben, wird ein CSV-Bericht gespeichert.
+    If specified, a CSV report is saved.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
     Get-sqmWaitStatistics -SqlInstance "SQL01" -TopN 20
@@ -40,8 +40,8 @@
     Get-sqmWaitStatistics -SqlInstance "SQL01" -SnapshotBefore $before
 
 .NOTES
-    Erfordert: dbatools, Invoke-sqmLogging
-    Benoetigt VIEW SERVER STATE.
+    Requires: dbatools, Invoke-sqmLogging
+    Needs VIEW SERVER STATE.
 #>
 function Get-sqmWaitStatistics
 {

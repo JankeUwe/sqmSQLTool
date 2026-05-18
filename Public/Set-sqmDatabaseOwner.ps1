@@ -1,78 +1,78 @@
 ﻿<#
 .SYNOPSIS
-    Setzt den Eigentuemer (Owner) einer oder mehrerer Datenbanken auf einen einheitlichen Login.
+    Sets the owner of one or more databases to a uniform login.
 
 .DESCRIPTION
-    Prueft und korrigiert den Datenbankbesitzer auf einer oder mehreren SQL Server-Instanzen.
-    Typischer Anwendungsfall: Nach Restores oder Migrationen ist der Owner oft ein nicht mehr
-    existierender oder falscher Login. Die Funktion setzt ihn einheitlich auf den sa-Account
-    (unabhaengig vom tatsaechlichen sa-Namen, der per Obfuskation umbenannt sein kann) oder
-    einen beliebigen anderen Login.
+    Checks and corrects the database owner on one or more SQL Server instances.
+    Typical use case: after restores or migrations the owner is often a login that no
+    longer exists or is incorrect. The function uniformly sets it to the sa account
+    (regardless of the actual sa name, which may have been renamed via obfuscation) or
+    any other login.
 
-    Ablauf pro Datenbank:
-      1. Aktuellen Owner lesen
-      2. Pruefen ob aenderung notwendig (bereits korrekt ? ueberspringen)
-      3. Pruefen ob Ziel-Login auf der Instanz existiert
-      4. ALTER AUTHORIZATION ON DATABASE::<Name> TO <Login> ausfuehren
-      5. Ergebnis protokollieren
+    Process per database:
+      1. Read current owner
+      2. Check whether a change is necessary (already correct -> skip)
+      3. Check whether the target login exists on the instance
+      4. Execute ALTER AUTHORIZATION ON DATABASE::<Name> TO <Login>
+      5. Log result
 
-    Gibt fuer jede Datenbank ein Statusobjekt zurueck:
+    Returns a status object for each database:
       Status = OK / Skipped / Failed / NotFound
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz(en). Pipeline-faehig. Standard: aktueller Computername.
+    SQL Server instance(s). Pipeline-capable. Default: current computer name.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER Database
-    Datenbankname(n). Wildcards erlaubt (z.B. 'Prod*'). Standard: alle Benutzerdatenbanken.
+    Database name(s). Wildcards allowed (e.g. 'Prod*'). Default: all user databases.
 
 .PARAMETER ExcludeDatabase
-    Datenbanken die ausgeschlossen werden. Wildcards erlaubt.
+    Databases to exclude. Wildcards allowed.
 
 .PARAMETER OwnerLogin
-    Login der als neuer Eigentuemer gesetzt wird.
-    Standard: sa-Account (wird automatisch anhand der SID 0x01 ermittelt,
-    unabhaengig davon ob er umbenannt wurde).
+    Login to set as the new owner.
+    Default: sa account (automatically determined via SID 0x01,
+    regardless of whether it has been renamed).
 
 .PARAMETER IncludeSystemDatabases
-    Auch Systemdatenbanken (master, model, msdb) einbeziehen. Standard: $false.
-    tempdb wird immer ausgeschlossen.
+    Also include system databases (master, model, msdb). Default: $false.
+    tempdb is always excluded.
 
 .PARAMETER Force
-    Auch Datenbanken verarbeiten die bereits den korrekten Owner haben (erzwingt Neusetzen).
+    Also process databases that already have the correct owner (forces re-assignment).
 
 .PARAMETER OutputPath
-    Verzeichnis fuer das aenderungsprotokoll. Standard: aus Modulkonfiguration.
+    Directory for the change log. Default: from module configuration.
 
 .PARAMETER ContinueOnError
-    Bei Fehler auf einer Instanz fortfahren. Standard: $false.
+    Continue on error for one instance. Default: $false.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
-    # Sa-Account auf allen Benutzerdatenbanken setzen
+    # Set sa account on all user databases
     Set-sqmDatabaseOwner -SqlInstance "SQL01"
 
 .EXAMPLE
-    # Bestimmte Datenbanken mit eigenem Login
+    # Specific databases with a custom login
     Set-sqmDatabaseOwner -SqlInstance "SQL01" -Database "Prod*" -OwnerLogin "svc_sqlowner"
 
 .EXAMPLE
-    # Pipeline ueber mehrere Instanzen
+    # Pipeline across multiple instances
     'SQL01','SQL02' | Set-sqmDatabaseOwner
 
 .EXAMPLE
-    # WhatIf - nur zeigen was geaendert wuerde
+    # WhatIf - only show what would be changed
     Set-sqmDatabaseOwner -SqlInstance "SQL01" -WhatIf
 
 .NOTES
-    Erfordert: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath
-    Benoetigt: sysadmin oder ALTER ANY DATABASE auf der Instanz.
-    Der sa-Account wird ueber SID 0x01 ermittelt - funktioniert auch nach Umbenennung.
-    Systemdatenbanken: master/model/msdb koennen Owner-aenderungen erhalten, tempdb nie.
+    Requires: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath
+    Needs: sysadmin or ALTER ANY DATABASE on the instance.
+    The sa account is identified via SID 0x01 — works even after renaming.
+    System databases: master/model/msdb can receive owner changes, tempdb never.
 #>
 function Set-sqmDatabaseOwner
 {

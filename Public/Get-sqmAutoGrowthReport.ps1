@@ -1,4 +1,40 @@
-﻿function Get-sqmAutoGrowthReport
+﻿<#
+.SYNOPSIS
+    Creates an AutoGrowth configuration report for all database files on a SQL Server instance.
+
+.DESCRIPTION
+    Analyzes all data and log files of the accessible databases and evaluates their AutoGrowth settings.
+    Returns warnings for percent-based growth, growth values that are too small or too large, and
+    unbounded log files.
+
+.PARAMETER SqlInstance
+    SQL Server instance (default: current computer name).
+
+.PARAMETER SqlCredential
+    PSCredential for the connection.
+
+.PARAMETER Database
+    Restrict to specific databases (array of names).
+
+.PARAMETER IncludeSystem
+    Include system databases. Default: $false.
+
+.PARAMETER Detailed
+    When set, additional file properties (physical path) are included in the output.
+
+.PARAMETER EnableException
+    Throw exceptions immediately.
+
+.EXAMPLE
+    Get-sqmAutoGrowthReport -SqlInstance "SQL01"
+
+.EXAMPLE
+    Get-sqmAutoGrowthReport -SqlInstance "SQL01" -Detailed -IncludeSystem
+
+.NOTES
+    Requires: dbatools, Invoke-sqmLogging
+#>
+function Get-sqmAutoGrowthReport
 {
 	[CmdletBinding()]
 	param (

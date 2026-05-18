@@ -1,30 +1,30 @@
 ﻿<#
 .SYNOPSIS
-    Vergleicht wichtige Konfigurationseinstellungen zweier SQL Server-Instanzen.
+    Compares important configuration settings between two SQL Server instances.
 
 .DESCRIPTION
-    Zeigt Unterschiede in folgenden Bereichen an: sp_configure, Instanz-Eigenschaften (Collation, Version, MaxMemory), Datenbank-Einstellungen (optional). Ausgabe als Liste mit Alt/Neu-Werten.
+    Displays differences in the following areas: sp_configure, instance properties (Collation, Version, MaxMemory), database settings (optional). Output as a list with old/new values.
 
 .PARAMETER SourceInstance
-    Quell-Instanz (Referenz).
+    Source instance (reference).
 
 .PARAMETER TargetInstance
-    Ziel-Instanz (zu vergleichender Server). Wenn nicht angegeben, wird gleiche wie Source verwendet? Nein, Pflicht.
+    Target instance (server to compare). Mandatory.
 
 .PARAMETER SqlCredential
-    PSCredential fuer beide Instanzen (falls identisch). Fuer unterschiedliche Credentials sind separate Parameter noetig (vereinfacht).
+    PSCredential for both instances (if identical). For different credentials, separate parameters are required (simplified).
 
 .PARAMETER CompareDatabases
-    Wenn gesetzt, werden Datenbanken (Name, Owner, RecoveryModel, Collation) verglichen.
+    When set, databases (Name, Owner, RecoveryModel, Collation) are compared.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
     Compare-sqmServerConfiguration -SourceInstance "SQL01" -TargetInstance "SQL02"
 
 .NOTES
-    Verwendet Connect-DbaInstance und SMO-Objekte.
+    Uses Connect-DbaInstance and SMO objects.
 #>
 function Compare-sqmServerConfiguration
 {

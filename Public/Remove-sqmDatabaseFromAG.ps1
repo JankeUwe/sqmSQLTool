@@ -1,48 +1,48 @@
 ﻿<#
 .SYNOPSIS
-Entfernt eine oder mehrere Datenbanken aus ihrer Always On-Verfuegbarkeitsgruppe.
+Removes one or more databases from their Always On Availability Group.
 
 .DESCRIPTION
-Die Funktion erkennt selbststaendig, in welcher Verfuegbarkeitsgruppe sich die angegebene
-Datenbank befindet, entfernt sie daraus und loescht sie anschliessend von allen sekundaeren
-Replikaten. Systemdatenbanken werden ignoriert.
+The function automatically detects which Availability Group the specified database
+belongs to, removes it from the group, and then deletes it from all secondary replicas.
+System databases are ignored.
 
-Wenn kein SqlInstance-Parameter angegeben wird, wird standardmaessig der aktuelle
-Computername ($env:COMPUTERNAME) verwendet.
+If the SqlInstance parameter is not specified, the current computer name
+($env:COMPUTERNAME) is used by default.
 
 .PARAMETER SqlInstance
-Die primaere SQL Server-Instanz (das primaere Replikat der AG).
-Standard: aktueller Computername.
+The primary SQL Server instance (the primary replica of the AG).
+Default: current computer name.
 
 .PARAMETER SqlCredential
-Alternative Anmeldeinformationen.
+Alternative credentials.
 
 .PARAMETER Database
-Name oder Array von Benutzerdatenbanken, die aus ihrer AG entfernt werden sollen.
-Wird ignoriert, wenn -All gesetzt ist.
+Name or array of user databases to remove from their AG.
+Ignored when -All is set.
 
 .PARAMETER All
-Wenn gesetzt, werden alle Benutzerdatenbanken, die Mitglied einer AG sind, entfernt.
+When set, all user databases that are members of an AG are removed.
 
 .PARAMETER EnableException
-Schalter, um Ausnahmen durchzulassen.
+Switch to propagate exceptions immediately.
 
 .PARAMETER Confirm
-Fordert vor kritischen Aktionen (Entfernen aus AG, Loeschen auf Secondaries) eine Bestaetigung an.
+Prompts for confirmation before critical actions (remove from AG, delete on secondaries).
 
 .PARAMETER WhatIf
-Zeigt, was passieren wuerde, ohne aenderungen durchzufuehren.
+Shows what would happen without making any changes.
 
 .EXAMPLE
-# Einzelne Datenbank aus ihrer AG entfernen
+# Remove a single database from its AG
 Remove-sqmDatabaseFromAvailabilityGroup -Database "SalesDB"
 
 .EXAMPLE
-# Alle AG-Datenbanken entfernen
+# Remove all AG databases
 Remove-sqmDatabaseFromAvailabilityGroup -All
 
 .NOTES
-Erfordert dbatools und Invoke-sqmLogging.
+Requires dbatools and Invoke-sqmLogging.
 #>
 function Remove-sqmDatabaseFromAG
 {

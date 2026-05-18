@@ -1,62 +1,62 @@
 ﻿<#
 .SYNOPSIS
-    Erstellt eine strukturierte HTML- und CSV-Dokumentation aller Datenbanken einer SQL Server-Instanz.
+    Creates structured HTML and CSV documentation for all databases on a SQL Server instance.
 
 .DESCRIPTION
-    Dokumentiert je Datenbank:
-    - Allgemeine Eigenschaften (Status, Recovery-Modell, Collation, Owner, Erstelldatum, Kompatibilitaetslevel)
-    - Groesse (Data, Log, gesamt in MB)
-    - Dateigruppen und Dateien (Name, Pfad, Groesse, Autogrow, Wachstumstyp)
-    - Letzte Backup-Zeiten (Full, Diff, Log)
-    - Letzte DBCC CHECKDB-Ausfuehrung
-    - VLF-Anzahl (ab SQL Server 2016)
-    - Objekt-Zusammenfassung (Tabellen, Sichten, Prozeduren, Funktionen, Trigger)
-    - Datenbank-User (Name, Loginname, Typ)
-    - Extended Properties der Datenbank
+    Documents per database:
+    - General properties (status, recovery model, collation, owner, creation date, compatibility level)
+    - Size (data, log, total in MB)
+    - Filegroups and files (name, path, size, autogrow, growth type)
+    - Last backup times (full, diff, log)
+    - Last DBCC CHECKDB execution
+    - VLF count (SQL Server 2016+)
+    - Object summary (tables, views, procedures, functions, triggers)
+    - Database users (name, login name, type)
+    - Extended properties of the database
 
-    Die Ausgabe erfolgt als:
-    - HTML-Datei mit formatiertem Bericht (selbstenthalten, kein CSS extern)
-    - CSV-Datei fuer maschinelle Weiterverarbeitung
+    Output is generated as:
+    - HTML file with formatted report (self-contained, no external CSS)
+    - CSV file for machine processing
 
-    Standard-Ausgabepfad wird aus der Modulkonfiguration (OutputPath) gelesen.
-    Wenn CentralPath konfiguriert ist, werden die Dateien zusaetzlich dorthin kopiert.
+    Default output path is read from the module configuration (OutputPath).
+    If CentralPath is configured, files are additionally copied there.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz(en). Pipeline-faehig. Standard: aktueller Computername.
+    SQL Server instance(s). Pipeline-capable. Default: current computer name.
 
 .PARAMETER SqlCredential
-    Optionaler PSCredential fuer die SQL-Verbindung.
+    Optional PSCredential for the SQL connection.
 
 .PARAMETER Database
-    Nur bestimmte Datenbanken dokumentieren. Wildcard erlaubt (z.B. 'Sales*').
-    Standard: alle Benutzerdatenbanken.
+    Document specific databases only. Wildcards allowed (e.g. 'Sales*').
+    Default: all user databases.
 
 .PARAMETER IncludeSystemDatabases
-    Systemdatenbanken (master, model, msdb, tempdb) einbeziehen. Standard: $false.
+    Include system databases (master, model, msdb, tempdb). Default: $false.
 
 .PARAMETER IncludeFileDetails
-    Dateigruppen und Datei-Details in den Bericht einbeziehen. Standard: $true.
+    Include filegroup and file details in the report. Default: $true.
 
 .PARAMETER IncludeUsers
-    Datenbank-User in den Bericht einbeziehen. Standard: $true.
+    Include database users in the report. Default: $true.
 
 .PARAMETER IncludeObjectSummary
-    Objekt-Zusammenfassung (Tabellen, SP, Views usw.) einbeziehen. Standard: $true.
+    Include object summary (tables, SPs, views, etc.) in the report. Default: $true.
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis. Standard: Wert aus Modulkonfiguration (Get-sqmDefaultOutputPath).
+    Output directory. Default: value from module configuration (Get-sqmDefaultOutputPath).
 
 .PARAMETER ContinueOnError
-    Bei Fehler auf einer Instanz oder Datenbank fortfahren statt abzubrechen.
+    Continue on error for an instance or database instead of aborting.
 
 .PARAMETER EnableException
-    Ausnahmen direkt weiterwerfen (ueberschreibt ContinueOnError).
+    Throw exceptions directly (overrides ContinueOnError).
 
 .PARAMETER Confirm
-    Bestaetigung vor dem Schreiben der Ausgabedateien anfordern.
+    Request confirmation before writing output files.
 
 .PARAMETER WhatIf
-    Simulation: Zeigt, welche Dateien erstellt wuerden, ohne sie zu schreiben.
+    Simulation: shows which files would be created without writing them.
 
 .EXAMPLE
     Export-sqmDatabaseDocumentation
@@ -68,12 +68,12 @@
     Export-sqmDatabaseDocumentation -SqlInstance "SQL01" -IncludeSystemDatabases -ContinueOnError
 
 .EXAMPLE
-    # Mehrere Instanzen per Pipeline
+    # Multiple instances via pipeline
     "SQL01","SQL02","SQL03" | Export-sqmDatabaseDocumentation -ContinueOnError
 
 .NOTES
-    Voraussetzungen: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath
-    VLF-Abfrage erfordert SQL Server 2016+ (sys.dm_db_log_info).
+    Prerequisites: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath
+    VLF query requires SQL Server 2016+ (sys.dm_db_log_info).
 #>
 function Export-sqmDatabaseDocumentation
 {

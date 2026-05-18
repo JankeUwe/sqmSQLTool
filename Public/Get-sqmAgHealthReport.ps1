@@ -1,45 +1,45 @@
 <#
 .SYNOPSIS
-    Erstellt einen detaillierten Zustandsbericht aller Always On-Verfuegbarkeitsgruppen auf einer Instanz.
+    Creates a detailed health report for all Always On availability groups on an instance.
 
 .DESCRIPTION
-    Ermittelt fuer jede AG auf der angegebenen Instanz:
-    - Synchronisierungsstatus aller Replikate
-    - LSN-Lag zwischen Primary und Secondaries (Redo-Queue, Send-Queue)
-    - Datenbankstatus pro Replikat (Synchronized, Synchronizing, NotSynchronizing, ...)
-    - Verbindungsstatus der Replikate
-    - Listener-Konfiguration
-    - Laufende AutoSeed-Vorgaenge
+    Retrieves for each AG on the specified instance:
+    - Synchronization status of all replicas
+    - LSN lag between primary and secondaries (redo queue, send queue)
+    - Database status per replica (Synchronized, Synchronizing, NotSynchronizing, ...)
+    - Connection status of replicas
+    - Listener configuration
+    - Running AutoSeed operations
 
-    Die Ergebnisse werden als TXT-Bericht und CSV-Datei im angegebenen Verzeichnis gespeichert.
-    Zusaetzlich gibt die Funktion ein Objekt mit den Detaildaten und den Dateipfaden zurueck.
+    Results are saved as a TXT report and CSV file in the specified directory.
+    The function also returns an object with the detail data and file paths.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz(en). Pipeline-faehig. Standard: aktueller Computername.
+    SQL Server instance(s). Pipeline-capable. Default: current computer name.
 
 .PARAMETER SqlCredential
-    Optionales PSCredential fuer die Verbindung.
+    Optional PSCredential for the connection.
 
 .PARAMETER MaxRedoQueueMB
-    Warnschwelle fuer die Redo-Queue in MB. Standard: 100.
+    Warning threshold for the redo queue in MB. Default: 100.
 
 .PARAMETER MaxSendQueueMB
-    Warnschwelle fuer die Send-Queue in MB. Standard: 50.
+    Warning threshold for the send queue in MB. Default: 50.
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer die Berichtsdateien. Standard: $env:ProgramData\sqmSQLTool\Logs
+    Output directory for report files. Default: $env:ProgramData\sqmSQLTool\Logs
 
 .PARAMETER ContinueOnError
-    Bei Fehler auf einer Instanz fortfahren (ansonsten wird der Fehler ausgeloest).
+    Continue on error for an instance (otherwise the error is thrown).
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen (ueberschreibt ContinueOnError).
+    Throw exceptions immediately (overrides ContinueOnError).
 
 .PARAMETER Confirm
-    Fordert vor dem Schreiben der Dateien eine Bestaetigung an.
+    Request confirmation before writing files.
 
 .PARAMETER WhatIf
-    Zeigt, welche Dateien erstellt wuerden, ohne sie tatsaechlich zu schreiben.
+    Shows which files would be created without actually writing them.
 
 .EXAMPLE
     Get-sqmAgHealthReport
@@ -48,9 +48,9 @@
     Get-sqmAgHealthReport -SqlInstance "SQL01" -MaxRedoQueueMB 200 -OutputPath "D:\Reports"
 
 .NOTES
-    Autor:   MSSQLTools
-    Voraussetzungen: dbatools, Invoke-sqmLogging
-    Standard-Ausgabepfad: $env:ProgramData\sqmSQLTool\Logs
+    Author:       MSSQLTools
+    Prerequisites: dbatools, Invoke-sqmLogging
+    Default output path: $env:ProgramData\sqmSQLTool\Logs
 #>
 function Get-sqmAgHealthReport
 {

@@ -1,35 +1,35 @@
 ﻿<#
 .SYNOPSIS
-    Durchsucht alle (oder ausgewaehlte) Datenbanken einer Instanz nach einem Objektnamen.
+    Searches all (or selected) databases on an instance for an object name.
 
 .DESCRIPTION
-    Sucht in Benutzerdatenbanken nach Tabellen, Sichten, Prozeduren, Funktionen, Triggern, Synonymen.
-    Liefert Fundort (Datenbank, Schema, Objekttyp, Name). Kann nach SQL-Text (vollstaendige Definition) filtern.
+    Searches user databases for tables, views, procedures, functions, triggers, synonyms.
+    Returns the location (database, schema, object type, name). Can filter by SQL text (full definition).
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (Standard: aktueller Computername).
+    SQL Server instance (default: current computer name).
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER ObjectName
-    Name des gesuchten Objekts oder Wildcard (z.B. '*customer*').
+    Name of the object to search for, or wildcard (e.g. '*customer*').
 
 .PARAMETER ObjectType
-    Einschraenkung auf Typ: 'TABLE', 'VIEW', 'PROCEDURE', 'FUNCTION', 'TRIGGER', 'SYNONYM'.
-    Mehrfach moeglich als Array.
+    Restrict to type: 'TABLE', 'VIEW', 'PROCEDURE', 'FUNCTION', 'TRIGGER', 'SYNONYM'.
+    Multiple values possible as array.
 
 .PARAMETER Database
-    Datenbanken durchsuchen (Wildcard, Standard: alle Benutzerdatenbanken).
+    Databases to search (wildcard, default: all user databases).
 
 .PARAMETER IncludeSystem
-    Systemdatenbanken einbeziehen. Standard: $false.
+    Include system databases. Default: $false.
 
 .PARAMETER SearchDefinition
-    Wenn $true, wird auch der Objekttext (Definition) nach <ObjectName> durchsucht (langsamer).
+    If $true, the object text (definition) is also searched for <ObjectName> (slower).
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
     Find-sqmDatabaseObject -SqlInstance "SQL01" -ObjectName "sp_GetOrders"
@@ -38,7 +38,7 @@
     Find-sqmDatabaseObject -SqlInstance "SQL01" -ObjectName "*log*" -ObjectType "TABLE","VIEW" -Database "Sales*"
 
 .NOTES
-    Verwendet sys.objects und sys.sql_modules (fuer Definition).
+    Uses sys.objects and sys.sql_modules (for definition).
 #>
 function Find-sqmDatabaseObject
 {

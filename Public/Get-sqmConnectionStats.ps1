@@ -1,33 +1,33 @@
 ﻿<#
 .SYNOPSIS
-    Analysiert aktive SQL Server Verbindungen und Verbindungsstatistiken.
+    Analyzes active SQL Server connections and connection statistics.
 
 .DESCRIPTION
-    Liest sys.dm_exec_sessions und sys.dm_exec_connections und gruppiert
-    nach Applikation, Login, Host oder Datenbank. Zeigt Verbindungsauslastung,
-    aktive Requests, CPU-Nutzung und aelteste Verbindungen.
+    Reads sys.dm_exec_sessions and sys.dm_exec_connections and groups
+    by application, login, host or database. Shows connection load,
+    active requests, CPU usage and oldest connections.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz. Standard: lokaler Computername.
+    SQL Server instance. Default: local computer name.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER GroupBy
-    Gruppierungskriterium: Application | Login | Host | Database.
-    Standard: Application.
+    Grouping criterion: Application | Login | Host | Database.
+    Default: Application.
 
 .PARAMETER TopN
-    Anzahl der Top-Gruppen. Standard: 25.
+    Number of top groups. Default: 25.
 
 .PARAMETER IncludeSystemConnections
-    System-Verbindungen (is_user_process = 0) einschliessen.
+    Include system connections (is_user_process = 0).
 
 .PARAMETER OutputPath
-    Wenn angegeben, wird ein CSV-Bericht gespeichert.
+    If specified, a CSV report is saved.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
     Get-sqmConnectionStats -SqlInstance "SQL01"
@@ -39,8 +39,8 @@
     Get-sqmConnectionStats -SqlInstance "SQL01" -GroupBy Database -IncludeSystemConnections
 
 .NOTES
-    Erfordert: dbatools, Invoke-sqmLogging
-    Benoetigt VIEW SERVER STATE.
+    Requires: dbatools, Invoke-sqmLogging
+    Needs VIEW SERVER STATE.
 #>
 function Get-sqmConnectionStats
 {

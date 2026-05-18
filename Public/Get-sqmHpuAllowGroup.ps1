@@ -1,13 +1,13 @@
 ﻿<#
     .SYNOPSIS
-        Sucht die HPU-Allow-Gruppe im AD anhand konfigurierbarer Domain-/Gruppen-Mappings.
+        Searches for the HPU allow group in Active Directory based on configurable domain/group mappings.
 
     .DESCRIPTION
-        Liest das Domain-Gruppen-Mapping aus der Modulkonfiguration (Key: HpuDomainGroupMap).
-        Jeder Eintrag enthaelt ein DomainPattern (Wildcard) und ein GroupNamePattern (sAMAccountName-Filter).
-        Die aktuelle Maschinen-Domain wird gegen alle Eintraege geprueft; der erste Treffer gewinnt.
+        Reads the domain-group mapping from the module configuration (key: HpuDomainGroupMap).
+        Each entry contains a DomainPattern (wildcard) and a GroupNamePattern (sAMAccountName filter).
+        The current machine domain is checked against all entries; the first match wins.
 
-        Konfiguration ueber Set-sqmConfig:
+        Configuration via Set-sqmConfig:
             Set-sqmConfig -HpuDomainGroupMap @(
                 [PSCustomObject]@{ DomainPattern = 'bayernlb.sfinance.net'; GroupNamePattern = 'Fg_DC_AouAllowManageAuditSecLogSrvAll_Mod' },
                 [PSCustomObject]@{ DomainPattern = '*.sfinance.net';        GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' },
@@ -15,7 +15,7 @@
             )
 
     .OUTPUTS
-        [string] DistinguishedName der gefundenen Gruppe, oder $null.
+        [string] DistinguishedName of the found group, or $null.
 
     .EXAMPLE
         Get-sqmHpuAllowGroup

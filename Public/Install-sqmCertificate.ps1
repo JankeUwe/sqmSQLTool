@@ -1,111 +1,111 @@
 ﻿<#
 .SYNOPSIS
-    Installiert ein Zertifikat (selbstsigniert oder CA-signiert) in SQL Server und
-    bindet es automatisch an den konfigurierten Verwendungszweck.
+    Installs a certificate (self-signed or CA-signed) in SQL Server and
+    automatically binds it to the configured purpose.
 
 .DESCRIPTION
-    Unterstuetzt drei Eingabeformate:
-      PFX   (.pfx)  - Zertifikat + Private Key in einer Datei (CA-signiert oder exportiert)
-      CER+PVK       - Zertifikat (.cer) + verschluesselter Private Key (.pvk) getrennt
-      CER only      - Nur Zertifikat ohne Private Key (z.B. Public Key fuer AlwaysOn-Replikate)
+    Supports three input formats:
+      PFX   (.pfx)  - Certificate + private key in one file (CA-signed or exported)
+      CER+PVK       - Certificate (.cer) + encrypted private key (.pvk) separately
+      CER only      - Certificate without private key (e.g. public key for AlwaysOn replicas)
 
-    Ablauf:
-      1. Zertifikatsdatei lesen und Inhalt validieren (Ablaufdatum, Subject, Format)
-      2. Pruefen ob bereits ein Zertifikat mit gleichem Thumbprint in SQL Server existiert
-      3. Zertifikat per CREATE CERTIFICATE in SQL Server importieren
-      4. Je nach -Purpose automatisch einbinden:
-           AlwaysOn    ? ALTER ENDPOINT ... AUTHENTICATION = CERTIFICATE <neu>
-                         Hinweis fuer Replikat-Verteilung ausgeben
-           TDE         ? ALTER DATABASE ... SET ENCRYPTION KEY ... CERTIFICATE <neu>
-           SSL         ? Zertifikat in Windows-Maschinen-Store importieren +
-                         SQL Server Netzwerkprotokoll-Zertifikat setzen (Registry)
-           ServiceBroker ? ALTER ENDPOINT ... AUTHENTICATION = CERTIFICATE <neu>
-      5. Installationsprotokoll als TXT schreiben
+    Process:
+      1. Read certificate file and validate content (expiry date, subject, format)
+      2. Check whether a certificate with the same thumbprint already exists in SQL Server
+      3. Import certificate via CREATE CERTIFICATE in SQL Server
+      4. Automatically bind based on -Purpose:
+           AlwaysOn      -> ALTER ENDPOINT ... AUTHENTICATION = CERTIFICATE <new>
+                            Output guidance for replica distribution
+           TDE           -> ALTER DATABASE ... SET ENCRYPTION KEY ... CERTIFICATE <new>
+           SSL           -> Import certificate into Windows machine store +
+                            set SQL Server network protocol certificate (Registry)
+           ServiceBroker -> ALTER ENDPOINT ... AUTHENTICATION = CERTIFICATE <new>
+      5. Write installation log as TXT
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (Standard: aktueller Computername).
+    SQL Server instance (default: current computer name).
 
 .PARAMETER SqlCredential
-    PSCredential fuer die SQL Server-Verbindung.
+    PSCredential for the SQL Server connection.
 
 .PARAMETER CertFile
-    Pfad zur Zertifikatsdatei (.pfx, .cer, .crt, .p12).
-    Bei PFX wird der Private Key automatisch mitimportiert.
+    Path to the certificate file (.pfx, .cer, .crt, .p12).
+    For PFX the private key is automatically imported.
 
 .PARAMETER PrivateKeyFile
-    Pfad zur separaten Private Key-Datei (.pvk). Nur bei CER+PVK-Format erforderlich.
+    Path to the separate private key file (.pvk). Only required for CER+PVK format.
 
 .PARAMETER CertPassword
-    Passwort fuer PFX-Datei oder .pvk-Datei (als SecureString).
+    Password for the PFX file or .pvk file (as SecureString).
 
 .PARAMETER CertificateName
-    Name unter dem das Zertifikat in SQL Server angelegt wird.
-    Standard: Dateiname ohne Extension.
+    Name under which the certificate is created in SQL Server.
+    Default: file name without extension.
 
 .PARAMETER Database
-    Zieldatenbank in SQL Server. Standard: master.
+    Target database in SQL Server. Default: master.
 
 .PARAMETER Purpose
-    Verwendungszweck bestimmt die automatische Einbindung nach dem Import.
-    Gueltige Werte: AlwaysOn, TDE, SSL, ServiceBroker, UserDefined.
-    Standard: UserDefined (kein automatisches Binden).
+    Purpose determines the automatic binding after import.
+    Valid values: AlwaysOn, TDE, SSL, ServiceBroker, UserDefined.
+    Default: UserDefined (no automatic binding).
 
 .PARAMETER EndpointName
-    Name des Endpoints fuer AlwaysOn/ServiceBroker-Bindung.
-    Wenn nicht angegeben, wird der erste passende Endpoint automatisch ermittelt.
+    Name of the endpoint for AlwaysOn/ServiceBroker binding.
+    If not specified, the first matching endpoint is determined automatically.
 
 .PARAMETER TdeDatabaseName
-    Name der Datenbank fuer TDE-Bindung. Wenn nicht angegeben, wird die aktuelle
-    TDE-verschluesselte Datenbank auf der Instanz ermittelt (nur wenn eindeutig).
+    Name of the database for TDE binding. If not specified, the current
+    TDE-encrypted database on the instance is determined (only if unique).
 
 .PARAMETER ReplaceCertificateName
-    Name eines bestehenden Zertifikats das nach erfolgreicher Installation ersetzt
-    (Endpoint/TDE umgestellt) wird. Das alte Zertifikat wird NICHT geloescht.
+    Name of an existing certificate that is replaced (endpoint/TDE switched)
+    after successful installation. The old certificate is NOT deleted.
 
 .PARAMETER ImportToWindowsStore
-    Zertifikat zusaetzlich in den Windows-Maschinen-Zertifikatspeicher importieren.
-    Wird fuer SSL/TLS-Verbindungen benoetigt. Standard: $false, bei Purpose=SSL automatisch $true.
+    Additionally import the certificate into the Windows machine certificate store.
+    Required for SSL/TLS connections. Default: $false; automatically $true when Purpose=SSL.
 
 .PARAMETER SetSqlServerSslCert
-    SQL Server Netzwerkkonfiguration auf dieses Zertifikat (Thumbprint) setzen.
-    Setzt Neustart des SQL Server-Dienstes voraus. Standard: $false.
+    Set the SQL Server network configuration to use this certificate (thumbprint).
+    Requires a restart of the SQL Server service. Default: $false.
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer das Installationsprotokoll. Standard: aus Modulkonfiguration.
+    Output directory for the installation log. Default: from module configuration.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
-    # PFX von CA importieren und an AlwaysOn-Endpoint binden
+    # Import PFX from CA and bind to AlwaysOn endpoint
     Install-sqmCertificate -SqlInstance "SQL01" -CertFile "C:\Certs\sql01.pfx" `
         -CertPassword (Read-Host -AsSecureString) -Purpose AlwaysOn
 
 .EXAMPLE
-    # Public-Key-Zertifikat auf AlwaysOn-Replikat installieren (kein Private Key)
+    # Install public-key certificate on AlwaysOn replica (no private key)
     Install-sqmCertificate -SqlInstance "SQL02" -CertFile "C:\Certs\SQL01_AG_CERT.cer" `
         -CertificateName "SQL01_AG_CERT" -Purpose AlwaysOn
 
 .EXAMPLE
-    # CER + PVK installieren und TDE binden
+    # Install CER + PVK and bind TDE
     Install-sqmCertificate -SqlInstance "SQL01" `
         -CertFile "C:\Certs\tde_new.cer" `
         -PrivateKeyFile "C:\Certs\tde_new.pvk" `
-        -CertPassword (Read-Host -AsSecureString "PVK-Passwort") `
+        -CertPassword (Read-Host -AsSecureString "PVK password") `
         -Purpose TDE -TdeDatabaseName "ProdDB"
 
 .EXAMPLE
-    # SSL-Zertifikat installieren (Windows Store + SQL Server Netzwerk)
+    # Install SSL certificate (Windows Store + SQL Server network)
     Install-sqmCertificate -SqlInstance "SQL01" -CertFile "C:\Certs\ssl.pfx" `
         -CertPassword (Read-Host -AsSecureString) -Purpose SSL -SetSqlServerSslCert
 
 .NOTES
-    Erfordert: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath
-    Benoetigt: sysadmin auf der SQL Server-Instanz
-    SSL-Bindung (-SetSqlServerSslCert): Erfordert Neustart des SQL Server-Dienstes.
-    AlwaysOn: Public-Key (.cer) muss auf ALLEN Replikat-Instanzen installiert werden.
-    PFX-Import: Der Private Key wird in SQL Server unter dem Service-Account-Kontext gespeichert.
-    Zertifikatsdateien werden nach dem Import NICHT geloescht.
+    Requires: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath
+    Needs: sysadmin on the SQL Server instance
+    SSL binding (-SetSqlServerSslCert): Requires a restart of the SQL Server service.
+    AlwaysOn: The public key (.cer) must be installed on ALL replica instances.
+    PFX import: The private key is stored in SQL Server under the service account context.
+    Certificate files are NOT deleted after the import.
 #>
 function Install-sqmCertificate
 {

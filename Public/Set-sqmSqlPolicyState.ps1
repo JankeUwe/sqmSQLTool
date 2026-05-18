@@ -1,39 +1,37 @@
 ﻿<#
 .SYNOPSIS
-    Aktiviert oder deaktiviert eine einzelne Policy-Based Management Policy
-    auf einer SQL Server-Instanz.
+    Enables or disables a single Policy-Based Management policy on a SQL Server instance.
 
 .DESCRIPTION
-    Verwendet dbatools (Get-DbaPbmPolicy) um zu pruefen, ob die angegebene
-    Policy auf der Zielinstanz existiert, und schaltet anschliessend
-    ausschliesslich diese Policy ueber ihr SMO-Objekt.
+    Uses dbatools (Get-DbaPbmPolicy) to check whether the specified policy exists on
+    the target instance, and then toggles only that policy via its SMO object.
 
-    Im Gegensatz zu aelteren Skripten wird nicht der globale PBM-Engine-Zustand
-    veraendert, sondern nur die explizit benannte Policy.
+    Unlike older scripts, this does not change the global PBM engine state,
+    but only the explicitly named policy.
 
 .PARAMETER SqlInstance
-    Ziel-SQL-Server-Instanz(en). Pipeline-faehig. Standard: aktueller Computername.
+    Target SQL Server instance(s). Pipeline-capable. Default: current computer name.
 
 .PARAMETER SqlCredential
-    Optionales PSCredential fuer die Verbindung.
+    Optional PSCredential for the connection.
 
 .PARAMETER Policy
-    Name der zu schaltenden Policy. Standard: aus Modulkonfiguration (DefaultPolicy).
+    Name of the policy to toggle. Default: from module configuration (DefaultPolicy).
 
 .PARAMETER State
-    Zielzustand: 'Enable' oder 'Disable'.
+    Target state: 'Enable' or 'Disable'.
 
 .PARAMETER ContinueOnError
-    Bei Fehler auf einer Instanz mit naechster fortfahren.
+    Continue with the next instance on error.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen (ueberschreibt ContinueOnError).
+    Throw exceptions immediately (overrides ContinueOnError).
 
 .PARAMETER Confirm
-    Fordert Bestaetigung vor dem Schalten an.
+    Prompts for confirmation before toggling.
 
 .PARAMETER WhatIf
-    Zeigt, was passieren wuerde, ohne aenderungen vorzunehmen.
+    Shows what would happen without making any changes.
 
 .EXAMPLE
     Set-sqmSqlPolicyState -SqlInstance "SQL01" -Policy "xp_cmdshell must be disabled" -State Disable
@@ -42,7 +40,7 @@
     "SQL01","SQL02" | Set-sqmSqlPolicyState -Policy "Password Policy" -State Enable
 
 .OUTPUTS
-    [PSCustomObject] mit SqlInstance, Policy, State, Status, Message.
+    [PSCustomObject] with SqlInstance, Policy, State, Status, Message.
 #>
 function Set-sqmSqlPolicyState
 {

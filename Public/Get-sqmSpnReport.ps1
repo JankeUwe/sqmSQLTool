@@ -1,90 +1,89 @@
 ﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
-    Prueft die gesetzten SPNs fuer SQL Server-Instanzen (Standard- und benannte Instanzen).
+    Checks the registered SPNs for SQL Server instances (default and named instances).
 
 .DESCRIPTION
-    Ermittelt automatisch alle SQL Server-Dienste auf dem angegebenen Computer,
-    bestimmt pro Instanz das Dienstkonto und leitet daraus das AD-Konto fuer die
-    SPN-Pruefung ab.
+    Automatically determines all SQL Server services on the specified computer,
+    identifies the service account per instance and derives the AD account for
+    the SPN check.
 
-    Unterstuetzte Dienstkonto-Typen:
-    - Domaenenkonto (DOMAIN\svc_sql)         ? direkt als SPN-Konto verwendet
-    - Computerkonto-Konten (SYSTEM,
-      NETWORK SERVICE, NT SERVICE\*)        ? Computerkonto (DOMAIN\HOSTNAME$)
-      Das Computerkonto wird sauber ueber
-      [System.DirectoryServices.ActiveDirectory.Domain] ermittelt.
-    - LOCAL SERVICE                         ? keine Netzwerkidentitaet, SPNs
-      nicht moeglich ? Befund mit Status 'NoNetwork'
+    Supported service account types:
+    - Domain account (DOMAIN\svc_sql)        -> used directly as SPN account
+    - Computer-account-based accounts (SYSTEM,
+      NETWORK SERVICE, NT SERVICE\*)         -> computer account (DOMAIN\HOSTNAME$)
+      The computer account is determined cleanly via
+      [System.DirectoryServices.ActiveDirectory.Domain].
+    - LOCAL SERVICE                          -> no network identity, SPNs
+      not possible -> finding with status 'NoNetwork'
 
-    Pro Instanz werden die vier erwarteten MSSQLSvc-SPNs geprueft:
+    Per instance, the four expected MSSQLSvc SPNs are checked:
         MSSQLSvc/<Hostname>:<Port>
         MSSQLSvc/<FQDN>:<Port>
-        MSSQLSvc/<Hostname>        (nur Standardinstanz, Port 1433)
-        MSSQLSvc/<FQDN>            (nur Standardinstanz, Port 1433)
+        MSSQLSvc/<Hostname>        (default instance only, port 1433)
+        MSSQLSvc/<FQDN>            (default instance only, port 1433)
 
-    Bei benannten Instanzen (dynamischer Port via SQL Browser) werden zusaetzlich
-    die Instanznamens-SPNs geprueft:
-        MSSQLSvc/<Hostname>:<Instanzname>
-        MSSQLSvc/<FQDN>:<Instanzname>
+    For named instances (dynamic port via SQL Browser), additional instance-name SPNs are checked:
+        MSSQLSvc/<Hostname>:<InstanceName>
+        MSSQLSvc/<FQDN>:<InstanceName>
 
-    Fehlende SPNs werden als fertige setspn.exe-Kommandos aufbereitet,
-    die an das AD-Team uebergeben werden koennen.
+    Missing SPNs are prepared as ready-to-use setspn.exe commands
+    that can be handed to the AD team.
 
-    Ausgabe pro Instanz:
-        SpnReport_<Computer>_<Instanz>_<Datum>.txt   - Lesbarer Bericht inkl. setspn-Kommandos
-        SpnReport_<Computer>_<Instanz>_<Datum>.csv   - Maschinenlesbar (eine Zeile pro SPN)
+    Output per instance:
+        SpnReport_<Computer>_<Instance>_<Date>.txt   - Readable report including setspn commands
+        SpnReport_<Computer>_<Instance>_<Date>.csv   - Machine-readable (one row per SPN)
 
 .PARAMETER ComputerName
-    Zielrechner. Standard: lokaler Computer. Pipeline-faehig.
+    Target computer. Default: local computer. Pipeline-capable.
 
 .PARAMETER InstanceFilter
-    Optionaler Filter auf Instanznamen (Wildcards erlaubt).
-    Beispiel: 'MSSQLSERVER' fuer nur die Standardinstanz, 'SQL*' fuer benannte Instanzen.
+    Optional filter on instance names (wildcards allowed).
+    Example: 'MSSQLSERVER' for default instance only, 'SQL*' for named instances.
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer Bericht und CSV.
-    Standard: Modulkonfiguration (Get-sqmConfig -Key 'OutputPath').
+    Output directory for report and CSV.
+    Default: module configuration (Get-sqmConfig -Key 'OutputPath').
 
 .PARAMETER ContinueOnError
-    Bei Fehler auf einer Instanz mit der naechsten fortfahren.
+    Continue with the next instance on error.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen (ueberschreibt ContinueOnError).
+    Throw exceptions immediately (overrides ContinueOnError).
 
 .PARAMETER Confirm
-    Fordert vor dem Erstellen der Dateien eine Bestaetigung an.
+    Request confirmation before creating files.
 
 .PARAMETER WhatIf
-    Zeigt, welche Dateien erstellt wuerden, ohne sie zu schreiben.
+    Shows which files would be created without writing them.
 
 .EXAMPLE
     Get-sqmSpnReport
 
-    Prueft alle SQL Server-Instanzen auf dem lokalen Computer.
+    Checks all SQL Server instances on the local computer.
 
 .EXAMPLE
     Get-sqmSpnReport -ComputerName 'SQL01' -InstanceFilter 'MSSQLSERVER'
 
-    Prueft nur die Standardinstanz auf SQL01.
+    Checks only the default instance on SQL01.
 
 .EXAMPLE
     'SQL01','SQL02' | Get-sqmSpnReport -ContinueOnError
 
-    Prueft alle Instanzen auf zwei Servern, Fehler werden uebersprungen.
+    Checks all instances on two servers; errors are skipped.
 
 .EXAMPLE
     $result = Get-sqmSpnReport -ComputerName 'SQL01'
     $result.DetailRows | Where-Object Status -eq 'Missing' | Select-Object Spn, SetSpnCommand
 
-    Gibt nur fehlende SPNs mit dem fertigen setspn-Befehl aus.
+    Returns only missing SPNs with the ready-to-use setspn command.
 
 .NOTES
-    Voraussetzungen:
+    Prerequisites:
     - Invoke-sqmLogging, Get-sqmConfig
-    - setspn.exe im Systempfad (Windows-Standard oder RSAT)
-    - Lokale Administratorrechte auf dem Zielcomputer fuer WMI-Abfragen
-    - AD-Modul (RSAT) ist NICHT erforderlich; Domaenenermittlung erfolgt via
+    - setspn.exe in the system path (Windows default or RSAT)
+    - Local administrator rights on the target computer for WMI queries
+    - AD module (RSAT) is NOT required; domain resolution is performed via
       [System.DirectoryServices.ActiveDirectory.Domain]
 #>
 function Get-sqmSpnReport

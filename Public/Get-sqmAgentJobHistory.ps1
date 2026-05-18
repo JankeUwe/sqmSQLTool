@@ -1,35 +1,35 @@
 ﻿<#
 .SYNOPSIS
-    Zeigt die Ausfuehrungshistorie von SQL Agent Jobs an.
+    Displays the execution history of SQL Agent jobs.
 
 .DESCRIPTION
-    Liefert die letzte(n) Ausfuehrung(en) aller oder ausgewaehlter SQL Agent Jobs.
-    Kann nach Jobnamen, Status (Erfolg/Fehler) und Zeitraum filtern.
-    Standardmaessig werden die letzten 7 Tage angezeigt.
+    Returns the last execution(s) of all or selected SQL Agent jobs.
+    Can filter by job name, status (success/failure) and time range.
+    By default, the last 7 days are shown.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (Standard: aktueller Computername).
+    SQL Server instance (default: current computer name).
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER JobName
-    Name oder Wildcard-Muster (z.B. '*Backup*') zum Filtern von Jobs.
+    Name or wildcard pattern (e.g. '*Backup*') to filter jobs.
 
 .PARAMETER Status
-    'Success', 'Failure', 'Retry' oder 'Cancelled'. Standard: alle.
+    'Success', 'Failure', 'Retry' or 'Cancelled'. Default: all.
 
 .PARAMETER Since
-    Zeigt History ab diesem Datum. Standard: heute - 7 Tage.
+    Show history from this date onwards. Default: today minus 7 days.
 
 .PARAMETER LastX
-    Statt Zeitraum: Anzahl der letzten Ausfuehrungen pro Job (z.B. -LastX 5).
+    Instead of a time range: number of last executions per job (e.g. -LastX 5).
 
 .PARAMETER OutputPath
-    Export als CSV (optional). Wenn angegeben, wird eine CSV-Datei erstellt.
+    Export as CSV (optional). If specified, a CSV file is created.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
     Get-sqmAgentJobHistory
@@ -38,7 +38,7 @@
     Get-sqmAgentJobHistory -JobName '*Backup*' -Status Failure -Since (Get-Date).AddDays(-1)
 
 .NOTES
-    Erfordert dbatools und Invoke-sqmLogging.
+    Requires dbatools and Invoke-sqmLogging.
 #>
 function Get-sqmAgentJobHistory {
     [CmdletBinding()]

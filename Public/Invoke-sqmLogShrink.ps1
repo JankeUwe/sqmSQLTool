@@ -1,51 +1,50 @@
 ﻿<#
 .SYNOPSIS
-    Shrinkt die Transaktions-Logdatei (LDF) einer oder mehrerer Datenbanken.
+    Shrinks the transaction log file (LDF) of one or more databases.
 
 .DESCRIPTION
-    Fuehrt DBCC SHRINKFILE auf die Log-Datei(en) aus. Berechnet die Zielgroesse
-    aus einem Prozentsatz der aktuellen Groesse (ShrinkTargetPercent) mit einem
-    unteren Schwellwert (MinTargetMB). Beruecksichtigt Always On AGs (leitet
-    automatisch zum Primary um). Systemdatenbanken und Offline-Datenbanken
-    werden uebersprungen.
+    Executes DBCC SHRINKFILE on the log file(s). Calculates the target size
+    as a percentage of the current size (ShrinkTargetPercent) with a
+    lower threshold (MinTargetMB). Handles Always On AGs (automatically
+    redirects to the primary). System databases and offline databases are skipped.
 
-    Wichtige Hinweise:
-    - Shrink kann nur bis zum aeltesten aktiven VLF verkleinern.
-    - Im FULL Recovery Modell ist vorher ein Log-Backup sinnvoll.
-    - Haeufiges Shrinken fragmentiert die VLFs.
+    Important notes:
+    - Shrink can only reduce to the oldest active VLF.
+    - In FULL recovery model, a log backup beforehand is advisable.
+    - Frequent shrinking fragments VLFs.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (Standard: aktueller Computername). Bei AG-Mitglied
-    wird automatisch zum Primary umgeleitet.
+    SQL Server instance (default: current computer name). For AG members,
+    automatically redirected to the primary.
 
 .PARAMETER SqlCredential
-    Optionales PSCredential fuer die Verbindung.
+    Optional PSCredential for the connection.
 
 .PARAMETER Database
-    Name(n) der Zieldatenbank(en) (Wildcards erlaubt). Ohne Angabe werden alle
-    Benutzerdatenbanken verarbeitet (entspricht -All).
+    Target database name(s) (wildcards allowed). Without specification, all
+    user databases are processed (equivalent to -All).
 
 .PARAMETER All
-    Verarbeitet alle Benutzerdatenbanken (exkl. Systemdatenbanken, nur Online).
-    Wird auch implizit verwendet, wenn weder -Database noch -All angegeben wird.
+    Processes all user databases (excl. system databases, online only).
+    Also used implicitly when neither -Database nor -All is specified.
 
 .PARAMETER ShrinkTargetPercent
-    Zielgroesse in Prozent der aktuellen Log-Groesse (1-99). Standard: 10.
+    Target size as a percentage of the current log size (1-99). Default: 10.
 
 .PARAMETER MinTargetMB
-    Minimale Zielgroesse in MB (Standard: 64 MB).
+    Minimum target size in MB (default: 64 MB).
 
 .PARAMETER ContinueOnError
-    Bei Fehler mit naechster Datenbank fortfahren.
+    Continue with the next database on error.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen (ueberschreibt ContinueOnError).
+    Throw exceptions immediately (overrides ContinueOnError).
 
 .PARAMETER Confirm
-    Fordert Bestaetigung vor dem Shrink an. Standardmaessig deaktiviert.
+    Request confirmation before shrinking. Disabled by default.
 
 .PARAMETER WhatIf
-    Zeigt, was passieren wuerde, ohne den Shrink auszufuehren.
+    Shows what would happen without executing the shrink.
 
 .EXAMPLE
     Invoke-sqmLogShrink -Database "MyDB" -ShrinkTargetPercent 20
@@ -54,8 +53,8 @@
     Invoke-sqmLogShrink -SqlInstance "SQL01" -All -WhatIf
 
 .NOTES
-    Voraussetzungen: dbatools, Invoke-sqmLogging.
-    Bei Always On AGs wird automatisch zum Primary umgeleitet.
+    Prerequisites: dbatools, Invoke-sqmLogging.
+    For Always On AGs, automatically redirected to the primary.
 #>
 function Invoke-sqmLogShrink
 {

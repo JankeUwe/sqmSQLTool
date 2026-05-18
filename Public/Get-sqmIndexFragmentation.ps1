@@ -1,36 +1,36 @@
 ﻿<#
 .SYNOPSIS
-    Analysiert die Fragmentierung von Indizes in einer oder mehreren Datenbanken.
+    Analyzes index fragmentation in one or more databases.
 
 .DESCRIPTION
-    Liefert fuer alle Indizes den Fragmentierungsgrad (%) und empfiehlt Aktion:
-        - 5-30%   ? REORGANIZE
-        - >30%    ? REBUILD
-    Die Ausgabe kann auf bestimmte Datenbanken, Tabellen oder einen Mindestfragmentierungsgrad beschraenkt werden.
+    Returns the fragmentation level (%) for all indexes and recommends an action:
+        - 5-30%  -> REORGANIZE
+        - >30%   -> REBUILD
+    Output can be restricted to specific databases, tables or a minimum fragmentation level.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (Standard: aktueller Computername).
+    SQL Server instance (default: current computer name).
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER Database
-    Datenbankname oder Wildcard-Muster (z.B. 'Sales*'). Standard: alle Benutzerdatenbanken.
+    Database name or wildcard pattern (e.g. 'Sales*'). Default: all user databases.
 
 .PARAMETER TableName
-    Tabellenname oder Wildcard-Muster (z.B. 'Order*'). Standard: alle Tabellen.
+    Table name or wildcard pattern (e.g. 'Order*'). Default: all tables.
 
 .PARAMETER MinFragmentationPercent
-    Nur Indizes mit Fragmentierung >= diesem Wert anzeigen. Standard: 5.
+    Show only indexes with fragmentation >= this value. Default: 5.
 
 .PARAMETER PageCountMin
-    Nur Indizes mit mindestens dieser Seitenzahl anzeigen. Standard: 0 (alle Indizes).
+    Show only indexes with at least this page count. Default: 0 (all indexes).
 
 .PARAMETER OutputPath
-    Optionaler CSV-Exportpfad.
+    Optional CSV export path.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
     Get-sqmIndexFragmentation -Database 'AdventureWorks' -MinFragmentationPercent 10
@@ -39,8 +39,8 @@
     Get-sqmIndexFragmentation -SqlInstance 'SQL01' -MinFragmentationPercent 30
 
 .NOTES
-    Verwendet sys.dm_db_index_physical_stats (LIMITED-Modus) via Invoke-DbaQuery.
-    Erfordert dbatools und VIEW DATABASE STATE auf den Zieldatenbanken.
+    Uses sys.dm_db_index_physical_stats (LIMITED mode) via Invoke-DbaQuery.
+    Requires dbatools and VIEW DATABASE STATE on the target databases.
 #>
 function Get-sqmIndexFragmentation {
     [CmdletBinding()]

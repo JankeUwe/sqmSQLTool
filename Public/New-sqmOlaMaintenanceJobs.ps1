@@ -1,104 +1,103 @@
 <#
 .SYNOPSIS
-    Erstellt drei SQL Agent Jobs fuer Ola Hallengrens Wartungsloesung:
-    IndexOptimize (User-DBs) und IntegrityCheck (User- und System-DBs).
+    Creates three SQL Agent jobs for Ola Hallengren's Maintenance Solution:
+    IndexOptimize (user DBs) and IntegrityCheck (user and system DBs).
 
 .DESCRIPTION
-    Legt auf der angegebenen SQL Server-Instanz drei vollstaendig konfigurierte
-    SQL Agent Jobs an, die Ola Hallengrens IndexOptimize- und
-    DatabaseIntegrityCheck-Prozeduren aufrufen.
+    Creates three fully configured SQL Agent jobs on the specified SQL Server instance
+    that call Ola Hallengren's IndexOptimize and DatabaseIntegrityCheck procedures.
 
-    Voraussetzung: Ola Hallengrens Maintenance Solution muss installiert sein.
+    Prerequisite: Ola Hallengren's Maintenance Solution must be installed.
     (https://ola.hallengren.com)
 
-    Job-Namen werden aus der Modulkonfiguration gelesen (Standard siehe NOTES).
-    IndexOptimize verwendet optimierte Standardparameter (siehe NOTES).
+    Job names are read from the module configuration (see defaults in NOTES).
+    IndexOptimize uses optimized default parameters (see NOTES).
 
-    Logging und OutputPath werden ueber die Modulkonfiguration gesteuert.
+    Logging and OutputPath are controlled via the module configuration.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz. Standard: aktueller Computername.
+    SQL Server instance. Default: current computer name.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die SQL-Verbindung.
+    PSCredential for the SQL connection.
 
 .PARAMETER JobCategory
-    Kategorie fuer alle drei Jobs. Standard: 'Database Maintenance'.
+    Category for all three jobs. Default: 'Database Maintenance'.
 
 .PARAMETER JobNameIndexOpt
-    Name des IndexOptimize-Jobs (ueberschreibt Modulkonfiguration).
+    Name of the IndexOptimize job (overrides module configuration).
 
 .PARAMETER JobNameIntUserDb
-    Name des IntegrityCheck-Jobs fuer User-DBs (ueberschreibt Modulkonfiguration).
+    Name of the IntegrityCheck job for user DBs (overrides module configuration).
 
 .PARAMETER JobNameIntSysDb
-    Name des IntegrityCheck-Jobs fuer System-DBs (ueberschreibt Modulkonfiguration).
+    Name of the IntegrityCheck job for system DBs (overrides module configuration).
 
 .PARAMETER ScheduleTime
-    Startzeit fuer alle Jobs (Format 'HH:mm'). Standard: '23:00'.
+    Start time for all jobs (format 'HH:mm'). Default: '23:00'.
 
 .PARAMETER ScheduleDay
-    Wochentag als SQL Agent Frequency Interval (Bitmaske). Standard: 1 (Sonntag).
+    Day of week as SQL Agent Frequency Interval (bitmask). Default: 1 (Sunday).
 
 .PARAMETER Databases
-    Datenbank-Filter fuer IndexOptimize und IntegrityCheck User. Standard: 'USER_DATABASES'.
+    Database filter for IndexOptimize and IntegrityCheck user. Default: 'USER_DATABASES'.
 
 .PARAMETER FragmentationLevel1
-    Untere Fragmentierungsschwelle in Prozent (Medium). Standard: 5.
+    Lower fragmentation threshold in percent (medium). Default: 5.
 
 .PARAMETER FragmentationLevel2
-    Obere Fragmentierungsschwelle in Prozent (High). Standard: 30.
+    Upper fragmentation threshold in percent (high). Default: 30.
 
 .PARAMETER MinNumberOfPages
-    Minimale Seitenanzahl eines Index fuer Beruecksichtigung. Standard: 1000.
+    Minimum page count of an index to be considered. Default: 1000.
 
 .PARAMETER FillFactor
-    Fuellgrad fuer Index-Rebuilds in Prozent. Standard: 90.
+    Fill factor for index rebuilds in percent. Default: 90.
 
 .PARAMETER MaxDOP
-    MAXDOP fuer IndexOptimize. Standard: 0 (SQL Server entscheidet).
+    MAXDOP for IndexOptimize. Default: 0 (SQL Server decides).
 
 .PARAMETER SortInTempdb
-    Sort-Operationen in TempDB ausfuehren. Standard: 'Y'.
+    Execute sort operations in TempDB. Default: 'Y'.
 
 .PARAMETER UpdateStatistics
-    Statistiken aktualisieren: 'ALL', 'COLUMNS', 'INDEX', 'NONE'. Standard: 'ALL'.
+    Update statistics: 'ALL', 'COLUMNS', 'INDEX', 'NONE'. Default: 'ALL'.
 
 .PARAMETER OnlyModifiedStatistics
-    Nur geaenderte Statistiken aktualisieren. Standard: 'Y'.
+    Only update modified statistics. Default: 'Y'.
 
 .PARAMETER StatisticsSample
-    Stichprobengroesse fuer Statistik-Update in Prozent. Standard: 0 (SQL Server-Default).
+    Sample size for statistics update in percent. Default: 0 (SQL Server default).
 
 .PARAMETER LogToTable
-    Ola-interne Protokollierung in CommandLog-Tabelle. Standard: 'Y'.
+    Ola internal logging to CommandLog table. Default: 'Y'.
 
 .PARAMETER CheckCommands
-    DBCC-Befehl fuer IntegrityCheck. Standard: 'CHECKDB'.
+    DBCC command for IntegrityCheck. Default: 'CHECKDB'.
 
 .PARAMETER PhysicalOnly
-    Nur physische Konsistenz pruefen (schneller). Standard: 'N'.
+    Check physical consistency only (faster). Default: 'N'.
 
 .PARAMETER NoIndex
-    Non-Clustered Indexes bei IntegrityCheck ueberspringen. Standard: 'N'.
+    Skip non-clustered indexes in IntegrityCheck. Default: 'N'.
 
 .PARAMETER OperatorName
-    SQL Agent Operator fuer E-Mail-Benachrichtigung bei Fehlschlag.
+    SQL Agent operator for email notification on failure.
 
 .PARAMETER Update
-    Vorhandene Jobs gleichen Namens ersetzen.
+    Replace existing jobs with the same name.
 
 .PARAMETER ContinueOnError
-    Bei Fehler mit naechstem Job fortfahren (selten verwendet).
+    Continue with the next job on error (rarely used).
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .PARAMETER Confirm
-    Bestaetigung vor der Erstellung anfordern.
+    Request confirmation before creation.
 
 .PARAMETER WhatIf
-    Zeigt, was passieren wuerde.
+    Shows what would happen without making changes.
 
 .EXAMPLE
     New-sqmOlaMaintenanceJobs -SqlInstance "SQL01"
@@ -107,11 +106,11 @@
     New-sqmOlaMaintenanceJobs -SqlInstance "SQL01" -ScheduleTime "22:00" -ScheduleDay 64 -OperatorName "DBAs"
 
 .NOTES
-    Modulkonfigurationsschluessel:
+    Module configuration keys:
         OlaJobNameIndexOpt   (Default: 'OlaHH IndexOptimize - USER_DATABASES')
         OlaJobNameIntUserDb  (Default: 'OlaHH IntegrityCheck - USER_DATABASES')
         OlaJobNameIntSysDb   (Default: 'OlaHH IntegrityCheck - SYSTEM_DATABASES')
-    Voraussetzung: dbatools, Invoke-sqmLogging, Get-sqmConfig, Test-sqmOlaInstallation, Get-sqmSaLogin
+    Prerequisites: dbatools, Invoke-sqmLogging, Get-sqmConfig, Test-sqmOlaInstallation, Get-sqmSaLogin
 #>
 function New-sqmOlaMaintenanceJobs
 {

@@ -1,73 +1,73 @@
 ﻿<#
 .SYNOPSIS
-    Ermittelt fehlende Indexempfehlungen aus dem SQL Server DMV-Cache.
+    Retrieves missing index recommendations from the SQL Server DMV cache.
 
 .DESCRIPTION
-    Liest sys.dm_db_missing_index_details, sys.dm_db_missing_index_groups und
-    sys.dm_db_missing_index_group_stats aus und berechnet pro fehlendem Index
-    einen Impact-Score (nach Microsoft-Formel) sowie ein fertiges CREATE INDEX-Statement.
+    Reads sys.dm_db_missing_index_details, sys.dm_db_missing_index_groups and
+    sys.dm_db_missing_index_group_stats and calculates an impact score
+    (using the Microsoft formula) and a ready-to-use CREATE INDEX statement per missing index.
 
-    Pro Empfehlung werden ausgegeben:
-      - Datenbank, Schema, Tabelle
-      - Equality- und Inequality-Spalten, Include-Spalten
-      - Impact-Score (0-100, berechnet aus seeks/scans/lookups ? avg_user_cost ? avg_user_impact)
-      - Anzahl seeks, scans, lookups seit letztem SQL Server-Neustart
-      - Letzter Seek-Zeitpunkt
-      - Fertiges CREATE INDEX-Statement mit vorgeschlagenem Indexnamen
+    Per recommendation the following is returned:
+      - Database, schema, table
+      - Equality and inequality columns, include columns
+      - Impact score (0-100, calculated from seeks/scans/lookups * avg_user_cost * avg_user_impact)
+      - Number of seeks, scans, lookups since last SQL Server restart
+      - Last seek timestamp
+      - Ready-to-use CREATE INDEX statement with suggested index name
 
-    WICHTIG: Die DMV-Daten sind volatil (Reset bei SQL Server-Neustart, Failover,
-    und bei bestimmten Plan-Cache-Ereignissen). Empfehlungen immer mit dem DBA
-    pruefen bevor Indizes erstellt werden - besonders auf hoch ausgelasteten Systemen.
+    IMPORTANT: DMV data is volatile (reset on SQL Server restart, failover,
+    and certain plan cache events). Always review recommendations with the DBA
+    before creating indexes - especially on heavily loaded systems.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (Standard: aktueller Computername).
+    SQL Server instance (default: current computer name).
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER Database
-    Datenbankname(n) filtern. Wildcards erlaubt. Standard: alle Benutzerdatenbanken.
+    Filter by database name(s). Wildcards allowed. Default: all user databases.
 
 .PARAMETER MinImpactScore
-    Nur Empfehlungen mit Impact-Score >= diesem Wert ausgeben. Standard: 10.
+    Return only recommendations with impact score >= this value. Default: 10.
 
 .PARAMETER MinSeeks
-    Nur Empfehlungen mit mindestens dieser Anzahl Seeks/Scans ausgeben. Standard: 50.
+    Return only recommendations with at least this number of seeks/scans. Default: 50.
 
 .PARAMETER Top
-    Maximal diese Anzahl Empfehlungen zurueckgeben (nach Impact-Score sortiert). Standard: 50.
+    Return at most this number of recommendations (sorted by impact score). Default: 50.
 
 .PARAMETER OutputPath
-    Wenn angegeben, wird eine CSV-Datei mit den Empfehlungen und CREATE-Statements
-    in dieses Verzeichnis geschrieben.
+    If specified, a CSV file with the recommendations and CREATE statements
+    is written to this directory.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
     Get-sqmMissingIndexes -SqlInstance "SQL01"
 
 .EXAMPLE
-    # Nur sehr impactreiche Empfehlungen
+    # Only high-impact recommendations
     Get-sqmMissingIndexes -SqlInstance "SQL01" -MinImpactScore 50 -MinSeeks 500
 
 .EXAMPLE
-    # Top 10 ausgeben und als CSV speichern
+    # Show top 10 and save as CSV
     Get-sqmMissingIndexes -SqlInstance "SQL01" -Top 10 -OutputPath "D:\Reports"
 
 .EXAMPLE
-    # CREATE INDEX-Statements direkt ausgeben
+    # Output CREATE INDEX statements directly
     Get-sqmMissingIndexes -SqlInstance "SQL01" -MinImpactScore 30 |
         Select-Object DatabaseName, TableName, ImpactScore, CreateIndexStatement |
         Format-List
 
 .NOTES
-    Erfordert: dbatools, Invoke-sqmLogging
-    Benoetigt VIEW SERVER STATE auf der Instanz.
-    DMV-Daten werden bei SQL Server-Neustart oder Failover zurueckgesetzt.
-    Vorgeschlagene Indexnamen enthalten Datum und Spaltenkuerzel - vor Einsatz
-    auf Namenskonventionen pruefen und ggf. anpassen.
-    Impact-Score-Formel: seeks ? avg_cost ? avg_impact + scans ? avg_cost ? avg_impact
+    Requires: dbatools, Invoke-sqmLogging
+    Needs VIEW SERVER STATE on the instance.
+    DMV data is reset on SQL Server restart or failover.
+    Suggested index names contain date and column abbreviations - review naming conventions
+    and adjust as needed before deployment.
+    Impact score formula: seeks * avg_cost * avg_impact + scans * avg_cost * avg_impact
 #>
 function Get-sqmMissingIndexes
 {

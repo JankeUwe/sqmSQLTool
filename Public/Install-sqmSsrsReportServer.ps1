@@ -1,132 +1,131 @@
 ﻿<#
 .SYNOPSIS
-    Installiert SQL Server Reporting Services 2022 von einem Network Share
-    und konfiguriert die Instanz anschliessend vollautomatisch.
+    Installs SQL Server Reporting Services 2022 from a network share
+    and automatically configures the instance afterwards.
 
 .DESCRIPTION
-    Fuehrt folgende Schritte der Reihe nach aus:
+    Executes the following steps in sequence:
 
-    [1] Voraussetzungen pruefen
-        - Administratorrechte auf dem Zielrechner
-        - Installer (.exe oder .msi) im konfigurierten Share (SsrsInstallerPath) auffindbar
-        - SSRS noch nicht installiert (ueberspringbar mit -Force)
+    [1] Check prerequisites
+        - Administrator rights on the target computer
+        - Installer (.exe or .msi) found in the configured share (SsrsInstallerPath)
+        - SSRS not yet installed (skippable with -Force)
 
     [2] Installation
-        - Kopiert den Installer in ein lokales Temp-Verzeichnis (UNC-Pfade werden
-          nicht direkt als Prozess-Start unterstuetzt)
-        - Fuehrt den Installer silent aus:
+        - Copies the installer to a local temp directory (UNC paths are not
+          directly supported as process start)
+        - Runs the installer silently:
             SQLServerReportingServices.exe
                 /quiet /IAcceptLicenseTerms /Edition=<Edition> /IAcceptLicenseTerms
-        - Wertet den Exit Code aus (0 = OK, 3010 = Neustart empfohlen)
-        - Wartet danach bis zu 60 Sekunden auf den SSRS-WMI-Namespace (Dienst-Startup)
+        - Evaluates the exit code (0 = OK, 3010 = restart recommended)
+        - Waits up to 60 seconds for the SSRS WMI namespace (service startup)
 
-    [3] Konfiguration
-        - Ruft Set-sqmSsrsConfiguration mit allen uebergebenen Konfigurations-
-          Parametern auf (Splatting). Nicht uebergebene Parameter verwenden die
-          Standardwerte von Set-sqmSsrsConfiguration.
+    [3] Configuration
+        - Calls Set-sqmSsrsConfiguration with all passed configuration parameters
+          (splatting). Parameters not passed use the defaults of Set-sqmSsrsConfiguration.
 
-    Der Installer-Pfad wird bevorzugt aus dem Parameter -InstallerPath gelesen.
-    Fehlt der Parameter, wird Get-sqmConfig -Key 'SsrsInstallerPath' verwendet.
-    Ist auch dieser nicht gesetzt, wird ein Fehler ausgeloest.
+    The installer path is read preferably from the -InstallerPath parameter.
+    If missing, Get-sqmConfig -Key 'SsrsInstallerPath' is used.
+    If that is also not set, an error is thrown.
 
 .PARAMETER ComputerName
-    Zielrechner. Standard: $env:COMPUTERNAME (Lokal).
-    Remote-Installation via WinRM / PsRemoting wird unterstuetzt.
+    Target computer. Default: $env:COMPUTERNAME (local).
+    Remote installation via WinRM / PsRemoting is supported.
 
 .PARAMETER InstallerPath
-    Vollstaendiger UNC- oder lokaler Pfad zur Installationsdatei
-    (SQLServerReportingServices.exe oder .msi).
-    ueberschreibt Get-sqmConfig -Key 'SsrsInstallerPath'.
+    Full UNC or local path to the installation file
+    (SQLServerReportingServices.exe or .msi).
+    Overrides Get-sqmConfig -Key 'SsrsInstallerPath'.
 
 .PARAMETER Edition
-    Lizenz-Edition fuer den Silent-Parameter /Edition.
-    Gueltige Werte: Eval, Developer, Expr, Web, Standard, Enterprise.
-    Standard: 'Developer'.
+    License edition for the silent parameter /Edition.
+    Valid values: Eval, Developer, Expr, Web, Standard, Enterprise.
+    Default: 'Developer'.
 
 .PARAMETER ProductKey
-    Produktschluessel (25 Zeichen). Wenn angegeben, wird statt -Edition der
-    Parameter /IAcceptLicenseTerms /PID:<Key> verwendet.
+    Product key (25 characters). If specified, instead of -Edition the
+    parameter /IAcceptLicenseTerms /PID:<Key> is used.
 
 .PARAMETER Force
-    Installation auch dann durchfuehren, wenn SSRS bereits installiert ist.
+    Perform installation even if SSRS is already installed.
 
 .PARAMETER SkipConfiguration
-    Nur installieren, Set-sqmSsrsConfiguration nicht aufrufen.
+    Install only; do not call Set-sqmSsrsConfiguration.
 
 .PARAMETER InstanceName
-    SSRS-Instanzname. Wird an Set-sqmSsrsConfiguration weitergereicht.
-    Standard: 'MSSQLSERVER'.
+    SSRS instance name. Passed to Set-sqmSsrsConfiguration.
+    Default: 'MSSQLSERVER'.
 
 .PARAMETER DatabaseServer
-    SQL Server fuer die ReportServer-Datenbank.
-    Wird an Set-sqmSsrsConfiguration weitergereicht.
+    SQL Server for the ReportServer database.
+    Passed to Set-sqmSsrsConfiguration.
 
 .PARAMETER DatabaseName
-    Name der ReportServer-Datenbank. Standard: 'ReportServer'.
+    Name of the ReportServer database. Default: 'ReportServer'.
 
 .PARAMETER ReportServerUrl
-    URL fuer den ReportServer Web Service.
-    Standard: 'http://+:80/ReportServer'.
+    URL for the ReportServer web service.
+    Default: 'http://+:80/ReportServer'.
 
 .PARAMETER ReportsUrl
-    URL fuer das Reports-Portal. Standard: 'http://+:80/Reports'.
+    URL for the reports portal. Default: 'http://+:80/Reports'.
 
 .PARAMETER ServiceAccount
-    Windows-Dienstkonto fuer SSRS.
+    Windows service account for SSRS.
 
 .PARAMETER ServiceAccountPassword
-    Kennwort fuer -ServiceAccount (SecureString).
+    Password for -ServiceAccount (SecureString).
 
 .PARAMETER DatabaseAuthType
-    Authentifizierung fuer die DB-Verbindung: 'Windows' oder 'SQL'.
+    Authentication for the DB connection: 'Windows' or 'SQL'.
 
 .PARAMETER DatabaseCredential
-    PSCredential fuer SQL-Authentifizierung (nur bei -DatabaseAuthType SQL).
+    PSCredential for SQL authentication (only with -DatabaseAuthType SQL).
 
 .PARAMETER EncryptionKeyFile
-    Pfad fuer das Encryption Key Backup (.snk).
+    Path for the encryption key backup (.snk).
 
 .PARAMETER EncryptionKeyPassword
-    Kennwort fuer das Key Backup (SecureString).
+    Password for the key backup (SecureString).
 
 .PARAMETER SkipDatabase
-    Datenbankkonfiguration in Set-sqmSsrsConfiguration ueberspringen.
+    Skip database configuration in Set-sqmSsrsConfiguration.
 
 .PARAMETER SkipUrls
-    URL-Konfiguration in Set-sqmSsrsConfiguration ueberspringen.
+    Skip URL configuration in Set-sqmSsrsConfiguration.
 
 .PARAMETER SkipServiceAccount
-    Dienstkonto-Konfiguration in Set-sqmSsrsConfiguration ueberspringen.
+    Skip service account configuration in Set-sqmSsrsConfiguration.
 
 .PARAMETER SkipEncryptionKeyBackup
-    Key-Backup in Set-sqmSsrsConfiguration ueberspringen.
+    Skip the key backup in Set-sqmSsrsConfiguration.
 
 .PARAMETER Credential
-    PSCredential fuer die WinRM-Verbindung zum Zielrechner (Remote-Betrieb).
+    PSCredential for the WinRM connection to the target computer (remote operation).
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer den Konfigurationsbericht.
+    Output directory for the configuration report.
 
 .PARAMETER WmiWaitSeconds
-    Maximale Wartezeit in Sekunden auf den SSRS-WMI-Namespace nach der
-    Installation. Standard: 60.
+    Maximum wait time in seconds for the SSRS WMI namespace after installation.
+    Default: 60.
 
 .PARAMETER ContinueOnError
-    Konfigurationsfehler nicht als Abbruch werten.
+    Do not treat configuration errors as terminating.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .OUTPUTS
-    [PSCustomObject] mit den Feldern:
+    [PSCustomObject] with the following fields:
         ComputerName, InstallerUsed, Edition, InstallExitCode,
         RebootRequired, InstallResult, ConfigResult, OverallStatus, Message
 
 .EXAMPLE
     Install-sqmSsrsReportServer
 
-    Installiert SSRS mit dem in sqmConfig hinterlegten Installer-Pfad,
-    Edition Developer, anschliessend Vollkonfiguration mit Standardwerten.
+    Installs SSRS using the installer path stored in sqmConfig,
+    Edition Developer, followed by full configuration with default values.
 
 .EXAMPLE
     Install-sqmSsrsReportServer `
@@ -139,13 +138,13 @@
 .EXAMPLE
     Install-sqmSsrsReportServer -SkipConfiguration -WhatIf
 
-    Zeigt, was installiert wuerde, ohne aenderungen vorzunehmen.
+    Shows what would be installed without making any changes.
 
 .NOTES
-    Voraussetzungen : Invoke-sqmLogging, Set-sqmSsrsConfiguration, lokale Adminrechte
-    Unterstuetzte Versionen: SSRS 2022 (SQLServerReportingServices.exe)
-    Exit Codes      : 0 = Erfolg, 3010 = Neustart empfohlen, sonstige = Fehler
-    WMI-Namespace   : root\Microsoft\SqlServer\ReportServer
+    Prerequisites : Invoke-sqmLogging, Set-sqmSsrsConfiguration, local administrator rights
+    Supported versions: SSRS 2022 (SQLServerReportingServices.exe)
+    Exit Codes    : 0 = Success, 3010 = Restart recommended, other = Error
+    WMI Namespace : root\Microsoft\SqlServer\ReportServer
 #>
 function Install-sqmSsrsReportServer
 {

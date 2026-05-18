@@ -1,58 +1,54 @@
 ﻿<#
 .SYNOPSIS
-aendert den Recovery-Modus einer oder mehrerer Benutzerdatenbanken.
+Changes the recovery mode of one or more user databases.
 
 .DESCRIPTION
-Die Funktion setzt den Recovery-Modus (Simple, Full, BulkLogged) fuer alle oder
-ausgewaehlte Benutzerdatenbanken einer SQL Server-Instanz. Systemdatenbanken werden
-automatisch ausgeschlossen.
+Sets the recovery mode (Simple, Full, BulkLogged) for all or selected user databases
+on a SQL Server instance. System databases are automatically excluded.
 
-Wenn kein SqlInstance-Parameter angegeben wird, wird standardmaessig der aktuelle
-Computername ($env:COMPUTERNAME) verwendet. Diese Regel gilt fuer alle zukuenftigen
-Versionen.
+If the SqlInstance parameter is not specified, the current computer name
+($env:COMPUTERNAME) is used by default. This rule applies to all future versions.
 
 .PARAMETER SqlInstance
-Die Ziel-SQL Server-Instanz (z.B. "localhost", "SQL01\INSTANCE").
-Wenn nicht angegeben, wird der aktuelle Computername verwendet.
+The target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE").
+If not specified, the current computer name is used.
 
 .PARAMETER SqlCredential
-Alternative Anmeldeinformationen (PSCredential). Wenn nicht angegeben, wird
-Windows-Authentifizierung verwendet.
+Alternative credentials (PSCredential). If not specified, Windows authentication is used.
 
 .PARAMETER Database
-Name oder Array von Benutzerdatenbanken, deren Recovery-Modus geaendert werden soll.
-Wird ignoriert, wenn -All gesetzt ist.
+Name or array of user databases whose recovery mode should be changed.
+Ignored when -All is set.
 
 .PARAMETER All
-Wenn gesetzt, wird der Recovery-Modus fuer alle Benutzerdatenbanken geaendert.
+When set, changes the recovery mode for all user databases.
 
 .PARAMETER RecoveryMode
-Der gewuenschte Recovery-Modus. Erlaubte Werte: Simple, Full, BulkLogged.
+The desired recovery mode. Allowed values: Simple, Full, BulkLogged.
 
 .PARAMETER EnableException
-Schalter, um Ausnahmen durchzulassen (standardmaessig werden Fehler als Warnung
-protokolliert).
+Switch to propagate exceptions immediately (by default errors are logged as warnings).
 
 .PARAMETER Confirm
-Fordert vor der Ausfuehrung eine Bestaetigung an. Standardmaessig deaktiviert.
-Wird an Set-DbaDbRecoveryModel weitergereicht.
+Prompts for confirmation before execution. Disabled by default.
+Passed through to Set-DbaDbRecoveryModel.
 
 .PARAMETER WhatIf
-Zeigt, was passieren wuerde, ohne die aenderung tatsaechlich auszufuehren.
-Wird an Set-DbaDbRecoveryModel weitergereicht.
+Shows what would happen without actually making the change.
+Passed through to Set-DbaDbRecoveryModel.
 
 .EXAMPLE
-# Alle Benutzerdatenbanken auf Full setzen (ohne Nachfrage)
+# Set all user databases to Full (without prompting)
 Invoke-sqmSetDatabaseRecoveryMode -All -RecoveryMode Full
 
 .EXAMPLE
-# Mit Nachfrage (Confirm an Set-DbaDbRecoveryModel)
+# With confirmation prompt (passed to Set-DbaDbRecoveryModel)
 Invoke-sqmSetDatabaseRecoveryMode -Database "SalesDB" -RecoveryMode Simple -Confirm
 
 .NOTES
-Erfordert dbatools-Modul und eine vorhandene Funktion Invoke-sqmLogging.
-Systemdatenbanken werden ignoriert.
-Default fuer SqlInstance: $env:COMPUTERNAME.
+Requires the dbatools module and an existing Invoke-sqmLogging function.
+System databases are ignored.
+Default for SqlInstance: $env:COMPUTERNAME.
 #>
 
 function Invoke-sqmSetDatabaseRecoveryMode

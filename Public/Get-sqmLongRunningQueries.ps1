@@ -1,50 +1,49 @@
 <#
 .SYNOPSIS
-    Ermittelt lang laufende Queries auf einer SQL Server-Instanz.
+    Identifies long-running queries on a SQL Server instance.
 
 .DESCRIPTION
-    Liest sys.dm_exec_requests, sys.dm_exec_sessions, sys.dm_exec_sql_text und
-    sys.dm_exec_query_plan aus und gibt alle aktiven Requests zurueck, die die
-    konfigurierten Schwellwerte ueberschreiten.
+    Reads sys.dm_exec_requests, sys.dm_exec_sessions, sys.dm_exec_sql_text and
+    sys.dm_exec_query_plan and returns all active requests that exceed the
+    configured thresholds.
 
-    Pro Query werden ausgegeben:
-      - Session-ID, Datenbank, Login, Host, Programm
-      - Laufzeit in Sekunden, CPU-Zeit, logische/physische Reads, Writes
-      - Aktueller Wartetyp und Warteressource
-      - Aktuelles Statement (nicht nur der Batch) mit Start/End-Offset-Aufloesung
-      - Query Plan Hash und Query Hash (fuer Plan Cache Abgleich)
-      - Geschaetzte Fertigstellung (falls percent_complete > 0)
-      - Transaktionsisolationsstufe
+    Per query the following is returned:
+      - Session ID, database, login, host, program
+      - Duration in seconds, CPU time, logical/physical reads, writes
+      - Current wait type and wait resource
+      - Current statement (not just the batch) with start/end offset resolution
+      - Query plan hash and query hash (for plan cache comparison)
+      - Estimated completion (if percent_complete > 0)
+      - Transaction isolation level
 
-    Systemsessions (session_id <= 50) und der eigene Request werden automatisch
-    ausgeschlossen.
+    System sessions (session_id <= 50) and the own request are automatically excluded.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (Standard: aktueller Computername).
+    SQL Server instance (default: current computer name).
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER MinDurationSeconds
-    Nur Queries ausgeben, die laenger als dieser Wert laufen (Sekunden). Standard: 30.
+    Return only queries running longer than this value (seconds). Default: 30.
 
 .PARAMETER MinCpuMs
-    Nur Queries ausgeben, deren CPU-Zeit diesen Wert ueberschreitet (Millisekunden). Standard: 0.
+    Return only queries whose CPU time exceeds this value (milliseconds). Default: 0.
 
 .PARAMETER ExcludeWaitType
-    Wartetypen ausschliessen (z.B. 'SLEEP_TASK','WAITFOR'). Standard: uebliche Leerlauf-Waits.
+    Wait types to exclude (e.g. 'SLEEP_TASK','WAITFOR'). Default: common idle waits.
 
 .PARAMETER IncludeSystemSessions
-    Auch System-Sessions (SPID <= 50) einbeziehen. Standard: $false.
+    Include system sessions (SPID <= 50) as well. Default: $false.
 
 .PARAMETER IncludeQueryPlan
-    XML-Ausfuehrungsplan mit abrufen (kostenintensiv - nur bei Bedarf). Standard: $false.
+    Retrieve the XML execution plan as well (expensive - only on demand). Default: $false.
 
 .PARAMETER OutputPath
-    Wenn angegeben, wird ein CSV-Snapshot in dieses Verzeichnis geschrieben.
+    If specified, a CSV snapshot is written to this directory.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen statt als Fehler zurueckgeben.
+    Throw exceptions immediately instead of returning as errors.
 
 .EXAMPLE
     Get-sqmLongRunningQueries
@@ -53,17 +52,17 @@
     Get-sqmLongRunningQueries -SqlInstance "SQL01" -MinDurationSeconds 60
 
 .EXAMPLE
-    # Top 10 nach Laufzeit
+    # Top 10 by duration
     Get-sqmLongRunningQueries -MinDurationSeconds 10 | Sort-Object DurationSeconds -Descending | Select-Object -First 10
 
 .EXAMPLE
-    # Regelmaessiger Snapshot via Agent-Job
+    # Regular snapshot via Agent job
     Get-sqmLongRunningQueries -MinDurationSeconds 120 -OutputPath "$env:ProgramData\sqmSQLTool\Logs\LongRunning"
 
 .NOTES
-    Erfordert: dbatools, Invoke-sqmLogging
-    Benoetigt VIEW SERVER STATE auf der Instanz.
-    IncludeQueryPlan erzeugt zusaetzliche Last - nur interaktiv verwenden, nicht in Agent-Jobs.
+    Requires: dbatools, Invoke-sqmLogging
+    Needs VIEW SERVER STATE on the instance.
+    IncludeQueryPlan generates additional load - use interactively only, not in Agent jobs.
 #>
 function Get-sqmLongRunningQueries
 {

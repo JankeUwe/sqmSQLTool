@@ -1,52 +1,52 @@
 ﻿<#
 .SYNOPSIS
-    Umfassender Audit aller SQL Server-Logins auf einer oder mehreren Instanzen.
+    Comprehensive audit of all SQL Server logins on one or more instances.
 
 .DESCRIPTION
-    Prueft pro Login:
-    - POLICY-VERSToeSSE (CHECK_POLICY/EXPIRATION/MUST_CHANGE)
-    - Kennwortalter und ob nie geaendert
-    - Inaktive / nie verwendete Logins
-    - Doppelte SIDs (fehlerhafte Migration)
-    - AD-verwaiste Windows-Logins (optional)
+    Checks per login:
+    - POLICY VIOLATIONS (CHECK_POLICY/EXPIRATION/MUST_CHANGE)
+    - Password age and whether it was never changed
+    - Inactive / never-used logins
+    - Duplicate SIDs (failed migration)
+    - AD-orphaned Windows logins (optional)
 
-    Ausgabe als TXT-Bericht und CSV (nur Befunde) im konfigurierten OutputPath.
+    Output as TXT report and CSV (findings only) in the configured OutputPath.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz(en). Pipeline-faehig. Standard: aktueller Computername.
+    SQL Server instance(s). Pipeline-capable. Default: current computer name.
 
 .PARAMETER SqlCredential
-    Optionales PSCredential.
+    Optional PSCredential.
 
 .PARAMETER InactivityThresholdDays
-    Logins ohne Login seit diesem Wert gelten als inaktiv. Standard: 90.
+    Logins without login since this value are considered inactive. Default: 90.
 
 .PARAMETER MaxPasswordAgeDays
-    SQL-Logins mit Kennwort aelter als dieser Wert werden gemeldet. Standard: 180. 0 = deaktiviert.
+    SQL logins with password older than this value are reported. Default: 180. 0 = disabled.
 
 .PARAMETER ExcludeLogin
-    Logins die ausgeschlossen werden (Wildcards). Z.?B. 'NT SERVICE\*', 'sqmsa'.
+    Logins to exclude (wildcards). E.g. 'NT SERVICE\*', 'sqmsa'.
 
 .PARAMETER IncludeSystemLogins
-    Wenn gesetzt, werden auch NT SERVICE\*, NT AUTHORITY\* einbezogen.
+    When set, NT SERVICE\*, NT AUTHORITY\* are also included.
 
 .PARAMETER CheckAdOrphans
-    Wenn gesetzt, wird AD-Orphan-Pruefung fuer Windows-Logins durchgefuehrt (erfordert AD-Modul).
+    When set, AD orphan check is performed for Windows logins (requires AD module).
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis. Standard: aus Modulkonfiguration (Get-sqmDefaultOutputPath).
+    Output directory. Default: from module configuration (Get-sqmDefaultOutputPath).
 
 .PARAMETER ContinueOnError
-    Bei Fehler auf einer Instanz fortfahren.
+    Continue on error for an instance.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen (ueberschreibt ContinueOnError).
+    Throw exceptions immediately (overrides ContinueOnError).
 
 .PARAMETER Confirm
-    Fordert Bestaetigung vor Dateierstellung an.
+    Request confirmation before file creation.
 
 .PARAMETER WhatIf
-    Zeigt, was passieren wuerde.
+    Shows what would happen.
 
 .EXAMPLE
     Invoke-sqmLoginAudit
@@ -55,8 +55,8 @@
     Invoke-sqmLoginAudit -SqlInstance "SQL01" -CheckAdOrphans -IncludeSystemLogins
 
 .NOTES
-    Voraussetzungen: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath
-    AD-Orphan-Pruefung benoetigt ActiveDirectory-Modul (RSAT).
+    Prerequisites: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath
+    AD orphan check requires the ActiveDirectory module (RSAT).
 #>
 function Invoke-sqmLoginAudit
 {

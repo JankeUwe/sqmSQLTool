@@ -1,62 +1,62 @@
 ﻿<#
 .SYNOPSIS
-    Stellt die Server-Collation einer SQL Server-Instanz automatisch um.
+    Automatically changes the server collation of a SQL Server instance.
 
 .DESCRIPTION
-    aendert die SQL Server-Instanz-Collation mithilfe der undokumentierten Methode
-    "sqlservr.exe -m -T4022 -T3659 -q '<Collation>'". Diese Funktion ist nur fuer
-    lokale Standalone-Instanzen geeignet (keine AGs, kein Failover-Cluster).
+    Changes the SQL Server instance collation using the undocumented method
+    "sqlservr.exe -m -T4022 -T3659 -q '<Collation>'". This function is only
+    suitable for local standalone instances (no AGs, no failover cluster).
 
-    Die Funktion fuehrt folgende Schritte aus:
-    1. Pre-Flight-Check (Verbindung, aktuelle Collation, Ziel-Collation, Lokalitaet, Dienst, Adminrechte)
-    2. Rollback-Dokumentation erstellen
-    3. Optionales Backup aller User-Datenbanken (-BackupBeforeChange)
-    4. SQL Server-Dienst stoppen
-    5. sqlservr.exe mit neuer Collation starten (wartet auf Bereitschaft)
-    6. Prozess beenden (sqlservr.exe beendet sich selbst)
-    7. SQL Server-Dienst normal starten
-    8. Verifikation der neuen Collation
-    9. Optional: ALTER DATABASE ... COLLATE fuer User-Datenbanken (-IncludeUserDatabases)
+    The function performs the following steps:
+    1. Pre-flight check (connection, current collation, target collation, locality, service, admin rights)
+    2. Create rollback documentation
+    3. Optional backup of all user databases (-BackupBeforeChange)
+    4. Stop SQL Server service
+    5. Start sqlservr.exe with new collation (waits for readiness)
+    6. Terminate process (sqlservr.exe stops itself)
+    7. Start SQL Server service normally
+    8. Verify the new collation
+    9. Optional: ALTER DATABASE ... COLLATE for user databases (-IncludeUserDatabases)
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (muss lokal sein). Standard: aktueller Computername.
+    SQL Server instance (must be local). Default: current computer name.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die SQL-Verbindung.
+    PSCredential for the SQL connection.
 
 .PARAMETER NewCollation
-    Ziel-Collation (z.?B. 'Latin1_General_CI_AS').
+    Target collation (e.g. 'Latin1_General_CI_AS').
 
 .PARAMETER IncludeUserDatabases
-    Wenn gesetzt, wird die Default-Collation aller Benutzerdatenbanken ebenfalls geaendert.
+    When set, the default collation of all user databases is also changed.
 
 .PARAMETER BackupBeforeChange
-    Erstellt vor der aenderung ein Full-Backup aller Benutzerdatenbanken.
+    Creates a full backup of all user databases before the change.
 
 .PARAMETER ExcludeDatabase
-    Datenbanken, die von -IncludeUserDatabases ausgeschlossen werden (Wildcards erlaubt).
+    Databases to exclude from -IncludeUserDatabases (wildcards allowed).
 
 .PARAMETER ServiceName
-    Windows-Dienstname (wird automatisch aus SqlInstance ermittelt, falls nicht angegeben).
+    Windows service name (automatically determined from SqlInstance if not specified).
 
 .PARAMETER StartupTimeoutSeconds
-    Maximale Wartezeit auf sqlservr.exe im Minimal-Modus (Standard: 120).
+    Maximum wait time for sqlservr.exe in minimal mode (default: 120).
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer Rollback-Dokumentation und Spalten-Skript.
-    Standard: Get-sqmDefaultOutputPath.
+    Output directory for rollback documentation and column script.
+    Default: Get-sqmDefaultOutputPath.
 
 .PARAMETER ContinueOnError
-    Bei Fehler in einem Schritt mit dem naechsten fortfahren (selten verwendet).
+    Continue with the next step on error (rarely used).
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .PARAMETER Confirm
-    Fordert Bestaetigung vor dem Stoppen des Dienstes und der aenderung an.
+    Request confirmation before stopping the service and making the change.
 
 .PARAMETER WhatIf
-    Zeigt alle geplanten Schritte ohne Ausfuehrung.
+    Shows all planned steps without execution.
 
 .EXAMPLE
     Invoke-sqmCollationChange -NewCollation "Latin1_General_CI_AS"
@@ -65,9 +65,9 @@
     Invoke-sqmCollationChange -SqlInstance "SQL01\INST2" -NewCollation "German_CI_AS" -IncludeUserDatabases -BackupBeforeChange
 
 .NOTES
-    Voraussetzungen: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath.
-    Nur fuer lokale Standalone-Instanzen. AlwaysOn AGs werden erkannt und abgelehnt.
-    Administratorrechte auf dem Host sind erforderlich.
+    Prerequisites: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath.
+    Local standalone instances only. AlwaysOn AGs are detected and rejected.
+    Administrator rights on the host are required.
 #>
 function Invoke-sqmCollationChange
 {

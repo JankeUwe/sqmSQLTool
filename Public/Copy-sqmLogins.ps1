@@ -1,159 +1,156 @@
 ﻿<#
 .SYNOPSIS
-    Kopiert Logins von einer SQL Server-Quellinstanz auf eine Zielinstanz.
+    Copies logins from a source SQL Server instance to a target instance.
 
 .DESCRIPTION
-    uebertraegt SQL- und Windows-Logins von einer Quellinstanz auf eine Zielinstanz.
+    Transfers SQL and Windows logins from a source instance to a target instance.
 
-    Ablauf:
-        1. Policy deaktivieren  (Set-sqmSqlPolicyState -State Disable, falls -DisablePolicy $true)
-        2. Verbindung + Auth-Mode-Pruefung / Angleichung
-        3. Logins laden und filtern
-        4. Windows-Logins gegen Active Directory pruefen (AD-Modul erforderlich)
-           - Nicht aufloesbare Logins werden uebersprungen und als 'AdOrphan' gemeldet.
-        5. Logins kopieren (Copy-DbaLogin, Passwort-Hash + SID-Mapping)
-        6. Orphaned Users auf allen Benutzerdatenbanken des Ziels bereinigen
-           (Repair-DbaDbOrphanUser - laeuft immer, kein optionaler Schalter)
-        7. Policy wieder aktivieren - guaranteed via finally-Block, auch bei Fehler.
+    Process:
+        1. Disable policy  (Set-sqmSqlPolicyState -State Disable, if -DisablePolicy $true)
+        2. Connect + authentication mode check / alignment
+        3. Load and filter logins
+        4. Check Windows logins against Active Directory (AD module required)
+           - Unresolvable logins are skipped and reported as 'AdOrphan'.
+        5. Copy logins (Copy-DbaLogin, password hash + SID mapping)
+        6. Repair orphaned users on all user databases on the target
+           (Repair-DbaDbOrphanUser - always runs, no optional switch)
+        7. Re-enable policy - guaranteed via finally block, even on error.
 
-    Sicherheits-Modus-Angleichung:
-        Hat die Quelle Mixed-Mode (SQL + Windows) und das Ziel nur
-        Windows-Authentifizierung, wird das Ziel automatisch auf Mixed-Mode
-        umgestellt - sofern -AdjustAuthMode angegeben ist. Ohne diesen Schalter
-        bricht die Funktion mit einem Fehler ab und meldet die Abweichung.
-        Der SQL Server-Dienst muss nach einer Auth-Mode-aenderung neu gestartet
-        werden. Mit -RestartServiceIfRequired wird dies automatisch durchgefuehrt.
+    Authentication mode alignment:
+        If the source uses Mixed Mode (SQL + Windows) and the target is set to
+        Windows Authentication only, the target is automatically switched to Mixed Mode
+        - provided -AdjustAuthMode is specified. Without this switch, the function
+        aborts with an error and reports the discrepancy.
+        The SQL Server service must be restarted after an authentication mode change.
+        With -RestartServiceIfRequired this is done automatically.
 
-    AD-Pruefung:
-        Alle Windows-Logins (Typ WindowsUser / WindowsGroup) der Quelle werden
-        vor dem Kopieren per Get-ADObject gegen das Active Directory geprueft.
-        Nicht aufloesbare Logins werden aus dem Kopier-Batch entfernt und als
-        'AdOrphan' im Ergebnis gemeldet.
+    AD check:
+        All Windows logins (type WindowsUser / WindowsGroup) from the source are
+        validated against Active Directory via Get-ADObject before copying.
+        Unresolvable logins are removed from the copy batch and reported as
+        'AdOrphan' in the result.
 
-        Ist das ActiveDirectory-Modul nicht vorhanden, steuert -AdModuleAction
-        das Verhalten:
-            'Install' (Standard) - Install-sqmAdModule wird aufgerufen.
-                                   Schlaegt die Installation fehl, wird die
-                                   AD-Pruefung mit Warnung uebersprungen.
-            'Skip'               - Warnung, AD-Pruefung wird uebersprungen.
-            'Abort'              - Fehler, Funktion bricht ab.
+        If the ActiveDirectory module is not present, -AdModuleAction controls behavior:
+            'Install' (default) - Install-sqmAdModule is called.
+                                  If installation fails, the AD check is
+                                  skipped with a warning.
+            'Skip'              - Warning, AD check is skipped.
+            'Abort'             - Error, function aborts.
 
-    Login-Filter:
-        System-Logins (sa, ##MS_*, NT SERVICE\*, NT AUTHORITY\*, BUILTIN\*)
-        werden standardmaessig ausgeschlossen. Mit -IncludeSystemLogins werden
-        sie einbezogen. Einzelne Logins koennen ueber -ExcludeLogin gefiltert werden.
+    Login filter:
+        System logins (sa, ##MS_*, NT SERVICE\*, NT AUTHORITY\*, BUILTIN\*)
+        are excluded by default. With -IncludeSystemLogins they are included.
+        Individual logins can be filtered via -ExcludeLogin.
 
-    Passwoerter bei SQL-Logins:
-        Copy-DbaLogin uebertraegt den Passwort-Hash (HASHED) direkt.
-        SIDs werden beibehalten (SID-Mapping).
+    Passwords for SQL logins:
+        Copy-DbaLogin transfers the password hash (HASHED) directly.
+        SIDs are preserved (SID mapping).
 
-    Orphaned Users:
-        Nach dem Kopieren wird Repair-DbaDbOrphanUser auf allen Benutzerdatenbanken
-        des Ziels automatisch ausgefuehrt (kein optionaler Schalter).
+    Orphaned users:
+        After copying, Repair-DbaDbOrphanUser is automatically run on all user
+        databases on the target (no optional switch).
 
     Policy:
-        Vor dem Kopieren wird per Set-sqmSqlPolicyState die konfigurierte
-        Default-Policy auf der Zielinstanz deaktiviert. Nach Abschluss (auch
-        bei Fehler) wird sie ueber einen finally-Block garantiert wieder aktiviert.
-        Steuerung ueber -DisablePolicy (Standard: $true).
-        Der finally-Block reaktiviert die Policy nur, wenn sie zuvor tatsaechlich
-        erfolgreich deaktiviert wurde ($policyWasDisabled-Merker).
+        Before copying, Set-sqmSqlPolicyState disables the configured default policy
+        on the target instance. After completion (even on error) it is guaranteed to
+        be re-enabled via a finally block.
+        Controlled by -DisablePolicy (default: $true).
+        The finally block re-enables the policy only if it was previously successfully
+        disabled ($policyWasDisabled flag).
 
 .PARAMETER Source
-    Quell-SQL-Server-Instanz. Pflichtfeld.
+    Source SQL Server instance. Mandatory.
 
 .PARAMETER Destination
-    Ziel-SQL-Server-Instanz. Pflichtfeld.
+    Target SQL Server instance. Mandatory.
 
 .PARAMETER SqlCredential
-    Optionales PSCredential fuer beide Instanzen (Quelle und Ziel).
-    Fuer unterschiedliche Credentials: -SourceCredential / -DestinationCredential.
+    Optional PSCredential for both instances (source and target).
+    For different credentials use -SourceCredential / -DestinationCredential.
 
 .PARAMETER SourceCredential
-    PSCredential speziell fuer die Quellinstanz.
+    PSCredential specifically for the source instance.
 
 .PARAMETER DestinationCredential
-    PSCredential speziell fuer die Zielinstanz.
+    PSCredential specifically for the target instance.
 
 .PARAMETER Login
-    Filtert den Kopiervorgang auf diese Login-Namen (Wildcards erlaubt).
-    Ohne Angabe werden alle Logins (nach ExcludeLogin-Filter) kopiert.
+    Filters the copy operation to these login names (wildcards allowed).
+    Without specification, all logins (after ExcludeLogin filter) are copied.
 
 .PARAMETER ExcludeLogin
-    Logins die nicht kopiert werden sollen (Wildcards erlaubt).
-    Beispiel: 'AppLogin_*', 'OldUser'.
+    Logins that should not be copied (wildcards allowed).
+    Example: 'AppLogin_*', 'OldUser'.
 
 .PARAMETER IncludeSystemLogins
-    Wenn gesetzt, werden auch System-Logins (sa, ##MS_*, NT SERVICE\*, NT AUTHORITY\*)
-    kopiert. Standard: $false.
+    When set, system logins (sa, ##MS_*, NT SERVICE\*, NT AUTHORITY\*) are also copied.
+    Default: $false.
 
 .PARAMETER DisablePolicy
-    Steuert ob die Default-Policy auf dem Ziel vor dem Kopieren deaktiviert
-    und danach wieder aktiviert wird (via Set-sqmSqlPolicyState).
-    Standard: $true. Auf $false setzen um das Policy-Handling zu ueberspringen.
+    Controls whether the default policy on the target is disabled before copying
+    and re-enabled afterwards (via Set-sqmSqlPolicyState).
+    Default: $true. Set to $false to skip policy handling.
 
 .PARAMETER AdjustAuthMode
-    Wenn gesetzt und das Ziel nur Windows-Auth hat, die Quelle aber Mixed-Mode,
-    wird das Ziel automatisch auf Mixed-Mode umgestellt.
-    Ohne diesen Schalter bricht die Funktion bei Modus-Abweichung ab.
+    When set and the target is Windows-only auth but the source uses Mixed Mode,
+    the target is automatically switched to Mixed Mode.
+    Without this switch the function aborts on mode mismatch.
 
 .PARAMETER RestartServiceIfRequired
-    Wenn gesetzt, wird der SQL Server-Dienst auf dem Zielserver nach einer
-    Auth-Mode-aenderung automatisch neu gestartet.
-    Ohne diesen Schalter wird nur ein Warnhinweis ausgegeben.
+    When set, the SQL Server service on the target server is automatically restarted
+    after an authentication mode change.
+    Without this switch, only a warning is displayed.
 
 .PARAMETER Force
-    Vorhandene Logins auf dem Zielserver werden ueberschrieben.
+    Existing logins on the target server are overwritten.
 
 .PARAMETER AdModuleAction
-    Steuert das Verhalten wenn das ActiveDirectory-Modul nicht vorhanden ist.
-        'Install' (Standard) - Install-sqmAdModule wird aufgerufen um das Modul
-                               zu installieren. Schlaegt die Installation fehl,
-                               wird die AD-Pruefung mit Warnung uebersprungen.
-        'Skip'               - AD-Pruefung wird mit Warnung uebersprungen.
-        'Abort'              - Funktion bricht mit Fehler ab.
+    Controls behavior when the ActiveDirectory module is not present.
+        'Install' (default) - Install-sqmAdModule is called to install the module.
+                              If installation fails, the AD check is skipped with a warning.
+        'Skip'              - AD check is skipped with a warning.
+        'Abort'             - Function aborts with an error.
 
 .PARAMETER ContinueOnError
-    Bei Fehler einzelner Logins mit dem naechsten fortfahren.
+    Continue with the next login on error.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen (ueberschreibt ContinueOnError).
+    Throw exceptions immediately (overrides ContinueOnError).
 
 .PARAMETER Confirm
-    Fordert vor kritischen Aktionen eine Bestaetigung an.
+    Request confirmation before critical actions.
 
 .PARAMETER WhatIf
-    Zeigt alle geplanten Aktionen ohne Ausfuehrung.
+    Shows all planned actions without executing them.
 
 .EXAMPLE
     Copy-sqmLogins -Source 'SQL01' -Destination 'SQL02'
 
-    Kopiert alle Nicht-System-Logins. Policy wird deaktiviert/reaktiviert,
-    AD-Pruefung und Orphan-Repair laufen automatisch.
+    Copies all non-system logins. Policy is disabled/re-enabled,
+    AD check and orphan repair run automatically.
 
 .EXAMPLE
     Copy-sqmLogins -Source 'SQL01' -Destination 'SQL02' -AdjustAuthMode -RestartServiceIfRequired
 
-    Kopiert alle Logins und stellt den Zielserver bei Bedarf auf Mixed-Mode um.
-    Startet den SQL-Dienst automatisch neu, wenn erforderlich.
+    Copies all logins and switches the target server to Mixed Mode if needed.
+    Automatically restarts the SQL service if required.
 
 .EXAMPLE
     Copy-sqmLogins -Source 'SQL01' -Destination 'SQL02' -Login 'App_*' -Force
 
-    Kopiert nur Logins die mit 'App_' beginnen und ueberschreibt vorhandene.
+    Copies only logins starting with 'App_' and overwrites existing ones.
 
 .EXAMPLE
     Copy-sqmLogins -Source 'SQL01' -Destination 'SQL02' -DisablePolicy $false -WhatIf
 
-    Simuliert den Vorgang ohne Policy-Handling.
+    Simulates the operation without policy handling.
 
 .NOTES
-    Voraussetzungen : dbatools, Invoke-sqmLogging, Set-sqmSqlPolicyState, Install-sqmAdModule
-    AD-Pruefung      : Benoetigt das ActiveDirectory-Modul (RSAT). Verhalten bei fehlendem
-                      Modul ueber -AdModuleAction steuerbar (Install/Skip/Abort).
-    Auth-Mode SMO   : Server.LoginMode - Integrated(0/1) = Windows Only, Mixed(2) = SQL+Windows
-    Policy-Garantie : Der finally-Block stellt sicher dass die Policy auch bei
-                      unbehandelten Ausnahmen wieder aktiviert wird.
+    Prerequisites : dbatools, Invoke-sqmLogging, Set-sqmSqlPolicyState, Install-sqmAdModule
+    AD check       : Requires the ActiveDirectory module (RSAT). Behavior when module is missing
+                     is controllable via -AdModuleAction (Install/Skip/Abort).
+    Auth Mode SMO  : Server.LoginMode - Integrated(0/1) = Windows Only, Mixed(2) = SQL+Windows
+    Policy guarantee: The finally block ensures the policy is re-enabled even on unhandled exceptions.
 #>
 function Copy-sqmLogins
 {

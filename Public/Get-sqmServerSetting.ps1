@@ -1,57 +1,55 @@
 ﻿<#
 .SYNOPSIS
-Liest eine oder alle Server-Eigenschaften aus den Server-Properties einer SQL Server-Instanz.
+Reads one or all server properties from a SQL Server instance.
 
 .DESCRIPTION
-Die Funktion fragt entweder einen benannten Eigenschaftswert (z.B. "BackupDirectory") aus dem
-von Connect-DbaInstance  zurueckgegebenen Objekt ab, oder listet mit -All alle Eigenschaften auf.
+The function queries either a named property value (e.g. "BackupDirectory") from the
+object returned by Connect-DbaInstance, or lists all properties with -All.
 
-Wenn kein SqlInstance-Parameter angegeben wird, wird standardmaessig der aktuelle
-Computername ($env:COMPUTERNAME) verwendet. Diese Regel gilt fuer alle zukuenftigen
-Versionen.
+If no SqlInstance parameter is specified, the current computer name ($env:COMPUTERNAME)
+is used by default.
 
 .PARAMETER SqlInstance
-Die Ziel-SQL Server-Instanz (z.B. "localhost", "SQL01\INSTANCE").
-Wenn nicht angegeben, wird der aktuelle Computername verwendet.
+The target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE").
+If not specified, the current computer name is used.
 
 .PARAMETER SqlCredential
-Alternative Anmeldeinformationen (PSCredential). Wenn nicht angegeben, wird
-Windows-Authentifizierung verwendet.
+Alternative credentials (PSCredential). If not specified,
+Windows Authentication is used.
 
 .PARAMETER Name
-Der Name der gesuchten Server-Eigenschaft. Nur folgende Werte sind erlaubt:
+The name of the server property to retrieve. Only the following values are allowed:
 BackupDirectory, DefaultFile, DefaultLog, MasterDBPath, ErrorLogPath, ComputerName,
 InstanceName, Edition, VersionString, ProductLevel, ProductUpdateLevel, HostPlatform,
 IsClustered, IsHadrEnabled.
 
 .PARAMETER All
-Wenn gesetzt, werden alle Eigenschaften des Server-Objekts als Liste zurueckgegeben.
+When set, all properties of the server object are returned as a list.
 
 .PARAMETER DefaultValue
-Optionaler Default-Wert, falls die Eigenschaft nicht existiert oder nicht gelesen
-werden kann. Wird bei -All ignoriert.
+Optional default value if the property does not exist or cannot be read.
+Ignored when -All is used.
 
 .PARAMETER EnableException
-Schalter, um Ausnahmen durchzulassen (standardmaessig werden Fehler als Warnung
-protokolliert).
+Switch to allow exceptions to pass through (by default errors are logged as warnings).
 
 .EXAMPLE
-# BackupDirectory vom lokalen Server lesen
+# Read BackupDirectory from the local server
 $backupPath = Get-sqmServerSetting -Name "BackupDirectory"
 
 .EXAMPLE
-# Alle Eigenschaften anzeigen
+# Show all properties
 Get-sqmServerSetting -All
 
 .EXAMPLE
-# Alle Eigenschaften einer entfernten Instanz mit Credentials
+# All properties from a remote instance with credentials
 $cred = Get-Credential
 Get-sqmServerSetting -SqlInstance "SQL01" -SqlCredential $cred -All
 
 .NOTES
-Erfordert dbatools-Modul und eine vorhandene Funktion Invoke-sqmLogging.
-Default fuer SqlInstance: $env:COMPUTERNAME (gilt fuer alle zukuenftigen Versionen).
-Verwendet Connect-DbaInstance , um das Serverobjekt abzurufen.
+Requires dbatools module and an existing Invoke-sqmLogging function.
+Default for SqlInstance: $env:COMPUTERNAME.
+Uses Connect-DbaInstance to retrieve the server object.
 #>
 
 function Get-sqmServerSetting

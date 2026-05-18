@@ -1,25 +1,25 @@
 ﻿<#
 .SYNOPSIS
-    Vergleicht die installierte SQL Server-Version mit bekannten CU/SP-Builds.
+    Compares the installed SQL Server version with known CU/SP builds.
 
 .DESCRIPTION
-    Liest die installierte SQL Server-Version (ProductVersion) und vergleicht sie
-    gegen eine eingebettete Referenztabelle bekannter Builds. Gibt an ob die Instanz
-    aktuell ist, wie viele Builds sie hinter dem neuesten Stand liegt und gibt
-    eine Patch-Empfehlung aus.
+    Reads the installed SQL Server version (ProductVersion) and compares it
+    against an embedded reference table of known builds. Indicates whether the
+    instance is current, how many builds it lags behind the latest, and provides
+    a patch recommendation.
 
 .PARAMETER SqlInstance
-    Eine oder mehrere SQL Server-Instanzen. Standard: lokaler Computername.
-    Pipeline-faehig.
+    One or more SQL Server instances. Default: local computer name.
+    Pipeline-capable.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER OutputPath
-    Wenn angegeben, wird ein CSV-Bericht gespeichert.
+    If specified, a CSV report is saved.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
     Invoke-sqmPatchAnalysis -SqlInstance "SQL01"
@@ -31,9 +31,9 @@
     Invoke-sqmPatchAnalysis -SqlInstance "SQL01","SQL02" -OutputPath "D:\Reports"
 
 .NOTES
-    Die eingebettete Referenztabelle enthaelt bekannte Builds zum Zeitpunkt der
-    Modulerstellung. Neuere CUs werden nicht automatisch nachgeladen.
-    Referenz: https://sqlserverbuilds.blogspot.com/
+    The embedded reference table contains known builds at the time the module was created.
+    Newer CUs are not loaded automatically.
+    Reference: https://sqlserverbuilds.blogspot.com/
 #>
 function Invoke-sqmPatchAnalysis
 {

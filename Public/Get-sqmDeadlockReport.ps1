@@ -1,45 +1,45 @@
 <#
 .SYNOPSIS
-    Liest und analysiert Deadlock-Ereignisse aus der System Health Extended Event Session.
+    Reads and analyzes deadlock events from the System Health Extended Event session.
 
 .DESCRIPTION
-    Die System Health Session (seit SQL Server 2008 immer aktiv) protokolliert alle
-    Deadlocks als XML in den Ring Buffer. Diese Funktion liest diesen Buffer aus,
-    parst die Deadlock-Graphen und gibt fuer jeden Deadlock aus:
+    The System Health session (always active since SQL Server 2008) logs all
+    deadlocks as XML in the ring buffer. This function reads that buffer,
+    parses the deadlock graphs and returns for each deadlock:
 
-      - Zeitpunkt des Deadlocks
-      - Opfer-Session (victim) mit Login, Host, Programm, Statement
-      - Alle beteiligten Prozesse mit deren Statements und gehaltenen/angeforderten Locks
-      - Beteiligte Ressourcen (Tabellen, Indizes, Objekte)
-      - Deadlock-Graph als XML (fuer SSMS-Import oder Speicherung als .xdl)
+      - Timestamp of the deadlock
+      - Victim session with login, host, program, statement
+      - All involved processes with their statements and held/requested locks
+      - Involved resources (tables, indexes, objects)
+      - Deadlock graph as XML (for SSMS import or storage as .xdl)
 
-    Optional koennen die Deadlock-Graphen als .xdl-Dateien gespeichert werden
-    (direkt in SSMS via Doppelklick oeffenbar).
+    Optionally, deadlock graphs can be saved as .xdl files
+    (openable directly in SSMS by double-click).
 
-    Zusaetzlich wird der System Health .xel-Ringbuffer ausgelesen wenn verfuegbar
-    (SQL Server 2012+, liefert mehr History als der Ring Buffer).
+    Additionally, the System Health .xel ring buffer is read when available
+    (SQL Server 2012+, provides more history than the ring buffer).
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (Standard: aktueller Computername).
+    SQL Server instance (default: current computer name).
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER StartTime
-    Nur Deadlocks ab diesem Zeitpunkt zurueckgeben. Standard: letzte 24 Stunden.
+    Return only deadlocks from this point in time. Default: last 24 hours.
 
 .PARAMETER EndTime
-    Nur Deadlocks bis zu diesem Zeitpunkt zurueckgeben. Standard: jetzt.
+    Return only deadlocks up to this point in time. Default: now.
 
 .PARAMETER MaxDeadlocks
-    Maximale Anzahl zurueckgegebener Deadlocks (neueste zuerst). Standard: 100.
+    Maximum number of deadlocks returned (newest first). Default: 100.
 
 .PARAMETER OutputPath
-    Wenn angegeben, werden Deadlock-Graphen als .xdl-Dateien in dieses Verzeichnis
-    gespeichert (Format: Deadlock_<Instanz>_<Zeitstempel>.xdl).
+    If specified, deadlock graphs are saved as .xdl files in this directory
+    (format: Deadlock_<Instance>_<Timestamp>.xdl).
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen statt als Fehler zurueckgeben.
+    Throw exceptions immediately instead of returning as errors.
 
 .EXAMPLE
     Get-sqmDeadlockReport
@@ -48,20 +48,20 @@
     Get-sqmDeadlockReport -SqlInstance "SQL01" -StartTime (Get-Date).AddDays(-7)
 
 .EXAMPLE
-    # Deadlocks als XDL-Dateien fuer SSMS speichern
+    # Save deadlocks as XDL files for SSMS
     Get-sqmDeadlockReport -SqlInstance "SQL01" -OutputPath "$env:ProgramData\sqmSQLTool\Logs\Deadlocks"
 
 .EXAMPLE
-    # Nur Deadlocks der letzten Stunde, Anzahl betroffener Statements anzeigen
+    # Only deadlocks from the last hour, show number of affected statements
     Get-sqmDeadlockReport -StartTime (Get-Date).AddHours(-1) |
         Select-Object Timestamp, VictimLogin, VictimStatement, ProcessCount
 
 .NOTES
-    Erfordert: dbatools, Invoke-sqmLogging
-    Benoetigt VIEW SERVER STATE auf der Instanz.
-    Die System Health Session laeuft immer - keine Konfiguration erforderlich.
-    XDL-Dateien koennen in SSMS ueber Datei ? oeffnen direkt als Deadlock-Graph dargestellt werden.
-    Ring Buffer Kapazitaet: standardmaessig 4 MB ? bei hoher Deadlock-Frequenz frueh exportieren.
+    Requires: dbatools, Invoke-sqmLogging
+    Needs VIEW SERVER STATE on the instance.
+    The System Health session runs at all times - no configuration required.
+    XDL files can be opened directly in SSMS via File > Open as a deadlock graph.
+    Ring buffer capacity: 4 MB by default - export early at high deadlock frequency.
 #>
 function Get-sqmDeadlockReport
 {

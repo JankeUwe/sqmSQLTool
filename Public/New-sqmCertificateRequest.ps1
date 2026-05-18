@@ -1,106 +1,106 @@
 <#
 .SYNOPSIS
-    Erstellt eine CSR (Certificate Signing Request) und ein Bestelldatenblatt fuer ein
-    CA-signiertes Zertifikat auf Basis eines bestehenden SQL Server-Zertifikats.
+    Creates a CSR (Certificate Signing Request) and an order data sheet for a
+    CA-signed certificate based on an existing SQL Server certificate.
 
 .DESCRIPTION
-    Liest alle relevanten Eigenschaften des bestehenden Zertifikats aus SQL Server
-    (Subject, SANs, Verwendungszweck, Endpoint-Bindung) und erstellt:
+    Reads all relevant properties of the existing certificate from SQL Server
+    (Subject, SANs, purpose, endpoint binding) and creates:
 
-    1. INF-Datei (certreq-Konfiguration) mit allen Feldern aus dem Bestandszertifikat
-    2. CSR-Datei (.csr / PKCS#10) via Windows certreq.exe oder New-SelfSignedCertificate
-    3. Bestelldatenblatt (.txt) mit:
-         - Allen Angaben fuer die CA-Bestellung (Subject, SANs, Key Usage, EKU)
-         - Vorgeschlagenem Zertifikatstyp je nach Verwendungszweck
-         - Checkliste fuer den Bestellprozess
-         - T-SQL-Befehlen fuer die spaetere Installation
-    4. Optional: Privaten Schluessel lokal erzeugen und sicher speichern
+    1. INF file (certreq configuration) with all fields from the existing certificate
+    2. CSR file (.csr / PKCS#10) via Windows certreq.exe or New-SelfSignedCertificate
+    3. Order data sheet (.txt) with:
+         - All information for the CA order (Subject, SANs, Key Usage, EKU)
+         - Suggested certificate type based on purpose
+         - Checklist for the ordering process
+         - T-SQL commands for later installation
+    4. Optional: Generate private key locally and store securely
 
-    VERWENDUNGSZWECK-SPEZIFISCHE BEHANDLUNG:
-      AlwaysOn / Mirroring  ? Key Usage: Digital Signature, Key Encipherment
+    PURPOSE-SPECIFIC HANDLING:
+      AlwaysOn / Mirroring  -> Key Usage: Digital Signature, Key Encipherment
                                EKU: Server Authentication (1.3.6.1.5.5.7.3.1)
-      TDE                   ? Hinweis: TDE nutzt ueblicherweise selbstsignierte Zertifikate;
-                               CA-signierte Zertifikate sind moeglich aber unueblich
-      SSL/TLS Verbindungen  ? Key Usage: Digital Signature, Key Encipherment
+      TDE                   -> Note: TDE typically uses self-signed certificates;
+                               CA-signed certificates are possible but uncommon
+      SSL/TLS connections   -> Key Usage: Digital Signature, Key Encipherment
                                EKU: Server Authentication + Client Authentication
-      Service Broker        ? Key Usage: Digital Signature, Key Encipherment
+      Service Broker        -> Key Usage: Digital Signature, Key Encipherment
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (Standard: aktueller Computername). Wird fuer SAN und Bestellblatt verwendet.
+    SQL Server instance (default: current computer name). Used for SAN and order sheet.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER CertificateName
-    Name des bestehenden Zertifikats als Vorlage. Wenn nicht angegeben, wird ein
-    neues Zertifikat ohne Vorlage erstellt (-Subject wird dann Pflicht).
+    Name of the existing certificate to use as a template. If not specified, a new
+    certificate is created without a template (-Subject then becomes required).
 
 .PARAMETER Database
-    Datenbank in der das Zertifikat liegt. Standard: master.
+    Database where the certificate resides. Default: master.
 
 .PARAMETER Subject
-    Subject (CN) des neuen Zertifikats. ueberschreibt den Wert aus dem Bestandszertifikat.
-    Format: CN=SQL01.domain.com,O=Firma,L=Stadt,S=Bundesland,C=DE
+    Subject (CN) of the new certificate. Overrides the value from the existing certificate.
+    Format: CN=SQL01.domain.com,O=Company,L=City,S=State,C=DE
 
 .PARAMETER SubjectAlternativeNames
-    Zusaetzliche SANs (DNS-Namen oder IP-Adressen).
-    Wird automatisch ergaenzt um: FQDN, NetBIOS-Name, AG-Listener (falls erkannt).
+    Additional SANs (DNS names or IP addresses).
+    Automatically extended with: FQDN, NetBIOS name, AG listener (if detected).
 
 .PARAMETER KeyLength
-    Schluessellaenge in Bit. Standard: 2048. Fuer neue Installationen empfohlen: 4096.
+    Key length in bits. Default: 2048. Recommended for new installations: 4096.
 
 .PARAMETER ValidityYears
-    Gewuenschte Laufzeit in Jahren (Information fuer die CA, keine Garantie). Standard: 3.
+    Desired validity period in years (information for the CA, not guaranteed). Default: 3.
 
 .PARAMETER Purpose
-    Verwendungszweck wenn kein bestehendes Zertifikat als Vorlage verwendet wird.
-    Gueltige Werte: AlwaysOn, TDE, SSL, ServiceBroker, UserDefined.
+    Purpose when no existing certificate is used as a template.
+    Valid values: AlwaysOn, TDE, SSL, ServiceBroker, UserDefined.
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer CSR, INF und Bestelldatenblatt. Standard: $env:ProgramData\sqmSQLTool\Logs\Cert
+    Output directory for CSR, INF, and order data sheet. Default: $env:ProgramData\sqmSQLTool\Logs\Cert
 
 .PARAMETER Organization
-    Organisationsname fuer das Zertifikat (O=). Standard: aus bestehendem Zertifikat oder Computername.
+    Organization name for the certificate (O=). Default: from existing certificate or computer name.
 
 .PARAMETER OrganizationalUnit
-    Organisationseinheit (OU=). Optional.
+    Organizational unit (OU=). Optional.
 
 .PARAMETER Locality
-    Ort (L=). Optional.
+    City/locality (L=). Optional.
 
 .PARAMETER State
-    Bundesland/Staat (S=). Optional.
+    State/province (S=). Optional.
 
 .PARAMETER Country
-    Laenderkennzeichen zweistellig (C=). Standard: DE.
+    Two-letter country code (C=). Default: DE.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
-    # CSR auf Basis eines bestehenden Zertifikats
+    # CSR based on an existing certificate
     New-sqmCertificateRequest -SqlInstance "SQL01" -CertificateName "AG_CERT"
 
 .EXAMPLE
-    # Neuer CSR ohne Vorlage, alle Felder manuell
+    # New CSR without template, all fields specified manually
     New-sqmCertificateRequest -SqlInstance "SQL01" -Purpose "SSL" `
         -Subject "CN=SQL01.firma.de,O=Firma GmbH,L=Muenchen,C=DE" `
         -SubjectAlternativeNames @("sql01.firma.de","sql01","192.168.1.10") `
         -KeyLength 4096 -ValidityYears 2
 
 .EXAMPLE
-    # CSR mit Ausgabe in bestimmtes Verzeichnis
+    # CSR with output to a specific directory
     New-sqmCertificateRequest -SqlInstance "SQL01" -CertificateName "TLS_CERT" `
         -OutputPath "D:\CertRequests"
 
 .NOTES
-    Erfordert: dbatools (fuer Instanz-Lesen), Invoke-sqmLogging, Get-sqmDefaultOutputPath
-    certreq.exe muss verfuegbar sein (Windows-Standard).
-    Der erzeugte CSR wird bei der CA eingereicht. Das zurueckgelieferte Zertifikat
-    wird mit Install-sqmCertificate installiert.
-    Private Key: Beim Einsatz von certreq.exe verbleibt der Private Key im lokalen
-    Windows Zertifikatspeicher (Maschinen-Store). Fuer SQL Server-Import muss er
-    exportiert und als .pfx/.pvk bereitgestellt werden.
+    Requires: dbatools (for instance reading), Invoke-sqmLogging, Get-sqmDefaultOutputPath
+    certreq.exe must be available (Windows standard).
+    The generated CSR is submitted to the CA. The returned certificate is
+    installed with Install-sqmCertificate.
+    Private Key: When using certreq.exe, the private key remains in the local
+    Windows certificate store (machine store). For SQL Server import it must be
+    exported and provided as a .pfx/.pvk file.
 #>
 function New-sqmCertificateRequest
 {

@@ -1,49 +1,49 @@
 ﻿<#
 .SYNOPSIS
-    Installiert oder aktualisiert Ola Hallengrens Maintenance Solution auf einer SQL Server-Instanz.
+    Installs or updates Ola Hallengren's Maintenance Solution on a SQL Server instance.
 
 .DESCRIPTION
-    Laedt die neueste Version der Maintenance Solution von GitHub herunter
+    Downloads the latest version of the Maintenance Solution from GitHub
     (https://github.com/olahallengren/sql-server-maintenance-solution/archive/refs/heads/main.zip),
-    extrahiert die benoetigten Skripte und fuehrt sie in folgender Reihenfolge aus:
+    extracts the required scripts and executes them in the following order:
     1. CommandExecute.sql
     2. CommandLog.sql
     3. DatabaseBackup.sql
     4. DatabaseIntegrityCheck.sql
     5. IndexOptimize.sql
 
-    Die Installation erstellt ausschliesslich die Datenbankobjekte (Tabellen, Prozeduren),
-    aber keine SQL Agent Jobs. Die Jobs werden spaeter mit den dafuer vorgesehenen Funktionen
-    (z.?B. New-sqmOlaBackupJobs) erstellt.
+    The installation creates only the database objects (tables, procedures),
+    but no SQL Agent jobs. Jobs are created later using the dedicated functions
+    (e.g. New-sqmOlaBackupJobs).
 
-    Vorhandene Installationen werden mit -Force / -Update ueberschrieben.
+    Existing installations are overwritten with -Force / -Update.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (Standard: aktueller Computername).
+    SQL Server instance (default: current computer name).
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER SourcePath
-    Alternative Quelle fuer das ZIP-Archiv. Standard: GitHub-ZIP.
+    Alternative source for the ZIP archive. Default: GitHub ZIP.
 
 .PARAMETER Force
-    Vorhandene Installation ignorieren und neu installieren.
+    Ignore existing installation and reinstall.
 
 .PARAMETER Update
-    Alias fuer -Force.
+    Alias for -Force.
 
 .PARAMETER ContinueOnError
-    Bei Fehler mit naechster Instanz fortfahren.
+    Continue with the next instance on error.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .PARAMETER Confirm
-    Bestaetigung vor der Installation anfordern.
+    Request confirmation before installation.
 
 .PARAMETER WhatIf
-    Zeigt, was passieren wuerde, ohne aenderungen vorzunehmen.
+    Shows what would happen without making changes.
 
 .EXAMPLE
     Install-sqmOlaMaintenanceSolution -SqlInstance "SQL01"
@@ -52,8 +52,8 @@
     Install-sqmOlaMaintenanceSolution -SqlInstance "SQL01" -Force
 
 .NOTES
-    Voraussetzungen: dbatools, Invoke-sqmLogging, Test-sqmOlaInstallation.
-    Die Funktion laedt das ZIP-Archiv herunter und bereinigt alle temporaeren Dateien selbststaendig.
+    Prerequisites: dbatools, Invoke-sqmLogging, Test-sqmOlaInstallation.
+    The function downloads the ZIP archive and cleans up all temporary files automatically.
 #>
 function Install-sqmOlaMaintenanceSolution
 {

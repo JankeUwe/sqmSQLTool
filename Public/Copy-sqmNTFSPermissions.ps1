@@ -1,40 +1,40 @@
 <#
 .SYNOPSIS
-    Kopiert NTFS-Berechtigungen (ACLs) von einem Quellpfad auf einen Zielpfad.
+    Copies NTFS permissions (ACLs) from a source path to a destination path.
 
 .DESCRIPTION
-    Liest fuer jedes Dateisystemobjekt (Ordner/Datei) unterhalb des Quellpfades die
-    expliziten NTFS-Berechtigungen aus und wendet sie auf das entsprechende Objekt
-    unterhalb des Zielpfades an. Voraussetzung ist, dass die Zielstruktur bereits
-    existiert (Ausnahme: mit -CreateMissingFolders werden fehlende Zielordner angelegt).
+    Reads the explicit NTFS permissions for each file system object (folder/file) below
+    the source path and applies them to the corresponding object below the destination path.
+    The target structure must already exist (exception: with -CreateMissingFolders, missing
+    target folders are created automatically).
 
 .PARAMETER SourcePath
-    Quellpfad (z.B. "D:\" oder "D:\Daten").
+    Source path (e.g. "D:\" or "D:\Data").
 
 .PARAMETER DestinationPath
-    Zielpfad (z.B. "E:\" oder "E:\Daten").
+    Destination path (e.g. "E:\" or "E:\Data").
 
 .PARAMETER Recurse
-    Rekursiver Durchlauf aller Unterordner und Dateien.
+    Recursive traversal of all subfolders and files.
 
 .PARAMETER CreateMissingFolders
-    Erstellt fehlende Zielordner automatisch (nur fuer Verzeichnisse, nicht fuer Dateien).
-    Dateien, die im Ziel fehlen, werden uebersprungen.
+    Automatically creates missing target folders (directories only, not files).
+    Files missing at the destination are skipped.
 
 .PARAMETER IncludeSystemAndHidden
-    Bezieht versteckte und Systemobjekte in die Verarbeitung ein.
+    Includes hidden and system objects in the processing.
 
 .EXAMPLE
     Copy-sqmNTFSPermissions -SourcePath "D:\" -DestinationPath "E:\" -Recurse
-    Kopiert alle Berechtigungen von D: nach E: (rekursiv).
+    Copies all permissions from D: to E: (recursively).
 
 .EXAMPLE
     Copy-sqmNTFSPermissions -SourcePath "D:\Daten" -DestinationPath "E:\Daten" -Recurse -CreateMissingFolders
-    Kopiert Berechtigungen und legt fehlende Zielordner an.
+    Copies permissions and creates missing target folders.
 
 .NOTES
-    Erfordert administrative Rechte (Get-Acl / Set-Acl).
-    Bei Zugriffsfehlern werden Warnungen ausgegeben, der Vorgang wird fortgesetzt.
+    Requires administrative rights (Get-Acl / Set-Acl).
+    Access errors generate warnings; processing continues.
 #>
 function Copy-sqmNTFSPermissions {
     [CmdletBinding(SupportsShouldProcess = $true)]

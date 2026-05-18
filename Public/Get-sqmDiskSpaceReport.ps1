@@ -1,48 +1,48 @@
 <#
 .SYNOPSIS
-    Ermittelt freien Speicherplatz aller SQL-relevanten Volumes und
-    schaetzt den Zeitpunkt bis zur Erschoepfung basierend auf Wachstumsdaten.
+    Determines free disk space on all SQL-relevant volumes and estimates
+    time to exhaustion based on growth data.
 
 .DESCRIPTION
-    Fragt sys.dm_os_volume_stats fuer alle Datenbankdateien ab und ermittelt:
-    - Freier Speicherplatz pro Volume
-    - Gesamtgroesse der Datenbankdateien auf dem Volume
-    - AutoGrowth-Volumen der letzten -HistoryDays Tage (aus Default Trace)
-    - Geschaetzte Tage bis Erschoepfung basierend auf Wachstumsrate
-    - Warnung wenn freier Speicher unter -WarnThresholdPct faellt
+    Queries sys.dm_os_volume_stats for all database files and determines:
+    - Free disk space per volume
+    - Total size of database files on the volume
+    - AutoGrowth volume over the last -HistoryDays days (from default trace)
+    - Estimated days until exhaustion based on growth rate
+    - Warning when free space falls below -WarnThresholdPct
 
-    Die Ergebnisse werden als TXT-Bericht und CSV-Datei im angegebenen Verzeichnis gespeichert.
-    Zusaetzlich gibt die Funktion ein Objekt mit den Detaildaten und den Dateipfaden zurueck.
+    Results are saved as TXT report and CSV file in the specified directory.
+    The function also returns an object with the detail data and file paths.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz(en). Pipeline-faehig. Standard: aktueller Computername.
+    SQL Server instance(s). Pipeline-capable. Default: current computer name.
 
 .PARAMETER SqlCredential
-    Optionales PSCredential fuer die Verbindung.
+    Optional PSCredential for the connection.
 
 .PARAMETER WarnThresholdPct
-    Warnung wenn freier Speicher unter diesem Prozentwert. Standard: 20.
+    Warning when free space falls below this percentage. Default: 20.
 
 .PARAMETER CriticalThresholdPct
-    Kritisch wenn freier Speicher unter diesem Prozentwert. Standard: 10.
+    Critical when free space falls below this percentage. Default: 10.
 
 .PARAMETER HistoryDays
-    Zeitraum fuer Wachstumsberechnung in Tagen. Standard: 30.
+    Time range for growth calculation in days. Default: 30.
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer die Berichtsdateien. Standard: $env:ProgramData\sqmSQLTool\Logs
+    Output directory for report files. Default: $env:ProgramData\sqmSQLTool\Logs
 
 .PARAMETER ContinueOnError
-    Bei Fehler auf einer Instanz fortfahren (ansonsten wird der Fehler ausgeloest).
+    Continue on error for an instance (otherwise the error is thrown).
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen (ueberschreibt ContinueOnError).
+    Throw exceptions immediately (overrides ContinueOnError).
 
 .PARAMETER Confirm
-    Fordert vor dem Schreiben der Dateien eine Bestaetigung an.
+    Request confirmation before writing files.
 
 .PARAMETER WhatIf
-    Zeigt, welche Dateien erstellt wuerden, ohne sie tatsaechlich zu schreiben.
+    Shows which files would be created without actually writing them.
 
 .EXAMPLE
     Get-sqmDiskSpaceReport
@@ -51,11 +51,11 @@
     Get-sqmDiskSpaceReport -SqlInstance "SQL01" -WarnThresholdPct 15 -OutputPath "D:\Reports"
 
 .NOTES
-    Autor:   MSSQLTools
-    Voraussetzungen: dbatools, Invoke-sqmLogging
-    Standard-Ausgabepfad: $env:ProgramData\sqmSQLTool\Logs
-    Die Wachstumsberechnung basiert auf dem Default Trace (falls aktiviert).
-    Ist der Trace deaktiviert, wird kein Wachstumswert ermittelt.
+    Author:       MSSQLTools
+    Prerequisites: dbatools, Invoke-sqmLogging
+    Default output path: $env:ProgramData\sqmSQLTool\Logs
+    Growth calculation is based on the default trace (if enabled).
+    If the trace is disabled, no growth value is determined.
 #>
 function Get-sqmDiskSpaceReport
 {

@@ -1,57 +1,55 @@
 ﻿<#
 .SYNOPSIS
-Zeigt den Fortschritt und die geschaetzte Restdauer fuer aktive Backup-, Restore- und AutoSeed-Operationen an.
+Displays progress and estimated remaining time for active backup, restore and AutoSeed operations.
 
 .DESCRIPTION
-Die Funktion ueberwacht aktive SQL Server-Operationen (Backup, Restore, AutoSeed) und berechnet
-den Fortschritt sowie die geschaetzte verbleibende Zeit. Sie kombiniert Informationen aus:
-- Backup- und Restore-Fortschritt: sys.dm_exec_requests
-- AutoSeed-Fortschritt: sys.dm_hadr_physical_seeding_stats
+The function monitors active SQL Server operations (backup, restore, AutoSeed) and calculates
+the progress and estimated remaining time. It combines information from:
+- Backup and restore progress: sys.dm_exec_requests
+- AutoSeed progress: sys.dm_hadr_physical_seeding_stats
 
-Die Funktion kann auf einer bestimmten Instanz ausgefuehrt werden und zeigt standardmaessig
-alle aktiven Operationen an. ueber Parameter kann nach Vorgangstyp (Backup, Restore, AutoSeed)
-gefiltert werden.
+The function can run against a specific instance and shows all active operations by default.
+Use the parameter to filter by operation type (Backup, Restore, AutoSeed).
 
-Wenn kein SqlInstance-Parameter angegeben wird, wird standardmaessig der aktuelle
-Computername ($env:COMPUTERNAME) verwendet. Diese Regel gilt fuer alle zukuenftigen
-Versionen.
+If no SqlInstance parameter is specified, the current computer name ($env:COMPUTERNAME) is used
+by default.
 
 .PARAMETER SqlInstance
-Die Ziel-SQL Server-Instanz (Standard: aktueller Computername).
+The target SQL Server instance (default: current computer name).
 
 .PARAMETER SqlCredential
-Alternative Anmeldeinformationen.
+Alternative credentials.
 
 .PARAMETER OperationType
-Filtert nach Vorgangstyp. Moegliche Werte: 'Backup', 'Restore', 'AutoSeed'.
-Standardmaessig werden alle aktiven Operationen angezeigt.
+Filters by operation type. Valid values: 'Backup', 'Restore', 'AutoSeed'.
+By default all active operations are shown.
 
 .PARAMETER Continuous
-Wenn gesetzt, wird die Ausgabe kontinuierlich aktualisiert (aehnlich wie 'watch').
-Beenden mit Strg+C.
+When set, output is continuously refreshed (similar to 'watch').
+Stop with Ctrl+C.
 
 .PARAMETER RefreshSeconds
-Intervall fuer die kontinuierliche Aktualisierung in Sekunden (Standard: 5). Nur in Verbindung mit -Continuous.
+Refresh interval in seconds for continuous mode (default: 5). Only used with -Continuous.
 
 .PARAMETER EnableException
-Schalter, um Ausnahmen durchzulassen (standardmaessig werden Fehler als Warnung protokolliert).
+Switch to allow exceptions to pass through (by default errors are logged as warnings).
 
 .EXAMPLE
-# Alle aktiven Operationen auf der lokalen Instanz anzeigen
+# Show all active operations on the local instance
 Get-sqmOperationStatus
 
 .EXAMPLE
-# Nur aktive AutoSeed-Vorgaenge auf einer entfernten Instanz
+# Only active AutoSeed operations on a remote instance
 Get-sqmOperationStatus -SqlInstance "SQL01" -OperationType AutoSeed
 
 .EXAMPLE
-# Kontinuierliche Aktualisierung alle 10 Sekunden
+# Continuous refresh every 10 seconds
 Get-sqmOperationStatus -Continuous -RefreshSeconds 10
 
 .NOTES
-Erfordert dbatools und Invoke-sqmLogging.
-Die Berechnung der geschaetzten Restdauer basiert auf dem bisherigen Fortschritt
-und der vergangenen Zeit. Die Genauigkeit verbessert sich mit fortschreitender Operation.
+Requires dbatools and Invoke-sqmLogging.
+The estimated remaining time is calculated based on the current progress and elapsed time.
+Accuracy improves as the operation progresses.
 #>
 function Get-sqmOperationStatus
 {

@@ -1,39 +1,38 @@
 <#
 .SYNOPSIS
-    Ermittelt aktuelle Blockierungsketten auf einer SQL Server-Instanz.
+    Retrieves current blocking chains on a SQL Server instance.
 
 .DESCRIPTION
-    Liest sys.dm_exec_requests, sys.dm_exec_sessions und sys.dm_exec_sql_text aus
-    und baut daraus vollstaendige Blockierungsketten auf. Fuer jede blockierte Session
-    werden ausgegeben:
-      - Blockierende SPID und deren SQL-Text
-      - Blockierte SPID(s) mit Wartezeit, Wartetyp und Lock-Ressource
-      - Datenbank, Login, Hostname, Programm
-      - Komplette Kette (Head Blocker ? alle blockierten Sessions)
+    Reads sys.dm_exec_requests, sys.dm_exec_sessions and sys.dm_exec_sql_text
+    and builds complete blocking chains. For each blocked session the following is returned:
+      - Blocking SPID and its SQL text
+      - Blocked SPID(s) with wait time, wait type and lock resource
+      - Database, login, hostname, program
+      - Complete chain (head blocker to all blocked sessions)
 
-    Optional kann ein Snapshot-Modus aktiviert werden: Die Funktion schreibt dann
-    regelmaessig Snapshots als CSV-Datei - nuetzlich fuer Agent-Jobs zur Verlaufsanalyse.
+    An optional snapshot mode can be enabled: the function then periodically writes
+    snapshots as CSV files - useful for Agent jobs for historical analysis.
 
-    Gibt ein Objekt zurueck das sich direkt weiterverarbeiten laesst:
-      .BlockingChains  - Liste aller Ketten mit Head Blocker und blockierten Sessions
-      .HeadBlockers    - Nur die blockierenden Sessions
-      .BlockedSessions - Nur die blockierten Sessions
-      .HasBlocking     - $true wenn Blockierungen gefunden
+    Returns an object that can be used directly for further processing:
+      .BlockingChains  - List of all chains with head blocker and blocked sessions
+      .HeadBlockers    - Only the blocking sessions
+      .BlockedSessions - Only the blocked sessions
+      .HasBlocking     - $true if blocking was found
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (Standard: aktueller Computername).
+    SQL Server instance (default: current computer name).
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER MinWaitSeconds
-    Nur Blockierungen melden, die laenger als dieser Wert warten (in Sekunden). Standard: 0.
+    Only report blocking that has been waiting longer than this value (in seconds). Default: 0.
 
 .PARAMETER OutputPath
-    Wenn angegeben, wird ein CSV-Snapshot in dieses Verzeichnis geschrieben.
+    If specified, a CSV snapshot is written to this directory.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen statt als Fehler zurueckgeben.
+    Throw exceptions immediately instead of returning as errors.
 
 .EXAMPLE
     Get-sqmBlockingReport
@@ -42,17 +41,17 @@
     Get-sqmBlockingReport -SqlInstance "SQL01" -MinWaitSeconds 30
 
 .EXAMPLE
-    # Nur pruefen ob gerade geblockt wird
-    if ((Get-sqmBlockingReport -SqlInstance "SQL01").HasBlocking) { Write-Warning "Blockierungen vorhanden!" }
+    # Check whether blocking is currently occurring
+    if ((Get-sqmBlockingReport -SqlInstance "SQL01").HasBlocking) { Write-Warning "Blocking detected!" }
 
 .EXAMPLE
-    # Regelmaessiger Snapshot via Agent-Job
+    # Regular snapshot via Agent job
     Get-sqmBlockingReport -SqlInstance "SQL01" -OutputPath "$env:ProgramData\sqmSQLTool\Logs\Blocking"
 
 .NOTES
-    Erfordert: dbatools, Invoke-sqmLogging
-    Benoetigt VIEW SERVER STATE auf der Instanz.
-    SQL-Text wird ueber sys.dm_exec_sql_text aufgeloest (Statement-Ebene via statement_start/end_offset).
+    Requires: dbatools, Invoke-sqmLogging
+    Needs VIEW SERVER STATE on the instance.
+    SQL text is resolved via sys.dm_exec_sql_text (statement level via statement_start/end_offset).
 #>
 function Get-sqmBlockingReport
 {

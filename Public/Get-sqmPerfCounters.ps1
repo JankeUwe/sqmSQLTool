@@ -1,31 +1,31 @@
 ﻿<#
 .SYNOPSIS
-    Liest SQL Server Performance Counter aus sys.dm_os_performance_counters.
+    Reads SQL Server performance counters from sys.dm_os_performance_counters.
 
 .DESCRIPTION
-    Gibt die wichtigsten SQL Server Performance Counter zurueck:
+    Returns the most important SQL Server performance counters:
     Buffer Cache Hit Ratio, Page Life Expectancy, Batch Requests/sec,
-    Kompilierungen, Lock Waits, Speicher, Verbindungen, Scans und mehr.
-    Interpretiert Werte automatisch und kennzeichnet auffaellige Werte.
+    compilations, lock waits, memory, connections, scans and more.
+    Automatically interprets values and flags notable ones.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz. Standard: lokaler Computername.
+    SQL Server instance. Default: local computer name.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER Category
-    Filter auf Kategorie-Fragmente, z.B. @('Buffer','Memory','Locks').
-    Standard: alle Key-Counter.
+    Filter on category fragments, e.g. @('Buffer','Memory','Locks').
+    Default: all key counters.
 
 .PARAMETER TopN
-    Maximale Anzahl Ergebnisse. Standard: 50.
+    Maximum number of results. Default: 50.
 
 .PARAMETER OutputPath
-    Wenn angegeben, wird ein CSV-Bericht gespeichert.
+    If specified, a CSV report is saved.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
     Get-sqmPerfCounters -SqlInstance "SQL01"
@@ -34,8 +34,8 @@
     Get-sqmPerfCounters -SqlInstance "SQL01" -Category "Buffer","Memory"
 
 .NOTES
-    Erfordert: dbatools, Invoke-sqmLogging
-    Benoetigt VIEW SERVER STATE.
+    Requires: dbatools, Invoke-sqmLogging
+    Needs VIEW SERVER STATE.
 #>
 function Get-sqmPerfCounters
 {

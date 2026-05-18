@@ -1,55 +1,50 @@
 ﻿<#
 .SYNOPSIS
-Sichert Benutzerdatenbanken einer SQL Server-Instanz.
+Backs up user databases on a SQL Server instance.
 
 .DESCRIPTION
-Die Funktion sichert alle oder ausgewaehlte Benutzerdatenbanken (keine Systemdatenbanken)
-im Full-Backup-Modus. Der Zielpfad wird aus den Server-Eigenschaften (BackupDirectory)
-gelesen und muss auf "User-Db" enden.
+Backs up all or selected user databases (no system databases) in full backup mode.
+The target path is read from the server properties (BackupDirectory) and must end with "User-Db".
 
-Wenn kein SqlInstance-Parameter angegeben wird, wird standardmaessig der aktuelle
-Computername ($env:COMPUTERNAME) verwendet. Diese Regel gilt fuer alle zukuenftigen
-Versionen.
+If the SqlInstance parameter is not specified, the current computer name
+($env:COMPUTERNAME) is used by default. This rule applies to all future versions.
 
 .PARAMETER SqlInstance
-Die Ziel-SQL Server-Instanz (z.B. "localhost", "SQL01\INSTANCE").
-Wenn nicht angegeben, wird der aktuelle Computername verwendet.
+The target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE").
+If not specified, the current computer name is used.
 
 .PARAMETER SqlCredential
-Alternative Anmeldeinformationen (PSCredential). Wenn nicht angegeben, wird
-Windows-Authentifizierung verwendet.
+Alternative credentials (PSCredential). If not specified, Windows authentication is used.
 
 .PARAMETER Database
-Name oder Array von Benutzerdatenbanken, die gesichert werden sollen. Wird ignoriert,
-wenn -All gesetzt ist.
+Name or array of user databases to back up. Ignored when -All is set.
 
 .PARAMETER All
-Wenn gesetzt, werden alle Benutzerdatenbanken auf der Instanz gesichert.
+When set, all user databases on the instance are backed up.
 
 .PARAMETER BackupPath
-Optionaler direkter Backup-Pfad (ueberschreibt den Wert aus Server-Eigenschaften).
-Der Pfad muss auf "User-Db" enden.
+Optional direct backup path (overrides the value from server properties).
+The path must end with "User-Db".
 
 .PARAMETER EnableException
-Schalter, um Ausnahmen durchzulassen (standardmaessig werden Fehler als Warnung
-protokolliert).
+Switch to propagate exceptions immediately (by default errors are logged as warnings).
 
 .EXAMPLE
-# Alle Benutzerdatenbanken auf dem aktuellen Computer sichern
+# Back up all user databases on the current computer
 Invoke-sqmUserDatabaseBackup -All
 
 .EXAMPLE
-# Bestimmte Datenbanken auf einem entfernten Server sichern
+# Back up specific databases on a remote server
 Invoke-sqmUserDatabaseBackup -SqlInstance "SQL01" -Database "SalesDB", "InventoryDB"
 
 .EXAMPLE
-# Mit alternativem Pfad
+# With an alternative path
 Invoke-sqmUserDatabaseBackup -All -BackupPath "D:\Backup\User-Db"
 
 .NOTES
-Erfordert dbatools-Modul und eine vorhandene Funktion Invoke-sqmLogging sowie
-Get-sqmServerSetting (fuer den Standard-Backup-Pfad). Der Pfad muss auf 'User-Db' enden.
-Default fuer SqlInstance: $env:COMPUTERNAME (gilt fuer alle zukuenftigen Versionen).
+Requires the dbatools module and existing Invoke-sqmLogging and Get-sqmServerSetting functions
+(for the default backup path). The path must end with 'User-Db'.
+Default for SqlInstance: $env:COMPUTERNAME (applies to all future versions).
 #>
 
 function Invoke-sqmUserDatabaseBackup

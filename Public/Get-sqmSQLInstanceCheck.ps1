@@ -1,34 +1,34 @@
 ﻿<#
 .SYNOPSIS
-ueberprueft eine SQL Server-Instanz auf Best Practices.
+Checks a SQL Server instance against best practices.
 
 .DESCRIPTION
-Die Funktion fuehrt eine Reihe von Best-Practice-Pruefungen durch:
-- Max Degree of Parallelism (MAXDOP) - Empfehlung basierend auf Anzahl der Kerne
-- Max Server Memory - Sollte nicht zu hoch sein (Reserve fuer OS)
-- Cost Threshold for Parallelism - Empfehlung ? 50
-- Backup Directory - Existenz und Schreibrechte (optional)
-- SA-Konto - Umbenennung und Deaktivierung
-- xp_cmdshell - Sollte deaktiviert sein (es sei denn, benoetigt)
-- Datenbank-Autogrow-Einstellungen - Prozent vs. MB, angemessene Werte
-- TempDB - Anzahl der Dateien (sollte Anzahl der Kerne entsprechen, max 8), gleiche Groesse, Pfad
-- Isolierte Volumes - Pruefung, ob Datenbankdateien auf getrennten Laufwerken liegen (optional)
-- SQL Server Version / Service Pack - Prueft auf veraltete Versionen (optional)
+The function performs a series of best practice checks:
+- Max Degree of Parallelism (MAXDOP) - recommendation based on number of cores
+- Max Server Memory - should not be too high (reserve for OS)
+- Cost Threshold for Parallelism - recommendation >= 50
+- Backup Directory - existence and write permissions (optional)
+- SA account - renaming and disabling
+- xp_cmdshell - should be disabled (unless required)
+- Database autogrow settings - percent vs. MB, appropriate values
+- TempDB - number of files (should match number of cores, max 8), equal size, path
+- Isolated volumes - check whether database files are on separate drives (optional)
+- SQL Server version / service pack - checks for outdated versions (optional)
 
-Wenn kein SqlInstance-Parameter angegeben wird, wird standardmaessig der aktuelle
-Computername ($env:COMPUTERNAME) verwendet.
+If no SqlInstance parameter is specified, the current computer name ($env:COMPUTERNAME)
+is used by default.
 
 .PARAMETER SqlInstance
-Die Ziel-SQL Server-Instanz (Standard: aktueller Computername).
+The target SQL Server instance (default: current computer name).
 
 .PARAMETER SqlCredential
-Alternative Anmeldeinformationen.
+Alternative credentials.
 
 .PARAMETER Detailed
-Detaillierte Ausgabe (z.B. auch Pfadpruefungen, alle Datenbanken analysieren). Standard: $false.
+Detailed output (e.g. path checks, analyze all databases). Default: $false.
 
 .PARAMETER EnableException
-Ausnahmen durchlassen.
+Allow exceptions to pass through.
 
 .EXAMPLE
 Get-sqmSQLInstanceCheck
@@ -37,7 +37,7 @@ Get-sqmSQLInstanceCheck
 Get-sqmSQLInstanceCheck -SqlInstance "SQL01\INSTANCE" -Detailed
 
 .NOTES
-Erfordert dbatools und Invoke-sqmLogging.
+Requires dbatools and Invoke-sqmLogging.
 #>
 function Get-sqmSQLInstanceCheck
 {

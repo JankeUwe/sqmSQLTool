@@ -1,23 +1,23 @@
 ﻿<#
 .SYNOPSIS
-    Analysiert die TempDB?Konfiguration und gibt Optimierungsempfehlungen.
+    Analyzes the TempDB configuration and provides optimization recommendations.
 
 .DESCRIPTION
-    Prueft Anzahl und Groesse der TempDB?Dateien, Autogrow?Einstellungen und den Pfad.
-    Empfiehlt Anzahl Dateien (entsprechend CPU?Kerne, max 8), gleiche Groessen, MB?basierendes Autogrow,
-    separate Laufwerke (falls moeglich).
+    Checks the number and size of TempDB files, autogrow settings and the path.
+    Recommends file count (matching CPU core count, max 8), equal sizes, MB-based autogrow,
+    and separate drives where possible.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (Standard: aktueller Computername).
+    SQL Server instance (default: current computer name).
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER OutputPath
-    Optionaler CSV?Export.
+    Optional CSV export path.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
     Get-sqmTempDbRecommendation -SqlInstance "SQL01"

@@ -1,116 +1,115 @@
 <#
 .SYNOPSIS
-    Erstellt SQL Agent Jobs fuer FULL-, DIFF- und/oder LOG-Backup der
-    User-Datenbanken via Ola Hallengrens DatabaseBackup.
+    Creates SQL Agent jobs for FULL, DIFF, and/or LOG backups of user databases
+    via Ola Hallengren's DatabaseBackup.
 
 .DESCRIPTION
-    Legt je nach gewaehltem Backup-Typ (-Full, -Diff, -Log) einen separaten
-    SQL Agent Job an. Jeder Job erhaelt seinen eigenen Zeitplan mit
-    konfigurierbaren Tagen und Startzeit.
+    Creates a separate SQL Agent job for each selected backup type (-Full, -Diff, -Log).
+    Each job gets its own schedule with configurable days and start time.
 
-    Backups werden in <BackupDirectory>\Usr-db abgelegt.
-    Job-Namen werden aus der Modulkonfiguration gelesen:
+    Backups are stored in <BackupDirectory>\Usr-db.
+    Job names are read from the module configuration:
         OlaJobNameFull  (Default: 'OlaHH-UserDatabases-FULL')
         OlaJobNameDiff  (Default: 'OlaHH-UserDatabases-DIFF')
         OlaJobNameLog   (Default: 'OlaHH-UserDatabases-LOG')
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz. Standard: aktueller Computername.
+    SQL Server instance. Default: current computer name.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die SQL-Verbindung.
+    PSCredential for the SQL connection.
 
 .PARAMETER BackupDirectory
-    Backup-Basis-Verzeichnis. User-Datenbanken werden in <BackupDirectory>\Usr-db gesichert.
-    Standard: automatisch aus SQL Server ermittelt.
+    Backup base directory. User databases are backed up to <BackupDirectory>\Usr-db.
+    Default: automatically determined from SQL Server.
 
 .PARAMETER Databases
-    Datenbank-Filter fuer Ola. Z.B. 'USER_DATABASES', 'ALL_DATABASES' oder
-    kommagetrennte DB-Namen wie 'DB1,DB2'. Standard: 'USER_DATABASES'.
+    Database filter for Ola. E.g. 'USER_DATABASES', 'ALL_DATABASES', or
+    comma-separated DB names like 'DB1,DB2'. Default: 'USER_DATABASES'.
 
 .PARAMETER Full
-    Erstellt einen FULL-Backup-Job.
+    Creates a FULL backup job.
 
 .PARAMETER FullJobName
-    ueberschreibt den aus der Konfiguration gelesenen Job-Namen fuer FULL.
+    Overrides the job name for FULL read from the configuration.
 
 .PARAMETER FullScheduleTime
-    Startzeit des FULL-Jobs im Format 'HH:mm'. Standard: '20:00'.
+    Start time of the FULL job in format 'HH:mm'. Default: '20:00'.
 
 .PARAMETER FullScheduleDays
-    Wochentage fuer den FULL-Job als Array. Gueltige Werte: 'Monday'..'Sunday', 'Weekdays', 'Weekend', 'EveryDay'.
-    Mehrere Tage: @('Monday','Wednesday','Friday'). Standard: @('Sunday').
+    Days of the week for the FULL job as an array. Valid values: 'Monday'..'Sunday', 'Weekdays', 'Weekend', 'EveryDay'.
+    Multiple days: @('Monday','Wednesday','Friday'). Default: @('Sunday').
 
 .PARAMETER FullScheduleIntervalMinutes
-    Wiederholungsintervall fuer den FULL-Job in Minuten (z.B. 60 = stuendlich).
-    0 = kein Intervall, Job laeuft einmalig zur FullScheduleTime. Standard: 0.
+    Repeat interval for the FULL job in minutes (e.g. 60 = hourly).
+    0 = no interval, job runs once at FullScheduleTime. Default: 0.
 
 .PARAMETER Diff
-    Erstellt einen DIFF-Backup-Job.
+    Creates a DIFF backup job.
 
 .PARAMETER DiffJobName
-    ueberschreibt den aus der Konfiguration gelesenen Job-Namen fuer DIFF.
+    Overrides the job name for DIFF read from the configuration.
 
 .PARAMETER DiffScheduleTime
-    Startzeit des DIFF-Jobs im Format 'HH:mm'. Standard: '20:00'.
+    Start time of the DIFF job in format 'HH:mm'. Default: '20:00'.
 
 .PARAMETER DiffScheduleDays
-    Wochentage fuer den DIFF-Job. Standard: @('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday').
+    Days of the week for the DIFF job. Default: @('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday').
 
 .PARAMETER DiffScheduleIntervalMinutes
-    Wiederholungsintervall fuer den DIFF-Job in Minuten. 0 = einmalig. Standard: 0.
+    Repeat interval for the DIFF job in minutes. 0 = once. Default: 0.
 
 .PARAMETER Log
-    Erstellt einen LOG-Backup-Job.
+    Creates a LOG backup job.
 
 .PARAMETER LogJobName
-    ueberschreibt den aus der Konfiguration gelesenen Job-Namen fuer LOG.
+    Overrides the job name for LOG read from the configuration.
 
 .PARAMETER LogScheduleTime
-    Startzeit des LOG-Jobs im Format 'HH:mm'. Standard: '00:00'.
+    Start time of the LOG job in format 'HH:mm'. Default: '00:00'.
 
 .PARAMETER LogScheduleDays
-    Wochentage fuer den LOG-Job. Standard: @('EveryDay').
+    Days of the week for the LOG job. Default: @('EveryDay').
 
 .PARAMETER LogScheduleIntervalMinutes
-    Wiederholungsintervall fuer den LOG-Job in Minuten (z.B. 15 = alle 15 Minuten).
-    0 = einmalig zur LogScheduleTime. Standard: 0.
+    Repeat interval for the LOG job in minutes (e.g. 15 = every 15 minutes).
+    0 = once at LogScheduleTime. Default: 0.
 
 .PARAMETER JobCategory
-    Kategorie aller erzeugten Jobs. Standard: 'Database Maintenance'.
+    Category for all created jobs. Default: 'Database Maintenance'.
 
 .PARAMETER CleanupTime
-    Alter in Stunden, nach dem Backup-Dateien geloescht werden. Standard: 48. 0 = kein Cleanup.
+    Age in hours after which backup files are deleted. Default: 48. 0 = no cleanup.
 
 .PARAMETER Compress
-    Backup-Komprimierung. Standard: 'Y'.
+    Backup compression. Default: 'Y'.
 
 .PARAMETER Verify
-    Backup-Verifikation. Standard: 'Y'.
+    Backup verification. Default: 'Y'.
 
 .PARAMETER CheckSum
-    Checksum-Berechnung. Standard: 'Y'.
+    Checksum calculation. Default: 'Y'.
 
 .PARAMETER LogToTable
-    Ola-interne Protokollierung in CommandLog-Tabelle. Standard: 'Y'.
+    Ola internal logging to CommandLog table. Default: 'Y'.
 
 .PARAMETER OperatorName
-    SQL Agent Operator fuer E-Mail-Benachrichtigung bei Fehlschlag.
+    SQL Agent operator for email notification on failure.
 
 .PARAMETER Update
-    Vorhandene Jobs gleichen Namens ersetzen.
+    Replace existing jobs with the same name.
 
 .PARAMETER ContinueOnError
-    Bei Fehler eines Jobs fortfahren und verbleibende Jobs weiter erstellen.
+    Continue with remaining jobs if one job fails.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .PARAMETER Confirm
-    Bestaetigung vor der Erstellung anfordern.
+    Request confirmation before creation.
 
 .PARAMETER WhatIf
-    Zeigt, was passieren wuerde.
+    Shows what would happen without making changes.
 
 .EXAMPLE
     New-sqmOlaUsrDbBackupJob -SqlInstance "SQL01" -Full
@@ -137,13 +136,13 @@
         -Update
 
 .EXAMPLE
-    # LOG-Backup alle 15 Minuten, taeglich
+    # LOG backup every 15 minutes, daily
     New-sqmOlaUsrDbBackupJob -SqlInstance "SQL01" -Log `
         -LogScheduleDays @('EveryDay') -LogScheduleTime "00:00" `
         -LogScheduleIntervalMinutes 15 -Update
 
 .EXAMPLE
-    # FULL an mehreren Tagen, DIFF taeglich, LOG alle 30 Minuten
+    # FULL on multiple days, DIFF daily, LOG every 30 minutes
     New-sqmOlaUsrDbBackupJob -SqlInstance "SQL01" -Full -Diff -Log `
         -FullScheduleDays @('Monday','Wednesday','Friday') -FullScheduleTime "22:00" `
         -DiffScheduleDays @('EveryDay') -DiffScheduleTime "22:00" `
@@ -151,12 +150,12 @@
         -LogScheduleIntervalMinutes 30 -Update
 
 .NOTES
-    Voraussetzungen: dbatools, Invoke-sqmLogging, Get-sqmConfig, Test-sqmOlaInstallation, Get-sqmSaLogin
-    Konfigurationsschluessel:
+    Prerequisites: dbatools, Invoke-sqmLogging, Get-sqmConfig, Test-sqmOlaInstallation, Get-sqmSaLogin
+    Configuration keys:
         OlaJobNameFull  (Default: 'OlaHH-UserDatabases-FULL')
         OlaJobNameDiff  (Default: 'OlaHH-UserDatabases-DIFF')
         OlaJobNameLog   (Default: 'OlaHH-UserDatabases-LOG')
-    Backup-Unterverzeichnis: <BackupDirectory>\Usr-db
+    Backup subdirectory: <BackupDirectory>\Usr-db
 #>
 function New-sqmOlaUsrDbBackupJob
 {

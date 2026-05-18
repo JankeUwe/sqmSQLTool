@@ -1,30 +1,30 @@
 ﻿function Get-sqmADAccountStatus {
     <#
     .SYNOPSIS
-        Prueft den Status eines Active Directory Benutzerkontos.
+        Checks the status of an Active Directory user account.
 
     .DESCRIPTION
-        Ermittelt den Kontostatus ueber das ActiveDirectory-Modul (RSAT) mit
-        automatischem Fallback auf ADSI, falls RSAT nicht verfuegbar ist.
-        Gibt ein detailliertes PSObject mit Enabled, LockedOut, PasswordExpired
-        und AccountExpired zurueck.
+        Determines the account status using the ActiveDirectory module (RSAT) with
+        automatic fallback to ADSI if RSAT is not available.
+        Returns a detailed PSObject with Enabled, LockedOut, PasswordExpired
+        and AccountExpired.
 
     .PARAMETER SamAccountName
-        Der SamAccountName des zu pruefenden AD-Kontos.
+        The SamAccountName of the AD account to check.
 
     .PARAMETER DomainController
-        Optionaler Ziel-DC. Wird nur beim RSAT-Pfad verwendet.
+        Optional target DC. Only used via the RSAT path.
 
     .OUTPUTS
-        PSCustomObject mit folgenden Eigenschaften:
+        PSCustomObject with the following properties:
             SamAccountName  [string]
             Enabled         [bool]
             LockedOut       [bool]
             PasswordExpired [bool]
             AccountExpired  [bool]
-            Source          [string]  'RSAT' oder 'ADSI'
+            Source          [string]  'RSAT' or 'ADSI'
             QueryTime       [datetime]
-            ErrorMessage    [string]  leer wenn erfolgreich
+            ErrorMessage    [string]  empty if successful
 
     .EXAMPLE
         Get-sqmADAccountStatus -SamAccountName 'jdoe'

@@ -1,54 +1,54 @@
 ﻿<#
 .SYNOPSIS
-    Ermittelt Informationen zu einem Windows Failover Cluster: Clustername, Knoten und Rollen inkl. IP-Adressen.
+    Retrieves information about a Windows Failover Cluster: cluster name, nodes and roles including IP addresses.
 
 .DESCRIPTION
-    Diese Funktion fragt einen Windows Failover Cluster ab und gibt ein Objekt mit dem
-    Clusternamen, einer Liste der Knoten (Nodes) sowie einer Liste der Rollen (Cluster Groups) zurueck.
-    Fuer jede Rolle werden zusaetzlich die zugehoerigen IP-Adress-Ressourcen bereitgestellt.
-    Standardmaessig werden die Core-Cluster-Gruppe ("Cluster Group") und alle Storage-Gruppen ("Available Storage")
-    von der Rollenliste ausgeschlossen.
+    This function queries a Windows Failover Cluster and returns an object containing the cluster name,
+    a list of nodes, and a list of roles (cluster groups).
+    For each role, the associated IP address resources are also provided.
+    By default, the core cluster group ("Cluster Group") and all storage groups ("Available Storage")
+    are excluded from the role list.
 
-    Falls das benoetigte PowerShell-Modul 'FailoverClusters' nicht verfuegbar ist, wird versucht,
-    die RSAT-Clustering-Tools automatisch zu installieren (nur unter Windows Server, Administratorrechte erforderlich).
+    If the required PowerShell module 'FailoverClusters' is not available, an attempt is made to
+    install the RSAT clustering tools automatically (Windows Server only, administrator rights required).
 
 .PARAMETER ClusterName
-    Der Name des abzufragenden Clusters. Wenn nicht angegeben, wird versucht, den lokalen
-    Cluster zu ermitteln (nur sinnvoll auf einem Clusterknoten).
+    The name of the cluster to query. If not specified, the function attempts to determine
+    the local cluster (only meaningful on a cluster node).
 
 .PARAMETER IncludeCoreGroup
-    Schalter, um auch die Core-Clustergruppe (meist "Cluster Group") in die Rollen-Liste aufzunehmen.
-    Storage-Gruppen werden immer ausgeschlossen.
+    Switch to include the core cluster group ("Cluster Group") in the roles list.
+    Storage groups are always excluded.
 
 .PARAMETER NoAutoInstall
-    Unterdrueckt die automatische Installation der RSAT-Clustering-Tools, falls das Modul fehlt.
+    Suppresses the automatic installation of RSAT clustering tools if the module is missing.
 
 .PARAMETER EnableException
-    Wenn gesetzt, werden Fehler als Exception ausgeloest (standardmaessig wird ein Fehlerobjekt zurueckgegeben).
+    When set, errors are thrown as exceptions (by default an error object is returned).
 
 .OUTPUTS
-    PSCustomObject mit den Eigenschaften:
-    - Success      : $true bei Erfolg, $false bei Fehler
-    - ErrorMessage : Fehlerbeschreibung bei Success = $false, sonst $null
-    - ClusterName  : Name des Clusters
-    - Nodes        : Array von Knotenobjekten (Name, State)
-    - Roles        : Array von Rollenobjekten (Name, State, OwnerNode, IPAddresses)
+    PSCustomObject with the following properties:
+    - Success      : $true on success, $false on error
+    - ErrorMessage : Error description when Success = $false, otherwise $null
+    - ClusterName  : Name of the cluster
+    - Nodes        : Array of node objects (Name, State)
+    - Roles        : Array of role objects (Name, State, OwnerNode, IPAddresses)
 
 .EXAMPLE
-    $info = Get-sqmClusterInfo -ClusterName "MEINCLUSTER"
+    $info = Get-sqmClusterInfo -ClusterName "MYCLUSTER"
     if (-not $info.Success) { Write-Error $info.ErrorMessage; return }
     $info.ClusterName
     $info.Nodes | Format-Table
-    $info.Roles | Where-Object OwnerNode -eq "Knoten1" | Select Name, IPAddresses
+    $info.Roles | Where-Object OwnerNode -eq "Node1" | Select Name, IPAddresses
 
 .EXAMPLE
     Get-sqmClusterInfo -IncludeCoreGroup
 
-    Ruft den lokalen Cluster ab und gibt alle Rollen inklusive der Core-Gruppe zurueck.
+    Queries the local cluster and returns all roles including the core group.
 
 .NOTES
-    Erfordert Administratorrechte fuer die automatische Installation der RSAT-Tools.
-    Die Funktion verwendet intern Invoke-sqmLogging fuer Diagnosemeldungen.
+    Requires administrator rights for automatic installation of RSAT tools.
+    The function uses Invoke-sqmLogging internally for diagnostic messages.
 #>
 function Get-sqmClusterInfo
 {

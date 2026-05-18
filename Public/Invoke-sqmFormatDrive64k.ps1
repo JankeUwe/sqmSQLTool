@@ -1,90 +1,90 @@
 ﻿<#
 .SYNOPSIS
-    Prueft ein NTFS-Laufwerk auf 64 KB-Allokationseinheit und formatiert es bei
-    Bedarf mit 65536 Byte Clustergroesse.
+    Checks an NTFS drive for 64 KB allocation unit size and formats it
+    with 65536 byte cluster size if needed.
 
 .DESCRIPTION
-    Ablauf:
-        1. Sicherheitspruefungen (kein C:, NTFS, eine primaere Partition).
-        2. Laufwerk-Metadaten sichern (Buchstabe, Label, Partitionsgroesse).
-        3. Pruefung der Allokationseinheit via Get-Volume / fsutil.
-        4. Ist die Clustergroesse bereits 65536 Byte ? Abbruch mit Status 'AlreadyOK'.
-        5. Pruefung ob das Laufwerk von einem Prozess verwendet wird.
-           Falls ja: Warnung und Abbruch (Status 'InUse').
-        6. Enthaelt das Laufwerk Daten: Sicherung mit robocopy nach
-           $BackupPath\<Buchstabe>_<Zeitstempel>\.
-        7. Format-Volume mit -AllocationUnitSize 65536 -FileSystem NTFS.
-        8. Laufwerksbuchstaben und Label wiederherstellen.
-        9. Falls Daten gesichert: Rueckspielen mit robocopy.
-           Fehler beim Rueckspielen ? Warnung, Backup bleibt auf C: erhalten.
-       10. Backup auf C: nur loeschen wenn robocopy fehlerfrei zurueckgespielt hat.
+    Process:
+        1. Safety checks (not C:, NTFS, one primary partition).
+        2. Save drive metadata (letter, label, partition size).
+        3. Check allocation unit via Get-Volume / fsutil.
+        4. If cluster size is already 65536 bytes -> abort with status 'AlreadyOK'.
+        5. Check whether the drive is in use by a process.
+           If so: warning and abort (status 'InUse').
+        6. If drive contains data: back up with robocopy to
+           $BackupPath\<Letter>_<Timestamp>\.
+        7. Format-Volume with -AllocationUnitSize 65536 -FileSystem NTFS.
+        8. Restore drive letter and label.
+        9. If data was backed up: restore with robocopy.
+           Restore error -> warning, backup remains on C:.
+       10. Delete backup on C: only if robocopy restored without errors.
 
-    Sicherheitsregeln:
-        - Laufwerk C: wird niemals formatiert (hartkodierter Guard).
-        - Nur NTFS-Volumes werden akzeptiert.
-        - Nur Laufwerke mit genau einer primaeren Partition.
-        - Laufwerke die von einem Prozess geoeffnet sind ? Abbruch.
+    Safety rules:
+        - Drive C: is never formatted (hard-coded guard).
+        - Only NTFS volumes are accepted.
+        - Only drives with exactly one primary partition.
+        - Drives opened by a process -> abort.
 
 .PARAMETER DriveLetter
-    Ziellaufwerksbuchstabe (einzelner Buchstabe, z. B. 'D'). Pflichtparameter.
-    C ist explizit verboten.
+    Target drive letter (single letter, e.g. 'D'). Mandatory.
+    C is explicitly prohibited.
 
 .PARAMETER BackupPath
-    Temporaerer Sicherungspfad auf C: fuer Datensicherung vor dem Format.
-    Standard: C:\Temp\DriveBackup.
-    Muss auf Laufwerk C: liegen.
+    Temporary backup path on C: for data backup before formatting.
+    Default: C:\Temp\DriveBackup.
+    Must reside on drive C:.
 
 .PARAMETER Force
-    ueberspringt die interaktive Bestaetigungsabfrage vor dem Formatieren.
+    Skips the interactive confirmation prompt before formatting.
 
 .PARAMETER WhatIf
-    Simuliert alle Schritte ohne aenderungen durchzufuehren.
+    Simulates all steps without making changes.
 
 .PARAMETER Confirm
-    Fordert vor dem Formatieren eine explizite Bestaetigung an.
+    Requests explicit confirmation before formatting.
 
 .OUTPUTS
-    [PSCustomObject] mit folgenden Feldern:
-        DriveLetter          : Laufwerksbuchstabe
-        Label                : Laufwerk-Label
-        PreviousClusterSize  : Clustergroesse vor der Aktion (Byte)
-        NewClusterSize       : Clustergroesse nach der Aktion (Byte)
-        DataBackedUp         : $true wenn Daten gesichert wurden
-        BackupFolder         : Pfad des Backups (oder $null)
-        DataRestored         : $true wenn Daten erfolgreich zurueckgespielt wurden
-        BackupCleanedUp      : $true wenn Backup auf C: nach Restore geloescht wurde
+    [PSCustomObject] with the following fields:
+        DriveLetter          : Drive letter
+        Label                : Drive label
+        PreviousClusterSize  : Cluster size before the action (bytes)
+        NewClusterSize       : Cluster size after the action (bytes)
+        DataBackedUp         : $true if data was backed up
+        BackupFolder         : Path of the backup (or $null)
+        DataRestored         : $true if data was successfully restored
+        BackupCleanedUp      : $true if backup on C: was deleted after restore
         Status               : AlreadyOK | Formatted | InUse | Error | WhatIf
-        Message              : Detailmeldung
+        Message              : Detail message
 
 .EXAMPLE
     Invoke-sqmFormatDrive64k -DriveLetter D
 
-    Prueft Laufwerk D: und formatiert es bei Bedarf mit 64 KB-Clustern.
-    Daten werden vorher nach C:\Temp\DriveBackup gesichert.
+    Checks drive D: and formats it with 64 KB clusters if needed.
+    Data is backed up to C:\Temp\DriveBackup first.
 
 .EXAMPLE
     Invoke-sqmFormatDrive64k -DriveLetter E -BackupPath "C:\Backup\DriveTemp" -Force
 
-    Wie oben, ohne Bestaetigungsabfrage, abweichender Backup-Pfad.
+    Same as above, without confirmation prompt, using a different backup path.
 
 .EXAMPLE
     Invoke-sqmFormatDrive64k -DriveLetter D -WhatIf
 
-    Simuliert den gesamten Ablauf ohne aenderungen.
+    Simulates the entire process without making any changes.
 
 .NOTES
-    Voraussetzungen : Windows PowerShell 5.1 oder PowerShell 7+, lokale
-                      Administratorrechte, robocopy.exe (Bestandteil von Windows).
-    Clustergroesse    : 65536 Byte = 64 KB = optimale Einstellung fuer SQL Server-
-                      Datendateien (Microsoft-Empfehlung).
-    Robocopy-Flags  : /E  alle Unterverzeichnisse inkl. leere
-                      /COPYALL  alle Dateiattribute, Timestamps, ACLs, Streams
-                      /R:3  max. 3 Wiederholungen pro Datei
-                      /W:5  5 Sekunden Wartezeit zwischen Wiederholungen
-                      /NP  keine Fortschrittsanzeige in %
-                      /LOG  Protokolldatei neben Backup-Ordner
-    Robocopy Exit-Codes 0-3 gelten als Erfolg (0=ok, 1=neue Dateien, 2=extra,
-    3=beides). Ab 4 wird gewarnt aber nicht zwingend abgebrochen.
+    Prerequisites   : Windows PowerShell 5.1 or PowerShell 7+, local
+                      administrator rights, robocopy.exe (part of Windows).
+    Cluster size    : 65536 bytes = 64 KB = optimal setting for SQL Server
+                      data files (Microsoft recommendation).
+    Robocopy flags  : /E  all subdirectories including empty ones
+                      /COPYALL  all file attributes, timestamps, ACLs, streams
+                      /R:3  max. 3 retries per file
+                      /W:5  5 seconds wait between retries
+                      /NP  no progress display in %
+                      /LOG  log file next to backup folder
+    Robocopy exit codes 0-3 are treated as success (0=ok, 1=new files, 2=extra,
+    3=both). From 4 onwards a warning is issued but execution is not necessarily aborted.
 #>
 function Invoke-sqmFormatDrive64k
 {

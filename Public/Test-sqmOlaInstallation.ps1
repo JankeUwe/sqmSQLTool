@@ -1,22 +1,22 @@
 ﻿<#
 .SYNOPSIS
-    Prueft, ob Ola Hallengrens Maintenance Solution auf einer SQL Server-Instanz installiert ist.
+    Checks whether Ola Hallengren's Maintenance Solution is installed on a SQL Server instance.
 
 .DESCRIPTION
-    Testet das Vorhandensein der gespeicherten Prozedur 'DatabaseBackup' im Schema 'master'.
-    Optional kann geprueft werden, ob auch 'CommandLog' Tabelle und 'DatabaseIntegrityCheck' etc. vorhanden sind.
+    Tests for the presence of the stored procedure 'DatabaseBackup' in the 'master' schema.
+    Optionally checks whether the 'CommandLog' table and 'DatabaseIntegrityCheck' etc. are also present.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz.
+    SQL Server instance.
 
 .PARAMETER SqlCredential
-    Anmeldeinformationen.
+    Credentials.
 
 .PARAMETER RequiredSet
-    Welche Komponenten mindestens benoetigt werden: 'Backup', 'Integrity', 'Index' (Default: 'Backup').
+    Which components are required at minimum: 'Backup', 'Integrity', 'Index' (Default: 'Backup').
 
 .OUTPUTS
-    [PSCustomObject] mit IsInstalled, AgentRunning, PresentObjects, Warnings, Message.
+    [PSCustomObject] with IsInstalled, AgentRunning, PresentObjects, Warnings, Message.
 #>
 function Test-sqmOlaInstallation
 {

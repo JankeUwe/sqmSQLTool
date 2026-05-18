@@ -1,92 +1,92 @@
 ﻿<#
 .SYNOPSIS
-    Konfiguriert SQL Server Integration Services (SSIS) vollautomatisch.
-    Unterstuetzt Standalone- und AlwaysOn AG-Umgebungen, lokal und remote.
+    Configures SQL Server Integration Services (SSIS) fully automatically.
+    Supports standalone and AlwaysOn AG environments, local and remote.
 
 .DESCRIPTION
-    Fuehrt eine vollstaendige SSIS-Erst- oder Neukonfiguration durch:
-    1. SSIS-Dienst (Dienstkonto + Starttyp)
-    2. SSISDB-Katalog (inkl. CLR-Aktivierung, Eigenschaften)
-    3. AlwaysOn AG-Integration (SSISDB in AG, DMK-Restore, Cleanup-Job deaktivieren, sp_ssis_startup)
-    4. Katalog-Ordner und Umgebungen anlegen
+    Performs a complete initial or re-configuration of SSIS:
+    1. SSIS service (service account + startup type)
+    2. SSISDB catalog (incl. CLR activation, properties)
+    3. AlwaysOn AG integration (SSISDB into AG, DMK restore, disable cleanup job, sp_ssis_startup)
+    4. Create catalog folders and environments
 
-    Verbindungsmodi: Lokal (direkt) / Remote (dbatools + WinRM fuer Dienst).
+    Connection modes: Local (direct) / Remote (dbatools + WinRM for service).
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (Standard: aktueller Computername).
+    SQL Server instance (default: current computer name).
 
 .PARAMETER SqlCredential
-    PSCredential fuer SQL-Verbindung.
+    PSCredential for the SQL connection.
 
 .PARAMETER AgName
-    Name der AlwaysOn Availability Group (optional).
+    Name of the AlwaysOn Availability Group (optional).
 
 .PARAMETER AgListener
-    AG-Listener-Name (wird automatisch ermittelt, wenn nicht angegeben).
+    AG listener name (automatically determined if not specified).
 
 .PARAMETER AgNodes
-    Explizite Liste aller AG-Nodes (optional).
+    Explicit list of all AG nodes (optional).
 
 .PARAMETER CatalogPassword
-    Kennwort fuer den SSISDB-Katalog (SecureString, Pflicht).
+    Password for the SSISDB catalog (SecureString, required).
 
 .PARAMETER CatalogFolder
-    Array von Katalog-Ordnernamen (z.B. @('ETL','Staging')).
+    Array of catalog folder names (e.g. @('ETL','Staging')).
 
 .PARAMETER CatalogFolderDescription
-    Beschreibung fuer die Ordner (Standard: 'Angelegt von MSSQLTools').
+    Description for the folders (default: 'Created by MSSQLTools').
 
 .PARAMETER Environments
-    Array von Umgebungsnamen (wird in jedem CatalogFolder angelegt).
+    Array of environment names (created in each CatalogFolder).
 
 .PARAMETER SsisServiceAccount
-    Dienstkonto fuer den SSIS-Dienst (z.B. 'DOMAIN\svc_ssis').
+    Service account for the SSIS service (e.g. 'DOMAIN\svc_ssis').
 
 .PARAMETER SsisServiceAccountPassword
-    Kennwort fuer das Dienstkonto (SecureString).
+    Password for the service account (SecureString).
 
 .PARAMETER SsisServiceStartupType
-    Starttyp des SSIS-Diensts (Automatic, Manual, Disabled, Standard: Automatic).
+    Startup type of the SSIS service (Automatic, Manual, Disabled; default: Automatic).
 
 .PARAMETER RetentionPeriod
-    Aufbewahrungszeitraum fuer SSISDB-Logs in Tagen (Standard: 365).
+    Retention period for SSISDB logs in days (default: 365).
 
 .PARAMETER LoggingLevel
-    Logging-Level (0=None,1=Basic,2=Performance,3=Verbose, Standard: 1).
+    Logging level (0=None, 1=Basic, 2=Performance, 3=Verbose; default: 1).
 
 .PARAMETER MaxConcurrentExecutables
-    Maximale parallele Ausfuehrungen (Standard: -1 = unbegrenzt).
+    Maximum concurrent executions (default: -1 = unlimited).
 
 .PARAMETER SkipService
-    Dienst-Konfiguration ueberspringen.
+    Skip service configuration.
 
 .PARAMETER SkipCatalog
-    Katalog-Anlage/Konfiguration ueberspringen.
+    Skip catalog creation/configuration.
 
 .PARAMETER SkipAg
-    AG-Integration ueberspringen (auch wenn -AgName angegeben).
+    Skip AG integration (even if -AgName is specified).
 
 .PARAMETER SkipFolders
-    Ordner/Umgebungs-Anlage ueberspringen.
+    Skip folder/environment creation.
 
 .PARAMETER WinRmCredential
-    Credentials fuer WinRM (Remote-Dienstkonfiguration, optional).
+    Credentials for WinRM (remote service configuration, optional).
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer den Konfigurationsbericht.
-    Standard: Get-sqmDefaultOutputPath.
+    Output directory for the configuration report.
+    Default: Get-sqmDefaultOutputPath.
 
 .PARAMETER ContinueOnError
-    Bei Fehler mit naechstem Schritt fortfahren (selten verwendet).
+    Continue with the next step on error (rarely used).
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen (ueberschreibt ContinueOnError).
+    Throw exceptions immediately (overrides ContinueOnError).
 
 .PARAMETER Confirm
-    Bestaetigung vor kritischen aenderungen anfordern.
+    Request confirmation before critical changes.
 
 .PARAMETER WhatIf
-    Zeigt, was passieren wuerde.
+    Shows what would happen without making changes.
 
 .EXAMPLE
     $pwd = Read-Host "SSISDB-Kennwort" -AsSecureString
@@ -97,7 +97,7 @@
     Invoke-sqmSsisConfiguration -SqlInstance "SQL01" -AgName "AG_SSIS" -CatalogPassword $pwd
 
 .NOTES
-    Voraussetzungen: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath.
+    Prerequisites: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath.
 #>
 function Invoke-sqmSsisConfiguration
 {

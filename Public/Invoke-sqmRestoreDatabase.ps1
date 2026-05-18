@@ -1,76 +1,99 @@
 ﻿<#
 .SYNOPSIS
-Stellt eine Datenbank aus einer Backup-Datei wieder her, mit Unterstuetzung fuer Single-Server und AlwaysOn.
+Restores a database from a backup file, with support for single-server and AlwaysOn environments.
 
 .DESCRIPTION
-Die Funktion fuehrt einen kontrollierten Restore einer Datenbank durch. Sie erkennt automatisch, ob die Zieldatenbank zu einer AlwaysOn-Verfuegbarkeitsgruppe gehoert, und entfernt sie in diesem Fall aus der AG (inkl. Loeschung auf sekundaeren Replikaten). Vor dem Restore werden die Datenbank-User exportiert (fuer spaetere Wiederherstellung). Optional kann ein Backup der urspruenglichen Datenbank erstellt werden. Nach dem Restore werden die User wiederhergestellt, verwaiste User repariert, nicht mehr existierende Windows-Logins entfernt und der Datenbank-Eigentuemer auf das sa-Konto (unabhaengig vom Namen) gesetzt.
+The function performs a controlled database restore. It automatically detects whether the target
+database belongs to an AlwaysOn availability group and removes it from the AG if so (including
+deletion on secondary replicas). Database users are exported before the restore (for later
+recovery). Optionally a backup of the original database can be created. After the restore,
+users are recovered, orphaned users are repaired, non-existent Windows logins are removed,
+and the database owner is set to the SA account (regardless of its name).
 
-Die Funktion kann auch die Wiederherstellung einer Sequenz von Backups (Full + Diff + Logs) durchfuehren. Dazu wird der Parameter `-BackupFiles` verwendet, der eine Liste von Backup-Dateien in der richtigen Reihenfolge (Full, dann Diff, dann Logs) akzeptiert.
+The function can also restore a sequence of backups (Full + Diff + Logs) using the `-BackupFiles`
+parameter, which accepts a list of backup files in the correct order (Full, then Diff, then Logs).
 
-Vor dem Export der User und vor dem Restore wird die konfigurierte PBM-Policy (DefaultPolicy) temporaer deaktiviert, um Einschraenkungen bei der User-Erstellung zu vermeiden. Nach Abschluss wird sie wieder aktiviert.
+Before user export and before the restore, the configured PBM policy (DefaultPolicy) is
+temporarily disabled to avoid restrictions during user creation. It is re-enabled after completion.
 
-Falls die Datenbank vor dem Restore in Benutzung ist, wird sie automatisch in den Single-User-Modus versetzt (und nach dem Restore wieder in Multi-User zurueckgesetzt).
+If the database is in use before the restore, it is automatically set to single-user mode
+(and switched back to multi-user after the restore).
 
 .PARAMETER SqlInstance
-Ziel-SQL Server-Instanz (z.B. "localhost", "SQL01\INSTANCE"). Default: aktueller Computername.
+Target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE"). Default: current computer name.
 
 .PARAMETER SqlCredential
-Alternative Anmeldeinformationen fuer die Zielinstanz.
+Alternative credentials for the target instance.
 
 .PARAMETER BackupFile
-Pfad zur Full-Backup-Datei (.bak). Kann auch ein Array sein, wenn mehrere Dateien (z.B. Stripes). Fuer sequenzielle Wiederherstellung (Full + Diff + Logs) verwenden Sie `-BackupFiles`.
+Path to the full backup file (.bak). Can also be an array for striped backups.
+For sequential restore (Full + Diff + Logs) use `-BackupFiles`.
 
 .PARAMETER BackupFiles
-Array von Backup-Dateien in der Reihenfolge: Full, dann Diff (optional), dann Logs (optional). Beispiel: @("C:\Backup\Full.bak", "C:\Backup\Diff.bak", "C:\Backup\Log1.trn", "C:\Backup\Log2.trn"). Kann anstelle von `-BackupFile` verwendet werden.
+Array of backup files in order: Full, then Diff (optional), then Logs (optional).
+Example: @("C:\Backup\Full.bak", "C:\Backup\Diff.bak", "C:\Backup\Log1.trn", "C:\Backup\Log2.trn").
+Can be used instead of `-BackupFile`.
 
 .PARAMETER DatabaseName
-Name der wiederherzustellenden Datenbank (wie sie in der Backup-Datei heisst). Wird benoetigt, um die Dateinamen zu ermitteln.
+Name of the database to restore (as it appears in the backup file). Required to determine file names.
 
 .PARAMETER NewDatabaseName
-Optional: Neuer Name fuer die Datenbank nach dem Restore. Wenn angegeben, werden die logischen Dateinamen entsprechend angepasst (die physikalischen Dateien erhalten den neuen Namen als Basis).
+Optional: New name for the database after the restore. If specified, logical file names are
+adjusted accordingly (physical files use the new name as base).
 
 .PARAMETER NewDatabaseFilePath
-Optional: Zielverzeichnis fuer die Datenbank-Dateien (.mdf, .ndf). Wenn nicht angegeben, wird das Standardverzeichnis der Zielinstanz verwendet (BackupDirectory oder DefaultFile).
+Optional: Target directory for database files (.mdf, .ndf). If not specified, the default
+directory of the target instance is used (BackupDirectory or DefaultFile).
 
 .PARAMETER NewLogFilePath
-Optional: Zielverzeichnis fuer die Log-Datei (.ldf). Wenn nicht angegeben, wird das Standardverzeichnis der Zielinstanz verwendet.
+Optional: Target directory for the log file (.ldf). If not specified, the default directory
+of the target instance is used.
 
 .PARAMETER BackupBeforeRestore
-Optional: Erstellt vor dem Restore ein Full-Backup der bestehenden Datenbank (falls vorhanden). Das Backup wird im Standard-Backupverzeichnis mit dem Namen "DatabaseName_preRestore_YYYYMMDD_HHmsqm.bak" abgelegt.
+Optional: Creates a full backup of the existing database before the restore (if present).
+The backup is stored in the default backup directory named "DatabaseName_preRestore_YYYYMMDD_HHmmss.bak".
 
 .PARAMETER NoUserExport
-Optional: ueberspringt den Export der Datenbank-User (standardmaessig werden User immer exportiert). Die Export-Datei wird temporaer im %TEMP% Verzeichnis abgelegt.
+Optional: Skips export of database users (users are always exported by default).
+The export file is stored temporarily in the %TEMP% directory.
 
 .PARAMETER KeepAlwaysOn
-Optional: Wenn die Datenbank Teil einer AG ist, wird sie nicht aus der AG entfernt. Achtung: Ein Restore auf eine AG-Datenbank ist nur moeglich, wenn die Datenbank vorher aus der AG genommen wird. Daher sollte dieser Parameter nur verwendet werden, wenn die Datenbank bereits nicht in der AG ist.
+Optional: If the database is part of an AG, it is not removed from the AG.
+Note: Restoring an AG database is only possible after removing it from the AG.
+Use this parameter only if the database is already outside the AG.
 
 .PARAMETER WithNoRecovery
-Optional: Fuehrt den Restore mit NORECOVERY aus, so dass die Datenbank im wiederherstellenden Zustand bleibt (fuer weitere Log-Backups). Standardmaessig wird RECOVERY verwendet (Datenbank online).
+Optional: Performs the restore with NORECOVERY so the database remains in restoring state
+(for additional log backups). By default RECOVERY is used (database online).
 
 .PARAMETER ContinueWithNoRecovery
-Optional: Wenn gesetzt, wird auch der letzte Restore mit NORECOVERY ausgefuehrt (z.B. wenn manuell weitere Backups angewendet werden sollen).
+Optional: When set, the last restore is also performed with NORECOVERY (e.g. when
+additional backups are to be applied manually).
 
 .PARAMETER ForceSingleUser
-Erzwingt, dass die Datenbank vor dem Restore in den Single-User-Modus versetzt wird (auch wenn sie nicht in Benutzung scheint). Standardmaessig wird nur bei aktiven Verbindungen umgeschaltet.
+Forces the database into single-user mode before the restore (even if no active connections
+are detected). By default only switches when there are active connections.
 
 .PARAMETER RejoinAvailabilityGroup
-Wenn gesetzt und die Datenbank war Teil einer AG, wird sie nach dem Restore automatisch wieder in die AG aufgenommen (Add-DbaAgDatabase mit SeedingMode Automatic). Voraussetzung: Automatic Seeding ist auf der AG konfiguriert. Ohne diesen Parameter bleibt die Datenbank nach dem Restore ausserhalb der AG.
+When set and the database was part of an AG, it is automatically re-added to the AG after
+the restore (Add-DbaAgDatabase with SeedingMode Automatic). Requires Automatic Seeding on the AG.
+Without this parameter, the database remains outside the AG after the restore.
 
 .PARAMETER EnableException
-Schalter, um Ausnahmen durchzulassen (standardmaessig werden Fehler protokolliert und als Objekt zurueckgegeben).
+Switch to allow exceptions to pass through (by default errors are logged and returned as objects).
 
 .PARAMETER Confirm
-Fordert vor kritischen Aktionen (Loeschen der Datenbank aus AG, Restore) eine Bestaetigung an.
+Request confirmation before critical actions (removing from AG, restore).
 
 .PARAMETER WhatIf
-Zeigt, was passieren wuerde, ohne aenderungen durchzufuehren.
+Shows what would happen without making changes.
 
 .EXAMPLE
-# Einfacher Restore einer Full-Backup-Datei
+# Simple restore of a full backup file
 Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\AdventureWorks.bak" -DatabaseName "AdventureWorks"
 
 .EXAMPLE
-# Restore mit Full + Diff + Logs
+# Restore with Full + Diff + Logs
 $backupSequence = @(
     "D:\Backup\AdventureWorks_Full.bak",
     "D:\Backup\AdventureWorks_Diff.bak",
@@ -80,12 +103,12 @@ $backupSequence = @(
 Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFiles $backupSequence -DatabaseName "AdventureWorks"
 
 .EXAMPLE
-# Restore mit neuem Namen und Single-User-Erzwingung
+# Restore with new name and forced Single-User mode
 Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\OldDB.bak" -DatabaseName "OldDB" -NewDatabaseName "NewDB" -ForceSingleUser
 
 .NOTES
-Erfordert dbatools-Modul, Invoke-sqmLogging, Get-sqmConfig, Set-sqmSqlPolicyState.
-Die Funktion setzt voraus, dass der ausfuehrende Login sysadmin-Rechte auf der Zielinstanz und allen sekundaeren Replikaten hat.
+Requires dbatools module, Invoke-sqmLogging, Get-sqmConfig, Set-sqmSqlPolicyState.
+The function assumes that the executing login has sysadmin rights on the target instance and all secondary replicas.
 #>
 function Invoke-sqmRestoreDatabase
 {

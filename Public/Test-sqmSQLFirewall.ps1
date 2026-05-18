@@ -1,76 +1,73 @@
 ﻿<#
 .SYNOPSIS
-    Testet ob Firewall und Netzwerk eine TCP-Verbindung zum SQL Server zulassen.
+    Tests whether the firewall and network allow a TCP connection to SQL Server.
 
 .DESCRIPTION
-    Versucht eine TCP-Verbindung zum angegebenen SQL Server und Port aufzubauen.
-    Standardmaessig wird Port 1433 (Default-Instanz) verwendet.
+    Attempts to establish a TCP connection to the specified SQL Server and port.
+    By default, port 1433 (default instance) is used.
 
-    Fuer benannte Instanzen kann zusaetzlich der SQL Browser-Dienst (UDP 1434)
-    abgefragt werden, um den dynamischen TCP-Port der Instanz zu ermitteln.
+    For named instances, the SQL Browser service (UDP 1434) can additionally be
+    queried to determine the dynamic TCP port of the instance.
 
-    Gibt pro Server/Port-Kombination ein [PSCustomObject] zurueck mit:
+    Returns one [PSCustomObject] per server/port combination with:
         Server, Port, Instance, TcpReachable, DynamicPort, Status, Message
 
 .PARAMETER Server
-    Hostname oder IP-Adresse des SQL Servers. Pipeline-faehig.
+    Hostname or IP address of the SQL Server. Pipeline-capable.
 
 .PARAMETER Port
-    TCP-Port der getestet werden soll. Standard: 1433.
-    Wird ignoriert wenn -Instance angegeben ist und der SQL Browser den
-    dynamischen Port liefert.
+    TCP port to test. Default: 1433.
+    Ignored when -Instance is specified and the SQL Browser provides the dynamic port.
 
 .PARAMETER Instance
-    Name der benannten Instanz (ohne Serverpraefix). Wenn angegeben wird zuerst
-    der SQL Browser (UDP 1434) nach dem dynamischen Port der Instanz befragt
-    und dieser dann per TCP getestet.
+    Name of the named instance (without server prefix). When specified, the SQL Browser
+    (UDP 1434) is first queried for the dynamic port of the instance, which is then
+    tested via TCP.
 
 .PARAMETER TimeoutSeconds
-    Timeout fuer den TCP-Verbindungstest in Sekunden. Standard: 5.
+    Timeout for the TCP connection test in seconds. Default: 5.
 
 .PARAMETER ContinueOnError
-    Bei Fehler auf einem Server fortfahren statt abzubrechen.
+    Continue with the next server on error instead of aborting.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen (ueberschreibt ContinueOnError).
+    Throw exceptions immediately (overrides ContinueOnError).
 
 .OUTPUTS
-    [PSCustomObject] mit den Feldern:
-        Server       : Zielserver
-        Port         : Getesteter TCP-Port
-        Instance     : Instanzname (oder $null bei Default)
-        DynamicPort  : $true wenn Port per SQL Browser ermittelt wurde
-        TcpReachable : $true wenn TCP-Verbindung erfolgreich
+    [PSCustomObject] with fields:
+        Server       : Target server
+        Port         : TCP port tested
+        Instance     : Instance name (or $null for default instance)
+        DynamicPort  : $true if port was determined via SQL Browser
+        TcpReachable : $true if TCP connection was successful
         Status       : OK | Failed | Error
-        Message      : Detailmeldung
+        Message      : Detail message
 
 .EXAMPLE
     Test-sqmSQLFirewall -Server "SQL01"
 
-    Testet die Standardinstanz auf TCP-Port 1433.
+    Tests the default instance on TCP port 1433.
 
 .EXAMPLE
     Test-sqmSQLFirewall -Server "SQL01" -Port 54321
 
-    Testet einen benutzerdefinierten Port.
+    Tests a custom port.
 
 .EXAMPLE
     Test-sqmSQLFirewall -Server "SQL01" -Instance "SAGE"
 
-    Ermittelt den dynamischen Port der Instanz "SAGE" via SQL Browser (UDP 1434)
-    und testet anschliessend die TCP-Verbindung.
+    Determines the dynamic port of the "SAGE" instance via SQL Browser (UDP 1434)
+    and then tests the TCP connection.
 
 .EXAMPLE
     "SQL01","SQL02","SQL03" | Test-sqmSQLFirewall -Instance "PROD" -TimeoutSeconds 3
 
-    Testet die Instanz "PROD" auf drei Servern per Pipeline.
+    Tests the "PROD" instance on three servers via pipeline.
 
 .NOTES
-    Voraussetzungen : PowerShell 3.0+, Test-NetConnection (ab Windows 8 / 2012).
-    SQL Browser     : UDP 1434 muss auf dem Zielserver erreichbar sein wenn
-                      -Instance verwendet wird. Ist er nicht erreichbar, wird
-                      auf den unter -Port angegebenen Wert (Standard 1433)
-                      zurueckgefallen.
+    Prerequisites : PowerShell 3.0+, Test-NetConnection (from Windows 8 / 2012).
+    SQL Browser   : UDP 1434 must be reachable on the target server when -Instance is used.
+                    If not reachable, falls back to the port specified under -Port (default 1433).
 #>
 function Test-sqmSQLFirewall
 {

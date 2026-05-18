@@ -1,13 +1,13 @@
 ﻿<#
 .SYNOPSIS
-    Kopiert eine oder mehrere Dateien in den konfigurierten CentralPath.
+    Copies one or more files to the configured CentralPath.
 
 .DESCRIPTION
-    Wenn kein CentralPath konfiguriert ist, wird die Funktion ohne Fehler beendet.
-    Nicht vorhandene Quelldateien werden uebersprungen.
+    If no CentralPath is configured, the function exits without error.
+    Source files that do not exist are skipped.
 
 .PARAMETER Path
-    Pfad(e) der zu kopierenden Datei(en).
+    Path(s) of the file(s) to copy.
 #>
 function Copy-sqmToCentralPath
 {

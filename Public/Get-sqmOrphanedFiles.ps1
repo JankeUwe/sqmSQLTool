@@ -1,36 +1,36 @@
 ﻿<#
 .SYNOPSIS
-    Findet MDF/LDF/NDF-Datenbankdateien, die keiner Datenbank zugeordnet sind.
+    Finds MDF/LDF/NDF database files that are not assigned to any database.
 
 .DESCRIPTION
-    Liest alle registrierten Datenbankdateien aus sys.master_files und vergleicht
-    diese mit den tatsaechlich vorhandenen Dateien in den Verzeichnissen.
-    Dateien die auf dem Dateisystem existieren, aber nicht in sys.master_files
-    eingetragen sind, werden als verwaist (Orphaned) gemeldet.
+    Reads all registered database files from sys.master_files and compares them
+    with the files actually present in the directories.
+    Files that exist on the file system but are not registered in sys.master_files
+    are reported as orphaned.
 
-    Hinweis: Die Verzeichnisse werden von der PowerShell-Session aus durchsucht.
-    Bei Remote-Instanzen muessen die Pfade als UNC-Pfade erreichbar sein oder
-    SearchPath explizit als UNC-Pfad angegeben werden.
+    Note: Directories are searched from the PowerShell session.
+    For remote instances, paths must be accessible as UNC paths or
+    SearchPath must be specified explicitly as a UNC path.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz. Standard: lokaler Computername.
+    SQL Server instance. Default: local computer name.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER SearchPath
-    Verzeichnisse, die durchsucht werden sollen.
-    Standard: alle eindeutigen Verzeichnisse aus sys.master_files + SQL Server Standardpfade.
+    Directories to search.
+    Default: all unique directories from sys.master_files + SQL Server default paths.
 
 .PARAMETER FileExtension
-    Dateierweiterungen die gesucht werden.
-    Standard: .mdf, .ldf, .ndf
+    File extensions to search for.
+    Default: .mdf, .ldf, .ndf
 
 .PARAMETER Recurse
-    Unterverzeichnisse rekursiv durchsuchen.
+    Recursively search subdirectories.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
     Get-sqmOrphanedFiles -SqlInstance "SQL01"
@@ -39,8 +39,8 @@
     Get-sqmOrphanedFiles -SqlInstance "SQL01" -SearchPath "D:\SQLData","E:\SQLLog" -Recurse
 
 .NOTES
-    Erfordert: dbatools, Invoke-sqmLogging
-    Benoetigt VIEW SERVER STATE und Dateisystemzugriff auf die Datenbankverzeichnisse.
+    Requires: dbatools, Invoke-sqmLogging
+    Needs VIEW SERVER STATE and file system access to the database directories.
 #>
 function Get-sqmOrphanedFiles
 {

@@ -1,67 +1,66 @@
 <#
 .SYNOPSIS
-    Erstellt einen SQL Agent Job fuer das taegliche Full-Backup der
-    SQL Server System-Datenbanken via Ola Hallengrens DatabaseBackup.
+    Creates a SQL Agent job for the daily full backup of SQL Server system databases
+    via Ola Hallengren's DatabaseBackup.
 
 .DESCRIPTION
-    Legt einen SQL Agent Job an der taeglich master, model und msdb
-    vollstaendig sichert. Die Backups werden in ein dediziertes
-    Unterverzeichnis \Sys-db abgelegt: <BackupDirectory>\Sys-db.
+    Creates a SQL Agent job that daily backs up master, model, and msdb completely.
+    Backups are stored in a dedicated subdirectory \Sys-db: <BackupDirectory>\Sys-db.
 
-    Job-Name wird aus der Modulkonfiguration (OlaJobNameSysDbBackup) gelesen.
-    Standard: 'OlaHH-SystemDatabases-FULL'.
+    Job name is read from the module configuration (OlaJobNameSysDbBackup).
+    Default: 'OlaHH-SystemDatabases-FULL'.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz. Standard: aktueller Computername.
+    SQL Server instance. Default: current computer name.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die SQL-Verbindung.
+    PSCredential for the SQL connection.
 
 .PARAMETER BackupDirectory
-    Backup-Basis-Verzeichnis. System-Datenbanken werden in <BackupDirectory>\Sys-db gesichert.
-    Standard: automatisch aus SQL Server ermittelt.
+    Backup base directory. System databases are backed up to <BackupDirectory>\Sys-db.
+    Default: automatically determined from SQL Server.
 
 .PARAMETER JobName
-    Name des SQL Agent Jobs (ueberschreibt Modulkonfiguration).
+    Name of the SQL Agent job (overrides module configuration).
 
 .PARAMETER JobCategory
-    Kategorie des Jobs. Standard: 'Database Maintenance'.
+    Job category. Default: 'Database Maintenance'.
 
 .PARAMETER ScheduleTime
-    Startzeit im Format 'HH:mm'. Standard: '21:15'.
+    Start time in format 'HH:mm'. Default: '21:15'.
 
 .PARAMETER CleanupTime
-    Alter in Stunden nach dem Backup-Dateien geloescht werden. Standard: 48. 0 = kein Cleanup.
+    Age in hours after which backup files are deleted. Default: 48. 0 = no cleanup.
 
 .PARAMETER Compress
-    Backup-Komprimierung. Standard: 'Y'.
+    Backup compression. Default: 'Y'.
 
 .PARAMETER Verify
-    Backup-Verifikation. Standard: 'Y'.
+    Backup verification. Default: 'Y'.
 
 .PARAMETER CheckSum
-    Checksum-Berechnung. Standard: 'Y'.
+    Checksum calculation. Default: 'Y'.
 
 .PARAMETER LogToTable
-    Ola-interne Protokollierung in CommandLog-Tabelle. Standard: 'Y'.
+    Ola internal logging to CommandLog table. Default: 'Y'.
 
 .PARAMETER OperatorName
-    SQL Agent Operator fuer E-Mail-Benachrichtigung bei Fehlschlag.
+    SQL Agent operator for email notification on failure.
 
 .PARAMETER Update
-    Vorhandenen Job gleichen Namens ersetzen.
+    Replace an existing job with the same name.
 
 .PARAMETER ContinueOnError
-    Bei Fehler fortfahren (hier kaum verwendet, aber der Konsistenz halber).
+    Continue on error (rarely used here, but included for consistency).
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .PARAMETER Confirm
-    Bestaetigung vor der Erstellung anfordern.
+    Request confirmation before creation.
 
 .PARAMETER WhatIf
-    Zeigt, was passieren wuerde.
+    Shows what would happen without making changes.
 
 .EXAMPLE
     New-sqmOlaSysDbBackupJob -SqlInstance "SQL01"
@@ -70,8 +69,8 @@
     New-sqmOlaSysDbBackupJob -SqlInstance "SQL01" -ScheduleTime "20:00" -OperatorName "DBAs"
 
 .NOTES
-    Voraussetzungen: dbatools, Invoke-sqmLogging, Get-sqmConfig, Test-sqmOlaInstallation, Get-sqmSaLogin
-    Konfigurationsschluessel: OlaJobNameSysDbBackup (Default: 'OlaHH-SystemDatabases-FULL')
+    Prerequisites: dbatools, Invoke-sqmLogging, Get-sqmConfig, Test-sqmOlaInstallation, Get-sqmSaLogin
+    Configuration key: OlaJobNameSysDbBackup (Default: 'OlaHH-SystemDatabases-FULL')
 #>
 function New-sqmOlaSysDbBackupJob
 {

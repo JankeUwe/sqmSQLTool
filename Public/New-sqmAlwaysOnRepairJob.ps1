@@ -1,48 +1,48 @@
 ﻿<#
 .SYNOPSIS
-Erstellt einen SQL Server Agent-Job, der regelmaessig Repair-sqmAlwaysOnDatabases ausfuehrt.
+Creates a SQL Server Agent job that regularly runs Repair-sqmAlwaysOnDatabases.
 
 .DESCRIPTION
-Der Job wird auf der angegebenen SQL-Instanz erstellt und verwendet das PowerShell-Subsystem,
-um die Funktion Repair-sqmAlwaysOnDatabases aufzurufen. Der Job kann nach Zeitplan (z.B. stuendlich)
-oder bei Bedarf manuell gestartet werden.
+The job is created on the specified SQL instance and uses the PowerShell subsystem
+to call the Repair-sqmAlwaysOnDatabases function. The job can run on a schedule (e.g. hourly)
+or be started manually on demand.
 
-Voraussetzung: Die Funktionen (Repair-sqmAlwaysOnDatabases, Invoke-sqmLogging, Invoke-sqmSqlAlwaysOnAutoseeding)
-sowie das dbatools-Modul muessen auf dem SQL Server verfuegbar sein (z.B. in einem Modulpfad oder als Skriptdatei).
+Prerequisite: The functions (Repair-sqmAlwaysOnDatabases, Invoke-sqmLogging, Invoke-sqmSqlAlwaysOnAutoseeding)
+and the dbatools module must be available on the SQL Server (e.g. in a module path or as a script file).
 
 .PARAMETER SqlInstance
-Ziel-SQL-Instanz (Standard: Computername).
+Target SQL instance (default: computer name).
 
 .PARAMETER SqlCredential
-Anmeldeinformationen fuer die SQL-Instanz (fuer Job-Erstellung).
+Credentials for the SQL instance (for job creation).
 
 .PARAMETER JobName
-Name des zu erstellenden Agent-Jobs. Standard: 'sqmAlwaysOnRepair'.
+Name of the Agent job to create. Default: 'sqmAlwaysOnRepair'.
 
 .PARAMETER Schedule
-Zeitplan im Format 'FREQ=HOURLY;INTERVAL=1' (Standard stuendlich). Kann auch 'FREQ=DAILY;INTERVAL=1' sein.
-Leer lassen fuer keinen Zeitplan (nur manuell).
+Schedule in the format 'FREQ=HOURLY;INTERVAL=1' (default: hourly). Can also be 'FREQ=DAILY;INTERVAL=1'.
+Leave empty for no schedule (manual only).
 
 .PARAMETER StartTime
-Uhrzeit fuer den Zeitplan (z.B. '00:00:00'). Optional.
+Time for the schedule (e.g. '00:00:00'). Optional.
 
 .PARAMETER Force
-ueberschreibt einen vorhandenen Job mit gleichem Namen.
+Overwrites an existing job with the same name.
 
 .PARAMETER EnableException
-Ausnahmen durchlassen.
+Propagate exceptions immediately.
 
 .EXAMPLE
-# Erstellt einen stuendlichen Job
+# Creates an hourly job
 New-sqmAlwaysOnRepairJob
 
 .EXAMPLE
-# Taeglicher Job um 2 Uhr morgens
+# Daily job at 2 AM
 New-sqmAlwaysOnRepairJob -Schedule "FREQ=DAILY;INTERVAL=1" -StartTime "02:00:00"
 
 .NOTES
-Der PowerShell-Code des Job-Schritts laedt automatisch das dbatools-Modul und alle benoetigten Funktionen.
-Es wird angenommen, dass die Funktionen bereits im Session-Global verfuegbar sind oder als Skript nachgeladen werden.
+The PowerShell code in the job step automatically loads the dbatools module and all required functions.
+It is assumed that the functions are already available globally in the session or are loaded as a script.
 #>
 function New-sqmAlwaysOnRepairJob
 {

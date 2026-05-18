@@ -1,34 +1,34 @@
 ﻿<#
 .SYNOPSIS
-    Prueft eine oder mehrere Backup?Dateien mit RESTORE VERIFYONLY.
+    Verifies one or more backup files using RESTORE VERIFYONLY.
 
 .DESCRIPTION
-    Fuehrt RESTORE VERIFYONLY auf einer Backup?Datei (lokal oder optional remote) aus.
-    Liefert $true, wenn die Pruefung erfolgreich war, sonst $false.
-    Kann mehrere Dateien nacheinander pruefen (z.B. Stripes).
+    Executes RESTORE VERIFYONLY on a backup file (local or optionally remote).
+    Returns $true if the check was successful, otherwise $false.
+    Can verify multiple files in sequence (e.g. stripes).
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz, auf der der Verifizierungslauf erfolgt (Standard: aktueller Computername).
+    SQL Server instance on which the verification runs (default: current computer name).
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER BackupPath
-    Pfad zur Backup?Datei (.bak) auf dem Server (lokaler Pfad, kein UNC). Kann Array sein.
-    Wenn nicht angegeben, wird das Verzeichnis aus der Modulkonfiguration (BackupDirectory) verwendet.
-    Fallback: SQL Server Standardbackup-Verzeichnis der Zielinstanz.
+    Path to the backup file (.bak) on the server (local path, not UNC). Can be an array.
+    If not specified, the directory from the module configuration (BackupDirectory) is used.
+    Fallback: the default backup directory of the target SQL Server instance.
 
 .PARAMETER FileListOnly
-    Wenn $true, wird nur die Liste der enthaltenen Dateien angezeigt (ohne VerifyOnly).
+    When $true, only lists the files contained in the backup (without VerifyOnly).
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
     Test-sqmBackupIntegrity -SqlInstance "SQL01" -BackupPath "D:\Backup\AdventureWorks.bak"
 
 .NOTES
-    Verwendet Restore-DbaDatabase mit Parameter -VerifyOnly.
+    Uses Restore-DbaDatabase with the -VerifyOnly parameter.
 #>
 function Test-sqmBackupIntegrity
 {

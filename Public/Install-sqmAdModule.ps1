@@ -1,90 +1,87 @@
 ﻿<#
 .SYNOPSIS
-    Stellt sicher dass das ActiveDirectory PowerShell-Modul (RSAT) installiert ist.
+    Ensures that the ActiveDirectory PowerShell module (RSAT) is installed.
 
 .DESCRIPTION
-    Prueft zunaechst ob das ActiveDirectory-Modul bereits verfuegbar ist.
-    Ist das nicht der Fall, versucht die Funktion die Installation ueber vier
-    Methoden in folgender Reihenfolge (Fallback-Kette):
+    First checks whether the ActiveDirectory module is already available.
+    If not, the function attempts installation using four methods in the following
+    order (fallback chain):
 
         1. Windows Capability  (Add-WindowsCapability)
-           Ziel: Windows 10/11 Clients und Windows Server 2019+
-           Paket: Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0
+           Target: Windows 10/11 clients and Windows Server 2019+
+           Package: Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0
 
         2. Windows Feature  (Install-WindowsFeature)
-           Ziel: Windows Server (alle Versionen mit ServerManager)
+           Target: Windows Server (all versions with ServerManager)
            Feature: RSAT-AD-PowerShell
 
         3. DISM  (dism.exe /Online /Add-Capability)
-           Ziel: aeltere Systeme oder Umgebungen ohne ServerManager/PS-Cmdlets
+           Target: older systems or environments without ServerManager/PS cmdlets
            Capability: Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0
 
         4. PSGallery  (Install-Module ActiveDirectory)
-           Ziel: Systeme mit Internetzugang und PSGallery-Zugriff, wenn alle
-                 anderen Methoden nicht verfuegbar oder fehlgeschlagen sind.
-           Scope: zunaechst CurrentUser, dann AllUsers.
-           Voraussetzung: NuGet-Provider ? 2.8.5.201 (wird automatisch
-           installiert falls fehlend).
+           Target: systems with internet access and PSGallery access, when all
+                   other methods are unavailable or failed.
+           Scope: first CurrentUser, then AllUsers.
+           Prerequisite: NuGet provider >= 2.8.5.201 (installed automatically if missing).
 
-    Jede Methode wird nur versucht, wenn die zustaendigen Cmdlets bzw.
-    das Tool auf dem System vorhanden sind. Schlaegt eine Methode fehl,
-    wird mit der naechsten fortgefahren.
+    Each method is only attempted if the responsible cmdlets or tool are present
+    on the system. If a method fails, the next one is tried.
 
-    Nach erfolgreicher Installation wird Import-Module ActiveDirectory
-    ausgefuehrt um das Modul in die aktuelle Session zu laden.
+    After successful installation, Import-Module ActiveDirectory is run
+    to load the module into the current session.
 
-    Hinweis zur Berechtigung:
-        Alle Installationsmethoden erfordern lokale Administratorrechte.
-        Die Funktion prueft dies vorab und gibt einen sprechenden Fehler zurueck.
+    Permission note:
+        All installation methods require local administrator rights.
+        The function checks this beforehand and returns an informative error.
 
 .PARAMETER SkipIfPresent
-    Wenn $true (Standard) und das Modul bereits vorhanden ist, wird sofort
-    $true zurueckgegeben ohne Installationsversuch.
-    Auf $false setzen um einen Re-Import zu erzwingen.
+    If $true (default) and the module is already present, $true is returned
+    immediately without attempting installation.
+    Set to $false to force a re-import.
 
 .PARAMETER ContinueOnError
-    Wenn gesetzt, gibt die Funktion bei fehlgeschlagener Installation $false
-    zurueck statt einen Fehler auszuloesen.
+    When set, the function returns $false on failed installation instead of throwing an error.
 
 .PARAMETER EnableException
-    Wenn gesetzt, wirft die Funktion bei fehlgeschlagener Installation
-    eine Ausnahme (ueberschreibt ContinueOnError).
+    When set, the function throws an exception on failed installation
+    (overrides ContinueOnError).
 
 .PARAMETER WhatIf
-    Zeigt welche Installationsmethode versucht wuerde, ohne sie auszufuehren.
+    Shows which installation method would be attempted, without executing it.
 
 .PARAMETER Confirm
-    Fordert vor der Installation eine Bestaetigung an.
+    Request confirmation before installation.
 
 .OUTPUTS
-    [bool] - $true wenn das Modul am Ende verfuegbar und geladen ist,
-             $false wenn Installation fehlgeschlagen und ContinueOnError gesetzt.
+    [bool] - $true if the module is available and loaded at the end,
+             $false if installation failed and ContinueOnError is set.
 
 .EXAMPLE
     Install-sqmAdModule
 
-    Prueft ob das AD-Modul vorhanden ist und installiert es falls noetig.
+    Checks whether the AD module is present and installs it if necessary.
 
 .EXAMPLE
     Install-sqmAdModule -ContinueOnError
 
-    Gibt $false zurueck wenn Installation scheitert, statt eine Ausnahme zu werfen.
+    Returns $false if installation fails instead of throwing an exception.
 
 .EXAMPLE
     if (-not (Install-sqmAdModule -ContinueOnError))
     {
-        Write-Warning "AD-Modul nicht verfuegbar - AD-Pruefung wird uebersprungen."
+        Write-Warning "AD module not available - AD check will be skipped."
     }
 
 .NOTES
-    Voraussetzungen : Invoke-sqmLogging, lokale Administratorrechte
-    Getestete Systeme: Windows 10/11, Windows Server 2016/2019/2022
-    DISM-Fallback   : Benoetigt Internetzugang oder WSUS/SCCM-Quelle
-                      (Windows Update muss erreichbar sein).
-    PSGallery       : Benoetigt Internetzugang und Zugriff auf gallery.powershellgallery.com.
-                      NuGet-Provider wird automatisch installiert falls fehlend.
-                      In abgeschotteten Umgebungen schlaegt diese Methode erwartungsgemaess fehl.
-    Neustart        : Keine der Methoden erfordert einen Neustart.
+    Prerequisites : Invoke-sqmLogging, local administrator rights
+    Tested systems: Windows 10/11, Windows Server 2016/2019/2022
+    DISM fallback  : Requires internet access or a WSUS/SCCM source
+                     (Windows Update must be reachable).
+    PSGallery      : Requires internet access and access to gallery.powershellgallery.com.
+                     NuGet provider is installed automatically if missing.
+                     In isolated environments this method will fail as expected.
+    Restart        : None of the methods requires a restart.
 #>
 function Install-sqmAdModule
 {

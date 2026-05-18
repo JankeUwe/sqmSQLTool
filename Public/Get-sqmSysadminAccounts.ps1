@@ -1,60 +1,60 @@
 <#
 .SYNOPSIS
-    Ermittelt alle Logins mit Sysadmin-Rechten auf einer SQL Server-Instanz.
+    Retrieves all logins with sysadmin rights on a SQL Server instance.
 
 .DESCRIPTION
-    Fragt sys.server_principals und sys.server_role_members ab und liefert
-    alle direkten Mitglieder der sysadmin-Serverrolle.
+    Queries sys.server_principals and sys.server_role_members and returns
+    all direct members of the sysadmin server role.
 
-    Pro Login werden folgende Informationen ermittelt:
-    - Loginname und Logintyp (SQL, Windows-User, Windows-Gruppe, etc.)
-    - Aktiviert / deaktiviert
-    - Ist SA (SID 0x01) oder nicht
-    - Erstellungsdatum
-    - Ob der Login explizit ausgeschlossen wurde (-ExcludeLogin)
+    Per login the following information is determined:
+    - Login name and login type (SQL, Windows user, Windows group, etc.)
+    - Enabled / disabled
+    - Is SA (SID 0x01) or not
+    - Creation date
+    - Whether the login was explicitly excluded (-ExcludeLogin)
 
-    Mit -ExcludeLogin koennen bekannte/erwartete Konten aus dem Bericht
-    gefiltert werden (sie werden als 'Excluded' markiert).
+    With -ExcludeLogin, known/expected accounts can be filtered from the report
+    (they are marked as 'Excluded').
 
-    Mit -ExcludeSysAccounts werden bekannte SQL Server-System- und
-    Dienstkonten automatisch als 'Excluded' markiert.
+    With -ExcludeSysAccounts, known SQL Server system and service accounts are
+    automatically marked as 'Excluded'.
 
-    BUILTIN\Administrators erhaelt einen eigenen Status 'BuiltinAdmins'
-    und wird NICHT automatisch ausgeschlossen - Sicherheitspruefung erforderlich.
+    BUILTIN\Administrators receives its own status 'BuiltinAdmins'
+    and is NOT automatically excluded - security review required.
 
-    Ausgabe:
-        SysadminAccounts_<instanz>_<datum>.txt   - Lesbarer Bericht
-        SysadminAccounts_<instanz>_<datum>.csv   - Maschinenlesbar
+    Output:
+        SysadminAccounts_<instance>_<date>.txt   - Readable report
+        SysadminAccounts_<instance>_<date>.csv   - Machine-readable
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz(en). Pipeline-faehig. Standard: aktueller Computername.
+    SQL Server instance(s). Pipeline-capable. Default: current computer name.
 
 .PARAMETER SqlCredential
-    Optionales PSCredential fuer die Verbindung.
+    Optional PSCredential for the connection.
 
 .PARAMETER ExcludeLogin
-    Logins die als 'Excluded' markiert werden (Wildcards erlaubt).
+    Logins to be marked as 'Excluded' (wildcards allowed).
 
 .PARAMETER ExcludeSysAccounts
-    Wenn gesetzt, werden bekannte Systemkonten automatisch ausgeschlossen.
+    When set, known system accounts are automatically excluded.
 
 .PARAMETER IncludeDisabled
-    Wenn $true (Standard), werden auch deaktivierte sysadmin-Logins einbezogen.
+    If $true (default), disabled sysadmin logins are also included.
 
 .PARAMETER OutputPath
-    Ausgabeverzeichnis fuer die Berichtsdateien. Standard: $env:ProgramData\sqmSQLTool\Logs
+    Output directory for report files. Default: $env:ProgramData\sqmSQLTool\Logs
 
 .PARAMETER ContinueOnError
-    Bei Fehler auf einer Instanz fortfahren.
+    Continue on error for an instance.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen (ueberschreibt ContinueOnError).
+    Throw exceptions immediately (overrides ContinueOnError).
 
 .PARAMETER Confirm
-    Fordert vor dem Schreiben der Dateien eine Bestaetigung an.
+    Request confirmation before writing files.
 
 .PARAMETER WhatIf
-    Zeigt, welche Dateien erstellt wuerden, ohne sie zu schreiben.
+    Shows which files would be created without writing them.
 
 .EXAMPLE
     Get-sqmSysadminAccounts

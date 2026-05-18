@@ -1,56 +1,56 @@
 ﻿<#
 .SYNOPSIS
-    Synchronisiert SQL Server-Objekte vom Primary-Replikat auf alle
-    Secondary-Replikate einer Verfuegbarkeitsgruppe.
+    Synchronizes SQL Server objects from the primary replica to all secondary replicas
+    of an Availability Group.
 
 .DESCRIPTION
-    Erkennt automatisch den aktuellen Primary und alle Verfuegbarkeitsgruppen
-    der angegebenen Instanz. Alle AGs werden einzeln verarbeitet.
+    Automatically detects the current primary and all Availability Groups of the
+    specified instance. All AGs are processed individually.
 
-    Synchronisiert folgende Objekttypen vom Primary zu allen Secondaries:
-        Logins       - SQL- und Windows-Logins inkl. SID/Passwort-uebertragung,
-                       anschliessend Repair-DbaDbOrphanUser auf allen AG-Datenbanken
-                       der Secondaries (Orphaned-User-Bereinigung).
-        Jobs         - SQL Agent Jobs inkl. Job Steps, Schedules und Proxies.
-        LinkedServers- Linked Server-Definitionen inkl. Login-Mappings.
-        Operators    - SQL Agent Operatoren.
-        Alerts       - SQL Agent Alerts.
+    Synchronizes the following object types from primary to all secondaries:
+        Logins        - SQL and Windows logins including SID/password transfer,
+                        followed by Repair-DbaDbOrphanUser on all AG databases
+                        on the secondaries (orphaned user cleanup).
+        Jobs          - SQL Agent jobs including job steps, schedules, and proxies.
+        LinkedServers - Linked Server definitions including login mappings.
+        Operators     - SQL Agent operators.
+        Alerts        - SQL Agent alerts.
 
-    Mit -ExcludeType koennen einzelne Typen ausgeschlossen werden.
-    Mit -ObjectName koennen bei Logins und Jobs einzelne Objekte gezielt synchronisiert werden.
-    Mit -IncludeSystemObjects werden auch System-Logins (sa, ##MS_*) und System-Jobs synchronisiert.
+    Use -ExcludeType to exclude individual types.
+    Use -ObjectName to target specific logins and jobs by name.
+    Use -IncludeSystemObjects to also synchronize system logins (sa, ##MS_*) and system jobs.
 
 .PARAMETER SqlInstance
-    Name einer beliebigen SQL Server-Instanz des AG-Clusters (Standard: aktueller Computername).
+    Name of any SQL Server instance in the AG cluster (default: current computer name).
 
 .PARAMETER SqlCredential
-    Optionales PSCredential fuer alle SQL-Verbindungen.
+    Optional PSCredential for all SQL connections.
 
 .PARAMETER AvailabilityGroup
-    Optional: Name einer bestimmten AG. Sonst werden alle AGs der Instanz verarbeitet.
+    Optional: Name of a specific AG. Otherwise all AGs on the instance are processed.
 
 .PARAMETER ExcludeType
-    Objekttypen die NICHT synchronisiert werden sollen.
-    Gueltige Werte: Logins, Jobs, LinkedServers, Operators, Alerts.
+    Object types that should NOT be synchronized.
+    Valid values: Logins, Jobs, LinkedServers, Operators, Alerts.
 
 .PARAMETER ObjectName
-    Optional: Filtert bei Logins und Jobs auf bestimmte Namen (Wildcards erlaubt).
+    Optional: Filters logins and jobs by name (wildcards allowed).
 
 .PARAMETER IncludeSystemObjects
-    Wenn gesetzt, werden Systemobjekte (sa, ##MS_*, interne Jobs) synchronisiert.
-    Standard: $false (Systemobjekte werden ausgeschlossen).
+    When set, system objects (sa, ##MS_*, internal jobs) are synchronized.
+    Default: $false (system objects are excluded).
 
 .PARAMETER ContinueOnError
-    Bei Fehler eines Objekttyps mit dem naechsten fortfahren (ansonsten Abbruch).
+    Continue with the next object type on error (otherwise aborts).
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen (ueberschreibt ContinueOnError).
+    Throw exceptions immediately (overrides ContinueOnError).
 
 .PARAMETER Confirm
-    Fordert vor kritischen Aktionen (ueberschreiben von Jobs/Logins) eine Bestaetigung an.
+    Prompts for confirmation before critical actions (overwriting jobs/logins).
 
 .PARAMETER WhatIf
-    Zeigt alle geplanten Aktionen ohne Ausfuehrung.
+    Shows all planned actions without executing them.
 
 .EXAMPLE
     Sync-sqmAgNode
@@ -59,8 +59,8 @@
     Sync-sqmAgNode -SqlInstance "SQL01" -AvailabilityGroup "AG_Prod" -ObjectName "AppLogin_*"
 
 .NOTES
-    Voraussetzungen: dbatools, Invoke-sqmLogging.
-    Richtung: immer Primary ? alle Secondaries.
+    Prerequisites: dbatools, Invoke-sqmLogging.
+    Direction: always primary -> all secondaries.
 #>
 function Sync-sqmAgNode
 {

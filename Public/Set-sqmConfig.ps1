@@ -1,52 +1,52 @@
 ﻿<#
 .SYNOPSIS
-    Setzt einen oder mehrere Konfigurationswerte fuer das MSSQLTools-Modul.
+    Sets one or more configuration values for the MSSQLTools module.
 
 .DESCRIPTION
-    Erlaubt das Setzen von LogPath, OutputPath, CentralPath, Ola-Job-Namen,
-    TSM Management-Klassen, des HPU-Domain-Gruppen-Mappings sowie des
-    SSRS-Installer-Pfads (SsrsInstallerPath).
-    Jeder Pfad wird auf Existenz bzw. Erstellbarkeit geprueft.
-    Die Konfiguration wird dauerhaft in einer JSON-Datei im Benutzerprofil gespeichert.
+    Allows setting of LogPath, OutputPath, CentralPath, Ola job names,
+    TSM management classes, the HPU domain group mapping, and the
+    SSRS installer path (SsrsInstallerPath).
+    Each path is validated for existence or creatability.
+    The configuration is permanently saved in a JSON file in the user profile.
 
 .PARAMETER LogPath
-    Verzeichnis fuer Logdateien (Invoke-sqmLogging).
+    Directory for log files (Invoke-sqmLogging).
 
 .PARAMETER OutputPath
-    Standard-Ausgabeverzeichnis fuer Berichte.
+    Default output directory for reports.
 
 .PARAMETER CentralPath
-    Optionales zentrales Ablageverzeichnis (zusaetzliche Kopie).
+    Optional central storage directory (additional copy).
 
 .PARAMETER OlaJobNameFull
-    Name des Full-Backup-Jobs fuer User-Datenbanken.
+    Name of the full backup job for user databases.
 
 .PARAMETER OlaJobNameDiff
-    Name des Diff-Backup-Jobs fuer User-Datenbanken.
+    Name of the diff backup job for user databases.
 
 .PARAMETER OlaJobNameLog
-    Name des Log-Backup-Jobs fuer User-Datenbanken.
+    Name of the log backup job for user databases.
 
 .PARAMETER OlaJobNameIndexOpt
-    Name des IndexOptimize-Jobs.
+    Name of the IndexOptimize job.
 
 .PARAMETER OlaJobNameIntUserDb
-    Name des IntegrityCheck-Jobs fuer User-Datenbanken.
+    Name of the IntegrityCheck job for user databases.
 
 .PARAMETER OlaJobNameIntSysDb
-    Name des IntegrityCheck-Jobs fuer System-Datenbanken.
+    Name of the IntegrityCheck job for system databases.
 
 .PARAMETER OlaJobNameSysDbBackup
-    Name des Full-Backup-Jobs fuer System-Datenbanken.
+    Name of the full backup job for system databases.
 
 .PARAMETER TsmManagementClasses
-    Array von gueltigen TSM Management-Klassen (z.B. 'MC_B_NL.NL_42.42.NA').
+    Array of valid TSM management classes (e.g. 'MC_B_NL.NL_42.42.NA').
 
 .PARAMETER HpuDomainGroupMap
-    Array von PSCustomObject mit den Feldern DomainPattern (Wildcard) und GroupNamePattern
-    (sAMAccountName-Suffix der HPU-Allow-Gruppe). Wird von Get-sqmHpuAllowGroup ausgewertet.
-    Eintraege werden der Reihe nach geprueft; der erste Treffer gewinnt.
-    Beispiel:
+    Array of PSCustomObject with fields DomainPattern (wildcard) and GroupNamePattern
+    (sAMAccountName suffix of the HPU allow group). Evaluated by Get-sqmHpuAllowGroup.
+    Entries are checked in order; the first match wins.
+    Example:
         Set-sqmConfig -HpuDomainGroupMap @(
             [PSCustomObject]@{ DomainPattern = 'bayernlb.sfinance.net'; GroupNamePattern = 'Fg_DC_AouAllowManageAuditSecLogSrvAll_Mod' },
             [PSCustomObject]@{ DomainPattern = '*.sfinance.net';        GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' },
@@ -54,18 +54,18 @@
         )
 
 .PARAMETER SsrsInstallerPath
-    Vollstaendiger UNC- oder lokaler Pfad zur SSRS-Installationsdatei
-    (SQLServerReportingServices.exe oder .msi).
-    Wird von Install-sqmSsrsReportServer verwendet wenn -InstallerPath nicht angegeben wird.
-    Beispiel: '\\srv-share\Software\SSRS2022\SQLServerReportingServices.exe'
+    Full UNC or local path to the SSRS installer file
+    (SQLServerReportingServices.exe or .msi).
+    Used by Install-sqmSsrsReportServer when -InstallerPath is not specified.
+    Example: '\\srv-share\Software\SSRS2022\SQLServerReportingServices.exe'
 
 .PARAMETER Language
-    Ausgabe-Sprache des Moduls. Erlaubte Werte: de-DE, en-US.
-    Standard: de-DE.
-    Beispiel: Set-sqmConfig -Language en-US
+    Output language of the module. Allowed values: de-DE, en-US.
+    Default: de-DE.
+    Example: Set-sqmConfig -Language en-US
 
 .PARAMETER PassThru
-    Gibt die aktualisierte Konfiguration als Objekt zurueck.
+    Returns the updated configuration as an object.
 
 .EXAMPLE
     Set-sqmConfig -LogPath "D:\Logs" -OlaJobNameFull "Prod-FULL"

@@ -1,46 +1,46 @@
 ﻿<#
 .SYNOPSIS
-    Aktualisiert Statistiken in einer oder mehreren Datenbanken.
+    Updates statistics in one or more databases.
 
 .DESCRIPTION
-    Fuehrt UPDATE STATISTICS mit konfigurierbaren Optionen aus (Scan?Prozentsatz, nur geaenderte Statistiken, etc.).
-    Kann auf bestimmte Datenbanken, Tabellen oder Statistiken eingeschraenkt werden.
+    Executes UPDATE STATISTICS with configurable options (scan percentage, only modified statistics, etc.).
+    Can be restricted to specific databases, tables, or statistics.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz (Standard: aktueller Computername).
+    SQL Server instance (default: current computer name).
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER Database
-    Datenbankname oder Wildcard-Muster.
+    Database name or wildcard pattern.
 
 .PARAMETER Table
-    Tabellenname oder Wildcard-Muster.
+    Table name or wildcard pattern.
 
 .PARAMETER Statistics
-    Statistikname oder Wildcard-Muster.
+    Statistic name or wildcard pattern.
 
 .PARAMETER SamplePercent
-    Prozentsatz der Zeilen, der fuer das Update verwendet wird (0 = Vollscan). Standard: 0.
+    Percentage of rows used for the update (0 = full scan). Default: 0.
 
 .PARAMETER OnlyModified
-    Nur Statistiken aktualisieren, die seit der letzten Aktualisierung geaendert wurden. Standard: $true.
+    Only update statistics that have changed since the last update. Default: $true.
 
 .PARAMETER Index
-    Statistiken, die mit einem Index verbunden sind, werden ebenfalls aktualisiert. Standard: $true.
+    Also update statistics associated with an index. Default: $true.
 
 .PARAMETER WhatIf
-    Zeigt, welche Statistiken betroffen waeren.
+    Shows which statistics would be affected.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
     Invoke-sqmUpdateStatistics -Database 'SalesDB' -SamplePercent 10
 
 .NOTES
-    Verwendet dbatools (Update-DbaDbStatistic).
+    Uses dbatools (Update-DbaDbStatistic).
 #>
 function Invoke-sqmUpdateStatistics {
     [CmdletBinding(SupportsShouldProcess = $true)]

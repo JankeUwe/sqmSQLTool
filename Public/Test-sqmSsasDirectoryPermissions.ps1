@@ -1,48 +1,47 @@
 ﻿<#
 .SYNOPSIS
-    Prueft und korrigiert die NTFS-Berechtigungen fuer SSAS-Verzeichnisse (Data, Log, Temp, Backup).
+    Checks and corrects NTFS permissions for SSAS directories (Data, Log, Temp, Backup).
 
 .DESCRIPTION
-    Ermittelt fuer eine SSAS-Instanz die Verzeichnispfade aus der Registry,
-    prueft, ob das SSAS-Dienstkonto Vollzugriff (FullControl) auf diese Verzeichnisse
-    hat, und setzt ggf. die fehlenden Berechtigungen.
+    Determines the directory paths for an SSAS instance from the registry,
+    checks whether the SSAS service account has FullControl access to these directories,
+    and sets any missing permissions as needed.
 
-    Die Funktion arbeitet idempotent - bei wiederholtem Aufruf werden nur noch
-    fehlende Rechte ergaenzt.
+    The function is idempotent — on repeated calls only missing permissions are added.
 
 .PARAMETER InstanceName
-    Name der SSAS-Instanz. Standard: 'MSSQLSERVER' (Standardinstanz).
-    Bei benannten Instanzen z.?B. 'SSAS2019'.
+    Name of the SSAS instance. Default: 'MSSQLSERVER' (default instance).
+    For named instances e.g. 'SSAS2019'.
 
 .PARAMETER ServiceAccount
-    Optional: Name des Dienstkontos (z.?B. 'NT SERVICE\MSSQLServerOLAPService').
-    Wird nicht angegeben, wird das Konto automatisch aus dem Windows-Dienst ermittelt.
+    Optional: Name of the service account (e.g. 'NT SERVICE\MSSQLServerOLAPService').
+    If not specified, the account is automatically determined from the Windows service.
 
 .PARAMETER WhatIf
-    Zeigt, welche aenderungen vorgenommen wuerden, ohne sie auszufuehren.
+    Shows which changes would be made without executing them.
 
 .PARAMETER Confirm
-    Fordert vor jeder aenderung eine Bestaetigung an.
+    Prompts for confirmation before each change.
 
 .PARAMETER EnableException
-    Loest bei Fehlern sofort eine Exception aus (sonst wird der Fehler protokolliert).
+    Throws an exception immediately on errors (otherwise the error is logged).
 
 .PARAMETER ContinueOnError
-    Setzt die Pruefung der naechsten Verzeichnisse auch bei Fehlern fort.
+    Continues checking the next directories even on errors.
 
 .EXAMPLE
     Test-sqmSsasDirectoryPermissions
 
-    Prueft die Verzeichnisse der Standard-SSAS-Instanz und korrigiert fehlende Rechte.
+    Checks the directories of the default SSAS instance and corrects missing permissions.
 
 .EXAMPLE
     Test-sqmSsasDirectoryPermissions -InstanceName "SSAS2019" -WhatIf
 
-    Zeigt an, welche Berechtigungen fuer die benannte Instanz gesetzt wuerden.
+    Shows which permissions would be set for the named instance.
 
 .NOTES
-    Erfordert lokale Administratorrechte auf dem SSAS-Server.
-    Die Funktion nutzt die Registry unter HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\MSAS*.
+    Requires local administrator rights on the SSAS server.
+    The function uses the registry under HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\MSAS*.
 #>
 function Test-sqmSsasDirectoryPermissions
 {

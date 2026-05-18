@@ -1,108 +1,108 @@
 ﻿<#
 .SYNOPSIS
-    Richtet den Query Store ein, liest ihn aus, erkennt Probleme und speichert Berichte.
+    Configures the Query Store, reads from it, detects issues and saves reports.
 
 .DESCRIPTION
-    Umfassende Query-Store-Verwaltung fuer eine, mehrere oder alle Benutzerdatenbanken.
+    Comprehensive Query Store management for one, multiple or all user databases.
 
-    Betriebsarten (Switches, kombinierbar):
-      -Configure  Aktiviert und konfiguriert den Query Store (ALTER DATABASE SET QUERY_STORE).
-      -Query      Liest die Top-N-Queries aus dem Query Store (nach Dauer, CPU, Reads etc.).
-      -Diagnose   Erkennt Probleme: READ_ONLY-Status, Speicherdruck, Plan-Regression,
-                  Forced-Plan-Fehler, instabile Ausfuehrungsplaene.
+    Operating modes (switches, combinable):
+      -Configure  Enables and configures the Query Store (ALTER DATABASE SET QUERY_STORE).
+      -Query      Reads the top-N queries from the Query Store (by duration, CPU, reads, etc.).
+      -Diagnose   Detects issues: READ_ONLY status, memory pressure, plan regression,
+                  forced plan failures, unstable execution plans.
 
-    Wenn keiner der drei Switches angegeben wird, werden -Query und -Diagnose ausgefuehrt
-    (Report-Modus).
+    If none of the three switches are specified, -Query and -Diagnose are executed
+    (report mode).
 
-    Ergebnisse werden als PSCustomObject zurueckgegeben und optional als CSV/TXT gespeichert.
+    Results are returned as PSCustomObject and optionally saved as CSV/TXT.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz. Standard: aktueller Computername.
+    SQL Server instance. Default: current computer name.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die Verbindung.
+    PSCredential for the connection.
 
 .PARAMETER Database
-    Eine oder mehrere Datenbanken. Wird ignoriert wenn -All gesetzt ist.
+    One or more databases. Ignored when -All is set.
 
 .PARAMETER All
-    Alle zugaenglichen Benutzerdatenbanken verarbeiten.
+    Process all accessible user databases.
 
 .PARAMETER Configure
-    Query Store konfigurieren (aktivieren/Parameter setzen).
+    Configure Query Store (enable/set parameters).
 
 .PARAMETER Query
-    Top-N-Queries aus dem Query Store lesen.
+    Read top-N queries from the Query Store.
 
 .PARAMETER Diagnose
-    Probleme im Query Store erkennen und als Issues zurueckgeben.
+    Detect issues in the Query Store and return them as issues.
 
 .PARAMETER OperationMode
-    Query Store Betriebsmodus. Werte: READ_WRITE, READ_ONLY, OFF. Standard: READ_WRITE.
+    Query Store operation mode. Values: READ_WRITE, READ_ONLY, OFF. Default: READ_WRITE.
 
 .PARAMETER FlushIntervalSeconds
-    Haeufigkeit des Schreibens in den Query Store (Sekunden). Standard: 900.
+    Frequency of writing to the Query Store (seconds). Default: 900.
 
 .PARAMETER IntervalLengthMinutes
-    Laenge eines Statistik-Intervalls (Minuten). Standard: 60.
+    Length of a statistics interval (minutes). Default: 60.
 
 .PARAMETER MaxStorageSizeMB
-    Maximale Groesse des Query Store (MB). Standard: 1000.
+    Maximum size of the Query Store (MB). Default: 1000.
 
 .PARAMETER QueryCaptureMode
-    Erfassungsmodus. Werte: ALL, AUTO, NONE. Standard: AUTO.
+    Capture mode. Values: ALL, AUTO, NONE. Default: AUTO.
 
 .PARAMETER SizeBasedCleanupMode
-    Automatische Bereinigung bei Speicherdruck. Werte: OFF, AUTO. Standard: AUTO.
+    Automatic cleanup under memory pressure. Values: OFF, AUTO. Default: AUTO.
 
 .PARAMETER MaxPlansPerQuery
-    Maximale Anzahl Ausfuehrungsplaene je Query. Standard: 200.
+    Maximum number of execution plans per query. Default: 200.
 
 .PARAMETER TopN
-    Anzahl der zurueckzugebenden Top-Queries. Standard: 25.
+    Number of top queries to return. Default: 25.
 
 .PARAMETER OrderBy
-    Sortierspalte fuer Top-Queries. Werte: Duration, CPU, LogicalReads, ExecutionCount, Memory.
-    Standard: Duration.
+    Sort column for top queries. Values: Duration, CPU, LogicalReads, ExecutionCount, Memory.
+    Default: Duration.
 
 .PARAMETER LookbackHours
-    Betrachtungszeitraum in Stunden (rueckwirkend ab jetzt). Standard: 24.
+    Lookback period in hours (from now backwards). Default: 24.
 
 .PARAMETER MinExecutionCount
-    Mindestanzahl Ausfuehrungen fuer Aufnahme in Top-Queries. Standard: 5.
+    Minimum number of executions required to be included in top queries. Default: 5.
 
 .PARAMETER StorageWarningPct
-    Ab welchem Fuellgrad (%) eine Speicher-Warnung ausgegeben wird. Standard: 80.
+    Fill level (%) at which a storage warning is issued. Default: 80.
 
 .PARAMETER MaxPlansWarning
-    Ab wie vielen Plaenen pro Query eine Plan-Instabilitaets-Warnung ausgegeben wird. Standard: 5.
+    Number of plans per query at which a plan instability warning is issued. Default: 5.
 
 .PARAMETER OutputPath
-    Verzeichnis fuer Berichte (CSV + TXT). Standard: aus Modulkonfiguration + \QueryStore.
+    Directory for reports (CSV + TXT). Default: from module configuration + \QueryStore.
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen.
+    Throw exceptions immediately.
 
 .EXAMPLE
-    # Report fuer alle Datenbanken (Query + Diagnose)
+    # Report for all databases (Query + Diagnose)
     Invoke-sqmQueryStore -All
 
 .EXAMPLE
-    # Query Store konfigurieren und sofort abfragen
+    # Configure Query Store and query immediately
     Invoke-sqmQueryStore -Database "SalesDB","CRM" -Configure -Query -Diagnose
 
 .EXAMPLE
-    # Top 50 Queries nach CPU-Verbrauch, letzten 48 Stunden
+    # Top 50 queries by CPU consumption, last 48 hours
     Invoke-sqmQueryStore -Database "SalesDB" -Query -TopN 50 -OrderBy CPU -LookbackHours 48
 
 .EXAMPLE
-    # Diagnose mit Speicherwarnung ab 70% und Bericht speichern
+    # Diagnostics with storage warning from 70% and save report
     Invoke-sqmQueryStore -All -Diagnose -StorageWarningPct 70 -OutputPath "D:\Reports\QS"
 
 .NOTES
-    Erfordert: dbatools, Invoke-sqmLogging, Get-sqmConfig, Get-sqmDefaultOutputPath
-    Benoetigt VIEW DATABASE STATE auf den Zieldatenbanken.
-    Query Store ist verfuegbar ab SQL Server 2016 (Kompatibilitaetslevel >= 130).
+    Requires: dbatools, Invoke-sqmLogging, Get-sqmConfig, Get-sqmDefaultOutputPath
+    Needs VIEW DATABASE STATE on the target databases.
+    Query Store is available from SQL Server 2016 (compatibility level >= 130).
 #>
 function Invoke-sqmQueryStore
 {
