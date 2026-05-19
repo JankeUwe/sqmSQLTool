@@ -15,6 +15,10 @@ with the current list of databases on the server:
     IsOrphaned=0.
   - tempdb is always skipped, regardless of any switch.
 
+In addition, a history table master.dbo.sqm_BackupExclude_History and an audit trigger
+dbo.trg_sqm_BackupExclude_Audit are created automatically if they do not yet exist.
+The trigger records every INSERT and every change to IsActive or IsOrphaned.
+
 If SqlInstance is not specified, the current computer name ($env:COMPUTERNAME) is used.
 
 .PARAMETER SqlInstance
@@ -43,9 +47,15 @@ Sync-sqmBackupExcludeTable -SqlInstance "SQL01" -IncludeSystemDatabases
 # Preview what would change without making any modifications
 Sync-sqmBackupExcludeTable -SqlInstance "SQL01" -WhatIf
 
+.EXAMPLE
+# Synchronise and verify that the audit history table and trigger are in place
+Sync-sqmBackupExcludeTable -SqlInstance "SQL01\INST1"
+
 .NOTES
 Requires the dbatools module and the Invoke-sqmLogging function.
 Default for SqlInstance: $env:COMPUTERNAME (applies to all future versions).
+The history table master.dbo.sqm_BackupExclude_History and the trigger
+dbo.trg_sqm_BackupExclude_Audit are created automatically on first run.
 #>
 
 function Sync-sqmBackupExcludeTable
@@ -105,6 +115,54 @@ BEGIN
     );
 END
 "@
+
+		$createHistoryTableSql = @"
+IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'master.dbo.sqm_BackupExclude_History') AND type = 'U')
+BEGIN
+    CREATE TABLE master.dbo.sqm_BackupExclude_History (
+        HistoryId     int           NOT NULL IDENTITY(1,1) CONSTRAINT PK_sqm_BackupExclude_History PRIMARY KEY,
+        DatabaseName  sysname       NOT NULL,
+        ChangedField  nvarchar(50)  NOT NULL,
+        OldValue      nvarchar(255) NULL,
+        NewValue      nvarchar(255) NULL,
+        ChangedBy     sysname       NOT NULL DEFAULT SUSER_SNAME(),
+        ChangedAt     datetime2     NOT NULL DEFAULT SYSDATETIME()
+    );
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.triggers WHERE name = 'trg_sqm_BackupExclude_Audit')
+BEGIN
+    EXEC sp_executesql N'
+    CREATE TRIGGER dbo.trg_sqm_BackupExclude_Audit
+    ON master.dbo.sqm_BackupExclude
+    AFTER INSERT, UPDATE
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+        -- Track IsActive changes
+        INSERT INTO master.dbo.sqm_BackupExclude_History (DatabaseName, ChangedField, OldValue, NewValue)
+        SELECT i.DatabaseName,
+               ''IsActive'',
+               CAST(d.IsActive AS nvarchar(10)),
+               CAST(i.IsActive AS nvarchar(10))
+        FROM   inserted i
+        LEFT   JOIN deleted d ON i.DatabaseName = d.DatabaseName
+        WHERE  d.DatabaseName IS NULL                        -- INSERT
+            OR ISNULL(d.IsActive,-1) <> ISNULL(i.IsActive,-1);  -- UPDATE IsActive changed
+
+        -- Track IsOrphaned changes
+        INSERT INTO master.dbo.sqm_BackupExclude_History (DatabaseName, ChangedField, OldValue, NewValue)
+        SELECT i.DatabaseName,
+               ''IsOrphaned'',
+               CAST(d.IsOrphaned AS nvarchar(10)),
+               CAST(i.IsOrphaned AS nvarchar(10))
+        FROM   inserted i
+        LEFT   JOIN deleted d ON i.DatabaseName = d.DatabaseName
+        WHERE  d.DatabaseName IS NULL
+            OR ISNULL(d.IsOrphaned,-1) <> ISNULL(i.IsOrphaned,-1);
+    END';
+END
+"@
 	}
 
 	process
@@ -154,6 +212,10 @@ END
 			{
 				Invoke-sqmLogging -Message "Tabelle master.dbo.sqm_BackupExclude ist bereits vorhanden." -FunctionName $functionName -Level "INFO"
 			}
+
+			# 2b. History-Tabelle und Audit-Trigger erstellen falls nicht vorhanden
+			Invoke-DbaQuery @connParams -Database master -Query $createHistoryTableSql -ErrorAction Stop
+			Invoke-sqmLogging -Message "History-Tabelle und Audit-Trigger geprueft/erstellt." -FunctionName $functionName -Level "INFO"
 
 			# 3. Aktuelle Datenbanken vom Server laden
 			$dbParams = @{
