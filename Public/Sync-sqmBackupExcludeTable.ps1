@@ -1,0 +1,341 @@
+<#
+.SYNOPSIS
+Creates and synchronises the backup exclude table in the master database.
+
+.DESCRIPTION
+Ensures the table master.dbo.sqm_BackupExclude exists on the target SQL Server instance.
+If the table does not exist it is created automatically.
+
+After the table has been created or verified, the function synchronises its content
+with the current list of databases on the server:
+  - Databases not yet in the table are inserted (IsActive=1, IsOrphaned=0).
+  - Databases that are in the table but no longer exist on the server are marked
+    IsOrphaned=1 (the row is never deleted).
+  - Orphaned entries whose database has reappeared on the server are reset to
+    IsOrphaned=0.
+  - tempdb is always skipped, regardless of any switch.
+
+If SqlInstance is not specified, the current computer name ($env:COMPUTERNAME) is used.
+
+.PARAMETER SqlInstance
+The target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE").
+If not specified, the current computer name is used.
+
+.PARAMETER SqlCredential
+Alternative credentials (PSCredential). If not specified, Windows authentication is used.
+
+.PARAMETER IncludeSystemDatabases
+When set, the system databases master, model, and msdb are also inserted into the
+exclude table. tempdb is always excluded regardless of this switch.
+
+.PARAMETER EnableException
+Switch to propagate exceptions immediately (by default errors are logged as warnings).
+
+.EXAMPLE
+# Synchronise on the local instance – user databases only
+Sync-sqmBackupExcludeTable
+
+.EXAMPLE
+# Synchronise on a remote instance including system databases
+Sync-sqmBackupExcludeTable -SqlInstance "SQL01" -IncludeSystemDatabases
+
+.EXAMPLE
+# Preview what would change without making any modifications
+Sync-sqmBackupExcludeTable -SqlInstance "SQL01" -WhatIf
+
+.NOTES
+Requires the dbatools module and the Invoke-sqmLogging function.
+Default for SqlInstance: $env:COMPUTERNAME (applies to all future versions).
+#>
+
+function Sync-sqmBackupExcludeTable
+{
+	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
+	[OutputType([PSCustomObject[]])]
+	param (
+		[Parameter(Mandatory = $false, Position = 0)]
+		[string]$SqlInstance,
+		[Parameter(Mandatory = $false)]
+		[System.Management.Automation.PSCredential]$SqlCredential,
+		[Parameter(Mandatory = $false)]
+		[switch]$IncludeSystemDatabases,
+		[Parameter(Mandatory = $false)]
+		[switch]$EnableException
+	)
+
+	begin
+	{
+		$functionName = $MyInvocation.MyCommand.Name
+
+		# Default fuer SqlInstance: aktueller Computername
+		if (-not $PSBoundParameters.ContainsKey('SqlInstance') -or [string]::IsNullOrWhiteSpace($SqlInstance))
+		{
+			$SqlInstance = $env:COMPUTERNAME
+			Write-Verbose "Keine SqlInstance angegeben. Verwende Standard: $SqlInstance"
+		}
+
+		# Pruefung auf dbatools
+		if (-not (Get-Module -ListAvailable -Name dbatools))
+		{
+			$errMsg = "dbatools-Modul nicht gefunden. Bitte installieren Sie es mit: Install-Module dbatools"
+			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+			throw $errMsg
+		}
+
+		Invoke-sqmLogging -Message "Starte $functionName auf Instanz: $SqlInstance" -FunctionName $functionName -Level "INFO"
+
+		$connParams = @{ SqlInstance = $SqlInstance }
+		if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
+
+		$results = [System.Collections.Generic.List[PSCustomObject]]::new()
+
+		$createTableSql = @"
+IF NOT EXISTS (
+    SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'master.dbo.sqm_BackupExclude') AND type = 'U'
+)
+BEGIN
+    CREATE TABLE master.dbo.sqm_BackupExclude (
+        DatabaseName  sysname       NOT NULL,
+        Reason        nvarchar(255) NULL,
+        ExcludedBy    sysname       NOT NULL CONSTRAINT DF_sqm_BackupExclude_ExcludedBy DEFAULT SUSER_SNAME(),
+        ExcludedAt    datetime2     NOT NULL CONSTRAINT DF_sqm_BackupExclude_ExcludedAt DEFAULT SYSDATETIME(),
+        IsActive      bit           NOT NULL CONSTRAINT DF_sqm_BackupExclude_IsActive   DEFAULT 1,
+        IsOrphaned    bit           NOT NULL CONSTRAINT DF_sqm_BackupExclude_IsOrphaned DEFAULT 0,
+        CONSTRAINT PK_sqm_BackupExclude PRIMARY KEY (DatabaseName)
+    );
+END
+"@
+	}
+
+	process
+	{
+		try
+		{
+			# 1. Verbindung aufbauen
+			$sqlSrv = Connect-DbaInstance @connParams -ErrorAction Stop
+			Invoke-sqmLogging -Message "Verbindung zu '$SqlInstance' hergestellt." -FunctionName $functionName -Level "INFO"
+
+			# 2. Tabelle erstellen falls nicht vorhanden
+			$tableExists = Invoke-DbaQuery @connParams -Database master `
+				-Query "SELECT 1 AS TableExists FROM sys.objects WHERE object_id = OBJECT_ID(N'master.dbo.sqm_BackupExclude') AND type = 'U'" `
+				-ErrorAction Stop
+
+			if (-not $tableExists)
+			{
+				$actionMsg = "Erstelle Tabelle master.dbo.sqm_BackupExclude auf '$SqlInstance'"
+				if ($PSCmdlet.ShouldProcess($SqlInstance, $actionMsg))
+				{
+					Invoke-DbaQuery @connParams -Database master -Query $createTableSql -ErrorAction Stop
+					Invoke-sqmLogging -Message "Tabelle master.dbo.sqm_BackupExclude wurde erstellt." -FunctionName $functionName -Level "INFO"
+					$results.Add([PSCustomObject]@{
+						SqlInstance  = $SqlInstance
+						DatabaseName = 'N/A'
+						Action       = 'Created'
+						IsActive     = $null
+						IsOrphaned   = $null
+						Message      = "Tabelle master.dbo.sqm_BackupExclude wurde neu erstellt."
+					})
+				}
+				else
+				{
+					Invoke-sqmLogging -Message "WhatIf: Tabelle master.dbo.sqm_BackupExclude wuerde erstellt werden." -FunctionName $functionName -Level "VERBOSE"
+					$results.Add([PSCustomObject]@{
+						SqlInstance  = $SqlInstance
+						DatabaseName = 'N/A'
+						Action       = 'WhatIfSkipped'
+						IsActive     = $null
+						IsOrphaned   = $null
+						Message      = "WhatIf: Tabelle master.dbo.sqm_BackupExclude wuerde erstellt werden."
+					})
+					return
+				}
+			}
+			else
+			{
+				Invoke-sqmLogging -Message "Tabelle master.dbo.sqm_BackupExclude ist bereits vorhanden." -FunctionName $functionName -Level "INFO"
+			}
+
+			# 3. Aktuelle Datenbanken vom Server laden
+			$dbParams = @{
+				SqlInstance   = $SqlInstance
+				ExcludeSystem = $true
+				ErrorAction   = 'Stop'
+			}
+			if ($SqlCredential) { $dbParams['SqlCredential'] = $SqlCredential }
+			if ($EnableException) { $dbParams['EnableException'] = $true }
+
+			$serverDatabases = Get-DbaDatabase @dbParams | Where-Object { $_.Name -ne 'tempdb' -and $_.IsAccessible }
+
+			if ($IncludeSystemDatabases)
+			{
+				$sysDbs = Get-DbaDatabase @connParams -Database 'master', 'model', 'msdb' -ErrorAction SilentlyContinue |
+					Where-Object { $_.Name -ne 'tempdb' -and $_.IsAccessible }
+				$serverDatabases = @($serverDatabases) + @($sysDbs) | Where-Object { $_ }
+				Invoke-sqmLogging -Message "IncludeSystemDatabases gesetzt: master, model, msdb werden ebenfalls beruecksichtigt." -FunctionName $functionName -Level "INFO"
+			}
+
+			$serverDbNames = $serverDatabases | Select-Object -ExpandProperty Name
+
+			# 4. Bestehende Eintraege aus der Tabelle laden
+			$existingRows = Invoke-DbaQuery @connParams -Database master `
+				-Query "SELECT DatabaseName, IsActive, IsOrphaned FROM master.dbo.sqm_BackupExclude" `
+				-ErrorAction Stop
+
+			$existingDbNames = if ($existingRows) { @($existingRows | Select-Object -ExpandProperty DatabaseName) } else { @() }
+
+			# 5. Neue Datenbanken einfuegen (noch nicht in der Tabelle)
+			foreach ($dbName in $serverDbNames)
+			{
+				if ($dbName -eq 'tempdb') { continue }
+
+				if ($dbName -notin $existingDbNames)
+				{
+					$insertSql = "INSERT INTO master.dbo.sqm_BackupExclude (DatabaseName, IsActive, IsOrphaned) VALUES (N'$($dbName.Replace("'", "''"))', 1, 0)"
+					$actionMsg = "Fuege Datenbank '$dbName' in sqm_BackupExclude ein"
+					if ($PSCmdlet.ShouldProcess($dbName, $actionMsg))
+					{
+						Invoke-DbaQuery @connParams -Database master -Query $insertSql -ErrorAction Stop
+						Invoke-sqmLogging -Message "Datenbank '$dbName' wurde in sqm_BackupExclude eingefuegt (IsActive=1, IsOrphaned=0)." -FunctionName $functionName -Level "INFO"
+						$results.Add([PSCustomObject]@{
+							SqlInstance  = $SqlInstance
+							DatabaseName = $dbName
+							Action       = 'Added'
+							IsActive     = $true
+							IsOrphaned   = $false
+							Message      = "Datenbank '$dbName' neu in die Exclude-Tabelle eingefuegt."
+						})
+					}
+					else
+					{
+						Invoke-sqmLogging -Message "WhatIf: Datenbank '$dbName' wuerde eingefuegt werden." -FunctionName $functionName -Level "VERBOSE"
+						$results.Add([PSCustomObject]@{
+							SqlInstance  = $SqlInstance
+							DatabaseName = $dbName
+							Action       = 'WhatIfSkipped'
+							IsActive     = $true
+							IsOrphaned   = $false
+							Message      = "WhatIf: Datenbank '$dbName' wuerde eingefuegt werden."
+						})
+					}
+				}
+			}
+
+			# 6. Verwaiste Eintraege markieren (in Tabelle, aber nicht mehr auf dem Server)
+			foreach ($row in $existingRows)
+			{
+				$dbName = $row.DatabaseName
+				if ($dbName -notin $serverDbNames)
+				{
+					if (-not $row.IsOrphaned)
+					{
+						$updateSql = "UPDATE master.dbo.sqm_BackupExclude SET IsOrphaned = 1 WHERE DatabaseName = N'$($dbName.Replace("'", "''"))'"
+						$actionMsg = "Markiere '$dbName' als verwaist (IsOrphaned=1)"
+						if ($PSCmdlet.ShouldProcess($dbName, $actionMsg))
+						{
+							Invoke-DbaQuery @connParams -Database master -Query $updateSql -ErrorAction Stop
+							Invoke-sqmLogging -Message "Datenbank '$dbName' existiert nicht mehr auf dem Server. IsOrphaned auf 1 gesetzt." -FunctionName $functionName -Level "WARNING"
+							$results.Add([PSCustomObject]@{
+								SqlInstance  = $SqlInstance
+								DatabaseName = $dbName
+								Action       = 'Orphaned'
+								IsActive     = [bool]$row.IsActive
+								IsOrphaned   = $true
+								Message      = "Datenbank '$dbName' nicht mehr vorhanden. Als verwaist markiert."
+							})
+						}
+						else
+						{
+							Invoke-sqmLogging -Message "WhatIf: Datenbank '$dbName' wuerde als verwaist markiert werden." -FunctionName $functionName -Level "VERBOSE"
+							$results.Add([PSCustomObject]@{
+								SqlInstance  = $SqlInstance
+								DatabaseName = $dbName
+								Action       = 'WhatIfSkipped'
+								IsActive     = [bool]$row.IsActive
+								IsOrphaned   = $true
+								Message      = "WhatIf: Datenbank '$dbName' wuerde als verwaist markiert werden."
+							})
+						}
+					}
+					else
+					{
+						Invoke-sqmLogging -Message "Datenbank '$dbName' ist bereits als verwaist markiert." -FunctionName $functionName -Level "INFO"
+						$results.Add([PSCustomObject]@{
+							SqlInstance  = $SqlInstance
+							DatabaseName = $dbName
+							Action       = 'Unchanged'
+							IsActive     = [bool]$row.IsActive
+							IsOrphaned   = $true
+							Message      = "Datenbank '$dbName' ist bereits als verwaist markiert. Keine Aenderung."
+						})
+					}
+				}
+				else
+				{
+					# 7. Verwaiste Eintraege reaktivieren wenn Datenbank wieder vorhanden
+					if ($row.IsOrphaned)
+					{
+						$updateSql = "UPDATE master.dbo.sqm_BackupExclude SET IsOrphaned = 0 WHERE DatabaseName = N'$($dbName.Replace("'", "''"))'"
+						$actionMsg = "Reaktiviere '$dbName': IsOrphaned auf 0 zuruecksetzen"
+						if ($PSCmdlet.ShouldProcess($dbName, $actionMsg))
+						{
+							Invoke-DbaQuery @connParams -Database master -Query $updateSql -ErrorAction Stop
+							Invoke-sqmLogging -Message "Datenbank '$dbName' ist wieder vorhanden. IsOrphaned auf 0 zurueckgesetzt." -FunctionName $functionName -Level "INFO"
+							$results.Add([PSCustomObject]@{
+								SqlInstance  = $SqlInstance
+								DatabaseName = $dbName
+								Action       = 'Unorphaned'
+								IsActive     = [bool]$row.IsActive
+								IsOrphaned   = $false
+								Message      = "Datenbank '$dbName' wieder vorhanden. IsOrphaned auf 0 zurueckgesetzt."
+							})
+						}
+						else
+						{
+							Invoke-sqmLogging -Message "WhatIf: IsOrphaned fuer '$dbName' wuerde auf 0 gesetzt werden." -FunctionName $functionName -Level "VERBOSE"
+							$results.Add([PSCustomObject]@{
+								SqlInstance  = $SqlInstance
+								DatabaseName = $dbName
+								Action       = 'WhatIfSkipped'
+								IsActive     = [bool]$row.IsActive
+								IsOrphaned   = $false
+								Message      = "WhatIf: IsOrphaned fuer '$dbName' wuerde auf 0 gesetzt werden."
+							})
+						}
+					}
+					else
+					{
+						Invoke-sqmLogging -Message "Datenbank '$dbName' ist bereits korrekt in der Tabelle. Keine Aenderung." -FunctionName $functionName -Level "INFO"
+						$results.Add([PSCustomObject]@{
+							SqlInstance  = $SqlInstance
+							DatabaseName = $dbName
+							Action       = 'Unchanged'
+							IsActive     = [bool]$row.IsActive
+							IsOrphaned   = $false
+							Message      = "Datenbank '$dbName' unveraendert."
+						})
+					}
+				}
+			}
+		}
+		catch
+		{
+			$errMsg = "Allgemeiner Fehler in $functionName`: $($_.Exception.Message)"
+			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+			if ($EnableException) { throw }
+			$results.Add([PSCustomObject]@{
+				SqlInstance  = $SqlInstance
+				DatabaseName = $null
+				Action       = 'Error'
+				IsActive     = $null
+				IsOrphaned   = $null
+				Message      = $errMsg
+			})
+		}
+	}
+
+	end
+	{
+		Invoke-sqmLogging -Message "$functionName abgeschlossen. $($results.Count) Objekte zurueckgegeben." -FunctionName $functionName -Level "INFO"
+		return $results.ToArray()
+	}
+}

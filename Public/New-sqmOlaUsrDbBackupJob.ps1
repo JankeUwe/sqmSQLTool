@@ -13,6 +13,12 @@
         OlaJobNameDiff  (Default: 'OlaHH-UserDatabases-DIFF')
         OlaJobNameLog   (Default: 'OlaHH-UserDatabases-LOG')
 
+    When -UseExcludeTable is set, the function reads master.dbo.sqm_BackupExclude
+    (created by Sync-sqmBackupExcludeTable) for entries where IsActive=1 AND IsOrphaned=0.
+    If entries are found, they are passed to Ola's @ExcludeDatabases parameter in the
+    generated job step command. If the table does not exist or contains no matching rows,
+    the -Databases parameter is used unchanged.
+
 .PARAMETER SqlInstance
     SQL Server instance. Default: current computer name.
 
@@ -102,6 +108,11 @@
 .PARAMETER ContinueOnError
     Continue with remaining jobs if one job fails.
 
+.PARAMETER UseExcludeTable
+    When set, reads master.dbo.sqm_BackupExclude for active, non-orphaned entries and
+    adds them as @ExcludeDatabases to the Ola DatabaseBackup command in the job step.
+    If the table does not exist or is empty, the Databases parameter is used unchanged.
+
 .PARAMETER EnableException
     Throw exceptions immediately.
 
@@ -116,6 +127,14 @@
 
 .EXAMPLE
     New-sqmOlaUsrDbBackupJob -SqlInstance "SQL01" -Full -Diff -Log
+
+.EXAMPLE
+    # Create FULL job that automatically excludes databases from sqm_BackupExclude
+    New-sqmOlaUsrDbBackupJob -SqlInstance "SQL01" -Full -UseExcludeTable
+
+.EXAMPLE
+    # All three job types with exclude table integration
+    New-sqmOlaUsrDbBackupJob -SqlInstance "SQL01" -Full -Diff -Log -UseExcludeTable -Update
 
 .EXAMPLE
     New-sqmOlaUsrDbBackupJob -SqlInstance "SQL01" -Full `
@@ -240,6 +259,8 @@ function New-sqmOlaUsrDbBackupJob
 		[switch]$Update,
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
+		[Parameter(Mandatory = $false)]
+		[switch]$UseExcludeTable,
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
@@ -386,6 +407,45 @@ function New-sqmOlaUsrDbBackupJob
 				return ($expanded | Select-Object -Unique)
 			}
 			
+			# 5b. Exclude-Tabelle auswerten wenn -UseExcludeTable gesetzt
+			$excludeDatabasesParam = ''
+			if ($UseExcludeTable)
+			{
+				Invoke-sqmLogging -Message "-UseExcludeTable gesetzt: Pruefe master.dbo.sqm_BackupExclude auf Ausnahmen." -FunctionName $functionName -Level "INFO"
+				try
+				{
+					$excludeCheck = Invoke-DbaQuery @connParams -Database master `
+						-Query "SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'master.dbo.sqm_BackupExclude') AND type = 'U'" `
+						-ErrorAction Stop
+
+					if ($excludeCheck)
+					{
+						$excludeRows = Invoke-DbaQuery @connParams -Database master `
+							-Query "SELECT DatabaseName FROM master.dbo.sqm_BackupExclude WHERE IsActive = 1 AND IsOrphaned = 0" `
+							-ErrorAction Stop
+
+						if ($excludeRows)
+						{
+							$excludeList = ($excludeRows | Select-Object -ExpandProperty DatabaseName) -join ','
+							$excludeDatabasesParam = "@ExcludeDatabases = '$excludeList',"
+							Invoke-sqmLogging -Message "sqm_BackupExclude: $($excludeRows.Count) Datenbank(en) werden aus den Jobs ausgeschlossen: $excludeList" -FunctionName $functionName -Level "INFO"
+						}
+						else
+						{
+							Invoke-sqmLogging -Message "sqm_BackupExclude enthaelt keine aktiven Eintraege. Parameter -Databases wird unveraendert verwendet." -FunctionName $functionName -Level "INFO"
+						}
+					}
+					else
+					{
+						Invoke-sqmLogging -Message "Tabelle sqm_BackupExclude nicht gefunden. Parameter -Databases wird unveraendert verwendet." -FunctionName $functionName -Level "WARNING"
+					}
+				}
+				catch
+				{
+					Invoke-sqmLogging -Message "Konnte sqm_BackupExclude nicht auslesen: $($_.Exception.Message). Parameter -Databases wird unveraendert verwendet." -FunctionName $functionName -Level "WARNING"
+				}
+			}
+
 			# 6. Jeden Job anlegen
 			$cleanupParam = if ($CleanupTime -gt 0) { "@CleanupTime = $CleanupTime," } else { '' }
 			
@@ -432,6 +492,7 @@ function New-sqmOlaUsrDbBackupJob
 					$olaCommand = @"
 EXECUTE master.dbo.DatabaseBackup
     @Databases  = '$Databases',
+    $excludeDatabasesParam
     @Directory  = N'$usrBackupDir',
     @BackupType = '$($jobDef.BackupType)',
     @Verify     = '$Verify',

@@ -9,6 +9,11 @@ The target path is read from the server properties (BackupDirectory) and must en
 If the SqlInstance parameter is not specified, the current computer name
 ($env:COMPUTERNAME) is used by default. This rule applies to all future versions.
 
+When -UseExcludeTable is set, the function reads the table master.dbo.sqm_BackupExclude
+(created by Sync-sqmBackupExcludeTable) and skips all databases where IsActive=1 AND
+IsOrphaned=0. If the table does not exist or contains no active, non-orphaned rows,
+all databases are backed up normally.
+
 .PARAMETER SqlInstance
 The target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE").
 If not specified, the current computer name is used.
@@ -41,6 +46,14 @@ Invoke-sqmUserDatabaseBackup -SqlInstance "SQL01" -Database "SalesDB", "Inventor
 # With an alternative path
 Invoke-sqmUserDatabaseBackup -All -BackupPath "D:\Backup\User-Db"
 
+.EXAMPLE
+# Back up all user databases, skipping databases listed in sqm_BackupExclude
+Invoke-sqmUserDatabaseBackup -All -UseExcludeTable
+
+.EXAMPLE
+# Back up with exclude table on a remote instance
+Invoke-sqmUserDatabaseBackup -SqlInstance "SQL01" -All -UseExcludeTable
+
 .NOTES
 Requires the dbatools module and existing Invoke-sqmLogging and Get-sqmServerSetting functions
 (for the default backup path). The path must end with 'User-Db'.
@@ -61,6 +74,8 @@ function Invoke-sqmUserDatabaseBackup
 		[switch]$All,
 		[Parameter(Mandatory = $false)]
 		[string]$BackupPath,
+		[Parameter(Mandatory = $false)]
+		[switch]$UseExcludeTable,
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
@@ -199,6 +214,48 @@ function Invoke-sqmUserDatabaseBackup
 				return $results
 			}
 			
+			# Exclude-Tabelle auswerten wenn -UseExcludeTable gesetzt
+			if ($UseExcludeTable)
+			{
+				Invoke-sqmLogging -Message "-UseExcludeTable gesetzt: Pruefe master.dbo.sqm_BackupExclude auf Ausnahmen." -FunctionName $functionName -Level "INFO"
+				try
+				{
+					$excludeCheck = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database master `
+						-Query "SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'master.dbo.sqm_BackupExclude') AND type = 'U'" `
+						-ErrorAction Stop
+
+					if ($excludeCheck)
+					{
+						$excludeRows = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database master `
+							-Query "SELECT DatabaseName FROM master.dbo.sqm_BackupExclude WHERE IsActive = 1 AND IsOrphaned = 0" `
+							-ErrorAction Stop
+
+						if ($excludeRows)
+						{
+							$excludeNames = @($excludeRows | Select-Object -ExpandProperty DatabaseName)
+							foreach ($excludeName in $excludeNames)
+							{
+								Invoke-sqmLogging -Message "Datenbank '$excludeName' ist in sqm_BackupExclude (IsActive=1, IsOrphaned=0) und wird uebersprungen." -FunctionName $functionName -Level "INFO"
+							}
+							$databases = $databases | Where-Object { $_.Name -notin $excludeNames }
+							Invoke-sqmLogging -Message "Nach Exclude-Filter: $($databases.Count) Datenbank(en) verbleiben fuer das Backup." -FunctionName $functionName -Level "INFO"
+						}
+						else
+						{
+							Invoke-sqmLogging -Message "sqm_BackupExclude enthaelt keine aktiven Eintraege. Alle Datenbanken werden gesichert." -FunctionName $functionName -Level "INFO"
+						}
+					}
+					else
+					{
+						Invoke-sqmLogging -Message "Tabelle sqm_BackupExclude nicht gefunden. Alle Datenbanken werden gesichert." -FunctionName $functionName -Level "WARNING"
+					}
+				}
+				catch
+				{
+					Invoke-sqmLogging -Message "Konnte sqm_BackupExclude nicht auslesen: $($_.Exception.Message). Alle Datenbanken werden gesichert." -FunctionName $functionName -Level "WARNING"
+				}
+			}
+
 			# Backup fuer jede Datenbank
 			foreach ($db in $databases)
 			{
