@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.0.0.0'
+	ModuleVersion		   = '1.1.0.0'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
@@ -104,7 +104,7 @@
 			# IconUri = ''
 
 			# ReleaseNotes of this module
-			ReleaseNotes = 'v1.0.0 - Initial public release. Removed environment-specific defaults, added Pester 5 test suite, integrated NTFS permission management.'
+			ReleaseNotes = 'v1.1.0 - Dynamic backup exclude table: Sync-sqmBackupExcludeTable, Set-sqmBackupExcludePermission, New-sqmBackupMaintenanceJob. Extended Invoke-sqmUserDatabaseBackup and New-sqmOlaUsrDbBackupJob with -UseExcludeTable, -CheckPreferredReplica (AG-aware), mail notification (-MailTo, -MailProfile, -MailOnSuccess), and change history/audit trigger.'
 		}
 	}
 }
