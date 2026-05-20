@@ -324,6 +324,7 @@
               </tbody>
             </table>
             <div class="alert alert-g mt05">&#10003; Ein Aufruf erstellt alle drei Jobs (FULL/DIFF/LOG) inkl. Zeitplaene.</div>
+            <div class="alert alert-b">&#8505; Ola Hallengren nicht installiert? <code>New-sqmOlaUsrDbBackupJob</code> erkennt das und installiert die Ola-Skripte (<code>DatabaseBackup</code>, <code>CommandLog</code>, <code>DatabaseIntegrityCheck</code>, <code>IndexOptimize</code>) automatisch auf der Zielinstanz.</div>
           </div>
         </div>
       </div>
@@ -499,6 +500,7 @@
               </div>
             </div>
             <div class="alert alert-g mt05">&#10003; Funktioniert mit -Full, -Diff und -Log. Ola Hallengren und nativer Engine.</div>
+            <div class="alert alert-w mt05">&#9889; <strong>SQL Server 2025:</strong> Ab SQL 2025 erlaubt Microsoft erstmals echte FULL-Backups direkt vom <strong>Secondary</strong> - bisher war nur LOG vom Secondary moeglich. <code>-CheckPreferredReplica</code> beachtet dies automatisch: auf 2025-Instanzen kann der Secondary als Backup-Knoten bevorzugt werden und entlastet so den Primary vollstaendig.</div>
           </div>
         </div>
       </div>
@@ -584,19 +586,21 @@
         <div>
           <div class="card mb05">
             <h3>AlwaysOn-Behandlung</h3>
-            <table class="dtbl">
+            <table class="dtbl" style="table-layout:fixed;width:100%;">
+              <colgroup><col style="width:42%"><col style="width:58%"></colgroup>
               <tbody>
-                <tr><td><code>-KeepAlwaysOn</code></td><td>DB vor Restore aus AG entfernen und nach Restore automatisch wieder hinzufuegen</td></tr>
-                <tr><td><code>-RejoinAvailabilityGroup</code></td><td>Nur Wiederaufnahme in die AG nach manuellem Restore (WITH NORECOVERY)</td></tr>
+                <tr><td><code>-KeepAlwaysOn</code></td><td>DB aus AG entfernen, Restore durchfuehren, danach automatisch wieder hinzufuegen</td></tr>
+                <tr><td><code>-RejoinAvailability&shy;Group</code></td><td>Nur Wiederaufnahme in die AG nach manuellem Restore (WITH NORECOVERY)</td></tr>
                 <tr><td><code>-WithNoRecovery</code></td><td>Restore im NORECOVERY-Modus - fuer mehrstufige Restore-Ketten</td></tr>
               </tbody>
             </table>
           </div>
           <div class="card">
             <h3>Sicherheit &amp; Vorsicht</h3>
-            <table class="dtbl">
+            <table class="dtbl" style="table-layout:fixed;width:100%;">
+              <colgroup><col style="width:42%"><col style="width:58%"></colgroup>
               <tbody>
-                <tr><td><code>-BackupBeforeRestore</code></td><td>Sichert die Zieldatenbank bevor ueberschrieben wird</td></tr>
+                <tr><td><code>-BackupBefore&shy;Restore</code></td><td>Sichert die Zieldatenbank bevor ueberschrieben wird - Sicherheitsnetz</td></tr>
                 <tr><td><code>-ForceSingleUser</code></td><td>Erzwingt Einzelbenutzermodus wenn aktive Verbindungen vorhanden</td></tr>
               </tbody>
             </table>
