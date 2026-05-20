@@ -44,12 +44,13 @@
             padding: .18rem .65rem; font-size: .7rem; color: var(--lblue); white-space: nowrap; }
 
     /* ---- Cols ---- */
-    .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin: .4rem 0; }
-    .cols3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .8rem; margin: .4rem 0; }
+    .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin: .4rem 0; align-items: stretch; }
+    .cols3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .8rem; margin: .4rem 0; align-items: stretch; }
+    .cols2 > div, .cols3 > div { display: flex; flex-direction: column; }
 
     /* ---- Card ---- */
     .card { background: var(--card); border: 1px solid var(--bd); border-radius: 10px;
-            padding: .7rem .9rem; }
+            padding: .7rem .9rem; flex: 1; }
     .card-ico { font-size: 1.5rem; margin-bottom: .25rem; display: block; }
     .card h3  { margin: .1rem 0 .2rem; }
     .card p   { margin: 0; }
@@ -145,7 +146,7 @@
          SLIDE 1 - Titel
          ============================================================ -->
     <section>
-      <p class="eyebrow">DBA Tooling &middot; FI-TS Muenchen &middot; 2026</p>
+      <p class="eyebrow">DBA Tooling &middot; 2026</p>
       <h1>sqmSQLTool</h1>
       <p class="title-em">Die DBA-Toolbox</p>
       <p class="title-sub">87 Funktionen. Ein Modul. Vom Backup bis zum automatischen AlwaysOn-Repair.</p>
@@ -432,7 +433,7 @@
               <tr><td>Zertifikate ablaufend?</td><td>Get-sqmCertificateReport</td><td><span class="ok">Warnung bei &lt;30 Tage</span></td></tr>
             </tbody>
           </table>
-          <div class="alert alert-w mt05">&#9889; FI-TS Kontext - Bankenregulierung (BAIT/MaRisk) fordert regelmaessige Nachweise ueber privilegierte Accounts. Diese Funktionen liefern die Nachweise direkt.</div>
+          <div class="alert alert-w mt05">&#9889; Bankenregulierung (BAIT/MaRisk) fordert regelmaessige Nachweise ueber privilegierte Accounts. Diese Funktionen liefern die Nachweise direkt.</div>
         </div>
       </div>
     </section>
@@ -617,6 +618,7 @@
       <div class="xref mt05">
         <span>AlwaysOnSetup</span>
         <span>SQLSetupTool</span>
+        <span>SQLMigration</span>
         <span>DeadlockCollector</span>
         <span>SSRSDeploymentTool</span>
       </div>
@@ -639,6 +641,7 @@
               <tr><td>SA-Haertung</td><td><span class="ok">&#10003; Ja</span> - Invoke-sqmSaObfuscation</td></tr>
               <tr><td>SQL Server installieren</td><td><span class="warn">- Nein</span> &rarr; SQLSetupTool</td></tr>
               <tr><td>AlwaysOn einrichten</td><td><span class="warn">- Nein</span> &rarr; AlwaysOnSetup</td></tr>
+              <tr><td>Datenbanken migrieren</td><td><span class="warn">- Nein</span> &rarr; SQLMigration</td></tr>
               <tr><td>SSRS Reports deployen</td><td><span class="warn">- Nein</span> &rarr; SSRSDeploymentTool</td></tr>
               <tr><td>Deadlock-Sammlung GUI</td><td><span class="warn">- Nein</span> &rarr; DeadlockCollector</td></tr>
             </tbody>
@@ -734,6 +737,7 @@
           <div class="xref mt05">
             <span>SQLSetupTool - Basis-Installation</span>
             <span>AlwaysOnSetup - HA-Konfiguration</span>
+            <span>SQLMigration - Datenbankmigrationen</span>
             <span>DeadlockCollector - Deadlock-Erfassung</span>
             <span>ReportDeploymentTool - SSRS Deployment</span>
           </div>
