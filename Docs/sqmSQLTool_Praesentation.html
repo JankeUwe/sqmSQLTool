@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>sqmSQLTool - DBA Toolbox Praesentation</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+  <style>
+    :root {
+      --blue:  #2e86c1;
+      --lblue: #5dade2;
+      --green: #4ade80;
+      --yellow:#f0c040;
+      --red:   #f87171;
+      --card:  #1a2332;
+      --bd:    #2a3a52;
+      --txt:   #d0e0f0;
+      --sub:   #94a8c0;
+    }
+
+    /* ---- Base ---- */
+    .reveal { font-size: 17px; color: var(--txt); }
+    .reveal .slides > section { padding: 1.5rem 2rem; text-align: left; }
+    .reveal h1 { font-size: 2rem; color: #fff; margin: .2rem 0 .6rem; line-height: 1.1; }
+    .reveal h2 { font-size: 1.5rem; color: var(--lblue); margin: .4rem 0; }
+    .reveal h3 { font-size: 1rem; color: var(--lblue); margin: .3rem 0 .2rem; }
+    .reveal p  { margin: .25rem 0; font-size: .85rem; color: var(--sub); line-height: 1.4; }
+    .reveal pre { background: #0d1520; border: 1px solid var(--bd); border-radius: 8px;
+                  padding: .8rem 1rem; font-size: .72rem; line-height: 1.5;
+                  white-space: pre; overflow: hidden; margin: .4rem 0; box-shadow: none; }
+    .reveal pre code { background: none; padding: 0; color: #c8d8e8; }
+    .reveal ul { margin: .3rem 0 .3rem 1.2rem; }
+    .reveal li { font-size: .82rem; color: var(--sub); margin: .15rem 0; }
+
+    /* ---- Eyebrow ---- */
+    .eyebrow { font-size: .7rem; font-weight: 700; letter-spacing: .12em;
+               text-transform: uppercase; color: var(--lblue); margin: 0 0 .1rem; }
+
+    /* ---- Pill row ---- */
+    .pill-row { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0; }
+    .pill { background: #0d1f30; border: 1px solid var(--bd); border-radius: 20px;
+            padding: .18rem .65rem; font-size: .7rem; color: var(--lblue); white-space: nowrap; }
+
+    /* ---- Cols ---- */
+    .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin: .4rem 0; }
+    .cols3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .8rem; margin: .4rem 0; }
+
+    /* ---- Card ---- */
+    .card { background: var(--card); border: 1px solid var(--bd); border-radius: 10px;
+            padding: .7rem .9rem; }
+    .card-ico { font-size: 1.5rem; margin-bottom: .25rem; display: block; }
+    .card h3  { margin: .1rem 0 .2rem; }
+    .card p   { margin: 0; }
+
+    /* ---- Steps ---- */
+    .steps { display: flex; flex-direction: column; gap: .35rem; }
+    .step  { display: flex; gap: .6rem; align-items: flex-start; }
+    .step-n { background: var(--blue); color: #fff; border-radius: 50%;
+              width: 1.4rem; height: 1.4rem; display: flex; align-items: center;
+              justify-content: center; font-size: .72rem; font-weight: 800;
+              flex-shrink: 0; margin-top: .05rem; }
+    .step-body { flex: 1; }
+    .step-body strong { font-size: .82rem; color: #fff; }
+    .step-body p { margin: .05rem 0 0; font-size: .75rem; }
+
+    /* ---- Data Table (dtbl) ---- */
+    .dtbl { width: 100%; border-collapse: collapse; font-size: .78rem; margin: .3rem 0; }
+    .dtbl th { background: #0d1f30; color: var(--lblue); padding: .3rem .6rem;
+               text-align: left; border-bottom: 1px solid var(--bd); font-size: .72rem; }
+    .dtbl td { padding: .28rem .6rem; border-bottom: 1px solid var(--bd); color: var(--txt); vertical-align: top; }
+    .dtbl tr:last-child td { border-bottom: none; }
+    .dtbl .ok  { color: var(--green); font-weight: 700; }
+    .dtbl .warn{ color: var(--yellow); font-weight: 700; }
+    .dtbl .err { color: var(--red); font-weight: 700; }
+
+    /* ---- Alerts ---- */
+    .alert { border-radius: 7px; padding: .4rem .75rem; font-size: .78rem;
+             margin: .35rem 0; border-left: 3px solid; }
+    .alert-g { background: rgba(74,222,128,.08); border-color: var(--green); color: var(--green); }
+    .alert-w { background: rgba(240,192,64,.08); border-color: var(--yellow); color: var(--yellow); }
+    .alert-b { background: rgba(93,173,226,.08); border-color: var(--lblue); color: var(--lblue); }
+    .alert-r { background: rgba(248,113,113,.08); border-color: var(--red); color: var(--red); }
+
+    /* ---- xref ---- */
+    .xref { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; }
+    .xref span { background: #0d1f30; border: 1px solid var(--bd); border-radius: 5px;
+                 padding: .15rem .55rem; font-size: .68rem; color: var(--sub); }
+
+    /* ---- Timeline ---- */
+    .timeline { display: flex; align-items: flex-start; gap: 0; margin: .5rem 0; flex-wrap: nowrap; }
+    .tl-item { flex: 1; text-align: center; position: relative; }
+    .tl-item:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: .9rem; right: -1px;
+      width: calc(100% - 2rem);
+      height: 2px; background: var(--bd);
+      left: 50%; transform: none;
+    }
+    .tl-dot { width: 1.8rem; height: 1.8rem; border-radius: 50%; background: var(--card);
+              border: 2px solid var(--bd); margin: 0 auto .3rem; display: flex;
+              align-items: center; justify-content: center; font-size: .7rem;
+              font-weight: 800; color: var(--lblue); position: relative; z-index: 1; }
+    .tl-item.tl-active .tl-dot { border-color: var(--lblue); background: rgba(46,134,193,.2); }
+    .tl-item.tl-active { background: rgba(46,134,193,.06); border: 2px solid var(--lblue);
+                          border-radius: 8px; padding: .3rem .2rem; }
+    .tl-label { font-size: .75rem; color: #fff; font-weight: 700; }
+    .tl-sub   { font-size: .65rem; color: var(--sub); margin-top: .1rem; }
+
+    /* ---- Stat block (Slide 3) ---- */
+    .stat-block { background: var(--card); border: 1px solid var(--bd); border-radius: 10px;
+                  padding: 1rem; text-align: center; }
+    .stat-num { font-size: 2.5rem; font-weight: 800; color: var(--lblue); line-height: 1; }
+    .stat-num.green { color: var(--green); }
+    .stat-lbl { font-size: .8rem; color: #fff; font-weight: 700; margin: .2rem 0; }
+    .stat-desc{ font-size: .75rem; color: #94a8c0; margin: 0; }
+
+    /* ---- Code syntax ---- */
+    .ck { color: #5dade2; }
+    .cs { color: #4ade80; }
+    .cc { color: #6a7f96; }
+    .cw { color: #f0c040; }
+    .ce { color: #f87171; }
+
+    /* ---- Title slide specifics ---- */
+    .title-em { font-size: 1.3rem; color: var(--lblue); font-weight: 400; margin: 0; }
+    .title-sub{ font-size: .9rem; color: var(--sub); margin: .5rem 0; max-width: 700px; }
+    .author-line { font-size: .75rem; color: var(--sub); margin-top: .8rem; }
+
+    /* ---- Utility ---- */
+    .mt05 { margin-top: .5rem; }
+    .mb05 { margin-bottom: .5rem; }
+    .txt-small { font-size: .75rem; color: var(--sub); }
+    .w100 { width: 100%; }
+    .section-note { font-size: .8rem; color: var(--sub); margin: .25rem 0 .4rem; }
+  </style>
+</head>
+<body>
+<div class="reveal">
+  <div class="slides">
+
+    <!-- ============================================================
+         SLIDE 1 - Titel
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">DBA Tooling &middot; FI-TS Muenchen &middot; 2026</p>
+      <h1>sqmSQLTool</h1>
+      <p class="title-em">Die DBA-Toolbox</p>
+      <p class="title-sub">87 Funktionen. Ein Modul. Vom Backup bis zum automatischen AlwaysOn-Repair.</p>
+      <div class="pill-row">
+        <span class="pill">PowerShell 5.1</span>
+        <span class="pill">dbaTools 2.x</span>
+        <span class="pill">Pester-Tests</span>
+        <span class="pill">6 Domaenen</span>
+        <span class="pill">v2.x</span>
+      </div>
+      <p class="author-line">Uwe Janke &middot; Senior SQL Server DBA &middot; dtcSoftware</p>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 2 - The Problem
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Motivation</p>
+      <h1>The Problem</h1>
+      <div class="cols2">
+        <div>
+          <div class="card mb05">
+            <span class="card-ico">&#x1F525;</span>
+            <h3>AlwaysOn-DB nicht synchron</h3>
+            <p>Manueller Eingriff: Remove DB, Cleanup Secondary, Backup, Restore, Add to AG. 30-90 Minuten. Nachts um 3 Uhr.</p>
+          </div>
+          <div class="card mb05">
+            <span class="card-ico">&#x23F1;&#xFE0F;</span>
+            <h3>Backup-Job laeuft auf dem falschen Node</h3>
+            <p>AG-Preferred-Replica nicht geprueft. Primary macht Backup statt Secondary. I/O-Spike im Produktivbetrieb.</p>
+          </div>
+          <div class="card">
+            <span class="card-ico">&#x1F50D;</span>
+            <h3>Inventarisierung? Excel.</h3>
+            <p>Wer hat sysadmin? Welche DBs haben kein Backup? Welche Instanz hat welchen Patch-Stand? - Manuelle Abfragen, unvollstaendig.</p>
+          </div>
+        </div>
+        <div>
+          <div class="card mb05">
+            <span class="card-ico">&#x1F4CB;</span>
+            <h3>Compliance-Nachweis fehlt</h3>
+            <p>Auditoren fragen: Wann war das letzte CHECKDB? SA-Account noch aktiv? Login-Audit vorhanden? - Kein zentraler Report.</p>
+          </div>
+          <div class="card mb05">
+            <span class="card-ico">&#x1F41B;</span>
+            <h3>Deadlock passiert - niemand weiss wann</h3>
+            <p>Extended Events manuell einrichten, Trace-Datei auswerten. Bis die Analyse fertig ist, ist das Problem vergessen.</p>
+          </div>
+          <div class="card">
+            <span class="card-ico">&#x1F527;</span>
+            <h3>Keine einheitlichen DBA-Prozesse</h3>
+            <p>Jeder DBA hat eigene Scripts. Kein Standard, keine Nachvollziehbarkeit, keine Pester-Tests.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 3 - The Value
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Business Value</p>
+      <h1>The Value</h1>
+      <div class="cols3 mb05">
+        <div class="stat-block">
+          <div class="stat-num">87</div>
+          <div class="stat-lbl">Funktionen</div>
+          <p class="stat-desc">Ein Modul - kein Tool-Zoo</p>
+        </div>
+        <div class="stat-block">
+          <div class="stat-num green">30-90 min</div>
+          <div class="stat-lbl">AlwaysOn-Repair</div>
+          <p class="stat-desc">automatisch statt manuell</p>
+        </div>
+        <div class="stat-block">
+          <div class="stat-num green">0</div>
+          <div class="stat-lbl">manuelle Eingriffe</div>
+          <p class="stat-desc">bei naectlichem AG-Fehler</p>
+        </div>
+      </div>
+      <table class="dtbl">
+        <thead>
+          <tr><th>Situation</th><th>Frueher</th><th>Mit sqmSQLTool</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>AG-DB nicht synchron</td><td>Manuelle Reparatur 30-90 Min.</td><td><span class="ok">&#10003;</span> Automatischer Repair-Job (stuendlich)</td></tr>
+          <tr><td>Backup-Audit</td><td>Excel-Liste, veraltet</td><td><span class="ok">&#10003;</span> Get-sqmDatabaseHealth - Bericht per Klick</td></tr>
+          <tr><td>Deadlock-Analyse</td><td>Extended Events manuell</td><td><span class="ok">&#10003;</span> Get-sqmDeadlockReport - sofort</td></tr>
+          <tr><td>SA-Account aktiv</td><td>Oft uebersehen</td><td><span class="ok">&#10003;</span> Invoke-sqmSaObfuscation - 1 Befehl</td></tr>
+          <tr><td>Patch-Stand</td><td>Ad-hoc Abfrage</td><td><span class="ok">&#10003;</span> Invoke-sqmPatchAnalysis - alle Instanzen</td></tr>
+        </tbody>
+      </table>
+      <div class="alert alert-g">&#10003; Alle Funktionen Pester-getestet und produktionserprobt auf SQL Server 2019/2022/2025</div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 4 - 6 Functional Domains
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Ueberblick</p>
+      <h1>6 Functional Domains</h1>
+      <p class="section-note">87 Funktionen - 6 Themengebiete. Jedes Gebiet in sich vollstaendig.</p>
+      <div class="cols3">
+        <div class="card">
+          <span class="card-ico">&#x1F534;</span>
+          <h3>AlwaysOn &amp; HA</h3>
+          <p>Repair, Sync, Failover, Seeding, AG-Add/Remove, Repair-Job - vollstaendiger AG-Lebenszyklus</p>
+        </div>
+        <div class="card">
+          <span class="card-ico">&#x1F4BE;</span>
+          <h3>Backup &amp; Integritaet</h3>
+          <p>Backup mit AG-Aware-Logik, Backup-Exclude-Tabelle, Integrity-Check, Restore, Ola-Jobs</p>
+        </div>
+        <div class="card">
+          <span class="card-ico">&#x1F4CA;</span>
+          <h3>Health &amp; Diagnose</h3>
+          <p>Database Health, Wait Stats, Blocking, AutoGrowth, VLF-Count, Long Running Queries, Missing Indexes</p>
+        </div>
+      </div>
+      <div class="cols3 mt05">
+        <div class="card">
+          <span class="card-ico">&#x1F510;</span>
+          <h3>Sicherheit &amp; Compliance</h3>
+          <p>SA-Obfuscation, Login-Audit, Sysadmin-Report, AD-Account-Status, SPN-Report, Zertifikate</p>
+        </div>
+        <div class="card">
+          <span class="card-ico">&#x26A1;</span>
+          <h3>Performance</h3>
+          <p>PerfBaseline, PerfCounters, Index-Fragmentierung, Missing Indexes, Query Store, Wait Statistics</p>
+        </div>
+        <div class="card">
+          <span class="card-ico">&#x1F4CB;</span>
+          <h3>Inventory &amp; Doku</h3>
+          <p>Instance Inventory, Database Documentation, Server Configuration Compare, Patch Analysis</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 5 - AlwaysOn Auto-Repair
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Eye-Catcher &middot; AlwaysOn &amp; HA</p>
+      <h1>Automatic AlwaysOn Repair</h1>
+      <p class="section-note">Eine AG-DB verliert die Synchronisation - das Tool erkennt es, repariert vollautomatisch, schreibt ins Windows Event Log.</p>
+      <div class="cols2">
+        <div>
+          <div class="steps">
+            <div class="step"><div class="step-n">1</div><div class="step-body"><strong>Erkennung</strong><p>Prueft SynchronizationState aller AG-Datenbanken. Nicht HEALTHY oder SYNCHRONIZED = Kandidat</p></div></div>
+            <div class="step"><div class="step-n">2</div><div class="step-body"><strong>Automatic Seeding sicherstellen</strong><p>Invoke-sqmSqlAlwaysOnAutoseeding auf allen Replicas - Voraussetzung fuer AutoSeed-Repair</p></div></div>
+            <div class="step"><div class="step-n">3</div><div class="step-body"><strong>Remove aus AG</strong><p>Remove-DbaAgDatabase - sauber, mit dbaTools</p></div></div>
+            <div class="step"><div class="step-n">4</div><div class="step-body"><strong>Secondary bereinigen</strong><p>DB auf allen Secondaries loeschen - kein verwaister Zustand</p></div></div>
+            <div class="step"><div class="step-n">5</div><div class="step-body"><strong>Recovery-Modus pruefen</strong><p>Setzt auf FULL falls abgewichen - sonst schlaegt Add fehl</p></div></div>
+            <div class="step"><div class="step-n">6</div><div class="step-body"><strong>Add mit AutoSeed</strong><p>Add-DbaAgDatabase -SeedingMode Automatic - kein Backup/Restore noetig</p></div></div>
+            <div class="step"><div class="step-n">7</div><div class="step-body"><strong>Event Log + Protokoll</strong><p>EventId 1000/1001/1002 in Windows Application Log. Invoke-sqmLogging fuer File-Log</p></div></div>
+          </div>
+        </div>
+        <div>
+<pre><code><span class="cc"># Manuell aufrufen:</span>
+<span class="ck">Repair-sqmAlwaysOnDatabases</span>
+
+<span class="cc"># Als stuendlichen Agent-Job einrichten:</span>
+<span class="ck">New-sqmAlwaysOnRepairJob</span> <span class="cs">-Schedule</span> <span class="cw">"FREQ=HOURLY;INTERVAL=1"</span>
+
+<span class="cc"># Testen ohne Aenderungen:</span>
+<span class="ck">Repair-sqmAlwaysOnDatabases</span> <span class="cs">-WhatIf</span>
+
+<span class="cc"># Ausgabe:</span>
+<span class="cc"># SqlInstance  DatabaseName  AvailabilityGroup  Status</span>
+<span class="cc"># -----------  ------------  -----------------  ------</span>
+<span class="cs"># SQLNODE01    SalesDB       AG_PROD_01         RepairSuccess</span>
+<span class="cs"># SQLNODE01    HRDB          AG_PROD_01         RepairSuccess</span></code></pre>
+          <div class="alert alert-g mt05">&#10003; New-sqmAlwaysOnRepairJob erstellt automatisch einen SQL Agent Job - stuendliche Ueberwachung ohne DBA-Eingriff</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 6 - AG-Aware Backup
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Eye-Catcher &middot; Backup &amp; Integritaet</p>
+      <h1>AG-Aware Backup</h1>
+      <p class="section-note">Invoke-sqmUserDatabaseBackup kennt AlwaysOn. Prueft sys.fn_hadr_backup_is_preferred_replica() - laeuft nur auf dem richtigen Node.</p>
+      <div class="cols2">
+        <div>
+          <div class="alert alert-r">&#9888; Das Problem ohne dieses Feature - Backup-Job laeuft auf Primary UND Secondary. Doppelter I/O. Backup-Dateien redundant. Restore-Entscheidung unklar.</div>
+          <div class="alert alert-g">&#10003; Mit -CheckPreferredReplica - Job prueft ob dieser Node der bevorzugte Backup-Node ist. Wenn nicht: sofortiger Abbruch. Kein Backup. Kein I/O.</div>
+          <div class="steps mt05">
+            <div class="step"><div class="step-n">1</div><div class="step-body"><strong>-UseExcludeTable</strong><p>Liest master.dbo.sqm_BackupExclude - Datenbanken die bewusst ausgeschlossen sind (Sync-sqmBackupExcludeTable pflegt die Tabelle)</p></div></div>
+            <div class="step"><div class="step-n">2</div><div class="step-body"><strong>-MailTo / -MailOnSuccess</strong><p>Backup-Report per SQL Database Mail - standardmaessig nur bei Fehler oder Abbruch. -MailOnSuccess fuer immer.</p></div></div>
+            <div class="step"><div class="step-n">3</div><div class="step-body"><strong>BackupPath aus Server Properties</strong><p>Liest BackupDirectory automatisch aus den Server Properties. Kein hardcodierter Pfad im Job.</p></div></div>
+          </div>
+        </div>
+        <div>
+<pre><code><span class="cc"># Standard: alle User-DBs, AG-aware</span>
+<span class="ck">Invoke-sqmUserDatabaseBackup</span> <span class="cs">-All</span> <span class="cs">-CheckPreferredReplica</span>
+
+<span class="cc"># Mit Exclude-Tabelle und Mail-Report</span>
+<span class="ck">Invoke-sqmUserDatabaseBackup</span> <span class="cs">-All</span> `
+    <span class="cs">-CheckPreferredReplica</span> `
+    <span class="cs">-UseExcludeTable</span> `
+    <span class="cs">-MailTo</span> <span class="cw">"dba-team@firma.de"</span>
+
+<span class="cc"># Als Backup-Maintenance-Job anlegen</span>
+<span class="ck">New-sqmBackupMaintenanceJob</span> `
+    <span class="cs">-SqlInstance</span> <span class="cw">"SQLNODE01"</span> `
+    <span class="cs">-CheckPreferredReplica</span> `
+    <span class="cs">-MailTo</span> <span class="cw">"dba-team@firma.de"</span></code></pre>
+          <div class="alert alert-b mt05">&#8505; Backup-Pfad-Regel - Pfad muss auf 'User-Db' enden (aus Server Properties oder -BackupPath Parameter)</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 7 - Database Health
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Deep Dive &middot; Health &amp; Diagnose</p>
+      <h1>Database Health - One Command</h1>
+      <p class="section-note">Get-sqmDatabaseHealth prueft 8 Dimensionen pro Datenbank. Ergebnis: TXT-Report + CSV. Sofort verwendbar.</p>
+      <div class="cols2">
+        <div>
+          <table class="dtbl">
+            <thead><tr><th>Pruefpunkt</th><th>Schwellwert</th></tr></thead>
+            <tbody>
+              <tr><td>Recovery Model</td><td>Warnung wenn nicht FULL</td></tr>
+              <tr><td>Letztes CHECKDB</td><td>Warnung wenn aelter als 14 Tage (konfigurierbar)</td></tr>
+              <tr><td>Letztes Backup (Full)</td><td>Rot wenn nie / aelter als konfiguriert</td></tr>
+              <tr><td>Letztes Backup (Diff/Log)</td><td>Warnung wenn nicht vorhanden</td></tr>
+              <tr><td>AutoGrowth Events</td><td>Letzte 30 Tage (konfigurierbar)</td></tr>
+              <tr><td>VLF-Anzahl</td><td>Warnung ab 200 (konfigurierbar)</td></tr>
+              <tr><td>Datenbankgroesse</td><td>Info</td></tr>
+              <tr><td>DB-Status</td><td>Rot wenn nicht Online</td></tr>
+            </tbody>
+          </table>
+          <div class="alert alert-b mt05">&#8505; Pipeline-faehig - Get-sqmDatabaseHealth -SqlInstance 'SQL01','SQL02','SQL03' prueft mehrere Instanzen in einem Aufruf</div>
+        </div>
+        <div>
+<pre><code><span class="cc"># Einzelne Instanz</span>
+<span class="ck">Get-sqmDatabaseHealth</span>
+
+<span class="cc"># Mehrere Instanzen</span>
+<span class="ck">Get-sqmDatabaseHealth</span> `
+    <span class="cs">-SqlInstance</span> <span class="cw">"SQL01"</span>,<span class="cw">"SQL02"</span> `
+    <span class="cs">-MaxCheckDbAgeDays</span> <span class="cw">7</span> `
+    <span class="cs">-MaxVlfCount</span> <span class="cw">100</span> `
+    <span class="cs">-OutputPath</span> <span class="cw">"D:\Reports"</span>
+
+<span class="cc"># Ausgabe (Auszug):</span>
+<span class="cc"># Database   Status  LastFull    VLFs  CheckDB   AutoGrowth</span>
+<span class="cc"># --------   ------  --------    ----  -------   ----------</span>
+<span class="cs"># SalesDB    ok      2026-05-19  48    ok        3 Events</span>
+<span class="cw"># HRDB       WARN    2026-05-01  312   ok        0 Events</span>
+<span class="ce"># ArchiveDB  ERROR   never       89    14d ago   0 Events</span></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 8 - Security & Compliance
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Deep Dive &middot; Sicherheit &amp; Compliance</p>
+      <h1>Security Hardening - Audit-Ready</h1>
+      <p class="section-note">Auditoren fragen konkrete Fragen. sqmSQLTool liefert konkrete Antworten - und behebt Schwachstellen automatisch.</p>
+      <div class="cols2">
+        <div>
+          <div class="steps">
+            <div class="step"><div class="step-n">1</div><div class="step-body"><strong>SA-Obfuscation</strong><p>Invoke-sqmSaObfuscation - umbenennen + zufaelliges 32-Zeichen Passwort. Voraussetzung: AD-Gruppe als sysadmin gesetzt. Rueckgabe: neuer Name + Passwort als Objekt.</p></div></div>
+            <div class="step"><div class="step-n">2</div><div class="step-body"><strong>Login-Audit</strong><p>Invoke-sqmLoginAudit - alle Logins, Rollen, letzter Login-Zeitpunkt. Erkennt verwaiste, deaktivierte und inaktive Accounts. Als CSV exportierbar.</p></div></div>
+            <div class="step"><div class="step-n">3</div><div class="step-body"><strong>Sysadmin-Report</strong><p>Get-sqmSysadminAccounts - sofortige Uebersicht welche Accounts sysadmin-Rechte haben. Fuer Audit-Nachweise.</p></div></div>
+          </div>
+        </div>
+        <div>
+          <table class="dtbl">
+            <thead><tr><th>Audit-Frage</th><th>Funktion</th><th>Aufwand</th></tr></thead>
+            <tbody>
+              <tr><td>SA-Account noch aktiv?</td><td>Invoke-sqmSaObfuscation</td><td><span class="ok">1 Befehl</span></td></tr>
+              <tr><td>Wer hat sysadmin?</td><td>Get-sqmSysadminAccounts</td><td><span class="ok">1 Befehl</span></td></tr>
+              <tr><td>Letzte CHECKDB?</td><td>Get-sqmDatabaseHealth</td><td><span class="ok">Automatischer Report</span></td></tr>
+              <tr><td>Inaktive Logins?</td><td>Invoke-sqmLoginAudit</td><td><span class="ok">CSV-Export</span></td></tr>
+              <tr><td>SPNs korrekt?</td><td>Get-sqmSpnReport</td><td><span class="ok">Vergleich AD vs. erwartet</span></td></tr>
+              <tr><td>Zertifikate ablaufend?</td><td>Get-sqmCertificateReport</td><td><span class="ok">Warnung bei &lt;30 Tage</span></td></tr>
+            </tbody>
+          </table>
+          <div class="alert alert-w mt05">&#9889; FI-TS Kontext - Bankenregulierung (BAIT/MaRisk) fordert regelmaessige Nachweise ueber privilegierte Accounts. Diese Funktionen liefern die Nachweise direkt.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 9 - Performance
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Deep Dive &middot; Performance</p>
+      <h1>Performance Analysis - From Slow to Solution</h1>
+      <p class="section-note">Kein manuelles DMV-Stoebern mehr. sqmSQLTool liefert priorisierte Empfehlungen.</p>
+      <div class="cols2">
+        <div>
+          <div class="steps">
+            <div class="step"><div class="step-n">1</div><div class="step-body"><strong>Wait Statistics - Wo wartet SQL Server?</strong><p>Get-sqmWaitStatistics - Top Wait Types mit Gewichtung. Sofort sichtbar ob I/O, CPU, Locking oder Memory das Problem ist.</p></div></div>
+            <div class="step"><div class="step-n">2</div><div class="step-body"><strong>Missing Indexes - Was fehlt?</strong><p>Get-sqmMissingIndexes - aus sys.dm_db_missing_index_details, priorisiert nach Impact Score. Mit CREATE INDEX Statement.</p></div></div>
+            <div class="step"><div class="step-n">3</div><div class="step-body"><strong>Long Running Queries - Was dauert?</strong><p>Get-sqmLongRunningQueries - aktuelle + historische Langlaeufer aus DMVs, mit Query-Text-Auszug.</p></div></div>
+            <div class="step"><div class="step-n">4</div><div class="step-body"><strong>PerfBaseline - Ist das normal?</strong><p>Invoke-sqmPerfBaseline - sammelt Performance-Counters ueber einen Zeitraum, speichert als CSV-Baseline fuer Vergleiche.</p></div></div>
+          </div>
+        </div>
+        <div>
+<pre><code><span class="cc"># Schritt 1: Was wartet gerade?</span>
+<span class="ck">Get-sqmWaitStatistics</span> | <span class="ck">Select-Object</span> <span class="cs">-First</span> <span class="cw">5</span>
+
+<span class="cc"># WaitType          WaitMs  Percentage</span>
+<span class="cc"># --------          ------  ----------</span>
+<span class="ce"># PAGEIOLATCH_SH    45823   38.2 %</span>
+<span class="cw"># LCK_M_S           12401   10.3 %</span>
+<span class="cw"># CXPACKET           9822    8.2 %</span>
+
+<span class="cc"># Schritt 2: Welche Indexes fehlen?</span>
+<span class="ck">Get-sqmMissingIndexes</span> <span class="cs">-SqlInstance</span> <span class="cw">"SQL01"</span> |
+    <span class="ck">Sort-Object</span> <span class="cw">ImpactScore</span> <span class="cs">-Descending</span> |
+    <span class="ck">Select-Object</span> <span class="cs">-First</span> <span class="cw">3</span>
+
+<span class="cc"># Schritt 3: Baseline aufzeichnen (15 Min.)</span>
+<span class="ck">Invoke-sqmPerfBaseline</span> <span class="cs">-Duration</span> <span class="cw">15</span> `
+    <span class="cs">-OutputPath</span> <span class="cw">"D:\Baseline"</span></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 10 - Inventory
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Deep Dive &middot; Inventory &amp; Doku</p>
+      <h1>Instance Inventory - One Command, Full Picture</h1>
+      <p class="section-note">Invoke-sqmInstanceInventory dokumentiert eine Instanz vollstaendig: Version, DBs, Logins, Jobs, AlwaysOn. TXT + CSV automatisch.</p>
+      <div class="cols2">
+        <div>
+          <div class="steps">
+            <div class="step"><div class="step-n">1</div><div class="step-body"><strong>Instanz-Metadaten</strong><p>Version, Edition, Patch-Level, Collation, Max Memory, CPU-Anzahl, sp_configure-Werte</p></div></div>
+            <div class="step"><div class="step-n">2</div><div class="step-body"><strong>Datenbanken</strong><p>Name, Status, Recovery Model, Groesse, letztes Backup, Owner, Collation - alle User-DBs</p></div></div>
+            <div class="step"><div class="step-n">3</div><div class="step-body"><strong>Logins &amp; Rollen</strong><p>Alle Logins mit Typ, Status, Serverrollen - sofort fuer Audit verwendbar</p></div></div>
+            <div class="step"><div class="step-n">4</div><div class="step-body"><strong>SQL Agent Jobs</strong><p>Alle Jobs mit Status, Owner, Schedule, letzter Ausfuehrung und Ergebnis</p></div></div>
+            <div class="step"><div class="step-n">5</div><div class="step-body"><strong>AlwaysOn</strong><p>AGs, Replicas, Listener, Sync-Status - nur wenn konfiguriert</p></div></div>
+          </div>
+          <div class="alert alert-g mt05">&#10003; Pipeline-faehig - 'SQL01','SQL02','SQL03' | Invoke-sqmInstanceInventory - Fleet-Dokumentation per Mausklick</div>
+        </div>
+        <div>
+<pre><code><span class="cc"># Einzelne Instanz dokumentieren</span>
+<span class="ck">Invoke-sqmInstanceInventory</span>
+
+<span class="cc"># Mehrere Instanzen (Fleet)</span>
+<span class="cw">'SQL01'</span>,<span class="cw">'SQL02'</span>,<span class="cw">'SQL03'</span> |
+    <span class="ck">Invoke-sqmInstanceInventory</span> `
+    <span class="cs">-ContinueOnError</span> `
+    <span class="cs">-OutputPath</span> <span class="cw">"\\srv\DBA-Reports\Inventory"</span>
+
+<span class="cc"># Patch-Stand aller Instanzen</span>
+<span class="ck">Invoke-sqmPatchAnalysis</span> `
+    <span class="cs">-SqlInstance</span> <span class="cw">'SQL01'</span>,<span class="cw">'SQL02'</span>,<span class="cw">'SQL03'</span>
+
+<span class="cc"># Ausgabe:</span>
+<span class="cc"># Instance  Version  CU       LatestCU  Status</span>
+<span class="cc"># --------  -------  --       --------  ------</span>
+<span class="cw"># SQL01     2022     CU14     CU16      WARN</span>
+<span class="cs"># SQL02     2022     CU16     CU16      ok</span>
+<span class="ce"># SQL03     2019     RTM      CU27      ERROR</span></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 11 - Pester Tests
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Qualitaet &amp; Testbarkeit</p>
+      <h1>Production-Grade - Pester-Tested</h1>
+      <p class="section-note">sqmSQLTool ist keine Skript-Sammlung. Es ist ein PS-Modul mit Unit-Tests, strukturiertem Logging und einheitlichen Konventionen.</p>
+      <div class="cols2">
+        <div>
+          <h3>Modul-Struktur</h3>
+          <div class="steps">
+            <div class="step"><div class="step-n">1</div><div class="step-body"><strong>Public / Private</strong><p>Klare Trennung oeffentlicher API (87 Funktionen) und interner Helpers. Invoke-sqmLogging, Invoke-sqmHelpers nur intern.</p></div></div>
+            <div class="step"><div class="step-n">2</div><div class="step-body"><strong>Pester Unit-Tests</strong><p>Tests unter /tests/Unit/ fuer alle kritischen Funktionen. Mocking von dbaTools-Calls - kein echter SQL Server noetig.</p></div></div>
+            <div class="step"><div class="step-n">3</div><div class="step-body"><strong>Einheitliches Logging</strong><p>Invoke-sqmLogging: File + EventLog + Verbose. Jede Funktion loggt konsistent. Zentrales OutputPath per Set-sqmConfig.</p></div></div>
+            <div class="step"><div class="step-n">4</div><div class="step-body"><strong>Install / Update</strong><p>Install.cmd / Install.ps1: Auto-detect Admin, AllUsers oder CurrentUser. Robocopy ohne Zone.Identifier. Update.ps1 fuer Upgrades.</p></div></div>
+          </div>
+        </div>
+        <div>
+          <table class="dtbl">
+            <thead><tr><th>Eigenschaft</th><th>Wert</th></tr></thead>
+            <tbody>
+              <tr><td>Oeffentliche Funktionen</td><td><span class="ok">87</span></td></tr>
+              <tr><td>Pester-Test-Dateien</td><td>~15</td></tr>
+              <tr><td>PowerShell-Version</td><td>5.1 (PS 7 kompatibel)</td></tr>
+              <tr><td>Abhaengigkeiten</td><td>dbaTools &ge; 2.0</td></tr>
+              <tr><td>Logging</td><td>File + Windows EventLog</td></tr>
+              <tr><td>Konfiguration</td><td>Set-sqmConfig / Get-sqmConfig</td></tr>
+              <tr><td>Install-Scope</td><td>Auto-detect Admin &rarr; AllUsers</td></tr>
+            </tbody>
+          </table>
+          <div class="alert alert-b mt05">&#8505; Get-sqmConfig / Set-sqmConfig - Zentrale Konfiguration: OutputPath, CentralPath, LogLevel. Einmal setzen, alle Funktionen verwenden es.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 12 - Toolchain
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Toolchain</p>
+      <h1>sqmSQLTool in der Toolchain</h1>
+      <p class="section-note">sqmSQLTool ist das operative Rueckgrat. Alle anderen Tools stuetzen sich darauf.</p>
+
+      <div class="timeline mb05">
+        <div class="tl-item">
+          <div class="tl-dot">1</div>
+          <div class="tl-label">SQLSetupTool</div>
+          <div class="tl-sub">PostInstall: sqmSQLTool-Funktionen</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot">2</div>
+          <div class="tl-label">AlwaysOnSetup</div>
+          <div class="tl-sub">Endpoint, CONNECT, Monitoring</div>
+        </div>
+        <div class="tl-item tl-active">
+          <div class="tl-dot">3</div>
+          <div class="tl-label">sqmSQLTool</div>
+          <div class="tl-sub">Laufender Betrieb</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot">4</div>
+          <div class="tl-label">DeadlockCollector</div>
+          <div class="tl-sub">Nutzt sqmLogging</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot">5</div>
+          <div class="tl-label">SSRSDeployment</div>
+          <div class="tl-sub">Install-sqmSsrsReportServer</div>
+        </div>
+      </div>
+
+      <div class="cols2">
+        <div>
+          <div class="card mb05">
+            <span class="card-ico">&#x2699;&#xFE0F;</span>
+            <h3>SQLSetupTool &rarr; sqmSQLTool</h3>
+            <p>PostInstall ruft: Invoke-sqmNtfsSetup, Invoke-sqmSaObfuscation, Invoke-sqmMonitoringKey, Install-sqmOlaMaintenanceSolution, New-sqmOlaMaintenanceJobs</p>
+          </div>
+          <div class="card">
+            <span class="card-ico">&#x1F537;</span>
+            <h3>AlwaysOnSetup &rarr; sqmSQLTool</h3>
+            <p>Endpoint-Konfiguration, Monitoring-Key, SA-Check nach AG-Einrichtung</p>
+          </div>
+        </div>
+        <div>
+          <div class="card mb05">
+            <span class="card-ico">&#x1F4E6;</span>
+            <h3>dbaTools</h3>
+            <p>Basis fuer alle SQL-Operationen. sqmSQLTool ist eine Unternehmens-Erweiterungsschicht ueber dbaTools</p>
+          </div>
+          <div class="card">
+            <span class="card-ico">&#x1FA9F;</span>
+            <h3>Windows Event Log</h3>
+            <p>Repair-sqmAlwaysOnDatabases schreibt EventId 1000/1001/1002 - sichtbar im SIEM/Splunk</p>
+          </div>
+        </div>
+      </div>
+      <div class="xref mt05">
+        <span>AlwaysOnSetup</span>
+        <span>SQLSetupTool</span>
+        <span>DeadlockCollector</span>
+        <span>SSRSDeploymentTool</span>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 13 - Scope & Roadmap
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Abgrenzung</p>
+      <h1>Scope &amp; What's Next</h1>
+      <div class="cols2">
+        <div>
+          <table class="dtbl">
+            <thead><tr><th>Aufgabe</th><th>sqmSQLTool?</th></tr></thead>
+            <tbody>
+              <tr><td>AlwaysOn Auto-Repair</td><td><span class="ok">&#10003; Ja</span> - Repair-sqmAlwaysOnDatabases</td></tr>
+              <tr><td>AG-Aware Backup</td><td><span class="ok">&#10003; Ja</span> - Invoke-sqmUserDatabaseBackup</td></tr>
+              <tr><td>Instanz-Inventar</td><td><span class="ok">&#10003; Ja</span> - Invoke-sqmInstanceInventory</td></tr>
+              <tr><td>SA-Haertung</td><td><span class="ok">&#10003; Ja</span> - Invoke-sqmSaObfuscation</td></tr>
+              <tr><td>SQL Server installieren</td><td><span class="warn">- Nein</span> &rarr; SQLSetupTool</td></tr>
+              <tr><td>AlwaysOn einrichten</td><td><span class="warn">- Nein</span> &rarr; AlwaysOnSetup</td></tr>
+              <tr><td>SSRS Reports deployen</td><td><span class="warn">- Nein</span> &rarr; SSRSDeploymentTool</td></tr>
+              <tr><td>Deadlock-Sammlung GUI</td><td><span class="warn">- Nein</span> &rarr; DeadlockCollector</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3>Was sqmSQLTool bewusst nicht ist</h3>
+          <div class="alert alert-b">&#8505; Kein Installer-Tool - sqmSQLTool konfiguriert und ueberwacht. Installation und Einrichtung uebernehmen SQLSetupTool und AlwaysOnSetup.</div>
+          <div class="alert alert-b">&#8505; Kein Monitoring-System - sqmSQLTool liefert Daten und Reports. Splunk, SCOM, eigenes Monitoring konsumiert diese Daten.</div>
+          <div class="alert alert-g">&#10003; Erweiterbar - Neue Firmenfunktionen folgen dem sqm*-Muster. Logging, Config, Pester-Tests - Konventionen sind etabliert.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 14 - Quick Reference
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Referenz</p>
+      <h1>Quick Reference - Die wichtigsten Befehle</h1>
+      <p class="section-note">Die Befehle die ein DBA taeglich oder woechentlich braucht.</p>
+      <div class="cols2">
+        <div>
+          <h3>Taeglicher Betrieb</h3>
+          <table class="dtbl">
+            <thead><tr><th>Aufgabe</th><th>Befehl</th></tr></thead>
+            <tbody>
+              <tr><td>AG-Health pruefen</td><td><span class="ck">Get-sqmAgHealthReport</span></td></tr>
+              <tr><td>Blocking pruefen</td><td><span class="ck">Get-sqmBlockingReport</span></td></tr>
+              <tr><td>Lange Queries</td><td><span class="ck">Get-sqmLongRunningQueries</span></td></tr>
+              <tr><td>Disk Space</td><td><span class="ck">Get-sqmDiskSpaceReport</span></td></tr>
+              <tr><td>Instanz-Check</td><td><span class="ck">Get-sqmSQLInstanceCheck</span></td></tr>
+              <tr><td>AG Repair</td><td><span class="ck">Repair-sqmAlwaysOnDatabases</span></td></tr>
+              <tr><td>User-DB Backup</td><td><span class="ck">Invoke-sqmUserDatabaseBackup -All</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3>Woechentlich / Monatlich</h3>
+          <table class="dtbl">
+            <thead><tr><th>Aufgabe</th><th>Befehl</th></tr></thead>
+            <tbody>
+              <tr><td>DB Health Report</td><td><span class="ck">Get-sqmDatabaseHealth</span></td></tr>
+              <tr><td>Patch-Stand</td><td><span class="ck">Invoke-sqmPatchAnalysis</span></td></tr>
+              <tr><td>Missing Indexes</td><td><span class="ck">Get-sqmMissingIndexes</span></td></tr>
+              <tr><td>VLF/AutoGrowth</td><td><span class="ck">Get-sqmAutoGrowthReport</span></td></tr>
+              <tr><td>Login-Audit</td><td><span class="ck">Invoke-sqmLoginAudit</span></td></tr>
+              <tr><td>Sysadmin-Pruefung</td><td><span class="ck">Get-sqmSysadminAccounts</span></td></tr>
+              <tr><td>Inventarisierung</td><td><span class="ck">Invoke-sqmInstanceInventory</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 15 - Summary
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Zusammenfassung</p>
+      <h1>Summary &amp; Next Steps</h1>
+      <div class="cols2">
+        <div>
+          <div class="steps">
+            <div class="step"><div class="step-n">&#10003;</div><div class="step-body"><strong>AlwaysOn-Repair vollautomatisch</strong><p>Repair-sqmAlwaysOnDatabases + New-sqmAlwaysOnRepairJob. AG-DB Fehler = Agent Job repariert automatisch</p></div></div>
+            <div class="step"><div class="step-n">&#10003;</div><div class="step-body"><strong>AG-Aware Backup</strong><p>sys.fn_hadr_backup_is_preferred_replica geprueft. Kein Doppel-Backup mehr auf Primary und Secondary</p></div></div>
+            <div class="step"><div class="step-n">&#10003;</div><div class="step-body"><strong>Audit-Ready in Minuten</strong><p>SA-Obfuscation, Login-Audit, Sysadmin-Report, CHECKDB-Status - alle Compliance-Fragen beantwortet</p></div></div>
+            <div class="step"><div class="step-n">&#10003;</div><div class="step-body"><strong>Fleet-Management</strong><p>Pipeline-faehige Funktionen: Inventar, Patch-Stand, Health-Report fuer N Instanzen gleichzeitig</p></div></div>
+            <div class="step"><div class="step-n">&#10003;</div><div class="step-body"><strong>Unternehmens-Standard</strong><p>87 Funktionen, Pester-Tests, einheitliches Logging - keine Script-Sammlung sondern ein Modul</p></div></div>
+          </div>
+        </div>
+        <div>
+          <h3>Installation</h3>
+<pre><code><span class="cc"># Von Share installieren (empfohlen)</span>
+<span class="ck">Install.cmd</span>            <span class="cc"># auto-detect Admin -&gt; AllUsers</span>
+
+<span class="cc"># Manuell als Admin (AllUsers)</span>
+<span class="cs">.\Install.ps1</span> <span class="cs">-Scope</span> <span class="cw">AllUsers</span>
+
+<span class="cc"># Manuell CurrentUser</span>
+<span class="cs">.\Install.ps1</span> <span class="cs">-Scope</span> <span class="cw">CurrentUser</span>
+
+<span class="cc"># Konfiguration setzen</span>
+<span class="ck">Set-sqmConfig</span> <span class="cs">-OutputPath</span> <span class="cw">"D:\DBA-Reports"</span></code></pre>
+          <h3 class="mt05">Links &amp; Ressourcen</h3>
+          <table class="dtbl">
+            <tbody>
+              <tr><td>GitHub</td><td><span class="cs">github.com/JankeUwe/sqmSQLTool</span></td></tr>
+              <tr><td>Website</td><td><span class="cs">www.powershelldba.de</span></td></tr>
+              <tr><td>Modul-Import</td><td><span class="ck">Import-Module sqmSQLTool</span></td></tr>
+            </tbody>
+          </table>
+          <div class="xref mt05">
+            <span>SQLSetupTool - Basis-Installation</span>
+            <span>AlwaysOnSetup - HA-Konfiguration</span>
+            <span>DeadlockCollector - Deadlock-Erfassung</span>
+            <span>ReportDeploymentTool - SSRS Deployment</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /slides -->
+</div><!-- /reveal -->
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({
+    width: 1280,
+    height: 720,
+    margin: 0.04,
+    center: false,
+    transition: 'slide',
+    controls: true,
+    progress: true,
+    history: true,
+    keyboard: true,
+    overview: true,
+    touch: true,
+    plugins: []
+  });
+</script>
+</body>
+</html>
