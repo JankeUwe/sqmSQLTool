@@ -293,7 +293,7 @@ function New-sqmBackupMaintenanceJob
 			New-DbaAgentJob @connParams `
 				-Job $JobName `
 				-Category $JobCategory `
-				-Description "sqm BackupMaintenance $BackupType — Sync-sqmBackupExcludeTable + Invoke-sqmUserDatabaseBackup — $($ScheduleDays -join '/') $ScheduleTime" `
+				-Description "sqm BackupMaintenance $BackupType - Sync-sqmBackupExcludeTable + Invoke-sqmUserDatabaseBackup - $($ScheduleDays -join '/') $ScheduleTime" `
 				-EnableException -ErrorAction Stop | Out-Null
 
 			Invoke-sqmLogging -Message "Job '$JobName' angelegt." -FunctionName $functionName -Level "INFO"
@@ -388,7 +388,7 @@ function New-sqmBackupMaintenanceJob
 				}
 				else
 				{
-					Invoke-sqmLogging -Message "Operator '$OperatorName' nicht gefunden — Benachrichtigung nicht konfiguriert." -FunctionName $functionName -Level "WARNING"
+					Invoke-sqmLogging -Message "Operator '$OperatorName' nicht gefunden - Benachrichtigung nicht konfiguriert." -FunctionName $functionName -Level "WARNING"
 				}
 			}
 

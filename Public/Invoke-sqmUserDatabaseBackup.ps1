@@ -455,9 +455,9 @@ WHERE  rs.is_local = 1
 			if ($shouldSend)
 			{
 				$subject = if ($failedCount -gt 0 -or $aborted) {
-					"[$SqlInstance] Backup FEHLER — $failedCount fehlgeschlagen"
+					"[$SqlInstance] Backup FEHLER - $failedCount fehlgeschlagen"
 				} else {
-					"[$SqlInstance] Backup erfolgreich — $successCount Datenbanken"
+					"[$SqlInstance] Backup erfolgreich - $successCount Datenbanken"
 				}
 
 				$bodyLines = @(
@@ -470,7 +470,7 @@ WHERE  rs.is_local = 1
 					"Details:"
 				)
 				foreach ($r in $results) {
-					$bodyLines += "  [$($r.Status)] $($r.DatabaseName) — $($r.Message)"
+					$bodyLines += "  [$($r.Status)] $($r.DatabaseName) - $($r.Message)"
 				}
 				$body = $bodyLines -join "`n"
 
