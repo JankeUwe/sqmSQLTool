@@ -130,6 +130,28 @@
     .title-sub{ font-size: .9rem; color: var(--sub); margin: .5rem 0; max-width: 700px; }
     .author-line { font-size: .75rem; color: var(--sub); margin-top: .8rem; }
 
+    /* ---- PowerShell Console Mockup ---- */
+    .ps-console { background: #012456; border: 1px solid #1e3f6e; border-radius: 8px;
+                  padding: .5rem .85rem .65rem; margin: .4rem 0; }
+    .ps-titlebar { display: flex; align-items: center; gap: .3rem; margin-bottom: .45rem;
+                   padding-bottom: .3rem; border-bottom: 1px solid #1e3f6e; }
+    .ps-dot  { width: .55rem; height: .55rem; border-radius: 50%; flex-shrink: 0; }
+    .ps-dot.r { background: #f87171; }
+    .ps-dot.y { background: #f0c040; }
+    .ps-dot.g { background: #4ade80; }
+    .ps-wintitle { font-size: .6rem; color: #4a6a8a; margin-left: .4rem;
+                   font-family: 'Segoe UI', sans-serif; }
+    .ps-line { font-family: 'Consolas', 'Courier New', monospace; font-size: .68rem;
+               line-height: 1.55; margin: 0; white-space: pre; }
+    .ps-pr   { color: #ffff66; }
+    .ps-cmd  { color: #5dade2; }
+    .ps-par  { color: #c084fc; }
+    .ps-val  { color: #4ade80; }
+    .ps-cmt  { color: #3a5a72; font-style: italic; }
+    .ps-out  { color: #94a8c0; }
+    .ps-ok   { color: #4ade80; }
+    .pill.lang { color: #f0c040; border-color: rgba(240,192,64,.35); }
+
     /* ---- Utility ---- */
     .mt05 { margin-top: .5rem; }
     .mb05 { margin-bottom: .5rem; }
@@ -147,17 +169,47 @@
          ============================================================ -->
     <section>
       <p class="eyebrow">DBA Tooling &middot; 2026</p>
-      <h1>sqmSQLTool</h1>
-      <p class="title-em">Die DBA-Toolbox</p>
-      <p class="title-sub">87 Funktionen. Ein Modul. Vom Backup bis zum automatischen AlwaysOn-Repair.</p>
-      <div class="pill-row">
-        <span class="pill">PowerShell 5.1</span>
-        <span class="pill">dbaTools 2.x</span>
-        <span class="pill">Pester-Tests</span>
-        <span class="pill">6 Domaenen</span>
-        <span class="pill">v2.x</span>
+      <div style="display:grid;grid-template-columns:1fr 1.35fr;gap:1.4rem;align-items:start;">
+        <div>
+          <h1 style="margin-bottom:.3rem;">sqmSQLTool</h1>
+          <p class="title-em">Die DBA-Toolbox</p>
+          <p class="title-sub">87 Funktionen. Ein Modul. Vom Backup bis zum automatischen AlwaysOn-Repair.</p>
+          <div class="pill-row">
+            <span class="pill">PowerShell 5.1</span>
+            <span class="pill">dbaTools 2.x</span>
+            <span class="pill">Pester-Tests</span>
+            <span class="pill">6 Domaenen</span>
+            <span class="pill lang">&#127462;&#127466; DE &nbsp;|&nbsp; &#127463;&#127475; EN</span>
+            <span class="pill">v2.x</span>
+          </div>
+          <p class="author-line">Uwe Janke &middot; Senior SQL Server DBA &middot; dtcSoftware</p>
+        </div>
+        <div>
+          <div class="ps-console">
+            <div class="ps-titlebar">
+              <span class="ps-dot r"></span>
+              <span class="ps-dot y"></span>
+              <span class="ps-dot g"></span>
+              <span class="ps-wintitle">Windows PowerShell 5.1 &mdash; sqmSQLTool v2.x</span>
+            </div>
+            <p class="ps-line"><span class="ps-cmt"># AlwaysOn-Repair - vollautomatisch</span></p>
+            <p class="ps-line"><span class="ps-pr">PS&gt;</span> <span class="ps-cmd">Repair-sqmAlwaysOnDatabases</span> <span class="ps-par">-SqlInstance</span> <span class="ps-val">'SQL01'</span> <span class="ps-par">-Auto</span></p>
+            <p class="ps-line"><span class="ps-ok">  [OK] Finanzen    - removed, reseeded, joined AG</span></p>
+            <p class="ps-line"><span class="ps-ok">  [OK] Controlling - removed, reseeded, joined AG</span></p>
+            <p class="ps-line">&nbsp;</p>
+            <p class="ps-line"><span class="ps-cmt"># AG-aware Backup - nur bevorzugter Knoten</span></p>
+            <p class="ps-line"><span class="ps-pr">PS&gt;</span> <span class="ps-cmd">Invoke-sqmUserDatabaseBackup</span> <span class="ps-par">-SqlInstance</span> <span class="ps-val">'SQL01'</span> <span class="ps-par">-All</span> <span class="ps-par">-CheckPreferredReplica</span></p>
+            <p class="ps-line">&nbsp;</p>
+            <p class="ps-line"><span class="ps-cmt"># Health-Check + Security</span></p>
+            <p class="ps-line"><span class="ps-pr">PS&gt;</span> <span class="ps-cmd">Get-sqmDatabaseHealth</span>   <span class="ps-par">-SqlInstance</span> <span class="ps-val">'SQL01'</span> <span class="ps-par">| Format-Table</span></p>
+            <p class="ps-line"><span class="ps-pr">PS&gt;</span> <span class="ps-cmd">Invoke-sqmSaObfuscation</span> <span class="ps-par">-SqlInstance</span> <span class="ps-val">'SQL01'</span></p>
+            <p class="ps-line">&nbsp;</p>
+            <p class="ps-line"><span class="ps-cmt"># Inventar - HTML-Report generieren</span></p>
+            <p class="ps-line"><span class="ps-pr">PS&gt;</span> <span class="ps-cmd">Invoke-sqmInstanceInventory</span> <span class="ps-par">-SqlInstance</span> <span class="ps-val">'SQL01'</span> <span class="ps-par">-OutputPath</span> <span class="ps-val">'C:\Reports'</span></p>
+            <p class="ps-line"><span class="ps-ok">  Report saved: C:\Reports\SQL01_Inventory_20260520.html</span></p>
+          </div>
+        </div>
       </div>
-      <p class="author-line">Uwe Janke &middot; Senior SQL Server DBA &middot; dtcSoftware</p>
     </section>
 
     <!-- ============================================================
@@ -249,6 +301,7 @@
       <p class="eyebrow">Ueberblick</p>
       <h1>6 Functional Domains</h1>
       <p class="section-note">87 Funktionen - 6 Themengebiete. Jedes Gebiet in sich vollstaendig.</p>
+      <div class="alert alert-w" style="margin-bottom:.3rem;">&#127462;&#127466;&nbsp;<strong>DE</strong> &nbsp;|&nbsp; &#127463;&#127475;&nbsp;<strong>EN</strong> &nbsp;&mdash;&nbsp; sqmSQLTool ist zweisprachig. Alle Ausgaben (Logs, Meldungen, HTML-Reports, Mail-Benachrichtigungen) erscheinen in der konfigurierten Sprache. Umschalten: <code>Set-sqmConfig -Language 'en-US'</code> bzw. <code>'de-DE'</code>.</div>
       <div class="cols3">
         <div class="card">
           <span class="card-ico">&#x1F534;</span>
