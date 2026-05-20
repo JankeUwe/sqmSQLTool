@@ -6,12 +6,16 @@
     Copies the module to either the system-wide module path (requires Admin)
     or the current user's personal module path (no Admin rights needed).
 
-    The default is CurrentUser — no elevation required.
+    The default scope is determined automatically:
+      - Running as Administrator  -> AllUsers  ($env:ProgramFiles\WindowsPowerShell\Modules)
+      - Running as normal user    -> CurrentUser ($HOME\Documents\WindowsPowerShell\Modules)
+    Pass -Scope explicitly to override this behaviour.
 
 .PARAMETER Scope
     Installation scope:
-      CurrentUser  — installs to $HOME\Documents\WindowsPowerShell\Modules  (default, no Admin needed)
+      CurrentUser  — installs to $HOME\Documents\WindowsPowerShell\Modules
       AllUsers     — installs to $env:ProgramFiles\WindowsPowerShell\Modules (requires Admin)
+    Default: AllUsers when running as Administrator, CurrentUser otherwise.
 
 .PARAMETER Source
     Source directory of the module. Defaults to the script's own directory.
@@ -37,10 +41,21 @@
 #>
 param(
     [ValidateSet('CurrentUser', 'AllUsers')]
-    [string]$Scope       = 'CurrentUser',
+    [string]$Scope       = '',          # auto-detected below
     [string]$Source      = $PSScriptRoot,
     [string]$Destination = ''
 )
+
+# ---------------------------------------------------------------------------
+# 0. Scope auto-detect: Admin -> AllUsers, sonst CurrentUser
+# ---------------------------------------------------------------------------
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+             [Security.Principal.WindowsBuiltInRole]'Administrator')
+
+if ($Scope -eq '') {
+    $Scope = if ($isAdmin) { 'AllUsers' } else { 'CurrentUser' }
+    Write-Host "Auto-detected Scope: $Scope" -ForegroundColor Cyan
+}
 
 # ---------------------------------------------------------------------------
 # 1. Zielpfad bestimmen
@@ -100,9 +115,6 @@ if ($existsUser -and $existsAll -and $Scope -eq 'AllUsers') {
 # ---------------------------------------------------------------------------
 # 3. Scope-Hinweis und Admin-Check
 # ---------------------------------------------------------------------------
-$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
-             [Security.Principal.WindowsBuiltInRole]'Administrator')
-
 if ($Scope -eq 'AllUsers') {
     if (-not $isAdmin) {
         Write-Warning "Scope 'AllUsers' requires Administrator rights."
