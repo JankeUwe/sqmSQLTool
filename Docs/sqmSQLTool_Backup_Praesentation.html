@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>sqmSQLTool - Backup &amp; Restore Praesentation</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+  <style>
+    :root {
+      --blue:  #2e86c1;
+      --lblue: #5dade2;
+      --green: #4ade80;
+      --yellow:#f0c040;
+      --red:   #f87171;
+      --card:  #1a2332;
+      --bd:    #2a3a52;
+      --txt:   #d0e0f0;
+      --sub:   #94a8c0;
+    }
+
+    /* ---- Base ---- */
+    .reveal { font-size: 17px; color: var(--txt); }
+    .reveal .slides > section { padding: 1.5rem 2rem; text-align: left; }
+    .reveal h1 { font-size: 2rem; color: #fff; margin: .2rem 0 .6rem; line-height: 1.1; }
+    .reveal h2 { font-size: 1.5rem; color: var(--lblue); margin: .4rem 0; }
+    .reveal h3 { font-size: 1rem; color: var(--lblue); margin: .3rem 0 .2rem; }
+    .reveal p  { margin: .25rem 0; font-size: .85rem; color: var(--sub); line-height: 1.4; }
+    .reveal pre { background: #0d1520; border: 1px solid var(--bd); border-radius: 8px;
+                  padding: .8rem 1rem; font-size: .72rem; line-height: 1.5;
+                  white-space: pre; overflow: hidden; margin: .4rem 0; box-shadow: none; }
+    .reveal pre code { background: none; padding: 0; color: #c8d8e8; }
+    .reveal ul { margin: .3rem 0 .3rem 1.2rem; }
+    .reveal li { font-size: .82rem; color: var(--sub); margin: .15rem 0; }
+
+    /* ---- Eyebrow ---- */
+    .eyebrow { font-size: .7rem; font-weight: 700; letter-spacing: .12em;
+               text-transform: uppercase; color: var(--lblue); margin: 0 0 .1rem; }
+
+    /* ---- Pill row ---- */
+    .pill-row { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0; }
+    .pill { background: #0d1f30; border: 1px solid var(--bd); border-radius: 20px;
+            padding: .18rem .65rem; font-size: .7rem; color: var(--lblue); white-space: nowrap; }
+    .pill.green { color: var(--green); border-color: rgba(74,222,128,.35); }
+    .pill.yellow{ color: var(--yellow); border-color: rgba(240,192,64,.35); }
+
+    /* ---- Cols ---- */
+    .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin: .4rem 0; align-items: stretch; }
+    .cols3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .8rem; margin: .4rem 0; align-items: stretch; }
+    .cols2 > div, .cols3 > div { display: flex; flex-direction: column; }
+
+    /* ---- Card ---- */
+    .card { background: var(--card); border: 1px solid var(--bd); border-radius: 10px;
+            padding: .7rem .9rem; flex: 1; }
+    .card.highlight { border-color: var(--lblue); background: rgba(46,134,193,.08); }
+    .card.green     { border-color: var(--green);  background: rgba(74,222,128,.06); }
+    .card-ico { font-size: 1.5rem; margin-bottom: .25rem; display: block; }
+    .card h3  { margin: .1rem 0 .2rem; }
+    .card p   { margin: 0; }
+
+    /* ---- Steps ---- */
+    .steps { display: flex; flex-direction: column; gap: .35rem; }
+    .step  { display: flex; gap: .6rem; align-items: flex-start; }
+    .step-n { background: var(--blue); color: #fff; border-radius: 50%;
+              width: 1.4rem; height: 1.4rem; display: flex; align-items: center;
+              justify-content: center; font-size: .72rem; font-weight: 800;
+              flex-shrink: 0; margin-top: .05rem; }
+    .step-n.green { background: #16a34a; }
+    .step-body { flex: 1; }
+    .step-body strong { font-size: .82rem; color: #fff; }
+    .step-body p { margin: .05rem 0 0; font-size: .75rem; }
+
+    /* ---- Data Table (dtbl) ---- */
+    .dtbl { width: 100%; border-collapse: collapse; font-size: .78rem; margin: .3rem 0; }
+    .dtbl th { background: #0d1f30; color: var(--lblue); padding: .3rem .6rem;
+               text-align: left; border-bottom: 1px solid var(--bd); font-size: .72rem; }
+    .dtbl td { padding: .28rem .6rem; border-bottom: 1px solid var(--bd); color: var(--txt); vertical-align: top; }
+    .dtbl tr:last-child td { border-bottom: none; }
+    .dtbl .ok  { color: var(--green); font-weight: 700; }
+    .dtbl .warn{ color: var(--yellow); font-weight: 700; }
+    .dtbl .err { color: var(--red); font-weight: 700; }
+    .dtbl tr.hl td { background: rgba(46,134,193,.08); }
+
+    /* ---- Alerts ---- */
+    .alert { border-radius: 7px; padding: .4rem .75rem; font-size: .78rem;
+             margin: .35rem 0; border-left: 3px solid; }
+    .alert-g { background: rgba(74,222,128,.08); border-color: var(--green); color: var(--green); }
+    .alert-w { background: rgba(240,192,64,.08); border-color: var(--yellow); color: var(--yellow); }
+    .alert-b { background: rgba(93,173,226,.08); border-color: var(--lblue); color: var(--lblue); }
+    .alert-r { background: rgba(248,113,113,.08); border-color: var(--red); color: var(--red); }
+
+    /* ---- xref ---- */
+    .xref { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; }
+    .xref span { background: #0d1f30; border: 1px solid var(--bd); border-radius: 5px;
+                 padding: .15rem .55rem; font-size: .68rem; color: var(--sub); }
+
+    /* ---- Backup-Timeline (Wochenkalender) ---- */
+    .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: .25rem; margin: .5rem 0; }
+    .day  { border-radius: 6px; padding: .35rem .2rem; text-align: center; border: 1px solid var(--bd); }
+    .day-lbl { font-size: .62rem; color: var(--sub); font-weight: 700; margin-bottom: .2rem; }
+    .day-type { font-size: .8rem; font-weight: 800; }
+    .day.full  { background: rgba(46,134,193,.18); border-color: var(--blue); }
+    .day.diff  { background: rgba(240,192,64,.13); border-color: var(--yellow); }
+    .day.full .day-type  { color: var(--lblue); }
+    .day.diff .day-type  { color: var(--yellow); }
+    .day-log { font-size: .58rem; color: #6a8faa; margin-top: .1rem; }
+
+    /* ---- RPO/RTO bar ---- */
+    .rpo-bar { display: flex; gap: .5rem; align-items: center; margin: .2rem 0; }
+    .rpo-label { font-size: .75rem; color: var(--sub); width: 3.5rem; text-align: right; flex-shrink: 0; }
+    .rpo-track { flex: 1; background: #0d1520; border-radius: 4px; height: .6rem; overflow: hidden; }
+    .rpo-fill  { height: 100%; border-radius: 4px; }
+    .rpo-val   { font-size: .73rem; color: #fff; font-weight: 700; width: 3.5rem; flex-shrink: 0; }
+
+    /* ---- Stat block ---- */
+    .stat-block { background: var(--card); border: 1px solid var(--bd); border-radius: 10px;
+                  padding: 1rem; text-align: center; flex: 1; }
+    .stat-num { font-size: 2.5rem; font-weight: 800; color: var(--lblue); line-height: 1; }
+    .stat-num.green { color: var(--green); }
+    .stat-num.yellow{ color: var(--yellow); }
+    .stat-lbl { font-size: .8rem; color: #fff; font-weight: 700; margin: .2rem 0; }
+    .stat-desc{ font-size: .75rem; color: #94a8c0; margin: 0; }
+
+    /* ---- Code syntax ---- */
+    .ck { color: #5dade2; }
+    .cs { color: #4ade80; }
+    .cc { color: #6a7f96; }
+    .cw { color: #f0c040; }
+    .ce { color: #f87171; }
+    .cp { color: #c084fc; }
+
+    /* ---- Title slide ---- */
+    .title-em { font-size: 1.3rem; color: var(--lblue); font-weight: 400; margin: 0; }
+    .title-sub{ font-size: .9rem; color: var(--sub); margin: .5rem 0; max-width: 700px; }
+    .author-line { font-size: .75rem; color: var(--sub); margin-top: .8rem; }
+
+    /* ---- Utility ---- */
+    .mt05 { margin-top: .5rem; }
+    .mb05 { margin-bottom: .5rem; }
+    .txt-small { font-size: .75rem; color: var(--sub); }
+    .w100 { width: 100%; }
+    .section-note { font-size: .8rem; color: var(--sub); margin: .25rem 0 .4rem; }
+    .tag-new { background: rgba(74,222,128,.15); border: 1px solid var(--green);
+               border-radius: 4px; color: var(--green); font-size: .62rem;
+               padding: .05rem .35rem; vertical-align: middle; margin-left: .3rem; }
+  </style>
+</head>
+<body>
+<div class="reveal">
+  <div class="slides">
+
+    <!-- ============================================================
+         SLIDE 1 - Titel
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">sqmSQLTool &middot; Backup &amp; Restore &middot; 2026</p>
+      <h1>Backup &amp; Restore</h1>
+      <p class="title-em">FULL + DIFF + LOG. Selektiv. AlwaysOn-aware.</p>
+      <p class="title-sub">Die sqmSQLTool-Backup-Strategie: Tagesbackups als Differenzial, selektive Sicherung einzelner Datenbanken, automatische AG-Erkennung und strukturierter Restore in einem Rutsch.</p>
+      <div class="pill-row">
+        <span class="pill">FULL / DIFF / LOG</span>
+        <span class="pill green">Ola Hallengren</span>
+        <span class="pill">AlwaysOn-aware</span>
+        <span class="pill">sqm_BackupExclude</span>
+        <span class="pill">Restore-Chain</span>
+      </div>
+      <p class="author-line">Uwe Janke &middot; Senior SQL Server DBA &middot; dtcSoftware</p>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 2 - Das Problem (Management-Slide)
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Motivation</p>
+      <h1>Warum nicht einfach taglich FULL?</h1>
+      <div class="cols2">
+        <div>
+          <div class="card mb05">
+            <span class="card-ico">&#x23F1;</span>
+            <h3>Backup-Fenster schliessen sich</h3>
+            <p>Wachsende Datenbanken bedeuten: ein taegliches FULL-Backup belegt das Wartungsfenster komplett. Kein Platz fuer Integritaetscheck, Indexoptimierung, Statistikupdate.</p>
+          </div>
+          <div class="card">
+            <span class="card-ico">&#x1F4BE;</span>
+            <h3>Storage-Kosten</h3>
+            <p>7 x FULL pro Woche = 7 x die volle Datenbankgroesse. Mit DIFF + LOG werden Montag bis Samstag nur die geaenderten Seiten gesichert - meist 5-15 % der DB-Groesse.</p>
+          </div>
+        </div>
+        <div>
+          <div class="card mb05">
+            <span class="card-ico">&#x1F6A8;</span>
+            <h3>Einige Datenbanken benoetigen gar kein Backup</h3>
+            <p>Temporaere Datenbanken, Replicate-Targets, Staging-DBs, Ola-Hilfstools: diese muessen identifiziert und explizit ausgeschlossen werden - nicht versehentlich.</p>
+          </div>
+          <div class="card">
+            <span class="card-ico">&#x1F504;</span>
+            <h3>AlwaysOn: welcher Knoten sichert?</h3>
+            <p>In einer AG laufen Backup-Jobs auf allen Knoten. Ohne preferred-Replica-Pruefung laeuft das Backup mehrfach - oder gar nicht, wenn der aktive Knoten wechselt.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 3 - Strategie FULL + DIFF + LOG
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Strategie</p>
+      <h1>FULL + DIFF + LOG</h1>
+      <p class="section-note">Einmal pro Woche FULL (Sonntag), taeglich DIFF (Mo-Sa), stuendlich LOG. Backup-Fenster schrumpft, RPO sinkt auf &lt;1 h.</p>
+
+      <div class="week mb05">
+        <div class="day full">
+          <div class="day-lbl">So</div>
+          <div class="day-type">FULL</div>
+          <div class="day-log">&#10003; LOG</div>
+        </div>
+        <div class="day diff">
+          <div class="day-lbl">Mo</div>
+          <div class="day-type">DIFF</div>
+          <div class="day-log">&#10003; LOG</div>
+        </div>
+        <div class="day diff">
+          <div class="day-lbl">Di</div>
+          <div class="day-type">DIFF</div>
+          <div class="day-log">&#10003; LOG</div>
+        </div>
+        <div class="day diff">
+          <div class="day-lbl">Mi</div>
+          <div class="day-type">DIFF</div>
+          <div class="day-log">&#10003; LOG</div>
+        </div>
+        <div class="day diff">
+          <div class="day-lbl">Do</div>
+          <div class="day-type">DIFF</div>
+          <div class="day-log">&#10003; LOG</div>
+        </div>
+        <div class="day diff">
+          <div class="day-lbl">Fr</div>
+          <div class="day-type">DIFF</div>
+          <div class="day-log">&#10003; LOG</div>
+        </div>
+        <div class="day diff">
+          <div class="day-lbl">Sa</div>
+          <div class="day-type">DIFF</div>
+          <div class="day-log">&#10003; LOG</div>
+        </div>
+      </div>
+
+      <div class="cols3 mb05">
+        <div class="stat-block">
+          <div class="stat-num green">1 x</div>
+          <div class="stat-lbl">FULL pro Woche</div>
+          <div class="stat-desc">Sonntag, 20:00 Uhr. Basis fuer alle Restore-Chains der Woche.</div>
+        </div>
+        <div class="stat-block">
+          <div class="stat-num yellow">6 x</div>
+          <div class="stat-lbl">DIFF pro Woche</div>
+          <div class="stat-desc">Mo-Sa 20:00. Nur geaenderte Seiten - typisch 5-15 % der DB.</div>
+        </div>
+        <div class="stat-block">
+          <div class="stat-num" style="color:var(--sub);">24 x</div>
+          <div class="stat-lbl">LOG pro Tag</div>
+          <div class="stat-desc">Stuendlich (FULL-Recovery-Modell). RPO: max. 1 Stunde.</div>
+        </div>
+      </div>
+
+      <div class="rpo-bar">
+        <span class="rpo-label">Nur FULL</span>
+        <div class="rpo-track"><div class="rpo-fill" style="width:100%;background:var(--red);"></div></div>
+        <span class="rpo-val" style="color:var(--red);">bis 24 h</span>
+      </div>
+      <div class="rpo-bar">
+        <span class="rpo-label">+ DIFF</span>
+        <div class="rpo-track"><div class="rpo-fill" style="width:55%;background:var(--yellow);"></div></div>
+        <span class="rpo-val" style="color:var(--yellow);">max. 1 h*</span>
+      </div>
+      <div class="rpo-bar">
+        <span class="rpo-label">+ LOG</span>
+        <div class="rpo-track"><div class="rpo-fill" style="width:10%;background:var(--green);"></div></div>
+        <span class="rpo-val" style="color:var(--green);">&lt; 1 h</span>
+      </div>
+      <p class="txt-small">* DIFF ohne LOG-Backup: Recovery-Punkt = letztes DIFF, kein Point-in-Time moeglich.</p>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 4 - Zwei Backup-Engines
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Architektur</p>
+      <h1>Zwei Backup-Engines</h1>
+      <p class="section-note">sqmSQLTool unterstuetzt beide Ansaetze - nativ und ueber Ola Hallengren. Empfehlung: Ola fuer neue Umgebungen.</p>
+      <div class="cols2">
+        <div>
+          <div class="card">
+            <span class="card-ico">&#x2699;&#xFE0F;</span>
+            <h3>Nativ: New-sqmBackupMaintenanceJob</h3>
+            <p style="margin-bottom:.4rem;">Erstellt SQL Agent Jobs, die <code>Invoke-sqmUserDatabaseBackup</code> aufrufen. Kein externes Framework notwendig.</p>
+            <table class="dtbl">
+              <tbody>
+                <tr><td>BackupType</td><td><span class="ck">FULL | DIFF | LOG</span></td></tr>
+                <tr><td>Pfad</td><td><code>&lt;BackupDir&gt;\User-Db</code></td></tr>
+                <tr><td>Exclude</td><td><code>-UseExcludeTable</code></td></tr>
+                <tr><td>AlwaysOn</td><td><code>-CheckPreferredReplica</code></td></tr>
+                <tr><td>Mail</td><td><code>-MailTo</code>, <code>-MailOnSuccess</code></td></tr>
+              </tbody>
+            </table>
+            <div class="alert alert-b mt05">&#8505; Pro Job-Typ (FULL/DIFF/LOG) einen separaten Aufruf. Job 1 synct die Exclude-Tabelle, Job 2 fuehrt Backup aus.</div>
+          </div>
+        </div>
+        <div>
+          <div class="card highlight">
+            <span class="card-ico">&#x2B50;</span>
+            <h3>Empfohlen: New-sqmOlaUsrDbBackupJob</h3>
+            <p style="margin-bottom:.4rem;">Erstellt Jobs auf Basis von Ola Hallengrens <code>DatabaseBackup</code>-Prozedur. Industrie-Standard, umfangreiche Optionen.</p>
+            <table class="dtbl">
+              <tbody>
+                <tr><td>Schalter</td><td><code>-Full</code> <code>-Diff</code> <code>-Log</code></td></tr>
+                <tr><td>Pfad</td><td><code>&lt;BackupDir&gt;\Usr-db</code></td></tr>
+                <tr><td>Exclude</td><td><code>-UseExcludeTable</code></td></tr>
+                <tr><td>Qualitaet</td><td><code>-Compress</code>, <code>-Verify</code>, <code>-CheckSum</code></td></tr>
+                <tr><td>Protokoll</td><td><code>-LogToTable</code> (msdb)</td></tr>
+              </tbody>
+            </table>
+            <div class="alert alert-g mt05">&#10003; Ein Aufruf erstellt alle drei Jobs (FULL/DIFF/LOG) inkl. Zeitplaene.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 5 - New-sqmOlaUsrDbBackupJob Detail
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Einrichtung</p>
+      <h1>New-sqmOlaUsrDbBackupJob</h1>
+      <p class="section-note">Ein einziger PowerShell-Aufruf richtet die komplette FULL/DIFF/LOG-Job-Struktur auf einer Instanz ein.</p>
+<pre><code><span class="cc"># Vollstaendige Einrichtung: FULL (So 20:00) + DIFF (Mo-Sa 20:00) + LOG (stundlich)</span>
+<span class="ck">New-sqmOlaUsrDbBackupJob</span> <span class="cp">-SqlInstance</span> <span class="cs">'SQL01\PROD'</span> `
+    <span class="cp">-BackupDirectory</span> <span class="cs">'D:\SQLBackup'</span> `
+    <span class="cp">-Full</span>  <span class="cp">-FullScheduleTime</span> <span class="cs">'20:00'</span>  <span class="cp">-FullScheduleDays</span> @(<span class="cs">'Sunday'</span>) `
+    <span class="cp">-Diff</span>  <span class="cp">-DiffScheduleTime</span> <span class="cs">'20:00'</span>  <span class="cp">-DiffScheduleDays</span> @(<span class="cs">'Monday'</span>,<span class="cs">'Tuesday'</span>,<span class="cs">'Wednesday'</span>,<span class="cs">'Thursday'</span>,<span class="cs">'Friday'</span>,<span class="cs">'Saturday'</span>) `
+    <span class="cp">-Log</span>   <span class="cp">-LogScheduleIntervalMinutes</span> <span class="cw">60</span> `
+    <span class="cp">-UseExcludeTable</span> `
+    <span class="cp">-Compress</span> <span class="cp">-Verify</span> <span class="cp">-CheckSum</span> <span class="cp">-LogToTable</span></code></pre>
+
+      <p class="section-note mt05">Erstellte SQL Agent Jobs:</p>
+      <table class="dtbl">
+        <thead><tr><th>Job-Name (Konfigurierbar)</th><th>Typ</th><th>Zeitplan</th><th>Pfad</th></tr></thead>
+        <tbody>
+          <tr class="hl"><td><code>OlaHH-UserDatabases-FULL</code></td><td><span class="ok">FULL</span></td><td>Sonntag 20:00</td><td><code>D:\SQLBackup\Usr-db</code></td></tr>
+          <tr class="hl"><td><code>OlaHH-UserDatabases-DIFF</code></td><td><span class="warn">DIFF</span></td><td>Mo-Sa 20:00</td><td><code>D:\SQLBackup\Usr-db</code></td></tr>
+          <tr class="hl"><td><code>OlaHH-UserDatabases-LOG</code></td><td>LOG</td><td>Stundlich</td><td><code>D:\SQLBackup\Usr-db</code></td></tr>
+        </tbody>
+      </table>
+
+      <div class="alert alert-b mt05">&#8505; Systemdatenbanken (master, model, msdb) werden separat mit <code>New-sqmOlaSysDbBackupJob</code> als FULL gesichert - diese unterstuetzen kein DIFF/LOG.</div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 6 - Selektives Backup: -Database und Exclude-Tabelle
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Selektives Backup</p>
+      <h1>Nur bestimmte Datenbanken sichern</h1>
+      <p class="section-note">Zwei Ansaetze - je nach Bedarf kombinierbar.</p>
+      <div class="cols2">
+        <div>
+          <div class="card mb05">
+            <h3>Ansatz 1: Explizite Liste (-Database)</h3>
+            <p class="mb05">Direkt im Funktionsaufruf - fuer Ad-hoc oder einmalige Sicherungen.</p>
+<pre><code><span class="cc"># Nur zwei Datenbanken sichern</span>
+<span class="ck">Invoke-sqmUserDatabaseBackup</span> `
+    <span class="cp">-SqlInstance</span> <span class="cs">'SQL01'</span> `
+    <span class="cp">-Database</span> <span class="cs">'Finanzen'</span>, <span class="cs">'Controlling'</span> `
+    <span class="cp">-BackupPath</span> <span class="cs">'D:\SQLBackup\User-Db'</span>
+
+<span class="cc"># Alle ausser Exclude-Tabelle sichern</span>
+<span class="ck">Invoke-sqmUserDatabaseBackup</span> `
+    <span class="cp">-SqlInstance</span> <span class="cs">'SQL01'</span> `
+    <span class="cp">-All</span> `
+    <span class="cp">-UseExcludeTable</span></code></pre>
+          </div>
+          <div class="card">
+            <h3>Wann -Database verwenden?</h3>
+            <ul>
+              <li>Wiederherstellungs-Test einer bestimmten DB</li>
+              <li>Notfall-Backup vor einem Patch</li>
+              <li>Migration: Backup auf neuem Pfad testen</li>
+            </ul>
+          </div>
+        </div>
+        <div>
+          <div class="card highlight">
+            <h3>Ansatz 2: sqm_BackupExclude-Tabelle</h3>
+            <p class="mb05">Persistente Ausschlussliste in <code>master</code>. Aenderungen gelten sofort fuer alle Backup-Jobs - keine Job-Anpassung notwendig.</p>
+<pre><code><span class="cc"># Tabelle initialisieren (einmalig)</span>
+<span class="ck">Sync-sqmBackupExcludeTable</span> `
+    <span class="cp">-SqlInstance</span> <span class="cs">'SQL01'</span>
+
+<span class="cc"># Datenbank ausschliessen</span>
+<span class="ck">INSERT INTO</span> master.dbo.sqm_BackupExclude
+    (DatabaseName, Reason)
+<span class="ck">VALUES</span> (<span class="cs">'StagingDB'</span>, <span class="cs">'Kein Backup - taeglich neu befuellt'</span>)
+
+<span class="cc"># Lesezugriff fuer Backup-Dienst-Konto</span>
+<span class="ck">Set-sqmBackupExcludePermission</span> `
+    <span class="cp">-SqlInstance</span> <span class="cs">'SQL01'</span> `
+    <span class="cp">-LoginName</span>   <span class="cs">'DOMAIN\sqlsvc'</span></code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 7 - sqm_BackupExclude Detail
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Selektives Backup - Detail</p>
+      <h1>master.dbo.sqm_BackupExclude</h1>
+      <p class="section-note">Vollstaendige Tabellendefinition mit Audit-Trail. Automatisch durch <code>Sync-sqmBackupExcludeTable</code> erstellt und gepflegt.</p>
+      <div class="cols2">
+        <div>
+          <table class="dtbl">
+            <thead><tr><th>Spalte</th><th>Typ</th><th>Bedeutung</th></tr></thead>
+            <tbody>
+              <tr><td><code>DatabaseName</code></td><td>sysname PK</td><td>Name der auszuschliessenden DB</td></tr>
+              <tr><td><code>Reason</code></td><td>nvarchar(255)</td><td>Begruendung (z.B. "Staging")</td></tr>
+              <tr><td><code>ExcludedBy</code></td><td>sysname</td><td>Wer hat ausgeschlossen (<code>SUSER_SNAME()</code>)</td></tr>
+              <tr><td><code>ExcludedAt</code></td><td>datetime2</td><td>Wann (Default: <code>SYSDATETIME()</code>)</td></tr>
+              <tr><td><code>IsActive</code></td><td>bit</td><td>1 = aktiv ausgeschlossen, 0 = reaktiviert</td></tr>
+              <tr><td><code>IsOrphaned</code></td><td>bit</td><td>1 = DB existiert nicht mehr auf der Instanz</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <div class="card mb05">
+            <h3>sqm_BackupExclude_History</h3>
+            <p>Jede Aenderung an der Exclude-Tabelle wird automatisch per Trigger <code>trg_sqm_BackupExclude_Audit</code> in die History-Tabelle geschrieben. Vollstaendige Aenderungshistorie.</p>
+          </div>
+          <div class="card">
+            <h3>Sync-sqmBackupExcludeTable</h3>
+            <p>Laedt regelmaessig die aktuellen Datenbanken der Instanz und markiert geloeschte DBs automatisch als <code>IsOrphaned = 1</code>. Kein manuelles Bereinigen notwendig.</p>
+          </div>
+          <div class="alert alert-g mt05">&#10003; Empfehlung: <code>Sync-sqmBackupExcludeTable</code> als Schritt 1 im Backup-Job einrichten. <code>New-sqmBackupMaintenanceJob</code> macht das automatisch wenn <code>-UseExcludeTable</code> gesetzt ist.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 8 - AlwaysOn-aware Backup
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">AlwaysOn</p>
+      <h1>AG-aware Backup</h1>
+      <p class="section-note">Backup-Jobs laufen auf allen AG-Knoten. Ohne Pruefung: Backup laeuft mehrfach oder auf dem falschen Knoten.</p>
+      <div class="cols2">
+        <div>
+          <div class="card mb05">
+            <h3>Das Problem ohne Pruefung</h3>
+            <table class="dtbl">
+              <tbody>
+                <tr><td>SQL01 (Primary)</td><td><span class="warn">Backup laueft</span></td></tr>
+                <tr><td>SQL02 (Secondary)</td><td><span class="warn">Backup laueft ebenfalls</span></td></tr>
+                <tr><td>Ergebnis</td><td><span class="err">Doppelter Storage-Verbrauch</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card">
+            <h3>Losung: -CheckPreferredReplica</h3>
+<pre><code><span class="ck">Invoke-sqmUserDatabaseBackup</span> `
+    <span class="cp">-SqlInstance</span>            <span class="cs">'SQL01'</span> `
+    <span class="cp">-All</span>                    `
+    <span class="cp">-CheckPreferredReplica</span>  `
+    <span class="cp">-UseExcludeTable</span></code></pre>
+            <p>Prueft intern <code>sys.fn_hadr_backup_is_preferred_replica()</code> je AG-Datenbank. Nicht-bevorzugte Replikate ueberspringen die Datenbank stillschweigend.</p>
+          </div>
+        </div>
+        <div>
+          <div class="card highlight">
+            <h3>Wie es funktioniert</h3>
+            <div class="steps">
+              <div class="step">
+                <div class="step-n">1</div>
+                <div class="step-body"><strong>Job laeuft auf SQL01 und SQL02</strong><p>Beide Knoten haben identische Backup-Jobs.</p></div>
+              </div>
+              <div class="step">
+                <div class="step-n">2</div>
+                <div class="step-body"><strong>Pruefung je Datenbank</strong><p><code>fn_hadr_backup_is_preferred_replica('Finanzen')</code> gibt 1 (bevorzugt) oder 0 zurueck.</p></div>
+              </div>
+              <div class="step">
+                <div class="step-n">3</div>
+                <div class="step-body"><strong>Backup nur auf bevorzugtem Knoten</strong><p>SQL02 ueberspringt alle AG-Datenbanken wenn SQL01 bevorzugt ist.</p></div>
+              </div>
+              <div class="step">
+                <div class="step-n green">4</div>
+                <div class="step-body"><strong>Failover transparent</strong><p>Nach Failover auf SQL02 sichert SQL02 - ohne Job-Anpassung.</p></div>
+              </div>
+            </div>
+            <div class="alert alert-g mt05">&#10003; Funktioniert mit -Full, -Diff und -Log. Ola Hallengren und nativer Engine.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 9 - Backup-Integritaet
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Qualitaet</p>
+      <h1>Backup-Integritaet pruefen</h1>
+      <p class="section-note"><code>Test-sqmBackupIntegrity</code> - RESTORE VERIFYONLY ohne tatsaechlichen Restore. Erkennt korrupte Backup-Dateien bevor sie gebraucht werden.</p>
+      <div class="cols2">
+        <div>
+<pre><code><span class="cc"># Alle Backup-Dateien in einem Pfad pruefen</span>
+<span class="ck">Test-sqmBackupIntegrity</span> `
+    <span class="cp">-SqlInstance</span> <span class="cs">'SQL01'</span> `
+    <span class="cp">-BackupPath</span>  <span class="cs">'D:\SQLBackup\User-Db'</span>
+
+<span class="cc"># Dateiliste (Header-Info) ausgeben</span>
+<span class="ck">Test-sqmBackupIntegrity</span> `
+    <span class="cp">-SqlInstance</span>    <span class="cs">'SQL01'</span> `
+    <span class="cp">-BackupPath</span>     <span class="cs">'D:\SQLBackup\User-Db'</span> `
+    <span class="cp">-FileListOnly</span></code></pre>
+          <div class="alert alert-b mt05">&#8505; Intern: SQL Server fuhert <code>RESTORE VERIFYONLY FROM DISK = '...'</code> aus. Prueft Checksummen, Dateigroessen und Backup-Header - kein echtes Wiederherstellen.</div>
+        </div>
+        <div>
+          <div class="card mb05">
+            <h3>Was geprueft wird</h3>
+            <ul>
+              <li>Backup-Header lesbar und vollstaendig</li>
+              <li>Checksummen (wenn beim Backup mit <code>-CheckSum</code> erstellt)</li>
+              <li>Dateigroesse vs. erwartete Groesse</li>
+              <li>Backup-Set-Vollstaendigkeit (kein abgebrochenes Backup)</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Empfohlener Einsatz</h3>
+            <ul>
+              <li>Taeglich nach dem Backup-Fenster als separater Job</li>
+              <li>Nach Storage-Umzug / Robocopy-Lauf</li>
+              <li>Vor einem geplanten Restore-Test</li>
+              <li><code>-FileListOnly</code>: Inventarisierung aller gesicherten DBs</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 10 - Restore: Invoke-sqmRestoreDatabase
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Restore</p>
+      <h1>Invoke-sqmRestoreDatabase</h1>
+      <p class="section-note">Vollstaendiger Restore-Workflow - von der einzelnen Backup-Datei bis zur FULL+DIFF+LOG-Chain. AlwaysOn-aware.</p>
+<pre><code><span class="cc"># Einfacher Restore aus einer Datei</span>
+<span class="ck">Invoke-sqmRestoreDatabase</span> `
+    <span class="cp">-SqlInstance</span>  <span class="cs">'SQL01'</span> `
+    <span class="cp">-BackupFile</span>   <span class="cs">'D:\SQLBackup\User-Db\Finanzen_FULL_20260518.bak'</span>
+
+<span class="cc"># Restore-Chain: FULL + DIFF + LOG (Point-in-Time)</span>
+<span class="ck">Invoke-sqmRestoreDatabase</span> `
+    <span class="cp">-SqlInstance</span>   <span class="cs">'SQL01'</span> `
+    <span class="cp">-BackupFiles</span>   <span class="cs">'D:\Backup\Finanzen_FULL.bak'</span>,
+                   <span class="cs">'D:\Backup\Finanzen_DIFF.bak'</span>,
+                   <span class="cs">'D:\Backup\Finanzen_LOG_10.trn'</span>,
+                   <span class="cs">'D:\Backup\Finanzen_LOG_11.trn'</span> `
+    <span class="cp">-NewDatabaseName</span>     <span class="cs">'Finanzen_Restore_Test'</span> `
+    <span class="cp">-NewDatabaseFilePath</span> <span class="cs">'E:\MSSQL\DATA'</span> `
+    <span class="cp">-NewLogFilePath</span>      <span class="cs">'F:\MSSQL\LOG'</span></code></pre>
+
+      <div class="alert alert-w mt05">&#9889; Die Reihenfolge in <code>-BackupFiles</code> bestimmt die Restore-Sequenz: erst FULL, dann DIFF, dann LOGs in chronologischer Reihenfolge.</div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 11 - Restore Features
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Restore - Features</p>
+      <h1>Was der Restore mitbringt</h1>
+      <div class="cols2">
+        <div>
+          <div class="card mb05">
+            <h3>AlwaysOn-Behandlung</h3>
+            <table class="dtbl">
+              <tbody>
+                <tr><td><code>-KeepAlwaysOn</code></td><td>DB vor Restore aus AG entfernen und nach Restore automatisch wieder hinzufuegen</td></tr>
+                <tr><td><code>-RejoinAvailabilityGroup</code></td><td>Nur Wiederaufnahme in die AG nach manuellem Restore (WITH NORECOVERY)</td></tr>
+                <tr><td><code>-WithNoRecovery</code></td><td>Restore im NORECOVERY-Modus - fuer mehrstufige Restore-Ketten</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card">
+            <h3>Sicherheit &amp; Vorsicht</h3>
+            <table class="dtbl">
+              <tbody>
+                <tr><td><code>-BackupBeforeRestore</code></td><td>Sichert die Zieldatenbank bevor ueberschrieben wird</td></tr>
+                <tr><td><code>-ForceSingleUser</code></td><td>Erzwingt Einzelbenutzermodus wenn aktive Verbindungen vorhanden</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <div class="card highlight">
+            <h3>Automatische Nachbearbeitung</h3>
+            <p class="mb05">Nach dem Restore werden automatisch ausgefuehrt:</p>
+            <div class="steps">
+              <div class="step">
+                <div class="step-n green">&#10003;</div>
+                <div class="step-body"><strong>Orphaned Users reparieren</strong><p>Verwaiste DB-User werden automatisch mit vorhandenen Logins verknuepft.</p></div>
+              </div>
+              <div class="step">
+                <div class="step-n green">&#10003;</div>
+                <div class="step-body"><strong>Nicht-existente Windows-Logins entfernen</strong><p>Windows-Logins die im AD nicht (mehr) existieren werden aus der DB entfernt.</p></div>
+              </div>
+              <div class="step">
+                <div class="step-n green">&#10003;</div>
+                <div class="step-body"><strong>DB-Owner auf sa setzen</strong><p>Sicherheitskonsistenz: Datenbankbesitzer wird auf sa gesetzt.</p></div>
+              </div>
+              <div class="step">
+                <div class="step-n green">&#10003;</div>
+                <div class="step-body"><strong>User-Export optional unterdrucken</strong><p><code>-NoUserExport</code>: Benutzer-Wiederherstellung bei reinen Restore-Tests abschalten.</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 12 - Quick Reference Cheat Sheet
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Referenz</p>
+      <h1>Quick Reference</h1>
+      <div class="cols2">
+        <div>
+          <table class="dtbl">
+            <thead><tr><th>Aufgabe</th><th>Funktion</th></tr></thead>
+            <tbody>
+              <tr><td>Backup-Jobs einrichten (Ola)</td><td><code>New-sqmOlaUsrDbBackupJob</code></td></tr>
+              <tr><td>Backup-Jobs einrichten (nativ)</td><td><code>New-sqmBackupMaintenanceJob</code></td></tr>
+              <tr><td>Systemdatenbanken sichern</td><td><code>New-sqmOlaSysDbBackupJob</code></td></tr>
+              <tr><td>Ad-hoc User-DB sichern</td><td><code>Invoke-sqmUserDatabaseBackup</code></td></tr>
+              <tr><td>Exclude-Tabelle erstellen/synch</td><td><code>Sync-sqmBackupExcludeTable</code></td></tr>
+              <tr><td>Exclude-Berechtigung setzen</td><td><code>Set-sqmBackupExcludePermission</code></td></tr>
+              <tr><td>Backup-Datei pruefen</td><td><code>Test-sqmBackupIntegrity</code></td></tr>
+              <tr><td>Datenbank wiederherstellen</td><td><code>Invoke-sqmRestoreDatabase</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <table class="dtbl">
+            <thead><tr><th>Parameter-Cheat</th><th>Bedeutung</th></tr></thead>
+            <tbody>
+              <tr><td><code>-All</code></td><td>Alle User-DBs (respektiert Exclude-Tabelle)</td></tr>
+              <tr><td><code>-Database</code></td><td>Explizite DB-Liste</td></tr>
+              <tr><td><code>-UseExcludeTable</code></td><td>sqm_BackupExclude beachten</td></tr>
+              <tr><td><code>-CheckPreferredReplica</code></td><td>AG-aware - nur bevorzugter Knoten</td></tr>
+              <tr><td><code>-BackupType DIFF</code></td><td>Differenzial-Backup (nativ)</td></tr>
+              <tr><td><code>-Diff</code></td><td>Differenzial-Job anlegen (Ola)</td></tr>
+              <tr><td><code>-BackupFiles</code></td><td>Restore-Chain (FULL+DIFF+LOG[])</td></tr>
+              <tr><td><code>-BackupBeforeRestore</code></td><td>Sicherheitsnetz vor Ueberschreiben</td></tr>
+            </tbody>
+          </table>
+          <div class="alert alert-b mt05">&#8505; Backup-Pfad-Konvention: <code>&lt;BackupDir&gt;\Usr-db</code> (Ola) vs. <code>&lt;BackupDir&gt;\User-Db</code> (nativ) - bei Neuinstallation auf Einheitlichkeit achten.</div>
+        </div>
+      </div>
+      <div class="xref mt05">
+        <span>sqmSQLTool - Hauptmodul</span>
+        <span>AlwaysOnSetup - AG-Einrichtung</span>
+        <span>SQLSetupTool - Basis-Installation</span>
+        <span>SQLMigration - Datenbankmigrationen</span>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 13 - Scope und Abgrenzung
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Abgrenzung</p>
+      <h1>Scope &amp; Voraussetzungen</h1>
+      <div class="cols2">
+        <div>
+          <table class="dtbl">
+            <thead><tr><th>Voraussetzung</th><th>Detail</th></tr></thead>
+            <tbody>
+              <tr><td>SQL Server Version</td><td>2016 und neuer empfohlen</td></tr>
+              <tr><td>Recovery-Modell</td><td>FULL fuer LOG-Backup (sqmSQLTool prueft nicht - DBA-Aufgabe)</td></tr>
+              <tr><td>Ola Hallengren</td><td>Muss auf der Instanz installiert sein (<code>DatabaseBackup</code>-SP in msdb oder master)</td></tr>
+              <tr><td>SQL Server Agent</td><td>Laeuft und ist erreichbar</td></tr>
+              <tr><td>Backup-Pfad</td><td>SQL Server Dienst-Konto hat Schreibrechte</td></tr>
+              <tr><td>AlwaysOn</td><td>AG-Konfiguration bereits eingerichtet (z.B. via AlwaysOnSetup)</td></tr>
+              <tr><td>Datenbank-Mail</td><td>Optional - fuer Mail-Benachrichtigung (-MailTo)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <div class="card mb05">
+            <h3>Was sqmSQLTool Backup nicht ist</h3>
+            <div class="alert alert-b">&#8505; Kein Backup-Monitoring-Dashboard. sqmSQLTool richtet Jobs ein und fuehrt Backups aus. Erfolgs-Ueberwachung uebernimmt SQL Agent Job-Historie oder Datenbank-Mail.</div>
+            <div class="alert alert-b">&#8505; Kein Tape/Cloud-Backup. sqmSQLTool sichert auf lokale oder Netzwerk-Pfade. Archivierung auf Tertiaer-Storage ist eine separate Aufgabe.</div>
+          </div>
+          <div class="card">
+            <h3>Recovery-Modell pruefen</h3>
+<pre style="font-size:.66rem;"><code><span class="cc">-- Vor LOG-Backup sicherstellen:</span>
+<span class="ck">SELECT</span> name, recovery_model_desc
+<span class="ck">FROM</span>   sys.databases
+<span class="ck">WHERE</span>  recovery_model_desc &lt;&gt; <span class="cs">'FULL'</span>
+  <span class="ck">AND</span>  name <span class="ck">NOT IN</span> (<span class="cs">'tempdb'</span>, <span class="cs">'model'</span>)</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SLIDE 14 - Naechste Schritte / Zusammenfassung
+         ============================================================ -->
+    <section>
+      <p class="eyebrow">Zusammenfassung</p>
+      <h1>Einfuehrungsplan</h1>
+      <p class="section-note">Von Null zur laufenden FULL+DIFF+LOG-Strategie in vier Schritten.</p>
+      <div class="cols2">
+        <div>
+          <div class="steps">
+            <div class="step">
+              <div class="step-n">1</div>
+              <div class="step-body"><strong>Recovery-Modell sicherstellen</strong><p>Alle zu sichernden Datenbanken auf FULL setzen. Ohne FULL-Recovery kein LOG-Backup moeglich.</p></div>
+            </div>
+            <div class="step">
+              <div class="step-n">2</div>
+              <div class="step-body"><strong>Exclude-Tabelle initialisieren</strong><p><code>Sync-sqmBackupExcludeTable</code> auf jeder Instanz ausfuehren. Staging, Replicate-Targets und temporaere DBs eintragen.</p></div>
+            </div>
+            <div class="step">
+              <div class="step-n">3</div>
+              <div class="step-body"><strong>Backup-Jobs einrichten</strong><p><code>New-sqmOlaUsrDbBackupJob</code> mit <code>-Full -Diff -Log -UseExcludeTable -CheckPreferredReplica -Compress -Verify</code>. Systemdatenbanken separat mit <code>New-sqmOlaSysDbBackupJob</code>.</p></div>
+            </div>
+            <div class="step">
+              <div class="step-n green">4</div>
+              <div class="step-body"><strong>Restore-Test durchfuehren</strong><p><code>Invoke-sqmRestoreDatabase -BackupFiles ...</code> auf Testsystem. Backup-Integritaet mit <code>Test-sqmBackupIntegrity</code> bestaetigen.</p></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="card highlight mb05">
+            <h3>&#x1F3C6; Was wir gewinnen</h3>
+            <table class="dtbl">
+              <tbody>
+                <tr><td>Backup-Fenster</td><td><span class="ok">-70 % an Mo-Sa durch DIFF statt FULL</span></td></tr>
+                <tr><td>RPO</td><td><span class="ok">&lt; 1 Stunde mit stuendlichem LOG</span></td></tr>
+                <tr><td>Kontrolle</td><td><span class="ok">Selektive DBs ohne Job-Anpassung</span></td></tr>
+                <tr><td>AlwaysOn</td><td><span class="ok">Ein Job-Set fuer alle AG-Knoten</span></td></tr>
+                <tr><td>Nachvollziehbarkeit</td><td><span class="ok">Audit-Trail in sqm_BackupExclude</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card">
+            <h3>Relevante Funktionen (8)</h3>
+            <div class="pill-row">
+              <span class="pill">New-sqmOlaUsrDbBackupJob</span>
+              <span class="pill">New-sqmOlaSysDbBackupJob</span>
+              <span class="pill">New-sqmBackupMaintenanceJob</span>
+              <span class="pill">Invoke-sqmUserDatabaseBackup</span>
+              <span class="pill">Sync-sqmBackupExcludeTable</span>
+              <span class="pill">Set-sqmBackupExcludePermission</span>
+              <span class="pill">Test-sqmBackupIntegrity</span>
+              <span class="pill">Invoke-sqmRestoreDatabase</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="xref mt05">
+        <span>sqmSQLTool - Hauptmodul</span>
+        <span>AlwaysOnSetup - AG-Einrichtung</span>
+        <span>SQLSetupTool - Basis-Installation</span>
+        <span>SQLMigration - Datenbankmigrationen</span>
+      </div>
+    </section>
+
+  </div><!-- /slides -->
+</div><!-- /reveal -->
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: 'c/t',
+    transition: 'slide',
+    transitionSpeed: 'fast',
+    controls: true,
+    progress: true,
+    center: false,
+    width: 1100,
+    height: 700,
+    margin: 0.04
+  });
+</script>
+</body>
+</html>
