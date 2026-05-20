@@ -116,6 +116,17 @@ function Export-sqmDatabaseDocumentation
 		
 		Invoke-sqmLogging -Message "Starte $functionName ? OutputPath: $OutputPath" -FunctionName $functionName -Level "INFO"
 		
+		# Interne Hilfsfunktion: HtmlEncode (kein System.Web erforderlich — PS 5.1 kompatibel)
+		function _HtmlEncode
+		{
+			param([string]$Text)
+			$Text -replace '&','&amp;' `
+			      -replace '<','&lt;'  `
+			      -replace '>','&gt;'  `
+			      -replace '"','&quot;' `
+			      -replace "'",'&#39;'
+		}
+
 		# ?? Interne Hilfsfunktion: HTML-Tabelle aus PSObject-Array ??????????????
 		function _HtmlTable
 		{
@@ -136,7 +147,7 @@ function Export-sqmDatabaseDocumentation
 				{
 					$val = $row.$p
 					if ($null -eq $val) { $val = '' }
-					[void]$sb.Append("<td>$([System.Web.HttpUtility]::HtmlEncode($val.ToString()))</td>")
+					[void]$sb.Append("<td>$(_HtmlEncode $val.ToString())</td>")
 				}
 				[void]$sb.Append('</tr>')
 			}
