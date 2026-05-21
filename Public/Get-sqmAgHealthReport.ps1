@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Creates a detailed health report for all Always On availability groups on an instance.
 
@@ -107,6 +107,15 @@ function Get-sqmAgHealthReport
 					continue
 				}
 				
+				# SQL Server-Version ermitteln (2016=13, 2019=15, 2022=16, 2025=17)
+				$sqlMajorVersion = 0
+				try
+				{
+					$verRow = Invoke-DbaQuery @connParams -Query "SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS INT) AS V" -EnableException:$true -ErrorAction Stop
+					$sqlMajorVersion = [int]$verRow.V
+				}
+				catch { $sqlMajorVersion = 0 }
+				
 				# DMV-Abfrage: Replikat- und Datenbankstatus mit Queues
 				$dmvQuery = @"
 SELECT
@@ -133,13 +142,19 @@ ORDER BY ag.name, ars.role_desc DESC, ar.replica_server_name, DB_NAME(adbrs.data
 "@
 				$dmvRows = Invoke-DbaQuery @connParams -Query $dmvQuery -EnableException:$EnableException
 				
-				# Laufende AutoSeed-Vorgaenge (ab SQL Server 2016)
-				$seedQuery = @"
+				# Laufende AutoSeed-Vorgaenge (ab SQL Server 2016) - versionsspezifisch
+				# SQL 2019+ (v15): group_database_id, transferred/total_size_bytes, estimate_time_complete
+				# SQL 2016/2017 (v13/v14): nur Basis-Spalten, kein group_database_id
+				# SQL 2012/2014 (v<13): DMV existiert nicht - uebersprungen
+				$seedQuery = $null
+				if ($sqlMajorVersion -ge 15)
+				{
+					$seedQuery = @"
 SELECT
-    ag.name                       AS AgName,
-    adbrs.database_name           AS DatabaseName,
-    has.current_state             AS SeedState,
-    has.performed_seeding_name    AS SeedingType,
+    ag.name                        AS AgName,
+    DB_NAME(adbrs.database_id)     AS DatabaseName,
+    has.current_state              AS SeedState,
+    has.performed_seeding_name     AS SeedingType,
     has.start_time,
     has.transferred_size_bytes,
     has.total_size_bytes,
@@ -149,10 +164,34 @@ JOIN sys.availability_replicas       ar  ON ar.replica_id = has.local_physical_s
 JOIN sys.availability_groups         ag  ON ag.group_id   = ar.group_id
 JOIN sys.dm_hadr_database_replica_states adbrs
     ON adbrs.group_database_id = has.group_database_id
+   AND adbrs.is_local = 1
 WHERE has.completion_time IS NULL
 ORDER BY has.start_time;
 "@
+				}
+				elseif ($sqlMajorVersion -ge 13)
+				{
+					# SQL 2016 / 2017: keine group_database_id und keine neueren Groessen-Spalten
+					$seedQuery = @"
+SELECT
+    ag.name                        AS AgName,
+    DB_NAME(has.local_database_id) AS DatabaseName,
+    has.current_state              AS SeedState,
+    has.performed_seeding_name     AS SeedingType,
+    has.start_time,
+    CAST(NULL AS BIGINT)           AS transferred_size_bytes,
+    CAST(NULL AS BIGINT)           AS total_size_bytes,
+    CAST(NULL AS DATETIME2)        AS estimate_time_complete
+FROM sys.dm_hadr_automatic_seeding  has
+JOIN sys.availability_replicas       ar  ON ar.replica_id = has.local_physical_seeding_id
+JOIN sys.availability_groups         ag  ON ag.group_id   = ar.group_id
+WHERE has.completion_time IS NULL
+ORDER BY has.start_time;
+"@
+				}
 				$seedRows = $null
+				if ($seedQuery)
+				{
 				try
 				{
 					$seedRows = Invoke-DbaQuery @connParams -Query $seedQuery -EnableException:$EnableException -ErrorAction Stop
@@ -172,6 +211,7 @@ ORDER BY has.start_time;
 						throw
 					}
 				}
+				}  # end if ($seedQuery)
 				
 				# Ergebniszeilen sammeln (pro Datenbank/Replikat)
 				$healthRows = [System.Collections.Generic.List[PSCustomObject]]::new()
