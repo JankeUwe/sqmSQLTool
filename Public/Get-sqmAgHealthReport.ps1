@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Creates a detailed health report for all Always On availability groups on an instance.
 
@@ -117,7 +117,7 @@ SELECT
     ars.role_desc                     AS Role,
     ars.connected_state_desc          AS ConnectionState,
     ars.synchronization_health_desc   AS SyncHealth,
-    adbrs.database_name               AS DatabaseName,
+    DB_NAME(adbrs.database_id)         AS DatabaseName,
     adbrs.synchronization_state_desc  AS DbSyncState,
     adbrs.synchronization_health_desc AS DbSyncHealth,
     adbrs.redo_queue_size             AS RedoQueueKB,
@@ -129,7 +129,7 @@ FROM sys.availability_groups              ag
 JOIN sys.availability_replicas            ar    ON ar.group_id    = ag.group_id
 JOIN sys.dm_hadr_availability_replica_states ars ON ars.replica_id = ar.replica_id
 LEFT JOIN sys.dm_hadr_database_replica_states adbrs ON adbrs.replica_id = ar.replica_id
-ORDER BY ag.name, ars.role_desc DESC, ar.replica_server_name, adbrs.database_name;
+ORDER BY ag.name, ars.role_desc DESC, ar.replica_server_name, DB_NAME(adbrs.database_id);
 "@
 				$dmvRows = Invoke-DbaQuery @connParams -Query $dmvQuery -EnableException:$EnableException
 				
@@ -159,9 +159,9 @@ ORDER BY has.start_time;
 				}
 				catch
 				{
-					if ($_.Exception.Message -match 'Invalid object name')
+					if ($_.Exception.Message -match 'Invalid object name|Invalid column name')
 					{
-						Invoke-sqmLogging -Message "[$instance] sys.dm_hadr_automatic_seeding nicht verfuegbar (SQL Server < 2016). AutoSeed-ueberwachung uebersprungen." -FunctionName $functionName -Level "VERBOSE"
+						Invoke-sqmLogging -Message "[$instance] sys.dm_hadr_automatic_seeding nicht verfuegbar oder Spalten inkompatibel (SQL Server < 2016 oder aelteres CU-Build). AutoSeed-ueberwachung uebersprungen." -FunctionName $functionName -Level "VERBOSE"
 					}
 					elseif (-not $EnableException)
 					{
