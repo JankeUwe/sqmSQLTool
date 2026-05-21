@@ -51,7 +51,7 @@ if (Test-Path $manifestPath)
 # =============================================================================
 # SCHRITT 1b: FI-TS-Umgebungserkennung
 # Kriterium 1: Modul liegt auf W:\ (FI-TS Netzlaufwerk)
-# Kriterium 2: Angemeldeter Benutzer ist in *.sfinance.net-Domaene
+# Kriterium 2: Angemeldeter Benutzer ist in Domaene OFFICELAN.IZB / OFFICELAN
 # Wenn erkannt: FI-TS-Standardwerte setzen (config.json ueberschreibt weiterhin).
 # =============================================================================
 $script:sqmIsFitsEnvironment = $false
@@ -64,20 +64,32 @@ if ($PSScriptRoot -like 'W:\*')
 
 if (-not $script:sqmIsFitsEnvironment)
 {
-	$_dnsDomain = $env:USERDNSDOMAIN
-	if ($_dnsDomain -and $_dnsDomain -like '*.sfinance.net')
+	$_dnsDomain  = $env:USERDNSDOMAIN
+	$_userDomain = $env:USERDOMAIN
+	if (($_dnsDomain  -and $_dnsDomain  -eq 'OFFICELAN.IZB') -or
+		($_userDomain -and $_userDomain -eq 'OFFICELAN'))
 	{
 		$script:sqmIsFitsEnvironment = $true
-		Write-Verbose "sqmSQLTool: FI-TS-Umgebung erkannt (Domaene: $_dnsDomain)."
+		Write-Verbose "sqmSQLTool: FI-TS-Umgebung erkannt (Domaene: $_dnsDomain / $_userDomain)."
 	}
 }
 
 if ($script:sqmIsFitsEnvironment)
 {
-	$script:sqmModuleConfig['LogPath']          = 'C:\System\WinSrvLog\MSSQL'
-	$script:sqmModuleConfig['OutputPath']       = 'C:\System\WinSrvLog\MSSQL'
-	$script:sqmModuleConfig['AutoUpdate']       = $true
-	$script:sqmModuleConfig['UpdateRepository'] = 'W:\75084-Datenbanken\MSSQL\DEV\sqmSQLTool'
+	$script:sqmModuleConfig['LogPath']                = 'C:\System\WinSrvLog\MSSQL'
+	$script:sqmModuleConfig['OutputPath']             = 'C:\System\WinSrvLog\MSSQL'
+	$script:sqmModuleConfig['AutoUpdate']             = $true
+	$script:sqmModuleConfig['UpdateRepository']       = 'W:\75084-Datenbanken\MSSQL\CPM\sqmSQLTool'
+	$script:sqmModuleConfig['TsmManagementClasses']   = @('MC_B_NL.NL_35.35.NA')
+	$script:sqmModuleConfig['DefaultPolicy']          = 'New Login_Enforce Passwort Policy'
+	$script:sqmModuleConfig['SsrsInstallerPath']      = 'W:\75084-Datenbanken\MSSQL\SQLSources\Reporting'
+	$script:sqmModuleConfig['OlaJobNameFull']         = 'FITS-UserDatabases-FULL'
+	$script:sqmModuleConfig['OlaJobNameDiff']         = 'FITS-UserDatabases-DIFF'
+	$script:sqmModuleConfig['OlaJobNameLog']          = 'FITS-UserDatabases-LOG'
+	$script:sqmModuleConfig['OlaJobNameIndexOpt']     = 'FITS IndexOptimize - USER_DATABASES'
+	$script:sqmModuleConfig['OlaJobNameIntUserDb']    = 'FITS IntegrityCheck - USER_DATABASES'
+	$script:sqmModuleConfig['OlaJobNameIntSysDb']     = 'FITS IntegrityCheck - SYSTEM_DATABASES'
+	$script:sqmModuleConfig['OlaJobNameSysDbBackup']  = 'FITS-SystemDatabases-FULL'
 }
 
 # =============================================================================
