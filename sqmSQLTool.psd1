@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.2.0.0'
+	ModuleVersion		   = '1.3.0.0'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
@@ -91,7 +91,8 @@
 			Tags = @(
 				'SQLServer', 'DBA', 'dbatools', 'Administration',
 				'HealthCheck', 'Reporting', 'Maintenance', 'AlwaysOn',
-				'Backup', 'Security', 'Automation', 'MSSQL'
+				'Backup', 'Security', 'Automation', 'MSSQL',
+				'TLS', 'Certificate', 'Deployment', 'SSRS'
 			)
 
 			# A URL to the license for this module.
@@ -104,7 +105,7 @@
 			# IconUri = ''
 
 			# ReleaseNotes of this module
-			ReleaseNotes = 'v1.1.0 - Dynamic backup exclude table: Sync-sqmBackupExcludeTable, Set-sqmBackupExcludePermission, New-sqmBackupMaintenanceJob. Extended Invoke-sqmUserDatabaseBackup and New-sqmOlaUsrDbBackupJob with -UseExcludeTable, -CheckPreferredReplica (AG-aware), mail notification (-MailTo, -MailProfile, -MailOnSuccess), and change history/audit trigger.'
+			ReleaseNotes = 'v1.3.0 - TLS/Certificate management: Get-sqmTlsStatus (audit TLS protocols + cert binding), Set-sqmSqlTlsCertificate (bind cert to SQL Server, grant ACL to service account), Install-sqmCertificateToStore (distribute PFX/CER to Windows cert stores locally and remote), Set-sqmSsrsHttpsCertificate (configure SSRS/PBIRS HTTPS via WMI). Deployment: Invoke-sqmDeployScripts (sequential numbered SQL script deployment with backup, transaction wrapper, USE-DB check, WhatIf), Invoke-sqmSignModule (Authenticode code signing for cross-domain deployment). Diagnostics: Get-sqmDiskInfoByDriveLetter (disk info by drive letter with clipboard output). SQL Server 2012-2025 compatibility fix in Get-sqmAgHealthReport.'
 		}
 	}
 }
