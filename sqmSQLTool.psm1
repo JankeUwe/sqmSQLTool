@@ -13,6 +13,8 @@
 # =============================================================================
 # SCHRITT 1: Modulkonfiguration als ERSTES initialisieren
 # (muss vor dem Laden der Funktionen und vor Get-sqmConfig-Aufrufen stehen)
+# Neutrale Standardwerte fuer PSGallery-Nutzer.
+# FI-TS-spezifische Werte werden in Schritt 1b gesetzt wenn erkannt.
 # =============================================================================
 $script:sqmModuleConfig = @{
 	LogPath               = "$env:ProgramData\sqmSQLTool\Logs"
@@ -28,8 +30,8 @@ $script:sqmModuleConfig = @{
 	BackupDirectory       = $null
 	HpuDomainGroupMap     = @()
 	SsrsInstallerPath     = $null
-	AutoUpdate            = $true
-	UpdateRepository      = 'W:\75084-Datenbanken\MSSQL\DEV\sqmSQLTool'
+	AutoUpdate            = $false
+	UpdateRepository      = ''
 	ModuleVersion         = '1.0.0'
 	Language              = 'de-DE'
 }
@@ -46,7 +48,41 @@ if (Test-Path $manifestPath)
 	catch { }
 }
 
-# Persistierte Konfiguration laden (ueberschreibt Standardwerte)
+# =============================================================================
+# SCHRITT 1b: FI-TS-Umgebungserkennung
+# Kriterium 1: Modul liegt auf W:\ (FI-TS Netzlaufwerk)
+# Kriterium 2: Angemeldeter Benutzer ist in *.sfinance.net-Domaene
+# Wenn erkannt: FI-TS-Standardwerte setzen (config.json ueberschreibt weiterhin).
+# =============================================================================
+$script:sqmIsFitsEnvironment = $false
+
+if ($PSScriptRoot -like 'W:\*')
+{
+	$script:sqmIsFitsEnvironment = $true
+	Write-Verbose "sqmSQLTool: FI-TS-Umgebung erkannt (Modulpfad: $PSScriptRoot)."
+}
+
+if (-not $script:sqmIsFitsEnvironment)
+{
+	$_dnsDomain = $env:USERDNSDOMAIN
+	if ($_dnsDomain -and $_dnsDomain -like '*.sfinance.net')
+	{
+		$script:sqmIsFitsEnvironment = $true
+		Write-Verbose "sqmSQLTool: FI-TS-Umgebung erkannt (Domaene: $_dnsDomain)."
+	}
+}
+
+if ($script:sqmIsFitsEnvironment)
+{
+	$script:sqmModuleConfig['LogPath']          = 'C:\System\WinSrvLog\MSSQL'
+	$script:sqmModuleConfig['OutputPath']       = 'C:\System\WinSrvLog\MSSQL'
+	$script:sqmModuleConfig['AutoUpdate']       = $true
+	$script:sqmModuleConfig['UpdateRepository'] = 'W:\75084-Datenbanken\MSSQL\DEV\sqmSQLTool'
+}
+
+# =============================================================================
+# SCHRITT 1c: Persistierte Konfiguration laden (ueberschreibt alle Standardwerte)
+# =============================================================================
 $configFile = Join-Path $env:APPDATA "MSSQLTools\config.json"
 if (Test-Path $configFile)
 {
