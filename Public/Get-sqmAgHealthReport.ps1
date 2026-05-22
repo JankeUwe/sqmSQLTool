@@ -194,7 +194,9 @@ ORDER BY has.start_time;
 				{
 				try
 				{
-					$seedRows = Invoke-DbaQuery @connParams -Query $seedQuery -EnableException:$EnableException -ErrorAction Stop
+					# EnableException:$true erzwingt echte Exception statt dbatools-Warning
+					# (sonst greift catch nie, Warning laeuft durch)
+					$seedRows = Invoke-DbaQuery @connParams -Query $seedQuery -EnableException:$true
 				}
 				catch
 				{
@@ -219,8 +221,9 @@ ORDER BY has.start_time;
 				{
 					if (-not $row.DatabaseName) { continue } # Replikat ohne Datenbankzeile ueberspringen
 					
-					$redoMB = [math]::Round($row.RedoQueueKB / 1024, 1)
-					$sendMB = [math]::Round($row.SendQueueKB / 1024, 1)
+					# NULL-sicher: bei disconnected Secondary liefert SQL NULL fuer Queue-Groessen
+					$redoMB = [math]::Round([double]($row.RedoQueueKB -as [long]) / 1024, 1)
+					$sendMB = [math]::Round([double]($row.SendQueueKB -as [long]) / 1024, 1)
 					
 					$queueStatus = if ($row.Role -ne 'PRIMARY' -and $redoMB -gt $MaxRedoQueueMB) { 'Warning' }
 					elseif ($sendMB -gt $MaxSendQueueMB) { 'Warning' }
