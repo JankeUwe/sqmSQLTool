@@ -35,9 +35,15 @@
 .PARAMETER ProxyDescription
     Optionale Beschreibung fuer den Proxy.
 
+.PARAMETER WindowsCredential
+    Windows-Credential direkt als PSCredential uebergeben (kein Dialog).
+    Wenn nicht angegeben erscheint ein Get-Credential Dialog.
+    Kann z.B. aus einem Passwort-Safe oder vorherigem Get-Credential stammen.
+
 .PARAMETER WindowsUserName
     Optionaler Windows-Benutzername (DOMAIN\User) zur Vorbestueckung des
-    Get-Credential Dialogs. Wenn nicht angegeben wird der CredentialName verwendet.
+    Get-Credential Dialogs. Wird ignoriert wenn -WindowsCredential angegeben.
+    Wenn nicht angegeben wird der CredentialName als Vorschlag verwendet.
 
 .PARAMETER Subsystem
     Subsysteme die dem Proxy zugewiesen werden. Mehrfachauswahl moeglich.
@@ -55,6 +61,11 @@
     New-sqmAgentProxy -SqlInstance "SQL01" -CredentialName "DOMAIN\SqlServiceAccount" `
         -ProxyName "SSIS Proxy"
 
+    # Credential direkt uebergeben - kein Dialog
+    $cred = Get-Credential "DOMAIN\SvcSSIS"
+    New-sqmAgentProxy -SqlInstance "SQL01" -CredentialName "DOMAIN\SvcSSIS" `
+        -ProxyName "SSIS Proxy" -WindowsCredential $cred
+
 .EXAMPLE
     # Nur SSIS - Benutzername vorausgewaehlt im Dialog
     New-sqmAgentProxy -SqlInstance "SQL01" -CredentialName "DOMAIN\SvcSSIS" `
@@ -69,6 +80,13 @@
     # Abweichender Windows-Account und Force
     New-sqmAgentProxy -SqlInstance "SQL01" -CredentialName "ProxyCred_SSIS" `
         -ProxyName "SSIS Proxy" -WindowsUserName "DOMAIN\SvcSSIS" -Force
+
+.EXAMPLE
+    # Unattended / Skript-Betrieb mit SecureString aus Vault
+    $secPwd = ConvertTo-SecureString "P@ssw0rd" -AsPlainText -Force
+    $cred   = New-Object System.Management.Automation.PSCredential("DOMAIN\SvcSSIS", $secPwd)
+    New-sqmAgentProxy -SqlInstance "SQL01" -CredentialName "DOMAIN\SvcSSIS" `
+        -ProxyName "SSIS Proxy" -WindowsCredential $cred -Subsystem SSIS
     New-sqmAgentProxy -SqlInstance "SQL01\INST1" -CredentialName "DOMAIN\SvcSSIS" `
         -ProxyName "SSIS Execution Proxy" -ProxyDescription "Fuehrt SSIS-Pakete aus" `
         -WindowsCredential $winCred -Force
@@ -97,6 +115,9 @@ function New-sqmAgentProxy
 
         [Parameter(Mandatory = $false)]
         [string]$ProxyDescription = '',
+
+        [Parameter(Mandatory = $false)]
+        [System.Management.Automation.PSCredential]$WindowsCredential,
 
         [Parameter(Mandatory = $false)]
         [string]$WindowsUserName,
@@ -144,20 +165,29 @@ function New-sqmAgentProxy
         try
         {
             # ---------------------------------------------------------------
-            # 1. Windows-Credential abfragen
+            # 1. Windows-Credential ermitteln (Parameter oder Dialog)
             # ---------------------------------------------------------------
-            $dialogUser = if ($WindowsUserName) { $WindowsUserName } else { $CredentialName }
-
-            Write-Host ""
-            Write-Host "  Windows-Account fuer Proxy '$ProxyName'" -ForegroundColor Cyan
-            Write-Host "  Bitte Credentials eingeben ..." -ForegroundColor Gray
-
-            $WindowsCredential = Get-Credential -UserName $dialogUser `
-                -Message "Windows-Account fuer SQL Agent Proxy '$ProxyName' auf $SqlInstance"
-
-            if (-not $WindowsCredential)
+            if ($WindowsCredential)
             {
-                throw "Abgebrochen - kein Credential eingegeben."
+                Write-Host ""
+                Write-Host "  Windows-Credential direkt uebernommen: $($WindowsCredential.UserName)" -ForegroundColor Cyan
+                Invoke-sqmLogging -Message "WindowsCredential per Parameter: $($WindowsCredential.UserName)" -FunctionName $functionName -Level 'INFO'
+            }
+            else
+            {
+                $dialogUser = if ($WindowsUserName) { $WindowsUserName } else { $CredentialName }
+
+                Write-Host ""
+                Write-Host "  Windows-Account fuer Proxy '$ProxyName'" -ForegroundColor Cyan
+                Write-Host "  Bitte Credentials eingeben ..." -ForegroundColor Gray
+
+                $WindowsCredential = Get-Credential -UserName $dialogUser `
+                    -Message "Windows-Account fuer SQL Agent Proxy '$ProxyName' auf $SqlInstance"
+
+                if (-not $WindowsCredential)
+                {
+                    throw "Abgebrochen - kein Credential eingegeben."
+                }
             }
 
             # ---------------------------------------------------------------
