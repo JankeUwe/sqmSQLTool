@@ -4,16 +4,21 @@
 
 .DESCRIPTION
     Legt in einem Schritt einen neuen SQL Server Credential an und erstellt darauf
-    basierend einen SQL Server Agent Proxy. Ueber den Parameter -Subsystem kann
-    gezielt ausgewaehlt werden welche Subsysteme dem Proxy zugewiesen werden.
+    basierend einen SQL Server Agent Proxy. Die Windows-Credentials werden interaktiv
+    per Get-Credential abgefragt. Der Account wird vor der Erstellung auf Existenz
+    und Eignung geprueft (Enabled, nicht gesperrt, Passwort nicht abgelaufen,
+    Konto nicht abgelaufen). Ueber -Subsystem wird gesteuert welche Subsysteme
+    dem Proxy zugewiesen werden.
 
     Ablauf:
-      1. Pruefen ob Credential bereits existiert (Fehler oder -Force zum Ueberschreiben)
-      2. Credential anlegen (CREATE CREDENTIAL) via SMO
-      3. Pruefen ob Proxy bereits existiert
-      4. Agent Proxy anlegen und mit dem Credential verbinden via SMO
-      5. Subsysteme gemaess -Subsystem zuweisen (CmdExec, SSIS, PowerShell oder All)
-      6. Protokoll-Objekt zurueckgeben
+      1. Get-Credential Dialog - Windows-Account eingeben
+      2. AD-Pruefung: Existenz, Enabled, LockedOut, PasswordExpired, AccountExpired
+      3. Pruefen ob Credential bereits existiert (Fehler oder -Force)
+      4. Credential anlegen (CREATE CREDENTIAL) via SMO
+      5. Pruefen ob Proxy bereits existiert (Fehler oder -Force)
+      6. Agent Proxy anlegen und mit dem Credential verbinden via SMO
+      7. Subsysteme gemaess -Subsystem zuweisen (CmdExec, SSIS, PowerShell oder All)
+      8. Protokoll-Objekt zurueckgeben
 
 .PARAMETER SqlInstance
     SQL Server-Instanz. Standard: lokaler Computername.
@@ -30,9 +35,9 @@
 .PARAMETER ProxyDescription
     Optionale Beschreibung fuer den Proxy.
 
-.PARAMETER WindowsCredential
-    PSCredential mit Windows-Account (DOMAIN\User + Passwort) der im Credential
-    hinterlegt wird. Pflichtparameter.
+.PARAMETER WindowsUserName
+    Optionaler Windows-Benutzername (DOMAIN\User) zur Vorbestueckung des
+    Get-Credential Dialogs. Wenn nicht angegeben wird der CredentialName verwendet.
 
 .PARAMETER Subsystem
     Subsysteme die dem Proxy zugewiesen werden. Mehrfachauswahl moeglich.
@@ -46,24 +51,24 @@
     Ausnahmen sofort ausloesen statt Write-Error.
 
 .EXAMPLE
-    # Alle Subsysteme (Standard)
-    $winCred = Get-Credential "DOMAIN\SqlServiceAccount"
+    # Einzeiler - Credential-Dialog erscheint automatisch
     New-sqmAgentProxy -SqlInstance "SQL01" -CredentialName "DOMAIN\SqlServiceAccount" `
-        -ProxyName "SSIS Proxy" -WindowsCredential $winCred
+        -ProxyName "SSIS Proxy"
 
 .EXAMPLE
-    # Nur SSIS
+    # Nur SSIS - Benutzername vorausgewaehlt im Dialog
     New-sqmAgentProxy -SqlInstance "SQL01" -CredentialName "DOMAIN\SvcSSIS" `
-        -ProxyName "SSIS Only Proxy" -WindowsCredential $winCred -Subsystem SSIS
+        -ProxyName "SSIS Only Proxy" -Subsystem SSIS
 
 .EXAMPLE
     # CmdExec und PowerShell
     New-sqmAgentProxy -SqlInstance "SQL01" -CredentialName "DOMAIN\SvcPS" `
-        -ProxyName "Script Proxy" -WindowsCredential $winCred -Subsystem CmdExec, PowerShell
+        -ProxyName "Script Proxy" -Subsystem CmdExec, PowerShell
 
 .EXAMPLE
-    # Mit Force - ueberschreibt bestehende Objekte
-    $winCred = Get-Credential
+    # Abweichender Windows-Account und Force
+    New-sqmAgentProxy -SqlInstance "SQL01" -CredentialName "ProxyCred_SSIS" `
+        -ProxyName "SSIS Proxy" -WindowsUserName "DOMAIN\SvcSSIS" -Force
     New-sqmAgentProxy -SqlInstance "SQL01\INST1" -CredentialName "DOMAIN\SvcSSIS" `
         -ProxyName "SSIS Execution Proxy" -ProxyDescription "Fuehrt SSIS-Pakete aus" `
         -WindowsCredential $winCred -Force
@@ -93,8 +98,8 @@ function New-sqmAgentProxy
         [Parameter(Mandatory = $false)]
         [string]$ProxyDescription = '',
 
-        [Parameter(Mandatory = $true)]
-        [System.Management.Automation.PSCredential]$WindowsCredential,
+        [Parameter(Mandatory = $false)]
+        [string]$WindowsUserName,
 
         [Parameter(Mandatory = $false)]
         [ValidateSet('CmdExec', 'SSIS', 'PowerShell', 'All')]
@@ -139,7 +144,68 @@ function New-sqmAgentProxy
         try
         {
             # ---------------------------------------------------------------
-            # 1. SMO-Verbindung aufbauen
+            # 1. Windows-Credential abfragen
+            # ---------------------------------------------------------------
+            $dialogUser = if ($WindowsUserName) { $WindowsUserName } else { $CredentialName }
+
+            Write-Host ""
+            Write-Host "  Windows-Account fuer Proxy '$ProxyName'" -ForegroundColor Cyan
+            Write-Host "  Bitte Credentials eingeben ..." -ForegroundColor Gray
+
+            $WindowsCredential = Get-Credential -UserName $dialogUser `
+                -Message "Windows-Account fuer SQL Agent Proxy '$ProxyName' auf $SqlInstance"
+
+            if (-not $WindowsCredential)
+            {
+                throw "Abgebrochen - kein Credential eingegeben."
+            }
+
+            # ---------------------------------------------------------------
+            # 2. AD-Konto pruefen
+            # ---------------------------------------------------------------
+            # SamAccountName aus DOMAIN\User oder user@domain extrahieren
+            $rawUser = $WindowsCredential.UserName
+            $samAccountName = if ($rawUser -match '\\')
+            {
+                $rawUser.Split('\')[1]
+            }
+            elseif ($rawUser -match '@')
+            {
+                $rawUser.Split('@')[0]
+            }
+            else
+            {
+                $rawUser
+            }
+
+            Write-Host "  Pruefe AD-Konto '$samAccountName' ..." -ForegroundColor Gray
+            Invoke-sqmLogging -Message "AD-Pruefung fuer Konto '$samAccountName'." -FunctionName $functionName -Level 'INFO'
+
+            $adStatus = Get-sqmADAccountStatus -SamAccountName $samAccountName -ErrorAction SilentlyContinue
+
+            if (-not $adStatus -or $adStatus.ErrorMessage)
+            {
+                throw "AD-Konto '$samAccountName' nicht gefunden oder nicht erreichbar: $($adStatus.ErrorMessage)"
+            }
+
+            # Eignung pruefen
+            $issues = [System.Collections.Generic.List[string]]::new()
+            if (-not $adStatus.Enabled)       { $issues.Add("Konto ist deaktiviert") }
+            if ($adStatus.LockedOut)          { $issues.Add("Konto ist gesperrt") }
+            if ($adStatus.PasswordExpired)    { $issues.Add("Passwort abgelaufen") }
+            if ($adStatus.AccountExpired)     { $issues.Add("Konto abgelaufen") }
+
+            if ($issues.Count -gt 0)
+            {
+                $issueList = $issues -join ', '
+                throw "AD-Konto '$samAccountName' ist nicht geeignet: $issueList"
+            }
+
+            Write-Host "  AD-Konto OK: $rawUser (Enabled, nicht gesperrt)" -ForegroundColor Green
+            Invoke-sqmLogging -Message "AD-Konto '$samAccountName' geeignet (Source: $($adStatus.Source))." -FunctionName $functionName -Level 'INFO'
+
+            # ---------------------------------------------------------------
+            # 3. SMO-Verbindung aufbauen
             # ---------------------------------------------------------------
             $serverConn = New-Object Microsoft.SqlServer.Management.Smo.Server($SqlInstance)
 
@@ -155,7 +221,7 @@ function New-sqmAgentProxy
             Invoke-sqmLogging -Message "SMO-Verbindung zu $SqlInstance hergestellt (Version: $($serverConn.VersionString))." -FunctionName $functionName -Level 'INFO'
 
             # ---------------------------------------------------------------
-            # 2. Credential anlegen
+            # 4. Credential anlegen
             # ---------------------------------------------------------------
             $existingCred = $serverConn.Credentials | Where-Object { $_.Name -eq $CredentialName }
 
@@ -186,7 +252,7 @@ function New-sqmAgentProxy
             Invoke-sqmLogging -Message "Credential '$CredentialName' (Identity: $($WindowsCredential.UserName)) erfolgreich angelegt." -FunctionName $functionName -Level 'INFO'
 
             # ---------------------------------------------------------------
-            # 3. Agent Proxy anlegen
+            # 5. Agent Proxy anlegen
             # ---------------------------------------------------------------
             $jobServer      = $serverConn.JobServer
             $existingProxy  = $jobServer.ProxyAccounts | Where-Object { $_.Name -eq $ProxyName }
@@ -221,7 +287,7 @@ function New-sqmAgentProxy
             Invoke-sqmLogging -Message "Agent Proxy '$ProxyName' mit Credential '$CredentialName' angelegt." -FunctionName $functionName -Level 'INFO'
 
             # ---------------------------------------------------------------
-            # 4. Subsysteme zuweisen
+            # 6. Subsysteme zuweisen
             # ---------------------------------------------------------------
             # AgentSubSystem Enum-Werte:
             #   CmdExec     = 1
@@ -255,12 +321,14 @@ function New-sqmAgentProxy
             }
 
             # ---------------------------------------------------------------
-            # 5. Ergebnis
+            # 7. Ergebnis
             # ---------------------------------------------------------------
             $result = [PSCustomObject]@{
                 SqlInstance          = $SqlInstance
                 CredentialName       = $CredentialName
                 CredentialIdentity   = $WindowsCredential.UserName
+                ADAccountVerified    = $true
+                ADAccountSource      = $adStatus.Source
                 ProxyName            = $ProxyName
                 ProxyDescription     = $ProxyDescription
                 AssignedSubsystems   = $assignedSubsystems -join ', '
