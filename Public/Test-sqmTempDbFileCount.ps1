@@ -71,7 +71,15 @@ function Test-sqmTempDbFileCount
         {
             $SqlInstance = $env:COMPUTERNAME
         }
-        Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance" -FunctionName $functionName -Level 'INFO'
+
+        # MaxFiles aus Modulkonfiguration lesen (ueberschreibt Parameter-Default wenn nicht explizit angegeben)
+        if (-not $PSBoundParameters.ContainsKey('MaxFiles'))
+        {
+            $cfgVal = Get-sqmConfig -Key 'CheckTempDbMaxFiles'
+            if ($null -ne $cfgVal) { $MaxFiles = [int]$cfgVal }
+        }
+
+        Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance (MaxFiles: $MaxFiles)" -FunctionName $functionName -Level 'INFO'
     }
 
     process

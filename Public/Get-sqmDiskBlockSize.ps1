@@ -95,7 +95,14 @@ function Get-sqmDiskBlockSize
         $functionName  = $MyInvocation.MyCommand.Name
         $drivesToCheck = [System.Collections.Generic.List[string]]::new()
 
-        Invoke-sqmLogging -Message "Starte $functionName auf $ComputerName" -FunctionName $functionName -Level 'INFO'
+        # Empfohlene Blockgroesse aus Modulkonfiguration lesen (ueberschreibt Parameter-Default wenn nicht explizit angegeben)
+        if (-not $PSBoundParameters.ContainsKey('RecommendedBlockSize'))
+        {
+            $cfgVal = Get-sqmConfig -Key 'CheckDiskBlockSize'
+            if ($null -ne $cfgVal) { $RecommendedBlockSize = [int]$cfgVal }
+        }
+
+        Invoke-sqmLogging -Message "Starte $functionName auf $ComputerName (Empfehlung: $([Math]::Round($RecommendedBlockSize/1024)) KB)" -FunctionName $functionName -Level 'INFO'
 
         # Hilfsfunktion: WMI-Abfrage fuer ein Laufwerk
         function _GetVolumeInfo

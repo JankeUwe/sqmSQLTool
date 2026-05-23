@@ -34,6 +34,12 @@ $script:sqmModuleConfig = @{
 	UpdateRepository      = ''
 	ModuleVersion         = '1.0.0'
 	Language              = 'de-DE'
+	# Check-Profil: 'Auto' = FI-TS wenn erkannt, 'FiTs' = immer, 'Generic' = nie FI-TS-Checks
+	CheckProfile          = 'Auto'
+	# Grenzwerte fuer Setup-Checks (neutrale Defaults, FI-TS-Block setzt gleiche Werte)
+	CheckCostThresholdMin = 50
+	CheckTempDbMaxFiles   = 8
+	CheckDiskBlockSize    = 65536
 }
 
 # Aktuelle Version aus der Manifestdatei lesen
@@ -90,6 +96,11 @@ if ($script:sqmIsFitsEnvironment)
 	$script:sqmModuleConfig['OlaJobNameIntUserDb']    = 'FITS IntegrityCheck - USER_DATABASES'
 	$script:sqmModuleConfig['OlaJobNameIntSysDb']     = 'FITS IntegrityCheck - SYSTEM_DATABASES'
 	$script:sqmModuleConfig['OlaJobNameSysDbBackup']  = 'FITS-SystemDatabases-FULL'
+	# FI-TS Check-Profil und Grenzwerte (identisch mit Defaults, explizit gesetzt fuer Ueberschreibbarkeit)
+	$script:sqmModuleConfig['CheckProfile']           = 'FiTs'
+	$script:sqmModuleConfig['CheckCostThresholdMin']  = 50
+	$script:sqmModuleConfig['CheckTempDbMaxFiles']    = 8
+	$script:sqmModuleConfig['CheckDiskBlockSize']     = 65536
 }
 
 # =============================================================================

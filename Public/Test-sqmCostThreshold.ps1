@@ -68,7 +68,15 @@ function Test-sqmCostThreshold
         {
             $SqlInstance = $env:COMPUTERNAME
         }
-        Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance" -FunctionName $functionName -Level 'INFO'
+
+        # Grenzwert aus Modulkonfiguration lesen (ueberschreibt Parameter-Default wenn nicht explizit angegeben)
+        if (-not $PSBoundParameters.ContainsKey('MinRecommendedValue'))
+        {
+            $cfgVal = Get-sqmConfig -Key 'CheckCostThresholdMin'
+            if ($null -ne $cfgVal) { $MinRecommendedValue = [int]$cfgVal }
+        }
+
+        Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance (Min: $MinRecommendedValue)" -FunctionName $functionName -Level 'INFO'
     }
 
     process
