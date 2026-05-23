@@ -4,15 +4,15 @@
 
 .DESCRIPTION
     Legt in einem Schritt einen neuen SQL Server Credential an und erstellt darauf
-    basierend einen SQL Server Agent Proxy. Der Proxy wird automatisch fuer die
-    Subsysteme CmdExec, PowerShell und SSIS aktiviert.
+    basierend einen SQL Server Agent Proxy. Ueber den Parameter -Subsystem kann
+    gezielt ausgewaehlt werden welche Subsysteme dem Proxy zugewiesen werden.
 
     Ablauf:
       1. Pruefen ob Credential bereits existiert (Fehler oder -Force zum Ueberschreiben)
       2. Credential anlegen (CREATE CREDENTIAL) via SMO
       3. Pruefen ob Proxy bereits existiert
       4. Agent Proxy anlegen und mit dem Credential verbinden via SMO
-      5. Subsysteme zuweisen: CmdExec (1), PowerShell (12), SSIS (11)
+      5. Subsysteme gemaess -Subsystem zuweisen (CmdExec, SSIS, PowerShell oder All)
       6. Protokoll-Objekt zurueckgeben
 
 .PARAMETER SqlInstance
@@ -34,6 +34,11 @@
     PSCredential mit Windows-Account (DOMAIN\User + Passwort) der im Credential
     hinterlegt wird. Pflichtparameter.
 
+.PARAMETER Subsystem
+    Subsysteme die dem Proxy zugewiesen werden. Mehrfachauswahl moeglich.
+    Gueltiger Werte: CmdExec, SSIS, PowerShell, All
+    Standard: All (alle drei Subsysteme)
+
 .PARAMETER Force
     Ueberschreibt bestehenden Credential und/oder Proxy wenn vorhanden.
 
@@ -41,9 +46,20 @@
     Ausnahmen sofort ausloesen statt Write-Error.
 
 .EXAMPLE
+    # Alle Subsysteme (Standard)
     $winCred = Get-Credential "DOMAIN\SqlServiceAccount"
     New-sqmAgentProxy -SqlInstance "SQL01" -CredentialName "DOMAIN\SqlServiceAccount" `
         -ProxyName "SSIS Proxy" -WindowsCredential $winCred
+
+.EXAMPLE
+    # Nur SSIS
+    New-sqmAgentProxy -SqlInstance "SQL01" -CredentialName "DOMAIN\SvcSSIS" `
+        -ProxyName "SSIS Only Proxy" -WindowsCredential $winCred -Subsystem SSIS
+
+.EXAMPLE
+    # CmdExec und PowerShell
+    New-sqmAgentProxy -SqlInstance "SQL01" -CredentialName "DOMAIN\SvcPS" `
+        -ProxyName "Script Proxy" -WindowsCredential $winCred -Subsystem CmdExec, PowerShell
 
 .EXAMPLE
     # Mit Force - ueberschreibt bestehende Objekte
@@ -79,6 +95,10 @@ function New-sqmAgentProxy
 
         [Parameter(Mandatory = $true)]
         [System.Management.Automation.PSCredential]$WindowsCredential,
+
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('CmdExec', 'SSIS', 'PowerShell', 'All')]
+        [string[]]$Subsystem = @('All'),
 
         [Parameter(Mandatory = $false)]
         [switch]$Force,
@@ -207,19 +227,31 @@ function New-sqmAgentProxy
             #   CmdExec     = 1
             #   Ssis        = 11
             #   PowerShell  = 12
-            $subsystems = @(
-                [Microsoft.SqlServer.Management.Smo.Agent.AgentSubSystem]::CmdExec,
-                [Microsoft.SqlServer.Management.Smo.Agent.AgentSubSystem]::Ssis,
-                [Microsoft.SqlServer.Management.Smo.Agent.AgentSubSystem]::PowerShell
-            )
+
+            # Mapping: Parameterwert -> SMO Enum
+            $subsystemMap = @{
+                'CmdExec'    = [Microsoft.SqlServer.Management.Smo.Agent.AgentSubSystem]::CmdExec
+                'SSIS'       = [Microsoft.SqlServer.Management.Smo.Agent.AgentSubSystem]::Ssis
+                'PowerShell' = [Microsoft.SqlServer.Management.Smo.Agent.AgentSubSystem]::PowerShell
+            }
+
+            # 'All' aufloesen
+            $resolved = if ($Subsystem -contains 'All')
+            {
+                $subsystemMap.Values
+            }
+            else
+            {
+                $Subsystem | ForEach-Object { $subsystemMap[$_] }
+            }
 
             $assignedSubsystems = [System.Collections.Generic.List[string]]::new()
 
-            foreach ($subsystem in $subsystems)
+            foreach ($sub in $resolved)
             {
-                $proxy.AddSubSystem($subsystem)
-                $assignedSubsystems.Add($subsystem.ToString())
-                Invoke-sqmLogging -Message "Subsystem '$subsystem' dem Proxy '$ProxyName' zugewiesen." -FunctionName $functionName -Level 'INFO'
+                $proxy.AddSubSystem($sub)
+                $assignedSubsystems.Add($sub.ToString())
+                Invoke-sqmLogging -Message "Subsystem '$sub' dem Proxy '$ProxyName' zugewiesen." -FunctionName $functionName -Level 'INFO'
             }
 
             # ---------------------------------------------------------------
