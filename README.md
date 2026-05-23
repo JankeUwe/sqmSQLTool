@@ -141,8 +141,11 @@ Import-Module sqmSQLTool
 
 ## Mehr Informationen
 
-- Website: [www.powershelldba.de](https://www.powershelldba.de)
-- Entwickler: Uwe Janke, Senior IT-Spezialist / SQL Server DBA
+- **Dokumentation & Befehlsreferenz:** [powershelldba.de/tools/befehls-referenz](https://www.powershelldba.de/tools/befehls-referenz)
+- **Website:** [www.powershelldba.de](https://www.powershelldba.de)
+- **PowerShell Gallery:** [powershellgallery.com/profiles/JankeUwe](https://www.powershellgallery.com/profiles/JankeUwe)
+- **Alle Projekte:** [github.com/JankeUwe](https://github.com/JankeUwe)
+- Entwickler: Uwe Janke, Senior SQL Server DBA | dtcSoftware
 
 ## Lizenz
 
