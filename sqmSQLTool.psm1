@@ -62,7 +62,7 @@ if (Test-Path $manifestPath)
 # =============================================================================
 $script:sqmIsFitsEnvironment = $false
 
-if ($PSScriptRoot -like 'W:\*')
+if ($PSScriptRoot -like 'W:\*' -or $PSScriptRoot -like '\\tsclient\W\*')
 {
 	$script:sqmIsFitsEnvironment = $true
 	Write-Verbose "sqmSQLTool: FI-TS-Umgebung erkannt (Modulpfad: $PSScriptRoot)."

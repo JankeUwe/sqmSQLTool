@@ -165,11 +165,51 @@ Get-ChildItem -Path $Destination -Recurse -File | ForEach-Object {
 # 6. Import testen
 # ---------------------------------------------------------------------------
 Write-Host "Testing module import..." -ForegroundColor Cyan
+$importOk = $false
 try {
     Import-Module sqmSQLTool -Force -ErrorAction Stop
     $version = (Get-Module sqmSQLTool).Version
     Write-Host "sqmSQLTool v$version successfully loaded." -ForegroundColor Green
     Write-Host "Scope: $Scope  |  Path: $Destination" -ForegroundColor Gray
+    $importOk = $true
 } catch {
     Write-Warning "Import failed: $_"
+}
+
+# ---------------------------------------------------------------------------
+# 7. FI-TS-Konfiguration automatisch setzen
+#    Kriterium: Installation wurde von W:\ oder \\tsclient\W\ gestartet.
+#    Setzt alle FI-TS-Standardwerte via Set-sqmConfig (persistiert in config.json).
+#    Laeuft nur wenn der Import erfolgreich war.
+# ---------------------------------------------------------------------------
+$isFitsInstall = ($Source -like 'W:\*') -or ($Source -like '\\tsclient\W\*')
+if ($importOk -and $isFitsInstall) {
+    Write-Host ""
+    Write-Host "FI-TS-Umgebung erkannt (Quelle: $Source)" -ForegroundColor Cyan
+    Write-Host "Setze FI-TS-Standardkonfiguration..." -ForegroundColor Cyan
+    try {
+        Set-sqmConfig `
+            -OutputPath            'C:\System\WinSrvLog\MSSQL' `
+            -OlaJobNameFull        'FITS-UserDatabases-FULL' `
+            -OlaJobNameDiff        'FITS-UserDatabases-DIFF' `
+            -OlaJobNameLog         'FITS-UserDatabases-LOG' `
+            -OlaJobNameIndexOpt    'FITS IndexOptimize - USER_DATABASES' `
+            -OlaJobNameIntUserDb   'FITS IntegrityCheck - USER_DATABASES' `
+            -OlaJobNameIntSysDb    'FITS IntegrityCheck - SYSTEM_DATABASES' `
+            -OlaJobNameSysDbBackup 'FITS-SystemDatabases-FULL' `
+            -DefaultPolicy         'New Login_Enforce Passwort Policy' `
+            -CheckProfile          'FiTs' `
+            -ErrorAction Stop
+        Write-Host "FI-TS-Konfiguration erfolgreich gesetzt." -ForegroundColor Green
+        Write-Host "  OutputPath   : C:\System\WinSrvLog\MSSQL" -ForegroundColor Gray
+        Write-Host "  OlaJobs      : FITS-*" -ForegroundColor Gray
+        Write-Host "  DefaultPolicy: New Login_Enforce Passwort Policy" -ForegroundColor Gray
+    } catch {
+        Write-Warning "FI-TS-Konfiguration konnte nicht gesetzt werden: $_"
+        Write-Warning "Manuell nachholen mit: Set-sqmConfig -DefaultPolicy 'New Login_Enforce Passwort Policy' ..."
+    }
+} elseif ($importOk -and -not $isFitsInstall) {
+    Write-Host ""
+    Write-Host "Hinweis: Keine FI-TS-Umgebung erkannt." -ForegroundColor Yellow
+    Write-Host "  Job-Namen und Policy manuell setzen: Set-sqmConfig -OlaJobNameFull '...' -DefaultPolicy '...'" -ForegroundColor Gray
 }
