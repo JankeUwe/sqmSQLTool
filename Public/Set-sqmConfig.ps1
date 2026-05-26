@@ -59,6 +59,24 @@
     Used by Install-sqmSsrsReportServer when -InstallerPath is not specified.
     Example: '\\srv-share\Software\SSRS2022\SQLServerReportingServices.exe'
 
+.PARAMETER CheckProfile
+    Check-Profil fuer Invoke-sqmSetupReport und verwandte Checks.
+    Auto  = FI-TS-Checks nur wenn sqmIsFitsEnvironment erkannt (Standard)
+    FiTs  = FI-TS-Checks immer erzwingen (auch ausserhalb der Domaene)
+    Generic = nur Standard-Checks, keine FI-TS-spezifischen Pruefungen
+
+.PARAMETER CheckCostThresholdMin
+    Mindestwert fuer Cost Threshold for Parallelism im Setup-Check.
+    Standard: 50
+
+.PARAMETER CheckTempDbMaxFiles
+    Maximale TempDB-Dateianzahl im Setup-Check.
+    Standard: 8
+
+.PARAMETER CheckDiskBlockSize
+    Empfohlene NTFS-Blockgroesse in Bytes fuer Get-sqmDiskBlockSize.
+    Standard: 65536 (64 KB)
+
 .PARAMETER Language
     Output language of the module. Allowed values: de-DE, en-US.
     Default: de-DE.
@@ -118,6 +136,18 @@ function Set-sqmConfig
 		[PSCustomObject[]]$HpuDomainGroupMap,
 		[Parameter(Mandatory = $false)]
 		[string]$SsrsInstallerPath,
+		[Parameter(Mandatory = $false)]
+		[ValidateSet('Auto', 'FiTs', 'Generic')]
+		[string]$CheckProfile,
+		[Parameter(Mandatory = $false)]
+		[ValidateRange(1, 1000)]
+		[int]$CheckCostThresholdMin,
+		[Parameter(Mandatory = $false)]
+		[ValidateRange(1, 64)]
+		[int]$CheckTempDbMaxFiles,
+		[Parameter(Mandatory = $false)]
+		[ValidateSet(4096, 8192, 16384, 32768, 65536, 131072)]
+		[int]$CheckDiskBlockSize,
 		[Parameter(Mandatory = $false)]
 		[ValidateSet('de-DE', 'en-US')]
 		[string]$Language,
@@ -358,6 +388,28 @@ function Set-sqmConfig
 		}
 	}
 	
+	# Check-Profil und Grenzwerte
+	if ($PSBoundParameters.ContainsKey('CheckProfile'))
+	{
+		$globalConfig['CheckProfile'] = $CheckProfile
+		$updated = $true
+	}
+	if ($PSBoundParameters.ContainsKey('CheckCostThresholdMin'))
+	{
+		$globalConfig['CheckCostThresholdMin'] = $CheckCostThresholdMin
+		$updated = $true
+	}
+	if ($PSBoundParameters.ContainsKey('CheckTempDbMaxFiles'))
+	{
+		$globalConfig['CheckTempDbMaxFiles'] = $CheckTempDbMaxFiles
+		$updated = $true
+	}
+	if ($PSBoundParameters.ContainsKey('CheckDiskBlockSize'))
+	{
+		$globalConfig['CheckDiskBlockSize'] = $CheckDiskBlockSize
+		$updated = $true
+	}
+
 	# Ausgabe-Sprache
 	if ($PSBoundParameters.ContainsKey('Language'))
 	{
