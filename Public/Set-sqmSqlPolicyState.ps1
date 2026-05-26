@@ -121,8 +121,36 @@ function Set-sqmSqlPolicyState
 				if ($PSCmdlet.ShouldProcess($instance, $actionMsg))
 				{
 					Invoke-sqmLogging -Message "[$instance] $actionMsg ..." -FunctionName $functionName -Level "INFO"
-					$policyObject.Policy.Enabled = $targetEnabled
-					$policyObject.Policy.Alter()
+
+					# SMO-Policy-Objekt ermitteln: dbatools gibt je nach Version entweder
+					# einen Wrapper mit .Policy-Sub-Property zurueck, oder das SMO-Objekt direkt.
+					$smoPolicy = $null
+					$policySubObj = $policyObject.PSObject.Properties['Policy']
+					if ($policySubObj -and $null -ne $policySubObj.Value)
+					{
+						$candidate = $policySubObj.Value
+						if ($candidate | Get-Member -Name 'Enabled' -MemberType Property -ErrorAction SilentlyContinue)
+						{
+							$smoPolicy = $candidate
+						}
+					}
+					# Fallback: dbatools gibt SMO-Objekt direkt zurueck (dbatools 2.x)
+					if ($null -eq $smoPolicy)
+					{
+						if ($policyObject | Get-Member -Name 'Enabled' -MemberType Property -ErrorAction SilentlyContinue)
+						{
+							$smoPolicy = $policyObject
+						}
+					}
+					if ($null -eq $smoPolicy)
+					{
+						throw "Policy-Objekt hat keine setzbare 'Enabled'-Eigenschaft. " +
+						      "dbatools-Version pruefen. Verfuegbare Eigenschaften: " +
+						      (($policyObject | Get-Member -MemberType Property | Select-Object -ExpandProperty Name) -join ', ')
+					}
+
+					$smoPolicy.Enabled = $targetEnabled
+					$smoPolicy.Alter()
 					$msg = "Policy '$Policy' auf '$instance' erfolgreich $actionLabel."
 					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "INFO"
 					$results.Add([PSCustomObject]@{

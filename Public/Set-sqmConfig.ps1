@@ -126,6 +126,9 @@ function Set-sqmConfig
 	)
 	
 	# Hilfsfunktion zum Pruefen/Erstellen eines Pfads
+	# Pfad-Existenz und Schreibbarkeit werden geprueft wenn moeglich.
+	# Nicht-erreichbare Pfade erzeugen nur eine Warnung - kein Fehler.
+	# Konfiguration wird trotzdem gespeichert (Pfad kann spaeter entstehen).
 	function Test-AndCreatePath($Path, $Purpose)
 	{
 		if (-not $Path) { return $true }
@@ -141,15 +144,24 @@ function Set-sqmConfig
 				New-Item -ItemType Directory -Path $Path -Force -ErrorAction Stop | Out-Null
 				Write-Verbose "Verzeichnis '$Path' ($Purpose) wurde erstellt."
 			}
-			$testFile = Join-Path $Path "test_$(Get-Random).tmp"
-			New-Item -ItemType File -Path $testFile -Force -ErrorAction Stop | Out-Null
-			Remove-Item -Path $testFile -Force -ErrorAction Stop
+			# Schreibtest nur wenn Pfad erreichbar - Fehler hier ist nicht kritisch
+			try
+			{
+				$testFile = Join-Path $Path "test_$(Get-Random).tmp"
+				New-Item -ItemType File -Path $testFile -Force -ErrorAction Stop | Out-Null
+				Remove-Item -Path $testFile -Force -ErrorAction SilentlyContinue
+			}
+			catch
+			{
+				Write-Warning "Pfad '$Path' ($Purpose) ist nicht beschreibbar: $($_.Exception.Message). Konfiguration wird trotzdem gespeichert."
+			}
 			return $true
 		}
 		catch
 		{
-			Write-Error "Konnte Pfad '$Path' nicht fuer $Purpose verwenden: $($_.Exception.Message)"
-			return $false
+			# Verzeichnis konnte nicht erstellt werden - nur warnen, nicht abbrechen
+			Write-Warning "Pfad '$Path' ($Purpose) konnte nicht erstellt werden: $($_.Exception.Message). Wird spaeter automatisch angelegt. Konfiguration wird gespeichert."
+			return $true
 		}
 	}
 	
