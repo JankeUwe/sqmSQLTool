@@ -115,7 +115,7 @@ jobs:
           api-token:                  '${{ secrets.SIGNPATH_API_TOKEN }}'
           organization-id:            '${{ vars.SIGNPATH_ORGANIZATION_ID }}'
           project-slug:               'sqmSQLTool'
-          signing-policy-slug:        'release-signing'
+          signing-policy-slug:        '_Release_Signing'
           artifact-configuration-slug: 'powershell-module'
           github-artifact-id:         '${{ steps.upload.outputs.artifact-id }}'
           wait-for-completion:        true
