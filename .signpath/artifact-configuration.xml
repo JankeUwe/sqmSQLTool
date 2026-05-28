@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  SignPath.io Artifact Configuration fuer sqmSQLTool
+  ====================================================
+  Diese Datei in SignPath unter:
+    Projekt: sqmSQLTool
+    Artifact Configuration Name: powershell-module
+    Slug: powershell-module
+
+  Signiert alle .ps1, .psm1, .psd1 Dateien innerhalb des Release-ZIPs.
+  Zertifikat: Code Signing (OV) - von SignPath Community bereitgestellt
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <for-each-file-match glob="**\*.ps1">
+      <authenticode-sign />
+    </for-each-file-match>
+    <for-each-file-match glob="**\*.psm1">
+      <authenticode-sign />
+    </for-each-file-match>
+    <for-each-file-match glob="**\*.psd1">
+      <authenticode-sign />
+    </for-each-file-match>
+  </zip-file>
+</artifact-configuration>

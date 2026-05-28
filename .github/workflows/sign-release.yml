@@ -1,0 +1,142 @@
+# =============================================================================
+# sqmSQLTool - Code Signing Workflow
+# =============================================================================
+#
+# Laeuft bei: Push eines Release-Tags (v*.*.*)  ODER  manuellem Trigger
+#
+# Was passiert:
+#   1. Modul-Dateien als ZIP packen (nur .ps1 / .psm1 / .psd1)
+#   2. ZIP als GitHub-Artifact hochladen
+#   3. Signing Request an SignPath.io (Community - kostenlos fuer Open Source)
+#   4. Signiertes ZIP herunterladen + entpacken
+#   5. Release-Asset aktualisieren
+#
+# Benoetigt folgende GitHub Secrets / Variables:
+#   SIGNPATH_API_TOKEN         (Secret)   -> SignPath.io API Token
+#   SIGNPATH_ORGANIZATION_ID   (Variable) -> SignPath.io Organization ID
+#
+# SignPath.io Einrichtung: siehe Vault-Notiz
+#   04 Ressourcen/sqmSQLTool/SignPath Einrichtung.md
+# =============================================================================
+
+name: Sign Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      sign_only:
+        description: 'Nur signieren, kein Release-Asset update'
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write    # Benoetigt fuer SignPath OIDC-Verifikation
+  contents: write    # Benoetigt fuer Release-Asset Upload
+
+jobs:
+  build-and-sign:
+    runs-on: windows-latest
+    name: Package, Sign, Release
+
+    steps:
+      # ------------------------------------------------------------------
+      # 1. Repository auschecken
+      # ------------------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------
+      # 2. Modul-Version aus PSD1 lesen
+      # ------------------------------------------------------------------
+      - name: Read module version
+        id: version
+        shell: pwsh
+        run: |
+          $psd1 = Import-PowerShellDataFile "sqmSQLTool.psd1"
+          $ver  = $psd1.ModuleVersion
+          Write-Host "Module version: $ver"
+          echo "version=$ver" >> $env:GITHUB_OUTPUT
+          echo "artifact_name=sqmSQLTool-v$ver" >> $env:GITHUB_OUTPUT
+
+      # ------------------------------------------------------------------
+      # 3. Modul als ZIP verpacken (ohne .git, ohne Tests, ohne Logs)
+      # ------------------------------------------------------------------
+      - name: Package module
+        shell: pwsh
+        run: |
+          $outDir  = "dist"
+          $zipName = "sqmSQLTool-v${{ steps.version.outputs.version }}.zip"
+          $zipPath = Join-Path $outDir $zipName
+
+          New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+
+          # Dateien sammeln (nur Modul-relevante, keine Dev-Artefakte)
+          $exclude = @('.git', 'dist', '.github', 'Tests', 'Docs', '*.log', '*.txt')
+          $files   = Get-ChildItem -Recurse -File | Where-Object {
+            $rel = $_.FullName.Replace("$pwd\", '')
+            -not ($exclude | Where-Object { $rel -like "$_*" -or $rel -like "*\$_\*" })
+          }
+
+          Compress-Archive -Path $files.FullName -DestinationPath $zipPath -Force
+          Write-Host "Packaged $($files.Count) files -> $zipPath"
+          echo "zip_path=$zipPath"  >> $env:GITHUB_OUTPUT
+          echo "zip_name=$zipName"  >> $env:GITHUB_OUTPUT
+        id: package
+
+      # ------------------------------------------------------------------
+      # 4. ZIP als GitHub Artifact hochladen (wird von SignPath abgerufen)
+      # ------------------------------------------------------------------
+      - name: Upload unsigned artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact_name }}-unsigned
+          path: dist/*.zip
+          retention-days: 5
+
+      # ------------------------------------------------------------------
+      # 5. Signing Request an SignPath.io
+      #
+      #    Voraussetzungen:
+      #    - GitHub Secret:   SIGNPATH_API_TOKEN
+      #    - GitHub Variable: SIGNPATH_ORGANIZATION_ID
+      #    - SignPath Projekt: sqmSQLTool
+      #    - Artifact Config:  powershell-module
+      #    - Signing Policy:   release-signing
+      # ------------------------------------------------------------------
+      - name: Submit signing request to SignPath.io
+        id: signing
+        uses: signpath/github-action-submit-signing-request@v1.1
+        with:
+          connector-url:              'https://app.signpath.io'
+          api-token:                  '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id:            '${{ vars.SIGNPATH_ORGANIZATION_ID }}'
+          project-slug:               'sqmSQLTool'
+          signing-policy-slug:        'release-signing'
+          artifact-configuration-slug: 'powershell-module'
+          github-artifact-id:         '${{ steps.upload.outputs.artifact-id }}'
+          wait-for-completion:        true
+          output-artifact-directory:  'signed'
+
+      # ------------------------------------------------------------------
+      # 6. Signierten Inhalt auflisten (zur Kontrolle)
+      # ------------------------------------------------------------------
+      - name: List signed files
+        shell: pwsh
+        run: |
+          Write-Host "Signierte Dateien:"
+          Get-ChildItem -Recurse signed | Select-Object FullName | Format-Table
+
+      # ------------------------------------------------------------------
+      # 7. Signiertes ZIP als Release Asset anheften (nur bei Tag-Push)
+      # ------------------------------------------------------------------
+      - name: Upload signed ZIP to release
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.sign_only
+        uses: softprops/action-gh-release@v2
+        with:
+          files: signed/*.zip
+          tag_name: ${{ github.ref_name }}
+          fail_on_unmatched_files: false
