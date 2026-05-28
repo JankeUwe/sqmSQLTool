@@ -25,17 +25,24 @@
     Ausgabepfad fuer die HTML-Report-Datei(en).
     Standard: %ProgramData%\sqmSQLTool\HardwareReports
 
+.PARAMETER OutputFormat
+    Ausgabeformat: HTML (Standard), CSV, TXT oder All (alle Formate gleichzeitig).
+    - HTML: Interaktiver Dark-Theme Report (Standard)
+    - CSV : Flache CSV-Datei fuer Weiterverarbeitung (Excel, Import etc.)
+    - TXT : Lesbare Textdatei (wie CSV aber tabulatorgetrennt)
+    - All : HTML + CSV + TXT werden alle erstellt
+
 .PARAMETER NoOpen
     HTML-Datei nach dem Erstellen NICHT automatisch im Browser oeffnen.
 
 .PARAMETER PassThru
-    Gibt den vollstaendigen Pfad der erstellten HTML-Datei(en) als String zurueck.
+    Gibt den vollstaendigen Pfad der erstellten Datei(en) als String zurueck.
 
 .PARAMETER EnableException
     Ausnahmen sofort ausloesen statt Write-Error.
 
 .OUTPUTS
-    Kein Output (oder Dateipfad wenn -PassThru angegeben).
+    Kein Output (oder Dateipfad(e) wenn -PassThru angegeben).
 
 .EXAMPLE
     # Lokalen Server analysieren - Report wird automatisch im Browser geoeffnet
@@ -54,6 +61,14 @@
     $path = Get-sqmServerHardwareReport -ComputerName "SQL01" -NoOpen -PassThru
     Write-Host "Report: $path"
 
+.EXAMPLE
+    # CSV-Export fuer Weiterverarbeitung in Excel
+    Get-sqmServerHardwareReport -ComputerName "SQL01","SQL02" -OutputFormat CSV -NoOpen
+
+.EXAMPLE
+    # Alle Formate auf einmal (HTML + CSV + TXT)
+    Get-sqmServerHardwareReport -ComputerName "SQL01" -OutputFormat All -NoOpen -PassThru
+
 .NOTES
     SQL-Instanzen werden ueber Win32_Service ermittelt - kein SQL-Verbindungsaufbau noetig.
     DIMM-Details (Typ, Geschwindigkeit) sind auf manchen VMs nicht verfuegbar (Hypervisor-Abhngigkeit).
@@ -71,6 +86,10 @@ function Get-sqmServerHardwareReport
 
         [Parameter(Mandatory = $false)]
         [string]$ReportPath,
+
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('HTML', 'CSV', 'TXT', 'All')]
+        [string]$OutputFormat = 'HTML',
 
         [Parameter(Mandatory = $false)]
         [switch]$NoOpen,
@@ -114,22 +133,58 @@ function Get-sqmServerHardwareReport
                 $datestamp = Get-Date -Format 'yyyyMMdd_HHmm'
                 $safeComp  = $computer -replace '[\\/:*?"<>|]', '_'
 
-                $html     = _Build-sqmHardwareReportHtml -Data $hw -Timestamp $timestamp
-                $htmlFile = Join-Path $ReportPath "sqmHardwareReport_${safeComp}_${datestamp}.html"
+                $doHtml = ($OutputFormat -eq 'HTML' -or $OutputFormat -eq 'All')
+                $doCsv  = ($OutputFormat -eq 'CSV'  -or $OutputFormat -eq 'All')
+                $doTxt  = ($OutputFormat -eq 'TXT'  -or $OutputFormat -eq 'All')
 
-                $html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+                $htmlFile = $null
 
-                Invoke-sqmLogging -Message "Hardware-Report gespeichert: $htmlFile" -FunctionName $functionName -Level 'INFO'
-                Write-Host "  [$computer] Report: $htmlFile" -ForegroundColor Cyan
+                # -- HTML --
+                if ($doHtml)
+                {
+                    $html     = _Build-sqmHardwareReportHtml -Data $hw -Timestamp $timestamp
+                    $htmlFile = Join-Path $ReportPath "sqmHardwareReport_${safeComp}_${datestamp}.html"
+                    $html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+                    Invoke-sqmLogging -Message "Hardware-Report (HTML) gespeichert: $htmlFile" -FunctionName $functionName -Level 'INFO'
+                    Write-Host "  [$computer] HTML : $htmlFile" -ForegroundColor Cyan
+                    Copy-sqmToCentralPath -Path $htmlFile
+                    if ($PassThru) { $htmlFile }
+                }
 
-                Copy-sqmToCentralPath -Path $htmlFile
+                # -- Flat export-Objekt (gemeinsam fuer CSV + TXT) --
+                if ($doCsv -or $doTxt)
+                {
+                    $flat = _Build-sqmHardwareFlat -Data $hw -Timestamp $timestamp
+                }
 
-                if (-not $NoOpen)
+                # -- CSV --
+                if ($doCsv)
+                {
+                    $csvFile = Join-Path $ReportPath "sqmHardwareReport_${safeComp}_${datestamp}.csv"
+                    $flat | Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
+                    Invoke-sqmLogging -Message "Hardware-Report (CSV) gespeichert: $csvFile" -FunctionName $functionName -Level 'INFO'
+                    Write-Host "  [$computer] CSV  : $csvFile" -ForegroundColor Cyan
+                    Copy-sqmToCentralPath -Path $csvFile
+                    if ($PassThru) { $csvFile }
+                }
+
+                # -- TXT --
+                if ($doTxt)
+                {
+                    $txtFile = Join-Path $ReportPath "sqmHardwareReport_${safeComp}_${datestamp}.txt"
+                    _Build-sqmHardwareReportTxt -Data $hw -Timestamp $timestamp |
+                        Out-File -FilePath $txtFile -Encoding UTF8 -Force
+                    Invoke-sqmLogging -Message "Hardware-Report (TXT) gespeichert: $txtFile" -FunctionName $functionName -Level 'INFO'
+                    Write-Host "  [$computer] TXT  : $txtFile" -ForegroundColor Cyan
+                    Copy-sqmToCentralPath -Path $txtFile
+                    if ($PassThru) { $txtFile }
+                }
+
+                # Browser oeffnen (nur HTML)
+                if ($doHtml -and -not $NoOpen -and $htmlFile)
                 {
                     Start-Process $htmlFile
                 }
-
-                if ($PassThru) { $htmlFile }
             }
             catch
             {
@@ -673,4 +728,158 @@ table.itbl tr:hover { background: rgba(45,134,193,0.05); }
 </body>
 </html>
 "@
+}
+
+# =============================================================================
+# Private: Flaches PSCustomObject fuer CSV/TXT-Export
+# =============================================================================
+function _Build-sqmHardwareFlat
+{
+    param (
+        [PSCustomObject]$Data,
+        [string]$Timestamp
+    )
+
+    $d  = $Data
+    $cs = $d.ComputerSystem
+    $os = $d.OS
+
+    # RAM
+    $totalRamBytes = if ($cs) { [double]$cs.TotalPhysicalMemory } else { 0 }
+    $totalRamGB    = if ($totalRamBytes -gt 0) { [Math]::Round($totalRamBytes / 1GB, 2) } else { 0 }
+    $freeRamBytes  = if ($os -and $os.FreePhysicalMemory) { [double]$os.FreePhysicalMemory * 1024 } else { 0 }
+    $freeRamGB     = if ($freeRamBytes -gt 0) { [Math]::Round($freeRamBytes / 1GB, 2) } else { 0 }
+    $ramUsedPct    = if ($totalRamBytes -gt 0) { [int](($totalRamBytes - $freeRamBytes) / $totalRamBytes * 100) } else { 0 }
+
+    # CPU
+    $totalCores = 0; $totalLogic = 0
+    foreach ($p in $d.Processors)
+    {
+        if ($p.NumberOfCores)             { $totalCores += $p.NumberOfCores }
+        if ($p.NumberOfLogicalProcessors) { $totalLogic += $p.NumberOfLogicalProcessors }
+    }
+    $cpuModel   = if ($d.Processors.Count -gt 0 -and $d.Processors[0].Name) { $d.Processors[0].Name.Trim() } else { '' }
+    $cpuSockets = $d.Processors.Count
+    $cpuMHz     = if ($d.Processors.Count -gt 0 -and $d.Processors[0].MaxClockSpeed) { $d.Processors[0].MaxClockSpeed } else { 0 }
+
+    # OS
+    $osCaption  = if ($os) { [string]$os.Caption }   else { '' }
+    $osVersion  = if ($os) { [string]$os.Version }   else { '' }
+    $osBuild    = if ($os) { [string]$os.BuildNumber } else { '' }
+    $osDomain   = if ($cs) { [string]$cs.Domain }    else { '' }
+    $osLastBoot = if ($os -and $os.LastBootUpTime) { $os.LastBootUpTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+
+    # Uptime
+    $uptimeHours = 0
+    if ($os -and $os.LastBootUpTime)
+    {
+        $uptimeHours = [int]((Get-Date) - $os.LastBootUpTime).TotalHours
+    }
+
+    # Disks
+    $diskCount    = ($d.PhysicalDisks | Measure-Object).Count
+    $totalDiskGB  = [Math]::Round((($d.LogicalDisks | Measure-Object -Property Size -Sum).Sum / 1GB), 2)
+    $freeDiskGB   = [Math]::Round((($d.LogicalDisks | Measure-Object -Property FreeSpace -Sum).Sum / 1GB), 2)
+    $logDrives    = ($d.LogicalDisks | Sort-Object DeviceID | ForEach-Object { "$($_.DeviceID)\" }) -join '; '
+
+    # SQL
+    $sqlInstances = ($d.SQLServices | Where-Object { $_.Name -match '^MSSQLSERVER$|^MSSQL\$' } |
+        ForEach-Object { if ($_.Name -eq 'MSSQLSERVER') { 'DEFAULT' } else { $_.Name -replace '^MSSQL\$', '' } }) -join '; '
+
+    # Network (erste aktive IP)
+    $firstIP  = ''
+    $firstMac = ''
+    if ($d.NetworkAdapters.Count -gt 0)
+    {
+        $na = $d.NetworkAdapters[0]
+        $firstIP  = if ($na.IPAddress) { ($na.IPAddress | Where-Object { $_ -match '^\d+\.\d+\.\d+\.\d+$' } | Select-Object -First 1) } else { '' }
+        $firstMac = if ($na.MACAddress) { [string]$na.MACAddress } else { '' }
+    }
+
+    [PSCustomObject][ordered]@{
+        Timestamp       = $Timestamp
+        ComputerName    = $d.ComputerName
+        VMType          = $d.VMType
+        OS              = $osCaption
+        OSVersion       = $osVersion
+        OSBuild         = $osBuild
+        Domain          = $osDomain
+        LastBoot        = $osLastBoot
+        UptimeHours     = $uptimeHours
+        CPUModel        = $cpuModel
+        CPUSockets      = $cpuSockets
+        CPUCores        = $totalCores
+        CPULogical      = $totalLogic
+        CPUMHz          = $cpuMHz
+        RAMTotalGB      = $totalRamGB
+        RAMFreeGB       = $freeRamGB
+        RAMUsedPct      = $ramUsedPct
+        DimmCount       = ($d.PhysicalMemory | Measure-Object).Count
+        PhysicalDisks   = $diskCount
+        TotalDiskGB     = $totalDiskGB
+        FreeDiskGB      = $freeDiskGB
+        LogicalDrives   = $logDrives
+        IPAddress       = $firstIP
+        MACAddress      = $firstMac
+        SQLInstances    = $sqlInstances
+    }
+}
+
+# =============================================================================
+# Private: Lesbare TXT-Ausgabe
+# =============================================================================
+function _Build-sqmHardwareReportTxt
+{
+    param (
+        [PSCustomObject]$Data,
+        [string]$Timestamp
+    )
+
+    $flat = _Build-sqmHardwareFlat -Data $Data -Timestamp $Timestamp
+    $sep  = '=' * 60
+
+    $lines = @(
+        $sep
+        "  sqmSQLTool Hardware Report"
+        "  $Timestamp"
+        $sep
+        ''
+        "[SYSTEM]"
+        "  Computer    : $($flat.ComputerName)"
+        "  VM-Typ      : $($flat.VMType)"
+        "  Domain      : $($flat.Domain)"
+        "  OS          : $($flat.OS)"
+        "  Version     : $($flat.OSVersion)  Build $($flat.OSBuild)"
+        "  Letzter Boot: $($flat.LastBoot)"
+        "  Laufzeit    : $($flat.UptimeHours) Stunden"
+        ''
+        "[PROZESSOR]"
+        "  Modell      : $($flat.CPUModel)"
+        "  Sockel      : $($flat.CPUSockets)"
+        "  Kerne       : $($flat.CPUCores) physikalisch / $($flat.CPULogical) logisch"
+        "  Takt        : $($flat.CPUMHz) MHz"
+        ''
+        "[ARBEITSSPEICHER]"
+        "  Gesamt      : $($flat.RAMTotalGB) GB"
+        "  Frei        : $($flat.RAMFreeGB) GB"
+        "  Belegt      : $($flat.RAMUsedPct) %"
+        "  DIMM-Slots  : $($flat.DimmCount)"
+        ''
+        "[SPEICHER]"
+        "  Phys. Disks : $($flat.PhysicalDisks)"
+        "  Gesamt      : $($flat.TotalDiskGB) GB"
+        "  Frei        : $($flat.FreeDiskGB) GB"
+        "  Laufwerke   : $($flat.LogicalDrives)"
+        ''
+        "[NETZWERK]"
+        "  IP-Adresse  : $($flat.IPAddress)"
+        "  MAC         : $($flat.MACAddress)"
+        ''
+        "[SQL SERVER]"
+        "  Instanzen   : $(if ($flat.SQLInstances) { $flat.SQLInstances } else { 'keine' })"
+        ''
+        $sep
+    )
+
+    $lines -join "`r`n"
 }
