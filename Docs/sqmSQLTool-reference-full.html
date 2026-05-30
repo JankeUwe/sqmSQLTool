@@ -1,0 +1,2195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>sqmSQLTool - Command Reference</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #060f20;
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+
+        .psdb-st {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .psdb-st-sidebar {
+            width: 280px;
+            background-color: #0b1e3d;
+            padding: 2rem 0;
+            border-right: 1px solid #1e3a5f;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            top: 0;
+            left: 0;
+        }
+
+        .psdb-st-sidebar-title {
+            padding: 0 1.5rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #94a8c0;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .psdb-st-sidebar-search {
+            padding: 0 1rem 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .psdb-st-sidebar-search input {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            background-color: #051329;
+            border: 1px solid #1e3a5f;
+            border-radius: 0.375rem;
+            color: #e2e8f0;
+            font-size: 0.875rem;
+        }
+
+        .psdb-st-sidebar-search input:focus {
+            outline: none;
+            border-color: #2e86c1;
+            background-color: #051329;
+        }
+
+        .psdb-st-sidebar-list {
+            list-style: none;
+            padding: 0 0.5rem;
+        }
+
+        .psdb-st-sidebar-item {
+            margin-bottom: 0.25rem;
+        }
+
+        .psdb-st-sidebar-link {
+            display: block;
+            padding: 0.5rem 1rem;
+            color: #94a8c0;
+            text-decoration: none;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+        }
+
+        .psdb-st-sidebar-link:hover {
+            background-color: #1e3a5f;
+            color: #e2e8f0;
+        }
+
+        .psdb-st-sidebar-link.active {
+            background-color: #2e86c1;
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .psdb-st-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 2rem 3rem;
+            max-width: 1400px;
+            margin-right: auto;
+        }
+
+        .psdb-st-header {
+            margin-bottom: 3rem;
+        }
+
+        .psdb-st-h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(160deg, #2e86c1 0%, #5dade2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .psdb-st-subtitle {
+            color: #94a8c0;
+            font-size: 1rem;
+        }
+
+        .psdb-st-functions {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        .psdb-st-card {
+            background-color: #0b1e3d;
+            border: 1px solid #1e3a5f;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            transition: all 0.2s ease;
+        }
+
+        .psdb-st-card:hover {
+            border-color: #2e86c1;
+            box-shadow: 0 0 20px rgba(46, 134, 193, 0.1);
+        }
+
+        .psdb-st-card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #5dade2;
+            margin-bottom: 0.75rem;
+            font-family: 'Courier New', monospace;
+        }
+
+        .psdb-st-card-synopsis {
+            color: #e2e8f0;
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+
+        .psdb-st-section-title {
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: #94a8c0;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .psdb-st-params {
+            list-style: none;
+            margin-bottom: 1rem;
+        }
+
+        .psdb-st-param {
+            padding: 0.5rem 0;
+            color: #94a8c0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            margin-left: 0;
+        }
+
+        .psdb-st-param::before {
+            content: '→ ';
+            color: #2e86c1;
+            margin-right: 0.5rem;
+        }
+
+        .psdb-st-examples {
+            margin-top: 1rem;
+        }
+
+        .psdb-st-example {
+            background-color: #051329;
+            border-left: 3px solid #2e86c1;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            border-radius: 0.25rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            color: #94a8c0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+
+        .psdb-st-no-data {
+            color: #94a8c0;
+            font-style: italic;
+        }
+
+        .psdb-st-info {
+            background-color: rgba(46, 134, 193, 0.28);
+            color: #ffffff;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid #2e86c1;
+        }
+
+        @media (max-width: 1024px) {
+            .psdb-st-sidebar {
+                width: 250px;
+            }
+            .psdb-st-content {
+                margin-left: 250px;
+                padding: 1.5rem 2rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .psdb-st {
+                flex-direction: column;
+            }
+            .psdb-st-sidebar {
+                position: relative;
+                width: 100%;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid #1e3a5f;
+            }
+            .psdb-st-content {
+                margin-left: 0;
+                padding: 1rem;
+            }
+            .psdb-st-h1 {
+                font-size: 1.75rem;
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="psdb-st">
+        <aside class="psdb-st-sidebar">
+            <div class="psdb-st-sidebar-title">Functions</div>
+            <div class="psdb-st-sidebar-search">
+                <input type="text" id="search" placeholder="Search...">
+            </div>
+            <ul class="psdb-st-sidebar-list" id="function-list"></ul>
+        </aside>
+
+        <main class="psdb-st-content">
+            <div class="psdb-st-header">
+                <h1 class="psdb-st-h1">sqmSQLTool</h1>
+                <p class="psdb-st-subtitle">Command Reference - 104 Functions</p>
+            </div>
+
+            <div class="psdb-st-functions" id="functions-container"></div>
+        </main>
+    </div>
+
+    <script>
+        const functions = [
+  {
+    "Name": "_sqmSplunkWriteLog",
+    "Synopsis": "Configures the Splunk Universal Forwarder on SQL Server hosts.",
+    "Params": [
+      "Remote",
+      "SearchOU",
+      "Credential"
+    ],
+    "Examples": [
+      "Invoke-sqmSplunkConfiguration",
+      "Invoke-sqmSplunkConfiguration -Mode Test",
+      "Invoke-sqmSplunkConfiguration -Remote -SearchOU \"OU=DB-Server,DC=contoso,DC=com\"",
+      "Invoke-sqmSplunkConfiguration -ComputerList \"SRV-SQL01\",\"SRV-SQL02\"",
+      "Invoke-sqmSplunkConfiguration -ComputerList \"C:\\Listen\\db-server.txt\" -Mode Test"
+    ]
+  },
+  {
+    "Name": "Compare-sqmServerConfiguration",
+    "Synopsis": "Compares important configuration settings between two SQL Server instances.",
+    "Params": [
+      "SourceInstance",
+      "TargetInstance",
+      "SqlCredential",
+      "CompareDatabases",
+      "EnableException"
+    ],
+    "Examples": [
+      "Compare-sqmServerConfiguration -SourceInstance \"SQL01\" -TargetInstance \"SQL02\""
+    ]
+  },
+  {
+    "Name": "Copy-sqmLogins",
+    "Synopsis": "Copies logins from a source SQL Server instance to a target instance.",
+    "Params": [
+      "Source",
+      "Destination",
+      "SqlCredential",
+      "SourceCredential",
+      "DestinationCredential",
+      "IncludeSystemLogins",
+      "DisablePolicy",
+      "AdjustAuthMode",
+      "RestartServiceIfRequired",
+      "Force",
+      "AdModuleAction",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Copy-sqmLogins -Source 'SQL01' -Destination 'SQL02'\r\n\r\n    Copies all non-system logins. Policy is disabled/re-enabled,\r\n    AD check and orphan repair run automatically.",
+      "Copy-sqmLogins -Source 'SQL01' -Destination 'SQL02' -AdjustAuthMode -RestartServiceIfRequired\r\n\r\n    Copies all logins and switches the target server to Mixed Mode if needed.\r\n    Automatically restarts the SQL service if required.",
+      "Copy-sqmLogins -Source 'SQL01' -Destination 'SQL02' -Login 'App_*' -Force\r\n\r\n    Copies only logins starting with 'App_' and overwrites existing ones.",
+      "Copy-sqmLogins -Source 'SQL01' -Destination 'SQL02' -DisablePolicy $false -WhatIf\r\n\r\n    Simulates the operation without policy handling."
+    ]
+  },
+  {
+    "Name": "Copy-sqmNTFSPermissions",
+    "Synopsis": "Copies NTFS permissions (ACLs) from a source path to a destination path.",
+    "Params": [
+      "SourcePath",
+      "DestinationPath"
+    ],
+    "Examples": [
+      "Copy-sqmNTFSPermissions -SourcePath \"D:\\\" -DestinationPath \"E:\\\" -Recurse",
+      "Copy-sqmNTFSPermissions -SourcePath \"D:\\Daten\" -DestinationPath \"E:\\Daten\" -Recurse -CreateMissingFolders"
+    ]
+  },
+  {
+    "Name": "Copy-sqmToCentralPath",
+    "Synopsis": "Copies one or more files to the configured CentralPath.",
+    "Params": [],
+    "Examples": []
+  },
+  {
+    "Name": "Export-sqmDatabaseDocumentation",
+    "Synopsis": "Creates structured HTML and CSV documentation for all databases on a SQL Server instance.",
+    "Params": [
+      "SqlCredential",
+      "IncludeSystemDatabases",
+      "IncludeFileDetails",
+      "IncludeUsers",
+      "IncludeObjectSummary",
+      "OutputPath",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Export-sqmDatabaseDocumentation",
+      "Export-sqmDatabaseDocumentation -SqlInstance \"SQL01\" -Database \"SalesDB\",\"HRApp\" -OutputPath \"D:\\Reports\"",
+      "Export-sqmDatabaseDocumentation -SqlInstance \"SQL01\" -IncludeSystemDatabases -ContinueOnError",
+      "# Multiple instances via pipeline\r\n    \"SQL01\",\"SQL02\",\"SQL03\" | Export-sqmDatabaseDocumentation -ContinueOnError"
+    ]
+  },
+  {
+    "Name": "Find-sqmDatabaseObject",
+    "Synopsis": "Searches all (or selected) databases on an instance for an object name.",
+    "Params": [
+      "ObjectName",
+      "SqlInstance",
+      "SqlCredential",
+      "Database",
+      "IncludeSystem",
+      "SearchDefinition",
+      "EnableException"
+    ],
+    "Examples": [
+      "Find-sqmDatabaseObject -SqlInstance \"SQL01\" -ObjectName \"sp_GetOrders\"",
+      "Find-sqmDatabaseObject -SqlInstance \"SQL01\" -ObjectName \"*log*\" -ObjectType \"TABLE\",\"VIEW\" -Database \"Sales*\""
+    ]
+  },
+  {
+    "Name": "Get-sqmADAccountStatus",
+    "Synopsis": "Checks the status of an Active Directory user account.",
+    "Params": [
+      "DomainController"
+    ],
+    "Examples": [
+      "Get-sqmADAccountStatus -SamAccountName 'jdoe'",
+      "'jdoe','jsmith' | Get-sqmADAccountStatus",
+      "Get-sqmADAccountStatus -SamAccountName 'jdoe' -DomainController 'DC01'\r\n    #>\r\n\r\n    [CmdletBinding()]\r\n    [OutputType([PSCustomObject])]\r\n    param (\r\n        [Parameter(Mandatory, ValueFromPipeline, ValueFromPipelineByPropertyName)]\r\n        [ValidateNotNullOrEmpty()]\r\n        [string[]] $SamAccountName,\r\n\r\n        [Parameter()]\r\n        [string] $DomainController\r\n    )\r\n\r\n    begin {\r\n        #region --- Modul-Verfuegbarkeit einmalig pruefen ---\r\n        $useRSAT = $false\r\n        if (Get-Module -Name ActiveDirectory -ListAvailable) {\r\n            try {\r\n                Import-Module ActiveDirectory -ErrorAction Stop\r\n                $useRSAT = $true\r\n                Write-Verbose 'ActiveDirectory-Modul geladen (RSAT-Pfad aktiv).'\r\n            }\r\n            catch {\r\n                Write-Verbose \"ActiveDirectory-Modul nicht ladbar: $_  - Fallback auf ADSI.\"\r\n            }\r\n        }\r\n        else {\r\n            Write-Verbose 'ActiveDirectory-Modul nicht installiert - Fallback auf ADSI.'\r\n        }\r\n\r\n        # Hilfsfunktion: Ergebnis-Objekt erzeugen\r\n        function New-ResultObject {\r\n            param (\r\n                [string]   $Sam,\r\n                [bool]     $Enabled        = $false,\r\n                [bool]     $LockedOut      = $false,\r\n                [bool]     $PwdExpired     = $false,\r\n                [bool]     $AcctExpired    = $false,\r\n                [string]   $Source         = '',\r\n                [string]   $ErrorMessage   = ''\r\n            )\r\n            [PSCustomObject]@{\r\n                SamAccountName  = $Sam\r\n                Enabled         = $Enabled\r\n                LockedOut       = $LockedOut\r\n                PasswordExpired = $PwdExpired\r\n                AccountExpired  = $AcctExpired\r\n                Source          = $Source\r\n                QueryTime       = (Get-Date)\r\n                ErrorMessage    = $ErrorMessage\r\n            }\r\n        }\r\n\r\n        #region --- ADSI-Hilfsfunktion ---\r\n        function Get-ADAccountStatusViaADSI {\r\n            param ([string] $Sam)\r\n\r\n            # Searcher aufbauen\r\n            $searcher = [adsisearcher]\"(sAMAccountName=$Sam)\"\r\n            $searcher.PropertiesToLoad.AddRange(@(\r\n                'sAMAccountName',\r\n                'userAccountControl',\r\n                'lockoutTime',\r\n                'pwdLastSet',\r\n                'accountExpires',\r\n                'msDS-UserPasswordExpiryTimeComputed'\r\n            )) | Out-Null\r\n            $searcher.SizeLimit = 1\r\n\r\n            $entry = $searcher.FindOne()\r\n            if (-not $entry) {\r\n                throw \"Konto '$Sam' wurde im Verzeichnis nicht gefunden.\"\r\n            }\r\n\r\n            $uac = [int]$entry.Properties['useraccountcontrol'][0]\r\n\r\n            # Enabled: Bit 2 (0x0002) = disabled\r\n            $enabled   = -not [bool]($uac -band 0x0002)\r\n\r\n            # LockedOut: Bit 16 (0x0010) oder lockoutTime > 0\r\n            $lockedBit = [bool]($uac -band 0x0010)\r\n            $lockoutTimeRaw = $entry.Properties['lockouttime']\r\n            $lockedTime = $false\r\n            if ($lockoutTimeRaw.Count -gt 0) {\r\n                $lt = [long]$lockoutTimeRaw[0]\r\n                $lockedTime = ($lt -gt 0)\r\n            }\r\n            $lockedOut = $lockedBit -or $lockedTime\r\n\r\n            # PasswordExpired: Bit 8388608 (0x800000) oder msDS-Attribut\r\n            $pwdExpiredBit = [bool]($uac -band 0x800000)\r\n            $pwdExpired = $pwdExpiredBit\r\n\r\n            if (-not $pwdExpired) {\r\n                $expiryRaw = $entry.Properties['msds-userpasswordexpirytimecomputed']\r\n                if ($expiryRaw.Count -gt 0) {\r\n                    $expiryFt = [long]$expiryRaw[0]\r\n                    # 0 = laeuft nie ab, 9223372036854775807 = nie\r\n                    if ($expiryFt -gt 0 -and $expiryFt -ne [long]::MaxValue) {\r\n                        $expiryDate = [datetime]::FromFileTime($expiryFt)\r\n                        $pwdExpired = ($expiryDate -lt (Get-Date))\r\n                    }\r\n                }\r\n            }\r\n\r\n            # AccountExpired\r\n            $acctExpired = $false\r\n            $acctExpiresRaw = $entry.Properties['accountexpires']\r\n            if ($acctExpiresRaw.Count -gt 0) {\r\n                $ae = [long]$acctExpiresRaw[0]\r\n                # 0 und Int64.MaxValue bedeuten \"laeuft nie ab\"\r\n                if ($ae -gt 0 -and $ae -ne [long]::MaxValue) {\r\n                    $expDate = [datetime]::FromFileTime($ae)\r\n                    $acctExpired = ($expDate -lt (Get-Date))\r\n                }\r\n            }\r\n\r\n            return [PSCustomObject]@{\r\n                Enabled         = $enabled\r\n                LockedOut       = $lockedOut\r\n                PasswordExpired = $pwdExpired\r\n                AccountExpired  = $acctExpired\r\n            }\r\n        }\r\n        #endregion\r\n    }\r\n\r\n    process {\r\n        foreach ($sam in $SamAccountName) {\r\n            Write-Verbose \"Verarbeite Konto: $sam\"\r\n\r\n            #region --- RSAT-Pfad ---\r\n            if ($useRSAT) {\r\n                try {\r\n                    $params = @{\r\n                        Identity    = $sam\r\n                        Properties  = @(\r\n                            'Enabled',\r\n                            'LockedOut',\r\n                            'PasswordExpired',\r\n                            'AccountExpirationDate'   # 'AccountExpired' ist keine abrufbare Property\r\n                        )\r\n                        ErrorAction = 'Stop'\r\n                    }\r\n                    if ($DomainController) { $params['Server'] = $DomainController }\r\n\r\n                    $adUser = Get-ADUser @params\r\n\r\n                    # AccountExpired: ExpirationDate vorhanden und in der Vergangenheit?\r\n                    $acctExpired = ($null -ne $adUser.AccountExpirationDate) -and\r\n                                   ($adUser.AccountExpirationDate -lt (Get-Date))\r\n\r\n                    New-ResultObject `\r\n                        -Sam         $sam `\r\n                        -Enabled     ([bool]$adUser.Enabled) `\r\n                        -LockedOut   ([bool]$adUser.LockedOut) `\r\n                        -PwdExpired  ([bool]$adUser.PasswordExpired) `\r\n                        -AcctExpired $acctExpired `\r\n                        -Source      'RSAT'\r\n                    continue\r\n                }\r\n                catch {\r\n                    # Konto nicht gefunden ? direkt Fehlerobjekt, kein ADSI-Fallback\r\n                    if ($_.Exception.GetType().Name -eq 'ADIdentityNotFoundException') {\r\n                        New-ResultObject -Sam $sam -ErrorMessage \"Konto nicht gefunden: $_\" -Source 'RSAT'\r\n                        continue\r\n                    }\r\n                    Write-Verbose \"RSAT-Fehler fuer '$sam': $_ - Fallback auf ADSI.\"\r\n                }\r\n            }\r\n            #endregion\r\n\r\n            #region --- ADSI-Fallback ---\r\n            try {\r\n                $adsi = Get-ADAccountStatusViaADSI -Sam $sam\r\n\r\n                New-ResultObject `\r\n                    -Sam        $sam `\r\n                    -Enabled    $adsi.Enabled `\r\n                    -LockedOut  $adsi.LockedOut `\r\n                    -PwdExpired $adsi.PasswordExpired `\r\n                    -AcctExpired $adsi.AccountExpired `\r\n                    -Source     'ADSI'\r\n            }\r\n            catch {\r\n                New-ResultObject -Sam $sam -ErrorMessage $_.ToString() -Source 'ADSI'\r\n            }\r\n            #endregion\r\n        }\r\n    }\r\n}"
+    ]
+  },
+  {
+    "Name": "Get-sqmAgentJobHistory",
+    "Synopsis": "Displays the execution history of SQL Agent jobs.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "JobName",
+      "Status",
+      "Since",
+      "LastX",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmAgentJobHistory",
+      "Get-sqmAgentJobHistory -JobName '*Backup*' -Status Failure -Since (Get-Date).AddDays(-1)"
+    ]
+  },
+  {
+    "Name": "Get-sqmAgHealthReport",
+    "Synopsis": "Creates a detailed health report for all Always On availability groups on an instance.",
+    "Params": [
+      "SqlCredential",
+      "MaxRedoQueueMB",
+      "MaxSendQueueMB",
+      "OutputPath",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmAgHealthReport",
+      "Get-sqmAgHealthReport -SqlInstance \"SQL01\" -MaxRedoQueueMB 200 -OutputPath \"D:\\Reports\""
+    ]
+  },
+  {
+    "Name": "Get-sqmAutoGrowthReport",
+    "Synopsis": "Creates an AutoGrowth configuration report for all database files on a SQL Server instance.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "IncludeSystem",
+      "Detailed",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmAutoGrowthReport -SqlInstance \"SQL01\"",
+      "Get-sqmAutoGrowthReport -SqlInstance \"SQL01\" -Detailed -IncludeSystem"
+    ]
+  },
+  {
+    "Name": "Get-sqmBlockingReport",
+    "Synopsis": "Retrieves current blocking chains on a SQL Server instance.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "MinWaitSeconds",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmBlockingReport",
+      "Get-sqmBlockingReport -SqlInstance \"SQL01\" -MinWaitSeconds 30",
+      "# Check whether blocking is currently occurring\r\n    if ((Get-sqmBlockingReport -SqlInstance \"SQL01\").HasBlocking) { Write-Warning \"Blocking detected!\" }",
+      "# Regular snapshot via Agent job\r\n    Get-sqmBlockingReport -SqlInstance \"SQL01\" -OutputPath \"$env:ProgramData\\sqmSQLTool\\Logs\\Blocking\""
+    ]
+  },
+  {
+    "Name": "Get-sqmCertificateReport",
+    "Synopsis": "Creates a comprehensive report on SQL Server certificates and their expiration dates.",
+    "Params": [
+      "SqlCredential",
+      "WarningThresholdDays",
+      "CriticalThresholdDays",
+      "IncludeUserDatabases",
+      "OutputPath",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmCertificateReport",
+      "Get-sqmCertificateReport -SqlInstance \"SQL01\",\"SQL02\" -WarningThresholdDays 180",
+      "# Show only expiring certificates\r\n    Get-sqmCertificateReport -SqlInstance \"SQL01\" |\r\n        Select-Object -ExpandProperty Certificates |\r\n        Where-Object { $_.ExpiryStatus -ne 'OK' } |\r\n        Select-Object SqlInstance, DatabaseName, CertificateName, ExpiryDate, DaysRemaining, ExpiryStatus, Purpose",
+      "# Pipeline across multiple instances\r\n    'SQL01','SQL02','SQL03' | Get-sqmCertificateReport -OutputPath \"D:\\Reports\\Certs\""
+    ]
+  },
+  {
+    "Name": "Get-sqmClusterInfo",
+    "Synopsis": "Retrieves information about a Windows Failover Cluster: cluster name, nodes and roles including IP addresses.",
+    "Params": [
+      "ClusterName",
+      "IncludeCoreGroup",
+      "NoAutoInstall",
+      "EnableException"
+    ],
+    "Examples": [
+      "$info = Get-sqmClusterInfo -ClusterName \"MYCLUSTER\"\r\n    if (-not $info.Success) { Write-Error $info.ErrorMessage; return }\r\n    $info.ClusterName\r\n    $info.Nodes | Format-Table\r\n    $info.Roles | Where-Object OwnerNode -eq \"Node1\" | Select Name, IPAddresses",
+      "Get-sqmClusterInfo -IncludeCoreGroup\r\n\r\n    Queries the local cluster and returns all roles including the core group."
+    ]
+  },
+  {
+    "Name": "Get-sqmConfig",
+    "Synopsis": "Returns the current module configuration.",
+    "Params": [
+      "Key"
+    ],
+    "Examples": [
+      "Get-sqmConfig",
+      "Get-sqmConfig -Key 'OutputPath'\r\n#>\r\nfunction Get-sqmConfig\r\n{\r\n\t[CmdletBinding()]\r\n\tparam (\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$Key\r\n\t)\r\n\tif ($Key)\r\n\t{\r\n\t\tif ($script:sqmModuleConfig.ContainsKey($Key))\r\n\t\t{\r\n\t\t\treturn $script:sqmModuleConfig[$Key]\r\n\t\t}\r\n\t\telse\r\n\t\t{\r\n\t\t\tWrite-Warning \"Konfigurationsschluessel '$Key' existiert nicht. Verfuegbare Schluessel: $($script:sqmModuleConfig.Keys -join ', ')\"\r\n\t\t\treturn $null\r\n\t\t}\r\n\t}\r\n\treturn $script:sqmModuleConfig\r\n}"
+    ]
+  },
+  {
+    "Name": "Get-sqmConnectionStats",
+    "Synopsis": "Analyzes active SQL Server connections and connection statistics.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "GroupBy",
+      "TopN",
+      "IncludeSystemConnections",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmConnectionStats -SqlInstance \"SQL01\"",
+      "Get-sqmConnectionStats -SqlInstance \"SQL01\" -GroupBy Login -TopN 10",
+      "Get-sqmConnectionStats -SqlInstance \"SQL01\" -GroupBy Database -IncludeSystemConnections"
+    ]
+  },
+  {
+    "Name": "Get-sqmDatabaseHealth",
+    "Synopsis": "Aggregated health report for all databases on an instance.",
+    "Params": [
+      "SqlCredential",
+      "MaxCheckDbAgeDays",
+      "MaxVlfCount",
+      "HistoryDays",
+      "IncludeSystemDatabases",
+      "OutputPath",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmDatabaseHealth",
+      "Get-sqmDatabaseHealth -SqlInstance \"SQL01\" -IncludeSystemDatabases -OutputPath \"D:\\Reports\""
+    ]
+  },
+  {
+    "Name": "Get-sqmDeadlockReport",
+    "Synopsis": "Reads and analyzes deadlock events from the System Health Extended Event session.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "StartTime",
+      "EndTime",
+      "MaxDeadlocks",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmDeadlockReport",
+      "Get-sqmDeadlockReport -SqlInstance \"SQL01\" -StartTime (Get-Date).AddDays(-7)",
+      "# Save deadlocks as XDL files for SSMS\r\n    Get-sqmDeadlockReport -SqlInstance \"SQL01\" -OutputPath \"$env:ProgramData\\sqmSQLTool\\Logs\\Deadlocks\"",
+      "# Only deadlocks from the last hour, show number of affected statements\r\n    Get-sqmDeadlockReport -StartTime (Get-Date).AddHours(-1) |\r\n        Select-Object Timestamp, VictimLogin, VictimStatement, ProcessCount"
+    ]
+  },
+  {
+    "Name": "Get-sqmDiskBlockSize",
+    "Synopsis": "Prueft die NTFS-Blockgroesse (Cluster-Groesse) von Laufwerken auf 64KB.",
+    "Params": [
+      "SqlInstance",
+      "ComputerName",
+      "RecommendedBlockSize",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Einzelne Laufwerke pruefen",
+      "# Automatisch alle SQL-Laufwerke der Instanz ermitteln und pruefen",
+      "# Pipeline",
+      "# Nur Laufwerke mit falscher Blockgroesse anzeigen"
+    ]
+  },
+  {
+    "Name": "Get-sqmDiskInfoByDriveLetter",
+    "Synopsis": "Returns disk information for a given drive letter.",
+    "Params": [
+      "DriveLetter",
+      "NoClipboard"
+    ],
+    "Examples": [
+      "Get-sqmDiskInfoByDriveLetter -DriveLetter \"C\"",
+      "Get-sqmDiskInfoByDriveLetter \"D:\" -NoClipboard",
+      "\"C\",\"D\",\"E\" | ForEach-Object { Get-sqmDiskInfoByDriveLetter $_ }"
+    ]
+  },
+  {
+    "Name": "Get-sqmDiskSpaceReport",
+    "Synopsis": "",
+    "Params": [
+      "SqlCredential",
+      "WarnThresholdPct",
+      "CriticalThresholdPct",
+      "HistoryDays",
+      "OutputPath",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmDiskSpaceReport",
+      "Get-sqmDiskSpaceReport -SqlInstance \"SQL01\" -WarnThresholdPct 15 -OutputPath \"D:\\Reports\""
+    ]
+  },
+  {
+    "Name": "Get-sqmHpuAllowGroup",
+    "Synopsis": "Searches for the HPU allow group in Active Directory based on configurable domain/group mappings.",
+    "Params": [
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmHpuAllowGroup",
+      "Get-sqmHpuAllowGroup -EnableException"
+    ]
+  },
+  {
+    "Name": "Get-sqmIndexFragmentation",
+    "Synopsis": "Analyzes index fragmentation in one or more databases.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "Database",
+      "TableName",
+      "MinFragmentationPercent",
+      "PageCountMin",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmIndexFragmentation -Database 'AdventureWorks' -MinFragmentationPercent 10",
+      "Get-sqmIndexFragmentation -SqlInstance 'SQL01' -MinFragmentationPercent 30"
+    ]
+  },
+  {
+    "Name": "Get-sqmLinkedServerUsage",
+    "Synopsis": "Analyzes which database objects (procedures, functions, views, triggers, SQL Agent jobs) access linked servers.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "LinkedServer",
+      "IncludeJobs",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmLinkedServerUsage -SqlInstance \"SQL01\" -LinkedServer \"PROD_SRV\""
+    ]
+  },
+  {
+    "Name": "Get-sqmLongRunningQueries",
+    "Synopsis": "Identifies long-running queries on a SQL Server instance.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "MinDurationSeconds",
+      "MinCpuMs",
+      "IncludeSystemSessions",
+      "IncludeQueryPlan",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmLongRunningQueries",
+      "Get-sqmLongRunningQueries -SqlInstance \"SQL01\" -MinDurationSeconds 60",
+      "# Top 10 by duration\r\n    Get-sqmLongRunningQueries -MinDurationSeconds 10 | Sort-Object DurationSeconds -Descending | Select-Object -First 10",
+      "# Regular snapshot via Agent job\r\n    Get-sqmLongRunningQueries -MinDurationSeconds 120 -OutputPath \"$env:ProgramData\\sqmSQLTool\\Logs\\LongRunning\""
+    ]
+  },
+  {
+    "Name": "Get-sqmMissingIndexes",
+    "Synopsis": "Retrieves missing index recommendations from the SQL Server DMV cache.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "MinImpactScore",
+      "MinSeeks",
+      "Top",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmMissingIndexes -SqlInstance \"SQL01\"",
+      "# Only high-impact recommendations\r\n    Get-sqmMissingIndexes -SqlInstance \"SQL01\" -MinImpactScore 50 -MinSeeks 500",
+      "# Show top 10 and save as CSV\r\n    Get-sqmMissingIndexes -SqlInstance \"SQL01\" -Top 10 -OutputPath \"D:\\Reports\"",
+      "# Output CREATE INDEX statements directly\r\n    Get-sqmMissingIndexes -SqlInstance \"SQL01\" -MinImpactScore 30 |\r\n        Select-Object DatabaseName, TableName, ImpactScore, CreateIndexStatement |\r\n        Format-List"
+    ]
+  },
+  {
+    "Name": "Get-sqmOperationStatus",
+    "Synopsis": "Displays progress and estimated remaining time for active backup, restore and AutoSeed operations.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "OperationType",
+      "Continuous",
+      "RefreshSeconds",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Show all active operations on the local instance\r\nGet-sqmOperationStatus",
+      "# Only active AutoSeed operations on a remote instance\r\nGet-sqmOperationStatus -SqlInstance \"SQL01\" -OperationType AutoSeed",
+      "# Continuous refresh every 10 seconds\r\nGet-sqmOperationStatus -Continuous -RefreshSeconds 10"
+    ]
+  },
+  {
+    "Name": "Get-sqmOrphanedFiles",
+    "Synopsis": "Finds MDF/LDF/NDF database files that are not assigned to any database.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "Recurse",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmOrphanedFiles -SqlInstance \"SQL01\"",
+      "Get-sqmOrphanedFiles -SqlInstance \"SQL01\" -SearchPath \"D:\\SQLData\",\"E:\\SQLLog\" -Recurse"
+    ]
+  },
+  {
+    "Name": "Get-sqmPerfCounters",
+    "Synopsis": "Reads SQL Server performance counters from sys.dm_os_performance_counters.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "TopN",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmPerfCounters -SqlInstance \"SQL01\"",
+      "Get-sqmPerfCounters -SqlInstance \"SQL01\" -Category \"Buffer\",\"Memory\""
+    ]
+  },
+  {
+    "Name": "Get-sqmServerHardwareReport",
+    "Synopsis": "Erstellt einen HTML-Hardware-Konfigurationsbericht fuer einen oder mehrere Server.",
+    "Params": [
+      "ReportPath",
+      "OutputFormat",
+      "NoOpen",
+      "PassThru",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Lokalen Server analysieren - Report wird automatisch im Browser geoeffnet",
+      "# Remote-Server",
+      "# Mehrere Server, eigener Report-Pfad",
+      "# Nur speichern, nicht oeffnen - Dateipfad zurueckgeben",
+      "# CSV-Export fuer Weiterverarbeitung in Excel",
+      "# Alle Formate auf einmal (HTML + CSV + TXT)"
+    ]
+  },
+  {
+    "Name": "Get-sqmServerSetting",
+    "Synopsis": "Reads one or all server properties from a SQL Server instance.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "Name",
+      "All",
+      "DefaultValue",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Read BackupDirectory from the local server\r\n$backupPath = Get-sqmServerSetting -Name \"BackupDirectory\"",
+      "# Show all properties\r\nGet-sqmServerSetting -All",
+      "# All properties from a remote instance with credentials\r\n$cred = Get-Credential\r\nGet-sqmServerSetting -SqlInstance \"SQL01\" -SqlCredential $cred -All"
+    ]
+  },
+  {
+    "Name": "Get-sqmSpnReport",
+    "Synopsis": "Checks the registered SPNs for SQL Server instances (default and named instances).",
+    "Params": [
+      "InstanceFilter",
+      "OutputPath",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmSpnReport",
+      "Get-sqmSpnReport -ComputerName 'SQL01' -InstanceFilter 'MSSQLSERVER'",
+      "'SQL01','SQL02' | Get-sqmSpnReport -ContinueOnError",
+      "$result = Get-sqmSpnReport -ComputerName 'SQL01'"
+    ]
+  },
+  {
+    "Name": "Get-sqmSQLInstanceCheck",
+    "Synopsis": "Checks a SQL Server instance against best practices.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "Detailed",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmSQLInstanceCheck",
+      "Get-sqmSQLInstanceCheck -SqlInstance \"SQL01\\INSTANCE\" -Detailed"
+    ]
+  },
+  {
+    "Name": "Get-sqmSysadminAccounts",
+    "Synopsis": "Retrieves all logins with sysadmin rights on a SQL Server instance.",
+    "Params": [
+      "SqlCredential",
+      "ExcludeSysAccounts",
+      "IncludeDisabled",
+      "OutputPath",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmSysadminAccounts",
+      "Get-sqmSysadminAccounts -SqlInstance \"SQL01\" -ExcludeSysAccounts\r\n#>\r\nfunction Get-sqmSysadminAccounts\r\n{\r\n\t[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]\r\n\t[OutputType([PSCustomObject])]\r\n\tparam (\r\n\t\t[Parameter(Mandatory = $false, ValueFromPipeline = $true)]\r\n\t\t[string[]]$SqlInstance = @($env:COMPUTERNAME),\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[System.Management.Automation.PSCredential]$SqlCredential,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string[]]$ExcludeLogin = @(),\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[switch]$ExcludeSysAccounts,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[bool]$IncludeDisabled = $true,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$OutputPath = '$env:ProgramData\\sqmSQLTool\\Logs',\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[switch]$ContinueOnError,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[switch]$EnableException\r\n\t)\r\n\t\r\n\tbegin\r\n\t{\r\n\t\t$functionName = $MyInvocation.MyCommand.Name\r\n\t\t$allInstanceResults = [System.Collections.Generic.List[PSCustomObject]]::new()\r\n\t\t\r\n\t\tif (-not (Get-Module -ListAvailable -Name dbatools))\r\n\t\t{\r\n\t\t\t$errMsg = \"dbatools-Modul nicht gefunden.\"\r\n\t\t\tInvoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level \"ERROR\"\r\n\t\t\tthrow $errMsg\r\n\t\t}\r\n\t\t\r\n\t\tInvoke-sqmLogging -Message \"Starte $functionName mit OutputPath: $OutputPath\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\r\n\t\t# Systemkonten-Muster fuer -ExcludeSysAccounts\r\n\t\t$sysAccountPatterns = @(\r\n\t\t\t'NT SERVICE\\*',\r\n\t\t\t'NT AUTHORITY\\SYSTEM',\r\n\t\t\t'NT AUTHORITY\\NETWORK SERVICE',\r\n\t\t\t'NT AUTHORITY\\LOCAL SERVICE',\r\n\t\t\t'NT AUTHORITY\\*',\r\n\t\t\t'##MS_*##'\r\n\t\t)\r\n\t\t\r\n\t\tif ($ExcludeSysAccounts)\r\n\t\t{\r\n\t\t\t$ExcludeLogin = @($ExcludeLogin) + $sysAccountPatterns | Sort-Object -Unique\r\n\t\t\tInvoke-sqmLogging -Message \"ExcludeSysAccounts: $($sysAccountPatterns.Count) Systemmuster hinzugefuegt.\" -FunctionName $functionName -Level \"DEBUG\"\r\n\t\t}\r\n\t\t\r\n\t\t# Hilfsfunktion fuer Ausschlusspruefung\r\n\t\tfunction _IsExcluded\r\n\t\t{\r\n\t\t\tparam ([string]$Name,\r\n\t\t\t\t[string[]]$Patterns)\r\n\t\t\tif (-not $Patterns) { return $false }\r\n\t\t\tforeach ($p in $Patterns)\r\n\t\t\t{\r\n\t\t\t\tif ($Name -like $p) { return $true }\r\n\t\t\t}\r\n\t\t\treturn $false\r\n\t\t}\r\n\t}\r\n\t\r\n\tprocess\r\n\t{\r\n\t\tforeach ($instance in $SqlInstance)\r\n\t\t{\r\n\t\t\t$connParams = @{ SqlInstance = $instance }\r\n\t\t\tif ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }\r\n\t\t\t\r\n\t\t\t$detailRows = [System.Collections.Generic.List[PSCustomObject]]::new()\r\n\t\t\t\r\n\t\t\ttry\r\n\t\t\t{\r\n\t\t\t\tInvoke-sqmLogging -Message \"[$instance] Starte Sysadmin-Audit ...\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\r\n\t\t\t\t$disabledFilter = if ($IncludeDisabled) { '' }\r\n\t\t\t\telse { 'AND sp.is_disabled = 0' }\r\n\t\t\t\t\r\n\t\t\t\t# Achtung: password_last_set_time und last_login_date wurden entfernt,\r\n\t\t\t\t# da sie in aelteren SQL Server-Versionen nicht existieren.\r\n\t\t\t\t$query = @\"\r\nSELECT\r\n    sp.name                                          AS LoginName,\r\n    sp.type_desc                                     AS LoginType,\r\n    sp.is_disabled                                   AS IsDisabled,\r\n    CASE WHEN sp.sid = 0x01 THEN 1 ELSE 0 END        AS IsSa,\r\n    sp.create_date                                   AS CreateDate,\r\n    sp.modify_date                                   AS ModifyDate,\r\n    NULL                                             AS LastPasswordChange,\r\n    NULL                                             AS LastLogin,\r\n    sp.default_database_name                         AS DefaultDatabase\r\nFROM sys.server_principals       sp\r\nJOIN sys.server_role_members     rm ON rm.member_principal_id = sp.principal_id\r\nJOIN sys.server_principals       sr ON sr.principal_id        = rm.role_principal_id\r\nWHERE sr.name        = 'sysadmin'\r\n  AND sp.type        IN ('S','U','G','R')\r\n  AND sp.principal_id > 1\r\n  $disabledFilter\r\nORDER BY sp.type_desc, sp.name;\r\n\"@\r\n\t\t\t\t$rows = Invoke-DbaQuery @connParams -Query $query -EnableException:$EnableException\r\n\t\t\t\t\r\n\t\t\t\tif (-not $rows)\r\n\t\t\t\t{\r\n\t\t\t\t\t$msg = \"Keine sysadmin-Logins auf '$instance' gefunden (unerwartet).\"\r\n\t\t\t\t\tInvoke-sqmLogging -Message $msg -FunctionName $functionName -Level \"WARNING\"\r\n\t\t\t\t\t$detailRows.Add([PSCustomObject]@{\r\n\t\t\t\t\t\t\tSqlInstance\t       = $instance\r\n\t\t\t\t\t\t\tLoginName\t\t   = '(keine)'\r\n\t\t\t\t\t\t\tLoginType\t\t   = 'n/a'\r\n\t\t\t\t\t\t\tIsEnabled\t\t   = $null\r\n\t\t\t\t\t\t\tIsSa\t\t\t   = $false\r\n\t\t\t\t\t\t\tLastPasswordChange = $null\r\n\t\t\t\t\t\t\tLastLogin\t\t   = $null\r\n\t\t\t\t\t\t\tCreateDate\t\t   = $null\r\n\t\t\t\t\t\t\tStatus\t\t\t   = 'Error'\r\n\t\t\t\t\t\t\tMessage\t\t       = $msg\r\n\t\t\t\t\t\t})\r\n\t\t\t\t}\r\n\t\t\t\telse\r\n\t\t\t\t{\r\n\t\t\t\t\tInvoke-sqmLogging -Message \"[$instance] $($rows.Count) sysadmin-Login(s) gefunden.\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\t\r\n\t\t\t\t\tforeach ($row in $rows)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\t$loginName = $row.LoginName\r\n\t\t\t\t\t\t$isSa = [bool]$row.IsSa\r\n\t\t\t\t\t\t$isEnabled = -not [bool]$row.IsDisabled\r\n\t\t\t\t\t\t$excluded = _IsExcluded $loginName $ExcludeLogin\r\n\t\t\t\t\t\t$isBuiltinAdmins = ($loginName -eq 'BUILTIN\\Administrators')\r\n\t\t\t\t\t\t\r\n\t\t\t\t\t\t$status = if ($isSa) { 'SA' }\r\n\t\t\t\t\t\telseif ($isBuiltinAdmins) { 'BuiltinAdmins' }\r\n\t\t\t\t\t\telseif ($excluded) { 'Excluded' }\r\n\t\t\t\t\t\telseif (-not $isEnabled) { 'Disabled' }\r\n\t\t\t\t\t\telse { 'Unexpected' }\r\n\t\t\t\t\t\t\r\n\t\t\t\t\t\t$msg = switch ($status)\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t'SA'            { 'SA-Konto (SID 0x01).' }\r\n\t\t\t\t\t\t\t'BuiltinAdmins' { 'BUILTIN\\Administrators hat Sysadmin-Rechte - SICHERHEITSPRueFUNG ERFORDERLICH.' }\r\n\t\t\t\t\t\t\t'Excluded'      { 'Ausgeschlossen via -ExcludeLogin.' }\r\n\t\t\t\t\t\t\t'Disabled'      { 'Login hat sysadmin-Rechte, ist aber deaktiviert.' }\r\n\t\t\t\t\t\t\t'Unexpected'    { 'Sysadmin-Login - kein Ausschluss definiert.' }\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t\t\r\n\t\t\t\t\t\t$createDate = if ($row.CreateDate) { $row.CreateDate.ToString('yyyy-MM-dd') }\r\n\t\t\t\t\t\telse { $null }\r\n\t\t\t\t\t\t\r\n\t\t\t\t\t\t$detailRows.Add([PSCustomObject]@{\r\n\t\t\t\t\t\t\t\tSqlInstance = $instance\r\n\t\t\t\t\t\t\t\tLoginName   = $loginName\r\n\t\t\t\t\t\t\t\tLoginType   = $row.LoginType\r\n\t\t\t\t\t\t\t\tIsEnabled   = $isEnabled\r\n\t\t\t\t\t\t\t\tIsSa\t    = $isSa\r\n\t\t\t\t\t\t\t\tLastPasswordChange = $null # Nicht verfuegbar in aelteren Versionen\r\n\t\t\t\t\t\t\t\tLastLogin   = $null # Nicht verfuegbar in aelteren Versionen\r\n\t\t\t\t\t\t\t\tCreateDate  = $createDate\r\n\t\t\t\t\t\t\t\tStatus\t    = $status\r\n\t\t\t\t\t\t\t\tMessage\t    = $msg\r\n\t\t\t\t\t\t\t})\r\n\t\t\t\t\t}\r\n\t\t\t\t}\r\n\t\t\t\t\r\n\t\t\t\t# Statistik\r\n\t\t\t\t$cntSa = ($detailRows | Where-Object Status -eq 'SA').Count\r\n\t\t\t\t$cntExcluded = ($detailRows | Where-Object Status -eq 'Excluded').Count\r\n\t\t\t\t$cntDisabled = ($detailRows | Where-Object Status -eq 'Disabled').Count\r\n\t\t\t\t$cntUnexpected = ($detailRows | Where-Object Status -eq 'Unexpected').Count\r\n\t\t\t\t$cntBuiltinAdmins = ($detailRows | Where-Object Status -eq 'BuiltinAdmins').Count\r\n\t\t\t\t\r\n\t\t\t\tInvoke-sqmLogging -Message (\"[$instance] Gesamt: $($detailRows.Count) | SA: $cntSa | Ausgeschlossen: $cntExcluded | \" +\r\n\t\t\t\t\t\"Deaktiviert: $cntDisabled | Unerwartet: $cntUnexpected | BUILTIN\\\\Admins: $cntBuiltinAdmins\") -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\r\n\t\t\t\t# Dateien schreiben\r\n\t\t\t\t$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'\r\n\t\t\t\t$datestamp = Get-Date -Format 'yyyy-MM-dd'\r\n\t\t\t\t$safeInst = $instance -replace '[\\\\/:*?\"<>|]', '_'\r\n\t\t\t\t$txtFile = Join-Path $OutputPath \"SysadminAccounts_${safeInst}_${datestamp}.txt\"\r\n\t\t\t\t$csvFile = Join-Path $OutputPath \"SysadminAccounts_${safeInst}_${datestamp}.csv\"\r\n\t\t\t\t\r\n\t\t\t\tif ($PSCmdlet.ShouldProcess($instance, \"Erstelle Sysadmin-Bericht in $OutputPath\"))\r\n\t\t\t\t{\r\n\t\t\t\t\tif (-not (Test-Path $OutputPath))\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tNew-Item -ItemType Directory -Path $OutputPath -Force -ErrorAction Stop | Out-Null\r\n\t\t\t\t\t\tInvoke-sqmLogging -Message \"Verzeichnis $OutputPath wurde erstellt.\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\t}\r\n\t\t\t\t\t\r\n\t\t\t\t\t# TXT-Bericht (identisch zum vorherigen, daher hier ausgelassen - bitte aus Original uebernehmen)\r\n\t\t\t\t\t# ... (der Code fuer die TXT-Erstellung bleibt unveraendert)\r\n\t\t\t\t\t$lines = [System.Collections.Generic.List[string]]::new()\r\n\t\t\t\t\t$lines.Add(\"# ================================================================\")\r\n\t\t\t\t\t$lines.Add(\"# MSSQLTools - Sysadmin-Konten Bericht\")\r\n\t\t\t\t\t$lines.Add(\"# Instanz   : $instance\")\r\n\t\t\t\t\t$lines.Add(\"# Erstellt  : $timestamp\")\r\n\t\t\t\t\t$lines.Add(\"# Gesamt    : $($detailRows.Count) Logins\")\r\n\t\t\t\t\t$lines.Add(\"# SA        : $cntSa\")\r\n\t\t\t\t\t$lines.Add(\"# Ausgesch. : $cntExcluded\")\r\n\t\t\t\t\t$lines.Add(\"# Deaktiv.  : $cntDisabled\")\r\n\t\t\t\t\t$lines.Add(\"# Unerwartet: $cntUnexpected  ? PRueFEN\")\r\n\t\t\t\t\t$lines.Add(\"# BUILTIN\\\\Adm: $cntBuiltinAdmins  ? SICHERHEITSPRueFUNG\")\r\n\t\t\t\t\t$lines.Add(\"# SysExclude: $(if ($ExcludeSysAccounts) { 'Ja (NT SERVICE\\*, NT AUTHORITY\\*, ##MS_*##)' }\r\n\t\t\t\t\t\t\telse { 'Nein (manuell via -ExcludeLogin)' })\")\r\n\t\t\t\t\t$lines.Add(\"# ================================================================\")\r\n\t\t\t\t\t\r\n\t\t\t\t\t# BUILTIN\\Administrators\r\n\t\t\t\t\t$builtinEntries = $detailRows | Where-Object { $_.Status -eq 'BuiltinAdmins' }\r\n\t\t\t\t\t$lines.Add(\"\"); $lines.Add(\"# ================================================================\")\r\n\t\t\t\t\t$lines.Add(\"# BUILTIN\\Administrators - SICHERHEITSPRueFUNG ERFORDERLICH ($cntBuiltinAdmins)\")\r\n\t\t\t\t\t$lines.Add(\"# ================================================================\")\r\n\t\t\t\t\tif ($builtinEntries)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tforeach ($e in $builtinEntries)\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$lines.Add((\"  Name   : {0}\" -f $e.LoginName))\r\n\t\t\t\t\t\t\t$lines.Add((\"  Typ    : {0}  |  Aktiv: {1}  |  Erstellt: {2}\" -f $e.LoginType, $e.IsEnabled, $e.CreateDate))\r\n\t\t\t\t\t\t\t$lines.Add(\"  ? Empfehlung: Pruefen ob BUILTIN\\Administrators Sysadmin-Rechte\")\r\n\t\t\t\t\t\t\t$lines.Add(\"    gemaess Sicherheitsrichtlinie zulaessig sind. Ggf. entfernen:\")\r\n\t\t\t\t\t\t\t$lines.Add(\"    EXEC sp_dropsrvrolemember 'BUILTIN\\Administrators','sysadmin';\")\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse { $lines.Add(\"  (nicht vorhanden - kein Befund)\") }\r\n\t\t\t\t\t\r\n\t\t\t\t\t# Unerwartete Konten\r\n\t\t\t\t\t$unexpected = $detailRows | Where-Object { $_.Status -eq 'Unexpected' }\r\n\t\t\t\t\t$lines.Add(\"\"); $lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\t$lines.Add(\"# UNERWARTETE SYSADMIN-KONTEN ($cntUnexpected)  ? PRueFEN\")\r\n\t\t\t\t\t$lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\tif ($unexpected)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tforeach ($e in ($unexpected | Sort-Object LoginType, LoginName))\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$lines.Add((\"  {0,-40} {1,-20} Enabled:{2,-5} Erstellt:{3}\" -f $e.LoginName, $e.LoginType, $e.IsEnabled, $e.CreateDate))\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse { $lines.Add(\"  (keine)\") }\r\n\t\t\t\t\t\r\n\t\t\t\t\t# Deaktivierte Konten\r\n\t\t\t\t\t$disabledEntries = $detailRows | Where-Object { $_.Status -eq 'Disabled' }\r\n\t\t\t\t\t$lines.Add(\"\"); $lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\t$lines.Add(\"# DEAKTIVIERTE SYSADMIN-KONTEN ($cntDisabled)\")\r\n\t\t\t\t\t$lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\tif ($disabledEntries)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tforeach ($e in ($disabledEntries | Sort-Object LoginName))\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$lines.Add(\"  $($e.LoginName)  [$($e.LoginType)]  Erstellt: $($e.CreateDate)\")\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse { $lines.Add(\"  (keine)\") }\r\n\t\t\t\t\t\r\n\t\t\t\t\t# SA-Konto\r\n\t\t\t\t\t$saEntry = $detailRows | Where-Object { $_.Status -eq 'SA' }\r\n\t\t\t\t\t$lines.Add(\"\"); $lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\t$lines.Add(\"# SA-KONTO (SID 0x01)\")\r\n\t\t\t\t\t$lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\tif ($saEntry)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tforeach ($e in $saEntry)\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$lines.Add((\"  Name: {0,-40} Enabled: {1}\" -f $e.LoginName, $e.IsEnabled))\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse { $lines.Add(\"  (nicht gefunden)\") }\r\n\t\t\t\t\t\r\n\t\t\t\t\t# Ausgeschlossene Konten\r\n\t\t\t\t\t$excludedEntries = $detailRows | Where-Object { $_.Status -eq 'Excluded' }\r\n\t\t\t\t\t$lines.Add(\"\"); $lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\t$lines.Add(\"# AUSGESCHLOSSENE KONTEN ($cntExcluded)\")\r\n\t\t\t\t\t$lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\tif ($excludedEntries)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tforeach ($e in ($excludedEntries | Sort-Object LoginType, LoginName))\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$lines.Add((\"  {0,-40} {1,-20} Enabled:{2}\" -f $e.LoginName, $e.LoginType, $e.IsEnabled))\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse { $lines.Add(\"  (keine)\") }\r\n\t\t\t\t\t\r\n\t\t\t\t\t$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force\r\n\t\t\t\t\t$detailRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force\r\n\t\t\t\t\t\r\n\t\t\t\t\tInvoke-sqmLogging -Message \"[$instance] Bericht erstellt: $txtFile\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t}\r\n\t\t\t\telse\r\n\t\t\t\t{\r\n\t\t\t\t\tInvoke-sqmLogging -Message \"[$instance] WhatIf: Berichtsdateien wuerden erstellt werden.\" -FunctionName $functionName -Level \"VERBOSE\"\r\n\t\t\t\t\t$txtFile = $null\r\n\t\t\t\t\t$csvFile = $null\r\n\t\t\t\t}\r\n\t\t\t\t\r\n\t\t\t\tif ($cntBuiltinAdmins -gt 0)\r\n\t\t\t\t{\r\n\t\t\t\t\tInvoke-sqmLogging -Message (\"[$instance] BUILTIN\\Administrators hat Sysadmin-Rechte - Sicherheitspruefung erforderlich!\") -FunctionName $functionName -Level \"WARNING\"\r\n\t\t\t\t}\r\n\t\t\t\tif ($cntUnexpected -gt 0)\r\n\t\t\t\t{\r\n\t\t\t\t\tInvoke-sqmLogging -Message (\"[$instance] $cntUnexpected unerwartete(s) sysadmin-Konto(en) gefunden.\") -FunctionName $functionName -Level \"WARNING\"\r\n\t\t\t\t}\r\n\t\t\t\t\r\n\t\t\t\t$instanceResult = [PSCustomObject]@{\r\n\t\t\t\t\tSqlInstance\t\t\t\t\t\t\t     = $instance\r\n\t\t\t\t\tTimestamp\t\t\t\t\t\t\t     = $timestamp\r\n\t\t\t\t\tDetailRows\t\t\t\t\t\t\t     = $detailRows\r\n\t\t\t\t\tTxtFile\t\t\t\t\t\t\t\t     = $txtFile\r\n\t\t\t\t\tCsvFile\t\t\t\t\t\t\t\t     = $csvFile\r\n\t\t\t\t\tStatus\t\t\t\t\t\t\t\t     = if ($cntUnexpected -gt 0 -or $cntBuiltinAdmins -gt 0) { 'Warning' } else { 'OK' }\r\n\t\t\t\t}\r\n\t\t\t\t$allInstanceResults.Add($instanceResult)\r\n\t\t\t}\r\n\t\t\tcatch\r\n\t\t\t{\r\n\t\t\t\t$errMsg = \"Fehler auf '$instance': $($_.Exception.Message)\"\r\n\t\t\t\tInvoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level \"ERROR\"\r\n\t\t\t\t$allInstanceResults.Add([PSCustomObject]@{\r\n\t\t\t\t\t\tSqlInstance = $instance\r\n\t\t\t\t\t\tStatus\t    = 'Error'\r\n\t\t\t\t\t\tMessage\t    = $errMsg\r\n\t\t\t\t\t\tDetailRows  = $null\r\n\t\t\t\t\t\tTxtFile\t    = $null\r\n\t\t\t\t\t\tCsvFile\t    = $null\r\n\t\t\t\t\t})\r\n\t\t\t\tif ($EnableException) { throw }\r\n\t\t\t\tif (-not $ContinueOnError) { throw $_ }\r\n\t\t\t}\r\n\t\t}\r\n\t}\r\n\t\r\n\tend\r\n\t{\r\n\t\tInvoke-sqmLogging -Message \"$functionName abgeschlossen. $($allInstanceResults.Count) Instanzen verarbeitet.\" -FunctionName $functionName -Level \"INFO\"\r\n\t\treturn $allInstanceResults\r\n\t}\r\n}"
+    ]
+  },
+  {
+    "Name": "Get-sqmTempDbRecommendation",
+    "Synopsis": "Analyzes the TempDB configuration and provides optimization recommendations.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmTempDbRecommendation -SqlInstance \"SQL01\""
+    ]
+  },
+  {
+    "Name": "Get-sqmTlsStatus",
+    "Synopsis": "Audits TLS/SSL configuration and certificate status for all SQL Server instances on one or more computers.",
+    "Params": [
+      "Credential",
+      "OutputPath",
+      "WarnDaysBeforeExpiry"
+    ],
+    "Examples": [
+      "Get-sqmTlsStatus",
+      "Get-sqmTlsStatus -ComputerName \"SQL01\", \"SQL02\" -OutputPath \"D:\\Reports\"",
+      "$cred = Get-Credential"
+    ]
+  },
+  {
+    "Name": "Get-sqmTsmConfiguration",
+    "Synopsis": "",
+    "Params": [
+      "ComputerName",
+      "DsmOptPath",
+      "IncludePasswordPlain",
+      "Credential",
+      "EnableException"
+    ],
+    "Examples": []
+  },
+  {
+    "Name": "Get-sqmWaitStatistics",
+    "Synopsis": "Reads and analyzes SQL Server wait statistics from sys.dm_os_wait_stats.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "TopN",
+      "IncludeIdle",
+      "SaveSnapshot",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "Get-sqmWaitStatistics -SqlInstance \"SQL01\" -TopN 20",
+      "$before = Get-sqmWaitStatistics -SqlInstance \"SQL01\" -SaveSnapshot"
+    ]
+  },
+  {
+    "Name": "Install-sqmAdModule",
+    "Synopsis": "Ensures that the ActiveDirectory PowerShell module (RSAT) is installed.",
+    "Params": [
+      "SkipIfPresent",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Install-sqmAdModule\r\n\r\n    Checks whether the AD module is present and installs it if necessary.",
+      "Install-sqmAdModule -ContinueOnError\r\n\r\n    Returns $false if installation fails instead of throwing an exception.",
+      "if (-not (Install-sqmAdModule -ContinueOnError))\r\n    {\r\n        Write-Warning \"AD module not available - AD check will be skipped.\"\r\n    }"
+    ]
+  },
+  {
+    "Name": "Install-sqmCertificate",
+    "Synopsis": "",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "CertFile",
+      "PrivateKeyFile",
+      "CertPassword",
+      "CertificateName",
+      "Database",
+      "Purpose",
+      "EndpointName",
+      "TdeDatabaseName",
+      "ReplaceCertificateName",
+      "ImportToWindowsStore",
+      "SetSqlServerSslCert",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Import PFX from CA and bind to AlwaysOn endpoint\r\n    Install-sqmCertificate -SqlInstance \"SQL01\" -CertFile \"C:\\Certs\\sql01.pfx\" `\r\n        -CertPassword (Read-Host -AsSecureString) -Purpose AlwaysOn",
+      "# Install public-key certificate on AlwaysOn replica (no private key)\r\n    Install-sqmCertificate -SqlInstance \"SQL02\" -CertFile \"C:\\Certs\\SQL01_AG_CERT.cer\" `\r\n        -CertificateName \"SQL01_AG_CERT\" -Purpose AlwaysOn",
+      "# Install CER + PVK and bind TDE\r\n    Install-sqmCertificate -SqlInstance \"SQL01\" `\r\n        -CertFile \"C:\\Certs\\tde_new.cer\" `\r\n        -PrivateKeyFile \"C:\\Certs\\tde_new.pvk\" `\r\n        -CertPassword (Read-Host -AsSecureString \"PVK password\") `\r\n        -Purpose TDE -TdeDatabaseName \"ProdDB\"",
+      "# Install SSL certificate (Windows Store + SQL Server network)\r\n    Install-sqmCertificate -SqlInstance \"SQL01\" -CertFile \"C:\\Certs\\ssl.pfx\" `\r\n        -CertPassword (Read-Host -AsSecureString) -Purpose SSL -SetSqlServerSslCert"
+    ]
+  },
+  {
+    "Name": "Install-sqmCertificateToStore",
+    "Synopsis": "",
+    "Params": [
+      "CertFile",
+      "StoreName",
+      "CertPassword"
+    ],
+    "Examples": [
+      "# Install a CA root certificate to the Trusted Root store on all AlwaysOn replica nodes",
+      "# Distribute a SQL Server self-signed certificate to an admin workstation",
+      "# Distribute an AlwaysOn partner certificate (CER without private key) to replica machines",
+      "# Install a PFX certificate with password into the Personal store on the local machine"
+    ]
+  },
+  {
+    "Name": "Install-sqmDb2Driver",
+    "Synopsis": "Installiert den IBM DB2 ODBC/CLI-Treiber.",
+    "Params": [
+      "SourcePath"
+    ],
+    "Examples": [
+      "Install-sqmDb2Driver -SourcePath '\\\\srv\\Treiber\\DB2'",
+      "Install-sqmDb2Driver -SourcePath 'C:\\Downloads\\db2_odbc_cli_64.exe'"
+    ]
+  },
+  {
+    "Name": "Install-sqmJdbcDriver",
+    "Synopsis": "Installiert den Microsoft JDBC Driver for SQL Server.",
+    "Params": [
+      "SourcePath",
+      "DestinationPath",
+      "UpdateClassPath"
+    ],
+    "Examples": [
+      "Install-sqmJdbcDriver -SourcePath '\\\\srv\\Treiber\\JDBC'",
+      "Install-sqmJdbcDriver -SourcePath 'C:\\Downloads\\jdbc' -UpdateClassPath $true"
+    ]
+  },
+  {
+    "Name": "Install-sqmOdbcDriver",
+    "Synopsis": "Installiert den Microsoft ODBC Driver for SQL Server.",
+    "Params": [
+      "SourcePath",
+      "DriverName"
+    ],
+    "Examples": [
+      "Install-sqmOdbcDriver -SourcePath '\\\\srv\\Treiber\\ODBC'",
+      "Install-sqmOdbcDriver -SourcePath 'C:\\Setup\\msodbcsql18.msi'"
+    ]
+  },
+  {
+    "Name": "Install-sqmOlaMaintenanceSolution",
+    "Synopsis": "Installs or updates Ola Hallengren's Maintenance Solution on a SQL Server instance.",
+    "Params": [
+      "SqlCredential",
+      "SourcePath",
+      "Force",
+      "Update",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Install-sqmOlaMaintenanceSolution -SqlInstance \"SQL01\"",
+      "Install-sqmOlaMaintenanceSolution -SqlInstance \"SQL01\" -Force"
+    ]
+  },
+  {
+    "Name": "Install-sqmSsrsReportServer",
+    "Synopsis": "",
+    "Params": [
+      "ComputerName",
+      "InstallerPath",
+      "Edition",
+      "ProductKey",
+      "Force",
+      "SkipConfiguration",
+      "WmiWaitSeconds",
+      "InstanceName",
+      "DatabaseServer",
+      "DatabaseName",
+      "ReportServerUrl",
+      "ReportsUrl",
+      "ServiceAccount",
+      "ServiceAccountPassword",
+      "DatabaseAuthType",
+      "DatabaseCredential",
+      "EncryptionKeyFile",
+      "EncryptionKeyPassword",
+      "SkipDatabase",
+      "SkipUrls",
+      "SkipServiceAccount",
+      "SkipEncryptionKeyBackup",
+      "Credential",
+      "OutputPath",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Install-sqmSsrsReportServer",
+      "Install-sqmSsrsReportServer `",
+      "Install-sqmSsrsReportServer -SkipConfiguration -WhatIf"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmAddDatabaseToAG",
+    "Synopsis": "Adds one or more databases to an Always On availability group (AutoSeed).",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "AvailabilityGroup",
+      "All",
+      "EnableException"
+    ],
+    "Examples": [
+      "Add-sqmDatabaseToAvailabilityGroup -AvailabilityGroup \"AG1\" -Database \"SalesDB\"",
+      "Add-sqmDatabaseToAvailabilityGroup -AvailabilityGroup \"AG1\" -All"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmCollationChange",
+    "Synopsis": "Automatically changes the server collation of a SQL Server instance.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "NewCollation",
+      "IncludeUserDatabases",
+      "BackupBeforeChange",
+      "ServiceName",
+      "StartupTimeoutSeconds",
+      "OutputPath",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Invoke-sqmCollationChange -NewCollation \"Latin1_General_CI_AS\"",
+      "Invoke-sqmCollationChange -SqlInstance \"SQL01\\INST2\" -NewCollation \"German_CI_AS\" -IncludeUserDatabases -BackupBeforeChange"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmDeployScripts",
+    "Synopsis": "Executes numbered SQL scripts from a directory sequentially against a SQL Server database.",
+    "Params": [
+      "SqlInstance",
+      "Database",
+      "ScriptPath",
+      "LogPath",
+      "JobNumber",
+      "QueryTimeout",
+      "SkipBackup",
+      "NoWrapTransaction",
+      "SqlCredential"
+    ],
+    "Examples": [
+      "# Basic deploy with automatic backup",
+      "# Deploy with job number embedded in log filename",
+      "# Skip backup - requires interactive confirmation",
+      "# WhatIf dry run - no SQL executed, only pre-checks and summary table",
+      "# No outer transaction - scripts manage their own transactions",
+      "# SQL Server authentication"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmExtendedEvents",
+    "Synopsis": "Manages Extended Events sessions for performance analysis on SQL Server.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "SessionName",
+      "Template",
+      "SlowQueryThresholdMs",
+      "WaitTypes",
+      "TargetType",
+      "TargetFilePath",
+      "MaxFileSizeMB",
+      "MaxRolloverFiles",
+      "RingBufferMaxMB",
+      "MaxEventsRead",
+      "LookbackMinutes",
+      "TopN",
+      "OutputPath",
+      "Create",
+      "Start",
+      "Stop",
+      "Read",
+      "Diagnose",
+      "Drop",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Create AllInOne session and start immediately",
+      "# Record Slow Queries > 2 seconds, save to file",
+      "# Read running session and create report",
+      "# Stop session and remove it"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmFailover",
+    "Synopsis": "Performs a controlled AlwaysOn AG failover with pre- and post-checks.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "AvailabilityGroup",
+      "TargetReplica",
+      "MaxRedoQueueMB",
+      "WaitAfterFailoverSeconds",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Invoke-sqmFailover -SqlInstance \"SQL01\" -AvailabilityGroup \"AG_Prod\" -WhatIf",
+      "Invoke-sqmFailover -SqlInstance \"SQL01\" -AvailabilityGroup \"AG_Prod\" `"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmFormatDrive64k",
+    "Synopsis": "",
+    "Params": [
+      "BackupPath",
+      "Force"
+    ],
+    "Examples": [
+      "Invoke-sqmFormatDrive64k -DriveLetter D",
+      "Invoke-sqmFormatDrive64k -DriveLetter E -BackupPath \"C:\\Backup\\DriveTemp\" -Force",
+      "Invoke-sqmFormatDrive64k -DriveLetter D -WhatIf"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmInstanceInventory",
+    "Synopsis": "Creates a complete inventory of a SQL Server instance as a structured report (TXT + CSV).",
+    "Params": [
+      "SqlCredential",
+      "OutputPath",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Invoke-sqmInstanceInventory",
+      "Invoke-sqmInstanceInventory -SqlInstance \"SQL01\", \"SQL02\" -ContinueOnError"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmLoginAudit",
+    "Synopsis": "Comprehensive audit of all SQL Server logins on one or more instances.",
+    "Params": [
+      "SqlCredential",
+      "InactivityThresholdDays",
+      "MaxPasswordAgeDays",
+      "IncludeSystemLogins",
+      "CheckAdOrphans",
+      "OutputPath",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Invoke-sqmLoginAudit",
+      "Invoke-sqmLoginAudit -SqlInstance \"SQL01\" -CheckAdOrphans -IncludeSystemLogins"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmLogShrink",
+    "Synopsis": "Shrinks the transaction log file (LDF) of one or more databases.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "All",
+      "ShrinkTargetPercent",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Invoke-sqmLogShrink -Database \"MyDB\" -ShrinkTargetPercent 20",
+      "Invoke-sqmLogShrink -SqlInstance \"SQL01\" -All -WhatIf"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmMonitoringKey",
+    "Synopsis": "Gets or sets monitoring registry values for the sqmSQLTool on one or more computers.",
+    "Params": [
+      "Operation",
+      "SQL",
+      "SQLFreeSpaceVersion",
+      "RegistryBase",
+      "AutoDetectSQLFreeSpaceVersion",
+      "Credential",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Invoke-sqmMonitoringKey",
+      "Invoke-sqmMonitoringKey -Operation Set -SQL Standard -TSM 1 -AutoDetectSQLFreeSpaceVersion",
+      "\"SQL01\",\"SQL02\" | Invoke-sqmMonitoringKey -Operation Set -SQL Full -TSM 1\r\n#>\r\nfunction Invoke-sqmMonitoringKey\r\n{\r\n\t[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]\r\n\t[OutputType([PSCustomObject])]\r\n\tparam (\r\n\t\t[Parameter(Mandatory = $false, ValueFromPipeline = $true)]\r\n\t\t[Alias('Computer', 'Server')]\r\n\t\t[string[]]$ComputerName = @($env:COMPUTERNAME),\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[ValidateSet('Get', 'Set')]\r\n\t\t[string]$Operation = 'Get',\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[ValidateSet('None', 'Standard', 'Full')]\r\n\t\t[string]$SQL,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[ValidateSet('Standard', 'Cluster')]\r\n\t\t[string]$SQLFreeSpaceVersion,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[ValidateSet(0, 1)]\r\n\t\t[Nullable[int]]$TSM,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$RegistryBase = 'System',\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[switch]$AutoDetectSQLFreeSpaceVersion,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[System.Management.Automation.PSCredential]$Credential,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[switch]$ContinueOnError,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[switch]$EnableException\r\n\t)\r\n\t\r\n\tbegin\r\n\t{\r\n\t\t$functionName = $MyInvocation.MyCommand.Name\r\n\t\t$regSubKey = \"$RegistryBase\\dtcSoftware\\sqmSQLTool\"\r\n\t\t$regPath = \"HKLM:\\$regSubKey\"\r\n\t\t\r\n\t\t$sqlToDword = @{ 'None' = 0; 'Standard' = 1; 'Full' = 2 }\r\n\t\t$sqlDesc = @{ 0 = 'NoMonitoring'; 1 = 'ServiceMonitoring'; 2 = 'FullMonitoring' }\r\n\t\t$tsmDesc = @{ 0 = 'Inactive'; 1 = 'Active' }\r\n\t\t\r\n\t\t$allResults = [System.Collections.Generic.List[PSCustomObject]]::new()\r\n\t}\r\n\t\r\n\tprocess\r\n\t{\r\n\t\tforeach ($computer in $ComputerName)\r\n\t\t{\r\n\t\t\ttry\r\n\t\t\t{\r\n\t\t\t\tInvoke-sqmLogging -Message \"[$computer] Operation: $Operation\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\r\n\t\t\t\t$effectiveFreeSpaceVersion = $SQLFreeSpaceVersion\r\n\t\t\t\t\r\n\t\t\t\t# AutoDetect (nur bei Set)\r\n\t\t\t\tif ($Operation -eq 'Set' -and $AutoDetectSQLFreeSpaceVersion -and [string]::IsNullOrWhiteSpace($effectiveFreeSpaceVersion))\r\n\t\t\t\t{\r\n\t\t\t\t\tInvoke-sqmLogging -Message \"[$computer] AutoDetect SQLFreeSpaceVersion ...\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\ttry\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tif (-not (Get-Module -ListAvailable -Name dbatools))\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\tInvoke-sqmLogging -Message \"dbatools nicht gefunden - AutoDetect uebersprungen, verwende 'Standard'.\" -FunctionName $functionName -Level \"WARNING\"\r\n\t\t\t\t\t\t\t$effectiveFreeSpaceVersion = 'Standard'\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t\telse\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$agCheck = Get-DbaAvailabilityGroup -SqlInstance $computer -ErrorAction SilentlyContinue\r\n\t\t\t\t\t\t\t$effectiveFreeSpaceVersion = if ($agCheck) { 'Cluster' }\r\n\t\t\t\t\t\t\telse { 'Standard' }\r\n\t\t\t\t\t\t\tInvoke-sqmLogging -Message \"[$computer] AutoDetect Ergebnis: $effectiveFreeSpaceVersion\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\tcatch\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tInvoke-sqmLogging -Message \"[$computer] AutoDetect fehlgeschlagen: $($_.Exception.Message)\" -FunctionName $functionName -Level \"WARNING\"\r\n\t\t\t\t\t\t$effectiveFreeSpaceVersion = 'Standard'\r\n\t\t\t\t\t}\r\n\t\t\t\t}\r\n\t\t\t\t\r\n\t\t\t\t# Schreibvorgang\r\n\t\t\t\tif ($Operation -eq 'Set')\r\n\t\t\t\t{\r\n\t\t\t\t\tif ([string]::IsNullOrWhiteSpace($SQL) -and [string]::IsNullOrWhiteSpace($effectiveFreeSpaceVersion) -and $null -eq $TSM)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tInvoke-sqmLogging -Message \"[$computer] Keine Werte zum Setzen angegeben.\" -FunctionName $functionName -Level \"WARNING\"\r\n\t\t\t\t\t\tcontinue\r\n\t\t\t\t\t}\r\n\t\t\t\t\t\r\n\t\t\t\t\tif ($PSCmdlet.ShouldProcess($computer, \"Setze Monitoring-Registry-Werte in '$regPath'\"))\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\t# Stelle sicher, dass der Schluessel existiert (lokal/remote)\r\n\t\t\t\t\t\t$keyExists = $false\r\n\t\t\t\t\t\ttry\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\tif ($computer -eq $env:COMPUTERNAME -or $computer -eq 'localhost' -or $computer -eq '.')\r\n\t\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t\t$fullPath = \"HKLM:\\$regSubKey\"\r\n\t\t\t\t\t\t\t\tif (-not (Test-Path $fullPath))\r\n\t\t\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t\t\tNew-Item -Path $fullPath -Force -ErrorAction Stop | Out-Null\r\n\t\t\t\t\t\t\t\t\tInvoke-sqmLogging -Message \"[$computer] Registry-Schluessel erstellt: $fullPath\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\t\t\t\t}\r\n\t\t\t\t\t\t\t\t$keyExists = $true\r\n\t\t\t\t\t\t\t}\r\n\t\t\t\t\t\t\telse\r\n\t\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t\t# Remote: Pruefe/Erstelle ueber Invoke-Command\r\n\t\t\t\t\t\t\t\t$sb = {\r\n\t\t\t\t\t\t\t\t\tparam ($sk)\r\n\t\t\t\t\t\t\t\t\t$fullPath = \"HKLM:\\$sk\"\r\n\t\t\t\t\t\t\t\t\tif (-not (Test-Path $fullPath))\r\n\t\t\t\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t\t\t\tNew-Item -Path $fullPath -Force -ErrorAction Stop | Out-Null\r\n\t\t\t\t\t\t\t\t\t\tWrite-Output \"CREATED\"\r\n\t\t\t\t\t\t\t\t\t}\r\n\t\t\t\t\t\t\t\t\telse\r\n\t\t\t\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t\t\t\tWrite-Output \"EXISTS\"\r\n\t\t\t\t\t\t\t\t\t}\r\n\t\t\t\t\t\t\t\t}\r\n\t\t\t\t\t\t\t\t$invokeParams = @{\r\n\t\t\t\t\t\t\t\t\tComputerName = $computer\r\n\t\t\t\t\t\t\t\t\tScriptBlock  = $sb\r\n\t\t\t\t\t\t\t\t\tArgumentList = $regSubKey\r\n\t\t\t\t\t\t\t\t\tErrorAction  = 'Stop'\r\n\t\t\t\t\t\t\t\t}\r\n\t\t\t\t\t\t\t\tif ($Credential) { $invokeParams['Credential'] = $Credential }\r\n\t\t\t\t\t\t\t\t$result = Invoke-Command @invokeParams\r\n\t\t\t\t\t\t\t\tif ($result -eq 'CREATED')\r\n\t\t\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t\t\tInvoke-sqmLogging -Message \"[$computer] Registry-Schluessel remote erstellt: HKLM:\\$regSubKey\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\t\t\t\t}\r\n\t\t\t\t\t\t\t\t$keyExists = $true\r\n\t\t\t\t\t\t\t}\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t\tcatch\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\tInvoke-sqmLogging -Message \"[$computer] Fehler bei Schluesselerstellung: $($_.Exception.Message)\" -FunctionName $functionName -Level \"ERROR\"\r\n\t\t\t\t\t\t\tthrow\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t\t\r\n\t\t\t\t\t\t# Nun Werte setzen\r\n\t\t\t\t\t\t$values = @{ }\r\n\t\t\t\t\t\tif (-not [string]::IsNullOrWhiteSpace($SQL)) { $values['SQL'] = $sqlToDword[$SQL] }\r\n\t\t\t\t\t\tif (-not [string]::IsNullOrWhiteSpace($effectiveFreeSpaceVersion)) { $values['SQLFreeSpaceVersion'] = $effectiveFreeSpaceVersion }\r\n\t\t\t\t\t\tif ($null -ne $TSM) { $values['TSM'] = [int]$TSM }\r\n\t\t\t\t\t\t\r\n\t\t\t\t\t\tif ($computer -eq $env:COMPUTERNAME -or $computer -eq 'localhost' -or $computer -eq '.')\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$fullPath = \"HKLM:\\$regSubKey\"\r\n\t\t\t\t\t\t\tforeach ($entry in $values.GetEnumerator())\r\n\t\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t\t$type = if ($entry.Value -is [int]) { 'DWord' }\r\n\t\t\t\t\t\t\t\telse { 'String' }\r\n\t\t\t\t\t\t\t\tSet-ItemProperty -Path $fullPath -Name $entry.Key -Value $entry.Value -Type $type -ErrorAction Stop\r\n\t\t\t\t\t\t\t}\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t\telse\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$sb2 = {\r\n\t\t\t\t\t\t\t\tparam ($sk,\r\n\t\t\t\t\t\t\t\t\t$vals)\r\n\t\t\t\t\t\t\t\t$fullPath = \"HKLM:\\$sk\"\r\n\t\t\t\t\t\t\t\tforeach ($entry in $vals.GetEnumerator())\r\n\t\t\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t\t\t$type = if ($entry.Value -is [int]) { 'DWord' }\r\n\t\t\t\t\t\t\t\t\telse { 'String' }\r\n\t\t\t\t\t\t\t\t\tSet-ItemProperty -Path $fullPath -Name $entry.Key -Value $entry.Value -Type $type -ErrorAction Stop\r\n\t\t\t\t\t\t\t\t}\r\n\t\t\t\t\t\t\t\treturn $true\r\n\t\t\t\t\t\t\t}\r\n\t\t\t\t\t\t\t$invokeParams2 = @{\r\n\t\t\t\t\t\t\t\tComputerName = $computer\r\n\t\t\t\t\t\t\t\tScriptBlock  = $sb2\r\n\t\t\t\t\t\t\t\tArgumentList = $regSubKey, $values\r\n\t\t\t\t\t\t\t\tErrorAction  = 'Stop'\r\n\t\t\t\t\t\t\t}\r\n\t\t\t\t\t\t\tif ($Credential) { $invokeParams2['Credential'] = $Credential }\r\n\t\t\t\t\t\t\tInvoke-Command @invokeParams2 | Out-Null\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t\tInvoke-sqmLogging -Message \"[$computer] Werte erfolgreich gesetzt.\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tInvoke-sqmLogging -Message \"[$computer] WhatIf: Schreibvorgang uebersprungen.\" -FunctionName $functionName -Level \"VERBOSE\"\r\n\t\t\t\t\t}\r\n\t\t\t\t}\r\n\t\t\t\t\r\n\t\t\t\t# Lesen (immer, auch nach Set)\r\n\t\t\t\t# Hier wird der Schluessel NICHT erstellt - nur lesen\r\n\t\t\t\t$current = $null\r\n\t\t\t\ttry\r\n\t\t\t\t{\r\n\t\t\t\t\tif ($computer -eq $env:COMPUTERNAME -or $computer -eq 'localhost' -or $computer -eq '.')\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\t$fullPath = \"HKLM:\\$regSubKey\"\r\n\t\t\t\t\t\tif (Test-Path $fullPath)\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$key = Get-ItemProperty -Path $fullPath -ErrorAction Stop\r\n\t\t\t\t\t\t\t$current = @{\r\n\t\t\t\t\t\t\t\tSQL = $key.SQL\r\n\t\t\t\t\t\t\t\tSQLFreeSpaceVersion = $key.SQLFreeSpaceVersion\r\n\t\t\t\t\t\t\t\tTSM = $key.TSM\r\n\t\t\t\t\t\t\t\t_KeyExists = $true\r\n\t\t\t\t\t\t\t}\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t\telse\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$current = @{ _KeyExists = $false }\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\t$sbRead = {\r\n\t\t\t\t\t\t\tparam ($sk)\r\n\t\t\t\t\t\t\t$fullPath = \"HKLM:\\$sk\"\r\n\t\t\t\t\t\t\tif (Test-Path $fullPath)\r\n\t\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t\t$key = Get-ItemProperty -Path $fullPath -ErrorAction Stop\r\n\t\t\t\t\t\t\t\treturn @{\r\n\t\t\t\t\t\t\t\t\tSQL = $key.SQL\r\n\t\t\t\t\t\t\t\t\tSQLFreeSpaceVersion = $key.SQLFreeSpaceVersion\r\n\t\t\t\t\t\t\t\t\tTSM = $key.TSM\r\n\t\t\t\t\t\t\t\t\t_KeyExists = $true\r\n\t\t\t\t\t\t\t\t}\r\n\t\t\t\t\t\t\t}\r\n\t\t\t\t\t\t\telse\r\n\t\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t\treturn @{ _KeyExists = $false }\r\n\t\t\t\t\t\t\t}\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t\t$invokeRead = @{\r\n\t\t\t\t\t\t\tComputerName = $computer\r\n\t\t\t\t\t\t\tScriptBlock  = $sbRead\r\n\t\t\t\t\t\t\tArgumentList = $regSubKey\r\n\t\t\t\t\t\t\tErrorAction  = 'Stop'\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t\tif ($Credential) { $invokeRead['Credential'] = $Credential }\r\n\t\t\t\t\t\t$current = Invoke-Command @invokeRead\r\n\t\t\t\t\t}\r\n\t\t\t\t}\r\n\t\t\t\tcatch\r\n\t\t\t\t{\r\n\t\t\t\t\tthrow \"Registry-Lesen fehlgeschlagen: $($_.Exception.Message)\"\r\n\t\t\t\t}\r\n\t\t\t\t\r\n\t\t\t\t$status = if ($Operation -eq 'Set') { if ($current._KeyExists) { 'Updated' }\r\n\t\t\t\t\telse { 'Created' } }\r\n\t\t\t\telseif ($current._KeyExists) { 'OK' }\r\n\t\t\t\telse { 'KeyNotFound' }\r\n\t\t\t\t\r\n\t\t\t\t$sqlVal = $current.SQL\r\n\t\t\t\t$tsmVal = $current.TSM\r\n\t\t\t\t$fsvVal = $current.SQLFreeSpaceVersion\r\n\t\t\t\t$sqlText = if ($null -ne $sqlVal -and $sqlDesc.ContainsKey([int]$sqlVal)) { $sqlDesc[[int]$sqlVal] }\r\n\t\t\t\telse { '(nicht gesetzt)' }\r\n\t\t\t\t$tsmText = if ($null -ne $tsmVal -and $tsmDesc.ContainsKey([int]$tsmVal)) { $tsmDesc[[int]$tsmVal] }\r\n\t\t\t\telse { '(nicht gesetzt)' }\r\n\t\t\t\t\r\n\t\t\t\t$msg = switch ($status)\r\n\t\t\t\t{\r\n\t\t\t\t\t'KeyNotFound' { \"Registry-Schluessel '$regPath' nicht vorhanden.\" }\r\n\t\t\t\t\t'Created'     { \"Schluessel neu erstellt und Werte gesetzt.\" }\r\n\t\t\t\t\t'Updated'     { \"Werte aktualisiert.\" }\r\n\t\t\t\t\tdefault       { \"Werte erfolgreich ausgelesen.\" }\r\n\t\t\t\t}\r\n\t\t\t\t\r\n\t\t\t\t$allResults.Add([PSCustomObject]@{\r\n\t\t\t\t\t\tComputerName = $computer\r\n\t\t\t\t\t\tRegistryPath = \"HKLM:\\$regSubKey\"\r\n\t\t\t\t\t\tSQL\t\t     = $sqlVal\r\n\t\t\t\t\t\tSQL_Description = $sqlText\r\n\t\t\t\t\t\tSQLFreeSpaceVersion = $fsvVal\r\n\t\t\t\t\t\tTSM\t\t     = $tsmVal\r\n\t\t\t\t\t\tTSM_Description = $tsmText\r\n\t\t\t\t\t\tStatus\t     = $status\r\n\t\t\t\t\t\tMessage\t     = $msg\r\n\t\t\t\t\t})\r\n\t\t\t}\r\n\t\t\tcatch\r\n\t\t\t{\r\n\t\t\t\t$errMsg = $_.Exception.Message\r\n\t\t\t\tInvoke-sqmLogging -Message \"[$computer] Fehler: $errMsg\" -FunctionName $functionName -Level \"ERROR\"\r\n\t\t\t\t$allResults.Add([PSCustomObject]@{\r\n\t\t\t\t\t\tComputerName = $computer\r\n\t\t\t\t\t\tRegistryPath = \"HKLM:\\$regSubKey\"\r\n\t\t\t\t\t\tSQL\t\t     = $null\r\n\t\t\t\t\t\tSQL_Description = '(Fehler)'\r\n\t\t\t\t\t\tSQLFreeSpaceVersion = $null\r\n\t\t\t\t\t\tTSM\t\t     = $null\r\n\t\t\t\t\t\tTSM_Description = '(Fehler)'\r\n\t\t\t\t\t\tStatus\t     = 'Failed'\r\n\t\t\t\t\t\tMessage\t     = $errMsg\r\n\t\t\t\t\t})\r\n\t\t\t\tif ($EnableException) { throw }\r\n\t\t\t\tif (-not $ContinueOnError) { throw }\r\n\t\t\t}\r\n\t\t}\r\n\t}\r\n\t\r\n\tend\r\n\t{\r\n\t\tInvoke-sqmLogging -Message \"$functionName abgeschlossen.\" -FunctionName $functionName -Level \"INFO\"\r\n\t\treturn $allResults\r\n\t}\r\n}"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmPatchAnalysis",
+    "Synopsis": "Compares the installed SQL Server version with known CU/SP builds.",
+    "Params": [
+      "SqlCredential",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "Invoke-sqmPatchAnalysis -SqlInstance \"SQL01\"",
+      "\"SQL01\",\"SQL02\",\"SQL03\" | Invoke-sqmPatchAnalysis",
+      "Invoke-sqmPatchAnalysis -SqlInstance \"SQL01\",\"SQL02\" -OutputPath \"D:\\Reports\""
+    ]
+  },
+  {
+    "Name": "Invoke-sqmPerfBaseline",
+    "Synopsis": "Creates, compares or lists performance baselines (wait stats + perf counters).",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "Action",
+      "BaselineName",
+      "BaselineA",
+      "BaselineB",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Capture baseline",
+      "# Capture baseline after change and compare",
+      "# List all baselines"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmQueryStore",
+    "Synopsis": "Configures the Query Store, reads from it, detects issues and saves reports.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "All",
+      "Configure",
+      "Query",
+      "Diagnose",
+      "OperationMode",
+      "FlushIntervalSeconds",
+      "IntervalLengthMinutes",
+      "MaxStorageSizeMB",
+      "QueryCaptureMode",
+      "SizeBasedCleanupMode",
+      "MaxPlansPerQuery",
+      "TopN",
+      "OrderBy",
+      "LookbackHours",
+      "MinExecutionCount",
+      "StorageWarningPct",
+      "MaxPlansWarning",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Report for all databases (Query + Diagnose)",
+      "# Configure Query Store and query immediately",
+      "# Top 50 queries by CPU consumption, last 48 hours",
+      "# Diagnostics with storage warning from 70% and save report"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmRestoreDatabase",
+    "Synopsis": "Restores a database from a backup file, with support for single-server and AlwaysOn environments.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "DatabaseName",
+      "NewDatabaseName",
+      "NewDatabaseFilePath",
+      "NewLogFilePath",
+      "BackupBeforeRestore",
+      "NoUserExport",
+      "KeepAlwaysOn",
+      "WithNoRecovery",
+      "ContinueWithNoRecovery",
+      "ForceSingleUser",
+      "RejoinAvailabilityGroup",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Simple restore of a full backup file\r\nInvoke-sqmRestoreDatabase -SqlInstance \"SQL01\" -BackupFile \"D:\\Backup\\AdventureWorks.bak\" -DatabaseName \"AdventureWorks\"",
+      "# Restore with Full + Diff + Logs\r\n$backupSequence = @(\r\n    \"D:\\Backup\\AdventureWorks_Full.bak\",\r\n    \"D:\\Backup\\AdventureWorks_Diff.bak\",\r\n    \"D:\\Backup\\AdventureWorks_Log1.trn\",\r\n    \"D:\\Backup\\AdventureWorks_Log2.trn\"\r\n)\r\nInvoke-sqmRestoreDatabase -SqlInstance \"SQL01\" -BackupFiles $backupSequence -DatabaseName \"AdventureWorks\"",
+      "# Restore with new name and forced Single-User mode\r\nInvoke-sqmRestoreDatabase -SqlInstance \"SQL01\" -BackupFile \"D:\\Backup\\OldDB.bak\" -DatabaseName \"OldDB\" -NewDatabaseName \"NewDB\" -ForceSingleUser"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmSaObfuscation",
+    "Synopsis": "Obfuscates the SA account on a SQL Server instance by renaming it, disabling it, and setting a random password.",
+    "Params": [
+      "SqlCredential",
+      "NewName",
+      "PasswordLength",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Invoke-sqmSaObfuscation -SqlInstance \"SQL01\"",
+      "Invoke-sqmSaObfuscation -SqlInstance \"SQL01\" -NewName \"hidden_sa\" -PasswordLength 24"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmSetDatabaseRecoveryMode",
+    "Synopsis": "Changes the recovery mode of one or more user databases.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "All",
+      "RecoveryMode",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Set all user databases to Full (without prompting)\r\nInvoke-sqmSetDatabaseRecoveryMode -All -RecoveryMode Full",
+      "# With confirmation prompt (passed to Set-DbaDbRecoveryModel)\r\nInvoke-sqmSetDatabaseRecoveryMode -Database \"SalesDB\" -RecoveryMode Simple -Confirm"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmSetupReport",
+    "Synopsis": "Erstellt einen HTML-Abschlussbericht nach SQL Server Setup / PostInstall.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "CheckProfile",
+      "OutputPath",
+      "PassThru",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Am Ende von PostInstall - CheckProfile aus Modulkonfiguration",
+      "# FI-TS-Checks erzwingen (z.B. fuer Tests ausserhalb der Domaene)",
+      "# Nur generische Checks - kein FI-TS-Profil"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmSignModule",
+    "Synopsis": "Signs all PowerShell script files in a module directory using Set-AuthenticodeSignature.",
+    "Params": [
+      "ModulePath",
+      "CertificateThumbprint",
+      "CertificatePath",
+      "CertificatePassword",
+      "TimestampServer",
+      "Force"
+    ],
+    "Examples": [
+      "# 1. Sign with a specific certificate from the store",
+      "# 2. Sign with a PFX file",
+      "# 3. Auto-detect certificate (no parameters needed if cert is in store)",
+      "# 4. WhatIf dry run - show which files would be signed",
+      "# 5. Force re-sign all files, even those already signed"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmSqlAlwaysOnAutoseeding",
+    "Synopsis": "Enables Automatic Seeding on all replicas of an Always On Availability Group.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "All",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Uses the current computer name as default\r\nInvoke-sqmSqlAlwaysOnAutoseeding",
+      "# Explicit instance specification\r\nInvoke-sqmSqlAlwaysOnAutoseeding -SqlInstance \"SQL01\\INSTANCE\"",
+      "# All groups on the current computer\r\nInvoke-sqmSqlAlwaysOnAutoseeding -All"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmSsisConfiguration",
+    "Synopsis": "",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "AgName",
+      "AgListener",
+      "CatalogPassword",
+      "CatalogFolderDescription",
+      "SsisServiceAccount",
+      "SsisServiceAccountPassword",
+      "SsisServiceStartupType",
+      "RetentionPeriod",
+      "LoggingLevel",
+      "MaxConcurrentExecutables",
+      "SkipService",
+      "SkipCatalog",
+      "SkipAg",
+      "SkipFolders",
+      "WinRmCredential",
+      "OutputPath",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "$pwd = Read-Host \"SSISDB-Kennwort\" -AsSecureString\r\n    Invoke-sqmSsisConfiguration -SqlInstance \"SQL01\" -CatalogPassword $pwd",
+      "$pwd = Read-Host \"SSISDB-Kennwort\" -AsSecureString\r\n    Invoke-sqmSsisConfiguration -SqlInstance \"SQL01\" -AgName \"AG_SSIS\" -CatalogPassword $pwd"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmTsmConfiguration",
+    "Synopsis": "",
+    "Params": [
+      "ComputerName",
+      "SqlInstance",
+      "DsmOptPath",
+      "BackupDirectory",
+      "ManagementClass",
+      "UseDiff",
+      "SqlCredential",
+      "Credential",
+      "OutputPath",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Invoke-sqmTsmConfiguration -ManagementClass MC_B_NL.NL_42.42.NA",
+      "Invoke-sqmTsmConfiguration -ComputerName \"SQL01\" -UseDiff",
+      "Invoke-sqmTsmConfiguration -ComputerName \"SQL01\" -AdditionalIncludePaths \"E:\\Archive\""
+    ]
+  },
+  {
+    "Name": "Invoke-sqmUpdateStatistics",
+    "Synopsis": "Updates statistics in one or more databases.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "Database",
+      "Table",
+      "Statistics",
+      "SamplePercent",
+      "OnlyModified",
+      "Index",
+      "EnableException"
+    ],
+    "Examples": [
+      "Invoke-sqmUpdateStatistics -Database 'SalesDB' -SamplePercent 10"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmUserDatabaseBackup",
+    "Synopsis": "Backs up user databases on a SQL Server instance.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "All",
+      "BackupPath",
+      "UseExcludeTable",
+      "CheckPreferredReplica",
+      "MailTo",
+      "MailProfile",
+      "MailOnSuccess",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Back up all user databases on the current computer",
+      "# Back up specific databases on a remote server",
+      "# With an alternative path",
+      "# Back up all user databases, skipping databases listed in sqm_BackupExclude",
+      "# Back up with exclude table on a remote instance",
+      "# Only run backup if this instance is the preferred AG backup replica",
+      "# Back up all databases and send a mail report on errors (uses default mail profile)",
+      "# Back up all databases and always send a mail report (success and failure)",
+      "# Full pipeline: AG-aware backup with exclude table and mail notification"
+    ]
+  },
+  {
+    "Name": "New-sqmAgentProxy",
+    "Synopsis": "Erstellt einen SQL Server Credential und einen SQL Agent Proxy und verbindet beide.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "CredentialName",
+      "ProxyName",
+      "ProxyDescription",
+      "WindowsCredential",
+      "WindowsUserName",
+      "Force",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Einzeiler - Credential-Dialog erscheint automatisch",
+      "# Nur SSIS - Benutzername vorausgewaehlt im Dialog",
+      "# CmdExec und PowerShell",
+      "# Abweichender Windows-Account und Force",
+      "# Unattended / Skript-Betrieb mit SecureString aus Vault"
+    ]
+  },
+  {
+    "Name": "New-sqmAlwaysOnRepairJob",
+    "Synopsis": "Creates a SQL Server Agent job that regularly runs Repair-sqmAlwaysOnDatabases.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "JobName",
+      "Schedule",
+      "StartTime",
+      "Force",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Creates an hourly job\r\nNew-sqmAlwaysOnRepairJob",
+      "# Daily job at 2 AM\r\nNew-sqmAlwaysOnRepairJob -Schedule \"FREQ=DAILY;INTERVAL=1\" -StartTime \"02:00:00\""
+    ]
+  },
+  {
+    "Name": "New-sqmBackupMaintenanceJob",
+    "Synopsis": "Creates a SQL Agent job with two steps that implement the full dynamic backup maintenance workflow.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "JobName",
+      "BackupType",
+      "BackupPath",
+      "ScheduleTime",
+      "ScheduleIntervalMinutes",
+      "JobCategory",
+      "UseExcludeTable",
+      "CheckPreferredReplica",
+      "IncludeSystemDatabases",
+      "MailTo",
+      "MailProfile",
+      "MailOnSuccess",
+      "OperatorName",
+      "Update",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Weekly FULL backup Sunday 20:00 with all features",
+      "# Daily DIFF backup with exclude table",
+      "# LOG backup every 15 minutes",
+      "# Replace existing job"
+    ]
+  },
+  {
+    "Name": "New-sqmCertificateRequest",
+    "Synopsis": "",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "CertificateName",
+      "Database",
+      "Subject",
+      "KeyLength",
+      "ValidityYears",
+      "Purpose",
+      "OutputPath",
+      "Organization",
+      "OrganizationalUnit",
+      "Locality",
+      "State",
+      "Country",
+      "EnableException"
+    ],
+    "Examples": [
+      "# CSR based on an existing certificate\r\n    New-sqmCertificateRequest -SqlInstance \"SQL01\" -CertificateName \"AG_CERT\"",
+      "# New CSR without template, all fields specified manually\r\n    New-sqmCertificateRequest -SqlInstance \"SQL01\" -Purpose \"SSL\" `\r\n        -Subject \"CN=SQL01.firma.de,O=Firma GmbH,L=Muenchen,C=DE\" `\r\n        -SubjectAlternativeNames @(\"sql01.firma.de\",\"sql01\",\"192.168.1.10\") `\r\n        -KeyLength 4096 -ValidityYears 2",
+      "# CSR with output to a specific directory\r\n    New-sqmCertificateRequest -SqlInstance \"SQL01\" -CertificateName \"TLS_CERT\" `\r\n        -OutputPath \"D:\\CertRequests\""
+    ]
+  },
+  {
+    "Name": "New-sqmOlaMaintenanceJobs",
+    "Synopsis": "",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "JobCategory",
+      "JobNameIndexOpt",
+      "JobNameIntUserDb",
+      "JobNameIntSysDb",
+      "ScheduleTime",
+      "ScheduleDay",
+      "Databases",
+      "FragmentationLevel1",
+      "FragmentationLevel2",
+      "MinNumberOfPages",
+      "FillFactor",
+      "MaxDOP",
+      "SortInTempdb",
+      "UpdateStatistics",
+      "OnlyModifiedStatistics",
+      "StatisticsSample",
+      "LogToTable",
+      "CheckCommands",
+      "PhysicalOnly",
+      "NoIndex",
+      "OperatorName",
+      "Update",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "New-sqmOlaMaintenanceJobs -SqlInstance \"SQL01\"",
+      "New-sqmOlaMaintenanceJobs -SqlInstance \"SQL01\" -ScheduleTime \"22:00\" -ScheduleDay 64 -OperatorName \"DBAs\""
+    ]
+  },
+  {
+    "Name": "New-sqmOlaSysDbBackupJob",
+    "Synopsis": "",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "BackupDirectory",
+      "JobName",
+      "JobCategory",
+      "ScheduleTime",
+      "CleanupTime",
+      "Compress",
+      "Verify",
+      "CheckSum",
+      "LogToTable",
+      "OperatorName",
+      "Update",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "New-sqmOlaSysDbBackupJob -SqlInstance \"SQL01\"",
+      "New-sqmOlaSysDbBackupJob -SqlInstance \"SQL01\" -ScheduleTime \"20:00\" -OperatorName \"DBAs\""
+    ]
+  },
+  {
+    "Name": "New-sqmOlaUsrDbBackupJob",
+    "Synopsis": "",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "BackupDirectory",
+      "Databases",
+      "Full",
+      "FullJobName",
+      "FullScheduleTime",
+      "FullScheduleIntervalMinutes",
+      "Diff",
+      "DiffJobName",
+      "DiffScheduleTime",
+      "DiffScheduleIntervalMinutes",
+      "Log",
+      "LogJobName",
+      "LogScheduleTime",
+      "LogScheduleIntervalMinutes",
+      "JobCategory",
+      "CleanupTime",
+      "Compress",
+      "Verify",
+      "CheckSum",
+      "LogToTable",
+      "OperatorName",
+      "Update",
+      "ContinueOnError",
+      "UseExcludeTable",
+      "EnableException"
+    ],
+    "Examples": [
+      "New-sqmOlaUsrDbBackupJob -SqlInstance \"SQL01\" -Full",
+      "New-sqmOlaUsrDbBackupJob -SqlInstance \"SQL01\" -Full -Diff -Log",
+      "# Create FULL job that automatically excludes databases from sqm_BackupExclude",
+      "# All three job types with exclude table integration",
+      "New-sqmOlaUsrDbBackupJob -SqlInstance \"SQL01\" -Full `",
+      "New-sqmOlaUsrDbBackupJob -SqlInstance \"SQL01\" -Log `",
+      "New-sqmOlaUsrDbBackupJob -SqlInstance \"SQL01\" -Full -Diff -Log `",
+      "# LOG backup every 15 minutes, daily",
+      "# FULL on multiple days, DIFF daily, LOG every 30 minutes"
+    ]
+  },
+  {
+    "Name": "New-sqmRandomSaPassword",
+    "Synopsis": "Generiert ein zufaelliges, richtlinienkonformes SA-Passwort.",
+    "Params": [
+      "Length",
+      "ExportPath"
+    ],
+    "Examples": [
+      "$pwd = New-sqmRandomSaPassword",
+      "$pwd = New-sqmRandomSaPassword -Length 24 -ExportPath 'C:\\Temp\\sa.txt'",
+      "# Klartext anzeigen (nur fuer Debugging):"
+    ]
+  },
+  {
+    "Name": "New-sqmSqlCertificate",
+    "Synopsis": "Creates a new self-signed SQL Server certificate as a renewal of an existing one.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "CertificateName",
+      "Database",
+      "NewCertificateName",
+      "ValidityYears",
+      "BackupPath",
+      "BackupEncryptionPassword",
+      "RenameOldCertificate",
+      "BindEndpoint",
+      "BindTde",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Simple renewal without automatic binding\r\n    New-sqmSqlCertificate -SqlInstance \"SQL01\" -CertificateName \"AG_CERT\" -BackupEncryptionPassword (Read-Host -AsSecureString)",
+      "# With automatic endpoint binding and 10-year validity\r\n    New-sqmSqlCertificate -SqlInstance \"SQL01\" -CertificateName \"AG_CERT\" `\r\n        -ValidityYears 10 -BindEndpoint `\r\n        -BackupEncryptionPassword (Read-Host -AsSecureString \"Backup-Passwort\")",
+      "# Renew TDE certificate\r\n    New-sqmSqlCertificate -SqlInstance \"SQL01\" -CertificateName \"TDE_PROD\" `\r\n        -BindTde -BackupEncryptionPassword (Read-Host -AsSecureString \"Backup-Passwort\")"
+    ]
+  },
+  {
+    "Name": "Remove-sqmDatabaseFromAG",
+    "Synopsis": "Removes one or more databases from their Always On Availability Group.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "All",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Remove a single database from its AG\r\nRemove-sqmDatabaseFromAvailabilityGroup -Database \"SalesDB\"",
+      "# Remove all AG databases\r\nRemove-sqmDatabaseFromAvailabilityGroup -All"
+    ]
+  },
+  {
+    "Name": "Repair-sqmAlwaysOnDatabases",
+    "Synopsis": "Checks all AlwaysOn databases for problems and repairs them (Remove -> Cleanup -> Add).",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "Force",
+      "EnableException"
+    ],
+    "Examples": [
+      "Automatically repairs all problematic AG databases.\r\nRepair-sqmAlwaysOnDatabases",
+      "Forces repair of all AG databases (including healthy ones).\r\nRepair-sqmAlwaysOnDatabases -Force"
+    ]
+  },
+  {
+    "Name": "Set-sqmBackupExcludePermission",
+    "Synopsis": "Grants SELECT, INSERT, and UPDATE permissions on master.dbo.sqm_BackupExclude to a login.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "LoginName",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Grant permissions to a Windows group on the local instance",
+      "# Grant permissions to a SQL login on a remote instance",
+      "# Preview what would happen without making any changes"
+    ]
+  },
+  {
+    "Name": "Set-sqmConfig",
+    "Synopsis": "Sets one or more configuration values for the MSSQLTools module.",
+    "Params": [
+      "LogPath",
+      "OutputPath",
+      "CentralPath",
+      "OlaJobNameFull",
+      "OlaJobNameDiff",
+      "OlaJobNameLog",
+      "OlaJobNameIndexOpt",
+      "OlaJobNameIntUserDb",
+      "OlaJobNameIntSysDb",
+      "OlaJobNameSysDbBackup",
+      "AutoUpdate",
+      "UpdateRepository",
+      "DefaultPolicy",
+      "SsrsInstallerPath",
+      "CheckProfile",
+      "CheckCostThresholdMin",
+      "CheckTempDbMaxFiles",
+      "CheckDiskBlockSize",
+      "Language",
+      "PassThru"
+    ],
+    "Examples": [
+      "Set-sqmConfig -LogPath \"D:\\Logs\" -OlaJobNameFull \"Prod-FULL\"",
+      "Set-sqmConfig -TsmManagementClasses @('MC_10','MC_30','MC_100')",
+      "Set-sqmConfig -HpuDomainGroupMap @(\r\n        [PSCustomObject]@{ DomainPattern = '*.sfinance.net'; GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' },\r\n        [PSCustomObject]@{ DomainPattern = '*';              GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' }\r\n    )",
+      "Set-sqmConfig -SsrsInstallerPath '\\\\srv-share\\Software\\SSRS2022\\SQLServerReportingServices.exe'\r\n#>\r\nfunction Set-sqmConfig\r\n{\r\n\t[CmdletBinding(SupportsShouldProcess = $true)]\r\n\tparam (\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$LogPath,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$OutputPath,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$CentralPath,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$OlaJobNameFull,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$OlaJobNameDiff,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$OlaJobNameLog,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$OlaJobNameIndexOpt,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$OlaJobNameIntUserDb,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$OlaJobNameIntSysDb,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$OlaJobNameSysDbBackup,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string[]]$TsmManagementClasses,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[bool]$AutoUpdate,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$UpdateRepository,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$DefaultPolicy,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[PSCustomObject[]]$HpuDomainGroupMap,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$SsrsInstallerPath,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[ValidateSet('Auto', 'FiTs', 'Generic')]\r\n\t\t[string]$CheckProfile,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[ValidateRange(1, 1000)]\r\n\t\t[int]$CheckCostThresholdMin,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[ValidateRange(1, 64)]\r\n\t\t[int]$CheckTempDbMaxFiles,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[ValidateSet(4096, 8192, 16384, 32768, 65536, 131072)]\r\n\t\t[int]$CheckDiskBlockSize,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[ValidateSet('de-DE', 'en-US')]\r\n\t\t[string]$Language,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[switch]$PassThru\r\n\t)\r\n\t\r\n\t# Hilfsfunktion zum Pruefen/Erstellen eines Pfads\r\n\t# Pfad-Existenz und Schreibbarkeit werden geprueft wenn moeglich.\r\n\t# Nicht-erreichbare Pfade erzeugen nur eine Warnung - kein Fehler.\r\n\t# Konfiguration wird trotzdem gespeichert (Pfad kann spaeter entstehen).\r\n\tfunction Test-AndCreatePath($Path, $Purpose)\r\n\t{\r\n\t\tif (-not $Path) { return $true }\r\n\t\tif ($Path -match '^\\s*$')\r\n\t\t{\r\n\t\t\tWrite-Error \"Pfad fuer $Purpose darf nicht leer sein.\"\r\n\t\t\treturn $false\r\n\t\t}\r\n\t\ttry\r\n\t\t{\r\n\t\t\tif (-not (Test-Path $Path))\r\n\t\t\t{\r\n\t\t\t\tNew-Item -ItemType Directory -Path $Path -Force -ErrorAction Stop | Out-Null\r\n\t\t\t\tWrite-Verbose \"Verzeichnis '$Path' ($Purpose) wurde erstellt.\"\r\n\t\t\t}\r\n\t\t\t# Schreibtest nur wenn Pfad erreichbar - Fehler hier ist nicht kritisch\r\n\t\t\ttry\r\n\t\t\t{\r\n\t\t\t\t$testFile = Join-Path $Path \"test_$(Get-Random).tmp\"\r\n\t\t\t\tNew-Item -ItemType File -Path $testFile -Force -ErrorAction Stop | Out-Null\r\n\t\t\t\tRemove-Item -Path $testFile -Force -ErrorAction SilentlyContinue\r\n\t\t\t}\r\n\t\t\tcatch\r\n\t\t\t{\r\n\t\t\t\tWrite-Warning \"Pfad '$Path' ($Purpose) ist nicht beschreibbar: $($_.Exception.Message). Konfiguration wird trotzdem gespeichert.\"\r\n\t\t\t}\r\n\t\t\treturn $true\r\n\t\t}\r\n\t\tcatch\r\n\t\t{\r\n\t\t\t# Verzeichnis konnte nicht erstellt werden - nur warnen, nicht abbrechen\r\n\t\t\tWrite-Warning \"Pfad '$Path' ($Purpose) konnte nicht erstellt werden: $($_.Exception.Message). Wird spaeter automatisch angelegt. Konfiguration wird gespeichert.\"\r\n\t\t\treturn $true\r\n\t\t}\r\n\t}\r\n\t\r\n\t$updated = $false\r\n\t$globalConfig = $script:sqmModuleConfig\r\n\t\r\n\t# Pfad-Parameter\r\n\tif ($PSBoundParameters.ContainsKey('LogPath'))\r\n\t{\r\n\t\tif (Test-AndCreatePath $LogPath \"LogPath\")\r\n\t\t{\r\n\t\t\t$globalConfig['LogPath'] = $LogPath\r\n\t\t\t$updated = $true\r\n\t\t}\r\n\t\telse { return }\r\n\t}\r\n\tif ($PSBoundParameters.ContainsKey('OutputPath'))\r\n\t{\r\n\t\tif (Test-AndCreatePath $OutputPath \"OutputPath\")\r\n\t\t{\r\n\t\t\t$globalConfig['OutputPath'] = $OutputPath\r\n\t\t\t$updated = $true\r\n\t\t}\r\n\t\telse { return }\r\n\t}\r\n\tif ($PSBoundParameters.ContainsKey('CentralPath'))\r\n\t{\r\n\t\tif ($CentralPath)\r\n\t\t{\r\n\t\t\tif (Test-AndCreatePath $CentralPath \"CentralPath\")\r\n\t\t\t{\r\n\t\t\t\t$globalConfig['CentralPath'] = $CentralPath\r\n\t\t\t\t$updated = $true\r\n\t\t\t}\r\n\t\t\telse { return }\r\n\t\t}\r\n\t\telse\r\n\t\t{\r\n\t\t\t$globalConfig['CentralPath'] = $null\r\n\t\t\t$updated = $true\r\n\t\t}\r\n\t}\r\n\t\r\n\t# Ola-Job-Namen\r\n\tif ($PSBoundParameters.ContainsKey('OlaJobNameFull'))\r\n\t{\r\n\t\tif (-not [string]::IsNullOrWhiteSpace($OlaJobNameFull))\r\n\t\t{\r\n\t\t\t$globalConfig['OlaJobNameFull'] = $OlaJobNameFull\r\n\t\t\t$updated = $true\r\n\t\t}\r\n\t\telse { Write-Error \"OlaJobNameFull darf nicht leer sein.\"; return }\r\n\t}\r\n\tif ($PSBoundParameters.ContainsKey('OlaJobNameDiff'))\r\n\t{\r\n\t\tif (-not [string]::IsNullOrWhiteSpace($OlaJobNameDiff))\r\n\t\t{\r\n\t\t\t$globalConfig['OlaJobNameDiff'] = $OlaJobNameDiff\r\n\t\t\t$updated = $true\r\n\t\t}\r\n\t\telse { Write-Error \"OlaJobNameDiff darf nicht leer sein.\"; return }\r\n\t}\r\n\tif ($PSBoundParameters.ContainsKey('OlaJobNameLog'))\r\n\t{\r\n\t\tif (-not [string]::IsNullOrWhiteSpace($OlaJobNameLog))\r\n\t\t{\r\n\t\t\t$globalConfig['OlaJobNameLog'] = $OlaJobNameLog\r\n\t\t\t$updated = $true\r\n\t\t}\r\n\t\telse { Write-Error \"OlaJobNameLog darf nicht leer sein.\"; return }\r\n\t}\r\n\tif ($PSBoundParameters.ContainsKey('OlaJobNameIndexOpt'))\r\n\t{\r\n\t\tif (-not [string]::IsNullOrWhiteSpace($OlaJobNameIndexOpt))\r\n\t\t{\r\n\t\t\t$globalConfig['OlaJobNameIndexOpt'] = $OlaJobNameIndexOpt\r\n\t\t\t$updated = $true\r\n\t\t}\r\n\t\telse { Write-Error \"OlaJobNameIndexOpt darf nicht leer sein.\"; return }\r\n\t}\r\n\tif ($PSBoundParameters.ContainsKey('OlaJobNameIntUserDb'))\r\n\t{\r\n\t\tif (-not [string]::IsNullOrWhiteSpace($OlaJobNameIntUserDb))\r\n\t\t{\r\n\t\t\t$globalConfig['OlaJobNameIntUserDb'] = $OlaJobNameIntUserDb\r\n\t\t\t$updated = $true\r\n\t\t}\r\n\t\telse { Write-Error \"OlaJobNameIntUserDb darf nicht leer sein.\"; return }\r\n\t}\r\n\tif ($PSBoundParameters.ContainsKey('OlaJobNameIntSysDb'))\r\n\t{\r\n\t\tif (-not [string]::IsNullOrWhiteSpace($OlaJobNameIntSysDb))\r\n\t\t{\r\n\t\t\t$globalConfig['OlaJobNameIntSysDb'] = $OlaJobNameIntSysDb\r\n\t\t\t$updated = $true\r\n\t\t}\r\n\t\telse { Write-Error \"OlaJobNameIntSysDb darf nicht leer sein.\"; return }\r\n\t}\r\n\tif ($PSBoundParameters.ContainsKey('OlaJobNameSysDbBackup'))\r\n\t{\r\n\t\tif (-not [string]::IsNullOrWhiteSpace($OlaJobNameSysDbBackup))\r\n\t\t{\r\n\t\t\t$globalConfig['OlaJobNameSysDbBackup'] = $OlaJobNameSysDbBackup\r\n\t\t\t$updated = $true\r\n\t\t}\r\n\t\telse { Write-Error \"OlaJobNameSysDbBackup darf nicht leer sein.\"; return }\r\n\t}\r\n\t\r\n\t# TSM Management-Klassen\r\n\tif ($PSBoundParameters.ContainsKey('TsmManagementClasses'))\r\n\t{\r\n\t\tif ($TsmManagementClasses -and $TsmManagementClasses.Count -gt 0)\r\n\t\t{\r\n\t\t\t$globalConfig['TsmManagementClasses'] = $TsmManagementClasses\r\n\t\t\t$updated = $true\r\n\t\t}\r\n\t\telse\r\n\t\t{\r\n\t\t\tWrite-Error \"TsmManagementClasses darf nicht leer sein.\"\r\n\t\t\treturn\r\n\t\t}\r\n\t}\r\n\t\r\n\t# Update-Einstellungen\r\n\tif ($PSBoundParameters.ContainsKey('AutoUpdate'))\r\n\t{\r\n\t\t$globalConfig['AutoUpdate'] = $AutoUpdate\r\n\t\t$updated = $true\r\n\t}\r\n\tif ($PSBoundParameters.ContainsKey('UpdateRepository'))\r\n\t{\r\n\t\t$globalConfig['UpdateRepository'] = $UpdateRepository\r\n\t\t$updated = $true\r\n\t}\r\n\t\r\n\t# Default Policy Name\r\n\tif ($PSBoundParameters.ContainsKey('DefaultPolicy'))\r\n\t{\r\n\t\tif (-not [string]::IsNullOrWhiteSpace($DefaultPolicy))\r\n\t\t{\r\n\t\t\t$globalConfig['DefaultPolicy'] = $DefaultPolicy\r\n\t\t\t$updated = $true\r\n\t\t}\r\n\t\telse { Write-Error \"DefaultPolicy darf nicht leer sein.\"; return }\r\n\t}\r\n\t\r\n\t# HPU-Domain-Gruppen-Mapping\r\n\tif ($PSBoundParameters.ContainsKey('HpuDomainGroupMap'))\r\n\t{\r\n\t\tif ($HpuDomainGroupMap -and $HpuDomainGroupMap.Count -gt 0)\r\n\t\t{\r\n\t\t\t# Pflichtfelder jedes Eintrags pruefen\r\n\t\t\tforeach ($entry in $HpuDomainGroupMap)\r\n\t\t\t{\r\n\t\t\t\tif ([string]::IsNullOrWhiteSpace($entry.DomainPattern))\r\n\t\t\t\t{\r\n\t\t\t\t\tWrite-Error \"HpuDomainGroupMap: Jeder Eintrag benoetigt ein nicht-leeres Feld 'DomainPattern'.\"\r\n\t\t\t\t\treturn\r\n\t\t\t\t}\r\n\t\t\t\tif ([string]::IsNullOrWhiteSpace($entry.GroupNamePattern))\r\n\t\t\t\t{\r\n\t\t\t\t\tWrite-Error \"HpuDomainGroupMap: Jeder Eintrag benoetigt ein nicht-leeres Feld 'GroupNamePattern'.\"\r\n\t\t\t\t\treturn\r\n\t\t\t\t}\r\n\t\t\t}\r\n\t\t\t$globalConfig['HpuDomainGroupMap'] = $HpuDomainGroupMap\r\n\t\t\t$updated = $true\r\n\t\t}\r\n\t\telse\r\n\t\t{\r\n\t\t\tWrite-Error \"HpuDomainGroupMap darf nicht leer sein.\"\r\n\t\t\treturn\r\n\t\t}\r\n\t}\r\n\t\r\n\t# SSRS-Installer-Pfad\r\n\tif ($PSBoundParameters.ContainsKey('SsrsInstallerPath'))\r\n\t{\r\n\t\tif (-not [string]::IsNullOrWhiteSpace($SsrsInstallerPath))\r\n\t\t{\r\n\t\t\t$ext = [System.IO.Path]::GetExtension($SsrsInstallerPath).ToLower()\r\n\t\t\tif ($ext -notin @('.exe', '.msi'))\r\n\t\t\t{\r\n\t\t\t\tWrite-Error \"SsrsInstallerPath: Nur .exe oder .msi-Dateien sind gueltig (angegeben: '$SsrsInstallerPath').\"\r\n\t\t\t\treturn\r\n\t\t\t}\r\n\t\t\t$globalConfig['SsrsInstallerPath'] = $SsrsInstallerPath\r\n\t\t\t$updated = $true\r\n\t\t}\r\n\t\telse\r\n\t\t{\r\n\t\t\tWrite-Error \"SsrsInstallerPath darf nicht leer sein.\"\r\n\t\t\treturn\r\n\t\t}\r\n\t}\r\n\t\r\n\t# Check-Profil und Grenzwerte\r\n\tif ($PSBoundParameters.ContainsKey('CheckProfile'))\r\n\t{\r\n\t\t$globalConfig['CheckProfile'] = $CheckProfile\r\n\t\t$updated = $true\r\n\t}\r\n\tif ($PSBoundParameters.ContainsKey('CheckCostThresholdMin'))\r\n\t{\r\n\t\t$globalConfig['CheckCostThresholdMin'] = $CheckCostThresholdMin\r\n\t\t$updated = $true\r\n\t}\r\n\tif ($PSBoundParameters.ContainsKey('CheckTempDbMaxFiles'))\r\n\t{\r\n\t\t$globalConfig['CheckTempDbMaxFiles'] = $CheckTempDbMaxFiles\r\n\t\t$updated = $true\r\n\t}\r\n\tif ($PSBoundParameters.ContainsKey('CheckDiskBlockSize'))\r\n\t{\r\n\t\t$globalConfig['CheckDiskBlockSize'] = $CheckDiskBlockSize\r\n\t\t$updated = $true\r\n\t}\r\n\r\n\t# Ausgabe-Sprache\r\n\tif ($PSBoundParameters.ContainsKey('Language'))\r\n\t{\r\n\t\t$globalConfig['Language'] = $Language\r\n\t\t$script:_strings = $null    # String-Cache invalidieren\r\n\t\t$updated = $true\r\n\t}\r\n\r\n\tif (-not $updated)\r\n\t{\r\n\t\tWrite-Warning \"Es wurde kein gueltiger Konfigurationsparameter angegeben.\"\r\n\t\treturn\r\n\t}\r\n\t\r\n\t# Persistenz: JSON-Datei schreiben\r\n\t$configFile = Join-Path $env:APPDATA \"MSSQLTools\\config.json\"\r\n\t$configDir = Split-Path $configFile -Parent\r\n\tif (-not (Test-Path $configDir))\r\n\t{\r\n\t\tNew-Item -ItemType Directory -Path $configDir -Force | Out-Null\r\n\t}\r\n\t$globalConfig | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Force\r\n\tWrite-Verbose \"Konfiguration gespeichert: $configFile\"\r\n\t\r\n\tif ($PassThru)\r\n\t{\r\n\t\treturn Get-sqmConfig\r\n\t}\r\n}"
+    ]
+  },
+  {
+    "Name": "Set-sqmDatabaseOwner",
+    "Synopsis": "Sets the owner of one or more databases to a uniform login.",
+    "Params": [
+      "SqlCredential",
+      "OwnerLogin",
+      "IncludeSystemDatabases",
+      "Force",
+      "OutputPath",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Set sa account on all user databases\r\n    Set-sqmDatabaseOwner -SqlInstance \"SQL01\"",
+      "# Specific databases with a custom login\r\n    Set-sqmDatabaseOwner -SqlInstance \"SQL01\" -Database \"Prod*\" -OwnerLogin \"svc_sqlowner\"",
+      "# Pipeline across multiple instances\r\n    'SQL01','SQL02' | Set-sqmDatabaseOwner",
+      "# WhatIf - only show what would be changed\r\n    Set-sqmDatabaseOwner -SqlInstance \"SQL01\" -WhatIf"
+    ]
+  },
+  {
+    "Name": "Set-sqmSqlPolicyState",
+    "Synopsis": "Enables or disables a single Policy-Based Management policy on a SQL Server instance.",
+    "Params": [
+      "SqlCredential",
+      "Policy",
+      "State",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Set-sqmSqlPolicyState -SqlInstance \"SQL01\" -Policy \"xp_cmdshell must be disabled\" -State Disable",
+      "\"SQL01\",\"SQL02\" | Set-sqmSqlPolicyState -Policy \"Password Policy\" -State Enable"
+    ]
+  },
+  {
+    "Name": "Set-sqmSqlTlsCertificate",
+    "Synopsis": "Binds a Windows certificate from the Machine store to SQL Server as the TLS certificate.",
+    "Params": [
+      "SqlInstance",
+      "Thumbprint",
+      "ForceEncryption",
+      "Restart"
+    ],
+    "Examples": [
+      "Set-sqmSqlTlsCertificate -SqlInstance \"SQL01\" -Thumbprint \"A1B2C3D4E5F6...\"",
+      "Set-sqmSqlTlsCertificate -SqlInstance \"SQL01\\INST1\" -Thumbprint \"A1B2C3D4E5F6...\" -ForceEncryption -Restart",
+      "Set-sqmSqlTlsCertificate -Thumbprint \"A1 B2 C3 D4 E5 F6\" -WhatIf"
+    ]
+  },
+  {
+    "Name": "Set-sqmSsrsConfiguration",
+    "Synopsis": "",
+    "Params": [
+      "ComputerName",
+      "InstanceName",
+      "DatabaseServer",
+      "DatabaseName",
+      "ReportServerUrl",
+      "ReportsUrl",
+      "ServiceAccount",
+      "ServiceAccountPassword",
+      "DatabaseAuthType",
+      "DatabaseCredential",
+      "EncryptionKeyFile",
+      "EncryptionKeyPassword",
+      "PbmPolicyName",
+      "SkipDatabase",
+      "SkipUrls",
+      "SkipServiceAccount",
+      "SkipEncryptionKeyBackup",
+      "Credential",
+      "OutputPath",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Set-sqmSsrsConfiguration",
+      "Set-sqmSsrsConfiguration -ComputerName \"SSRS01\" -DatabaseServer \"AG_Listener\" -PbmPolicyName \"Password Policy\""
+    ]
+  },
+  {
+    "Name": "Set-sqmSsrsHttpsCertificate",
+    "Synopsis": "Binds a Windows certificate to SSRS or Power BI Report Server for HTTPS access.",
+    "Params": [
+      "ComputerName",
+      "Thumbprint",
+      "Port",
+      "InstanceName",
+      "IPAddress",
+      "RequireSSL",
+      "Credential"
+    ],
+    "Examples": [
+      "Set-sqmSsrsHttpsCertificate -Thumbprint \"A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2\"",
+      "Set-sqmSsrsHttpsCertificate -ComputerName \"REPSERVER01\" -Thumbprint \"A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2\" -Port 8443 -InstanceName \"RS_PBIRS\" -RequireSSL",
+      "$cred = Get-Credential"
+    ]
+  },
+  {
+    "Name": "Set-sqmTcpPort",
+    "Synopsis": "Konfiguriert den TCP-Port einer SQL Server-Instanz ueber die Registry.",
+    "Params": [
+      "SqlInstance",
+      "BasePort",
+      "PortIncrement",
+      "InstanceNumber"
+    ],
+    "Examples": [
+      "Set-sqmTcpPort -SqlInstance 'MSSQLSERVER' -BasePort 1433",
+      "Set-sqmTcpPort -SqlInstance 'INST01' -BasePort 1433 -PortIncrement 10"
+    ]
+  },
+  {
+    "Name": "Sync-sqmAgNode",
+    "Synopsis": "",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "AvailabilityGroup",
+      "IncludeSystemObjects",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Sync-sqmAgNode",
+      "Sync-sqmAgNode -SqlInstance \"SQL01\" -AvailabilityGroup \"AG_Prod\" -ObjectName \"AppLogin_*\""
+    ]
+  },
+  {
+    "Name": "Sync-sqmBackupExcludeTable",
+    "Synopsis": "Creates and synchronises the backup exclude table in the master database.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "IncludeSystemDatabases",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Synchronise on the local instance – user databases only",
+      "# Synchronise on a remote instance including system databases",
+      "# Preview what would change without making any modifications",
+      "# Synchronise and verify that the audit history table and trigger are in place"
+    ]
+  },
+  {
+    "Name": "Test-sqmBackupIntegrity",
+    "Synopsis": "Verifies one or more backup files using RESTORE VERIFYONLY.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "FileListOnly",
+      "EnableException"
+    ],
+    "Examples": [
+      "Test-sqmBackupIntegrity -SqlInstance \"SQL01\" -BackupPath \"D:\\Backup\\AdventureWorks.bak\""
+    ]
+  },
+  {
+    "Name": "Test-sqmCostThreshold",
+    "Synopsis": "Prueft ob CostThresholdForParallelism auf dem empfohlenen Wert liegt.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "MinRecommendedValue",
+      "EnableException"
+    ],
+    "Examples": [
+      "Test-sqmCostThreshold -SqlInstance \"SQL01\"",
+      "Test-sqmCostThreshold -SqlInstance \"SQL01\" -MinRecommendedValue 25"
+    ]
+  },
+  {
+    "Name": "Test-sqmDriverInstalled",
+    "Synopsis": "Prueft ob ein JDBC-, ODBC- oder DB2-Treiber auf dem System installiert ist.",
+    "Params": [
+      "DriverType",
+      "DriverName"
+    ],
+    "Examples": [
+      "Test-sqmDriverInstalled -DriverType ODBC",
+      "Test-sqmDriverInstalled -DriverType ODBC -DriverName 'ODBC Driver 18 for SQL Server'",
+      "Test-sqmDriverInstalled -DriverType JDBC",
+      "Test-sqmDriverInstalled -DriverType DB2"
+    ]
+  },
+  {
+    "Name": "Test-sqmMaxDop",
+    "Synopsis": "Prueft ob MAXDOP (Max Degree of Parallelism) korrekt konfiguriert ist.",
+    "Params": [
+      "SqlInstance"
+    ],
+    "Examples": [
+      "Test-sqmMaxDop -SqlInstance 'MSSQLSERVER'",
+      "Test-sqmMaxDop -SqlInstance 'SQL01\\INST01'"
+    ]
+  },
+  {
+    "Name": "Test-sqmMaxMemory",
+    "Synopsis": "Prueft ob SQL Server Max Server Memory korrekt konfiguriert ist.",
+    "Params": [
+      "SqlInstance",
+      "RecommendedPct"
+    ],
+    "Examples": [
+      "Test-sqmMaxMemory -SqlInstance 'MSSQLSERVER'",
+      "Test-sqmMaxMemory -SqlInstance 'SQL01\\INST01' | Where-Object { $_.Status -ne 'OK' }"
+    ]
+  },
+  {
+    "Name": "Test-sqmOlaInstallation",
+    "Synopsis": "Checks whether Ola Hallengren's Maintenance Solution is installed on a SQL Server instance.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "RequiredSet"
+    ],
+    "Examples": []
+  },
+  {
+    "Name": "Test-sqmSQLFirewall",
+    "Synopsis": "Tests whether the firewall and network allow a TCP connection to SQL Server.",
+    "Params": [
+      "Port",
+      "Instance",
+      "TimeoutSeconds",
+      "ContinueOnError",
+      "EnableException"
+    ],
+    "Examples": [
+      "Test-sqmSQLFirewall -Server \"SQL01\"",
+      "Test-sqmSQLFirewall -Server \"SQL01\" -Port 54321",
+      "Test-sqmSQLFirewall -Server \"SQL01\" -Instance \"SAGE\"",
+      "\"SQL01\",\"SQL02\",\"SQL03\" | Test-sqmSQLFirewall -Instance \"PROD\" -TimeoutSeconds 3"
+    ]
+  },
+  {
+    "Name": "Test-sqmSqlInstanceInstalled",
+    "Synopsis": "Prueft ob eine SQL Server-Instanz auf dem lokalen System installiert ist.",
+    "Params": [
+      "InstanceName"
+    ],
+    "Examples": [
+      "Test-sqmSqlInstanceInstalled",
+      "Test-sqmSqlInstanceInstalled -InstanceName 'INST01'",
+      "if ((Test-sqmSqlInstanceInstalled).IsInstalled) { Write-Host \"SQL installiert\" }"
+    ]
+  },
+  {
+    "Name": "Test-sqmSsasDirectoryPermissions",
+    "Synopsis": "Checks and corrects NTFS permissions for SSAS directories (Data, Log, Temp, Backup).",
+    "Params": [
+      "InstanceName",
+      "ServiceAccount",
+      "EnableException",
+      "ContinueOnError"
+    ],
+    "Examples": [
+      "Test-sqmSsasDirectoryPermissions\r\n\r\n    Checks the directories of the default SSAS instance and corrects missing permissions.",
+      "Test-sqmSsasDirectoryPermissions -InstanceName \"SSAS2019\" -WhatIf\r\n\r\n    Shows which permissions would be set for the named instance."
+    ]
+  },
+  {
+    "Name": "Test-sqmTempDbFileCount",
+    "Synopsis": "Prueft ob die Anzahl der TempDB-Datendateien der empfohlenen CPU-Anzahl entspricht.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "MaxFiles",
+      "EnableException"
+    ],
+    "Examples": [
+      "Test-sqmTempDbFileCount -SqlInstance \"SQL01\"",
+      "Test-sqmTempDbFileCount -SqlInstance \"SQL01\\INST1\" -MaxFiles 4"
+    ]
+  },
+  {
+    "Name": "Test-sqmTsmConnection",
+    "Synopsis": "Tests the connection to an IBM Spectrum Protect (TSM) server using dsmadmc.",
+    "Params": [
+      "ComputerName",
+      "DsmadmcPath",
+      "UserName",
+      "Password",
+      "ServerName",
+      "DsmOptPath",
+      "Credential",
+      "EnableException"
+    ],
+    "Examples": [
+      "Test-sqmTsmConnection",
+      "Test-sqmTsmConnection -ComputerName \"SQL01\" -UserName \"tsm_admin\" -Password (Read-Host -AsSecureString)\r\n#>\r\nfunction Test-sqmTsmConnection\r\n{\r\n\t[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]\r\n\t[OutputType([PSCustomObject])]\r\n\tparam (\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$ComputerName = $env:COMPUTERNAME,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$DsmadmcPath,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$UserName,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[System.Security.SecureString]$Password,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$ServerName,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$DsmOptPath,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[System.Management.Automation.PSCredential]$Credential,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[switch]$EnableException\r\n\t)\r\n\t\r\n\tbegin\r\n\t{\r\n\t\t$functionName = $MyInvocation.MyCommand.Name\r\n\t\tInvoke-sqmLogging -Message \"Starte $functionName auf $ComputerName\" -FunctionName $functionName -Level \"INFO\"\r\n\t}\r\n\t\r\n\tprocess\r\n\t{\r\n\t\t$result = [PSCustomObject]@{\r\n\t\t\tSuccess\t    = $false\r\n\t\t\tMessage\t    = $null\r\n\t\t\tDsmadmcPath = $null\r\n\t\t\tServerName  = $null\r\n\t\t\tUserName    = $null\r\n\t\t\tOutput\t    = $null\r\n\t\t\tErrorOutput = $null\r\n\t\t}\r\n\t\t\r\n\t\ttry\r\n\t\t{\r\n\t\t\t# ---- 1. dsmadmc.exe Pfad ermitteln ----\r\n\t\t\t$dsmadmc = if ($DsmadmcPath) { $DsmadmcPath }\r\n\t\t\telse { _FindDsmadmcPath -ComputerName $ComputerName -Credential $Credential }\r\n\t\t\tif (-not $dsmadmc)\r\n\t\t\t{\r\n\t\t\t\t$msg = \"dsmadmc nicht gefunden. Bitte TSM-Client installieren oder -DsmadmcPath angeben.\"\r\n\t\t\t\tInvoke-sqmLogging -Message $msg -FunctionName $functionName -Level \"ERROR\"\r\n\t\t\t\tif ($EnableException) { throw $msg }\r\n\t\t\t\t$result.Message = $msg\r\n\t\t\t\treturn $result\r\n\t\t\t}\r\n\t\t\t$result.DsmadmcPath = $dsmadmc\r\n\t\t\tInvoke-sqmLogging -Message \"Verwende dsmadmc: $dsmadmc\" -FunctionName $functionName -Level \"VERBOSE\"\r\n\t\t\t\r\n\t\t\t# ---- 2. TSM-Konfiguration aus dsm.opt lesen (falls nicht alle Parameter angegeben) ----\r\n\t\t\t$effUserName = $UserName\r\n\t\t\t$effPassword = $Password\r\n\t\t\t$effServerName = $ServerName\r\n\t\t\t\r\n\t\t\tif (-not $effUserName -or -not $effPassword -or -not $effServerName)\r\n\t\t\t{\r\n\t\t\t\t$cfg = Get-sqmTsmConfiguration -ComputerName $ComputerName -DsmOptPath $DsmOptPath -Credential $Credential -IncludePasswordPlain -ErrorAction Stop\r\n\t\t\t\tif (-not $cfg.Success)\r\n\t\t\t\t{\r\n\t\t\t\t\tthrow \"TSM-Konfiguration konnte nicht gelesen werden: $($cfg.ErrorMessage)\"\r\n\t\t\t\t}\r\n\t\t\t\tif (-not $effServerName) { $effServerName = $cfg.ServerName }\r\n\t\t\t\tif (-not $effUserName) { $effUserName = $cfg.UserName }\r\n\t\t\t\tif (-not $effPassword -and $cfg.Password) { $effPassword = $cfg.Password }\r\n\t\t\t}\r\n\t\t\t\r\n\t\t\tif (-not $effUserName)\r\n\t\t\t{\r\n\t\t\t\t$msg = \"Kein TSM-Benutzername angegeben und kein USERID in dsm.opt gefunden.\"\r\n\t\t\t\tInvoke-sqmLogging -Message $msg -FunctionName $functionName -Level \"ERROR\"\r\n\t\t\t\tif ($EnableException) { throw $msg }\r\n\t\t\t\t$result.Message = $msg\r\n\t\t\t\treturn $result\r\n\t\t\t}\r\n\t\t\tif (-not $effPassword)\r\n\t\t\t{\r\n\t\t\t\t$msg = \"Kein TSM-Kennwort angegeben und kein PASSWORD in dsm.opt gefunden.\"\r\n\t\t\t\tInvoke-sqmLogging -Message $msg -FunctionName $functionName -Level \"ERROR\"\r\n\t\t\t\tif ($EnableException) { throw $msg }\r\n\t\t\t\t$result.Message = $msg\r\n\t\t\t\treturn $result\r\n\t\t\t}\r\n\t\t\tif (-not $effServerName)\r\n\t\t\t{\r\n\t\t\t\t$msg = \"Kein TSM-Server angegeben und kein TCPServeraddress in dsm.opt gefunden.\"\r\n\t\t\t\tInvoke-sqmLogging -Message $msg -FunctionName $functionName -Level \"ERROR\"\r\n\t\t\t\tif ($EnableException) { throw $msg }\r\n\t\t\t\t$result.Message = $msg\r\n\t\t\t\treturn $result\r\n\t\t\t}\r\n\t\t\t$result.UserName = $effUserName\r\n\t\t\t$result.ServerName = $effServerName\r\n\t\t\tInvoke-sqmLogging -Message \"TSM-Server: $effServerName, Benutzer: $effUserName\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\r\n\t\t\t# ---- 3. Kennwort aus SecureString extrahieren ----\r\n\t\t\t$plainPwd = _SecureToPlain $effPassword\r\n\t\t\t\r\n\t\t\t# ---- 4. dsmadmc-Befehl aufbauen ----\r\n\t\t\t$cmdArgs = \"-id=$effUserName -password=$plainPwd -se=$effServerName -dataonly=yes show version\"\r\n\t\t\tInvoke-sqmLogging -Message \"Fuehre dsmadmc aus: $dsmadmc $cmdArgs\" -FunctionName $functionName -Level \"VERBOSE\"\r\n\t\t\t\r\n\t\t\t# ---- 5. Befehl ausfuehren ----\r\n\t\t\t$output = $null\r\n\t\t\t$errorOut = $null\r\n\t\t\t$exitCode = 0\r\n\t\t\t$isLocal = $ComputerName -in @($env:COMPUTERNAME, 'localhost', '127.0.0.1', '.')\r\n\t\t\t\r\n\t\t\tif ($PSCmdlet.ShouldProcess(\"TSM-Verbindung zu $effServerName mit Benutzer $effUserName\", \"Pruefen\"))\r\n\t\t\t{\r\n\t\t\t\tif ($isLocal)\r\n\t\t\t\t{\r\n\t\t\t\t\t$psi = New-Object System.Diagnostics.ProcessStartInfo\r\n\t\t\t\t\t$psi.FileName = $dsmadmc\r\n\t\t\t\t\t$psi.Arguments = $cmdArgs\r\n\t\t\t\t\t$psi.UseShellExecute = $false\r\n\t\t\t\t\t$psi.RedirectStandardOutput = $true\r\n\t\t\t\t\t$psi.RedirectStandardError = $true\r\n\t\t\t\t\t$psi.CreateNoWindow = $true\r\n\t\t\t\t\t$p = [System.Diagnostics.Process]::Start($psi)\r\n\t\t\t\t\t$output = $p.StandardOutput.ReadToEnd()\r\n\t\t\t\t\t$errorOut = $p.StandardError.ReadToEnd()\r\n\t\t\t\t\t$p.WaitForExit()\r\n\t\t\t\t\t$exitCode = $p.ExitCode\r\n\t\t\t\t}\r\n\t\t\t\telse\r\n\t\t\t\t{\r\n\t\t\t\t\t$scriptBlock = {\r\n\t\t\t\t\t\tparam ($exe,\r\n\t\t\t\t\t\t\t$args)\r\n\t\t\t\t\t\t$psi = New-Object System.Diagnostics.ProcessStartInfo\r\n\t\t\t\t\t\t$psi.FileName = $exe\r\n\t\t\t\t\t\t$psi.Arguments = $args\r\n\t\t\t\t\t\t$psi.UseShellExecute = $false\r\n\t\t\t\t\t\t$psi.RedirectStandardOutput = $true\r\n\t\t\t\t\t\t$psi.RedirectStandardError = $true\r\n\t\t\t\t\t\t$psi.CreateNoWindow = $true\r\n\t\t\t\t\t\t$p = [System.Diagnostics.Process]::Start($psi)\r\n\t\t\t\t\t\t$out = $p.StandardOutput.ReadToEnd()\r\n\t\t\t\t\t\t$err = $p.StandardError.ReadToEnd()\r\n\t\t\t\t\t\t$p.WaitForExit()\r\n\t\t\t\t\t\treturn @{ ExitCode = $p.ExitCode; Output = $out; Error = $err }\r\n\t\t\t\t\t}\r\n\t\t\t\t\t$session = New-PSSession -ComputerName $ComputerName -Credential $Credential -ErrorAction Stop\r\n\t\t\t\t\t$remoteResult = Invoke-Command -Session $session -ScriptBlock $scriptBlock -ArgumentList $dsmadmc, $cmdArgs -ErrorAction Stop\r\n\t\t\t\t\t$exitCode = $remoteResult.ExitCode\r\n\t\t\t\t\t$output = $remoteResult.Output\r\n\t\t\t\t\t$errorOut = $remoteResult.Error\r\n\t\t\t\t\tRemove-PSSession $session\r\n\t\t\t\t}\r\n\t\t\t\t\r\n\t\t\t\t$result.Output = $output\r\n\t\t\t\t$result.ErrorOutput = $errorOut\r\n\t\t\t\t\r\n\t\t\t\tif ($exitCode -eq 0 -and $output -match 'IBM Spectrum Protect')\r\n\t\t\t\t{\r\n\t\t\t\t\t$result.Success = $true\r\n\t\t\t\t\t$result.Message = \"Verbindung zu TSM-Server '$effServerName' mit Benutzer '$effUserName' erfolgreich.\"\r\n\t\t\t\t\tInvoke-sqmLogging -Message $result.Message -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t}\r\n\t\t\t\telse\r\n\t\t\t\t{\r\n\t\t\t\t\t$result.Success = $false\r\n\t\t\t\t\t$result.Message = \"Fehler bei TSM-Verbindung (Exitcode $exitCode). Ausgabe: $output $errorOut\".Trim()\r\n\t\t\t\t\tInvoke-sqmLogging -Message $result.Message -FunctionName $functionName -Level \"ERROR\"\r\n\t\t\t\t}\r\n\t\t\t}\r\n\t\t\telse\r\n\t\t\t{\r\n\t\t\t\t$result.Success = $false\r\n\t\t\t\t$result.Message = \"WhatIf: Verbindungstest wuerde ausgefuehrt.\"\r\n\t\t\t\tInvoke-sqmLogging -Message $result.Message -FunctionName $functionName -Level \"VERBOSE\"\r\n\t\t\t}\r\n\t\t}\r\n\t\tcatch\r\n\t\t{\r\n\t\t\t$errMsg = \"Allgemeiner Fehler: $($_.Exception.Message)\"\r\n\t\t\tInvoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level \"ERROR\"\r\n\t\t\tif ($EnableException) { throw }\r\n\t\t\t$result.Message = $errMsg\r\n\t\t}\r\n\t\treturn $result\r\n\t}\r\n\t\r\n\tend\r\n\t{\r\n\t\tInvoke-sqmLogging -Message \"$functionName abgeschlossen.\" -FunctionName $functionName -Level \"INFO\"\r\n\t}\r\n}\r\n\r\n# ---- Hilfsfunktionen (lokal) ----\r\nfunction _FindDsmadmcPath\r\n{\r\n\tparam ([string]$ComputerName,\r\n\t\t[System.Management.Automation.PSCredential]$Credential)\r\n\t\r\n\t$isLocal = $ComputerName -in @($env:COMPUTERNAME, 'localhost', '127.0.0.1', '.')\r\n\t$candidates = [System.Collections.Generic.List[string]]::new()\r\n\t\r\n\tif ($isLocal)\r\n\t{\r\n\t\ttry\r\n\t\t{\r\n\t\t\t$regPath = 'HKLM:\\SOFTWARE\\IBM\\ADSM\\CurrentVersion'\r\n\t\t\t$installPath = (Get-ItemProperty $regPath -Name 'InstallPath' -ErrorAction SilentlyContinue).InstallPath\r\n\t\t\t# KORREKTUR: Doppelte Klammern fuer den Methodenaufruf\r\n\t\t\tif ($installPath) { $candidates.Add((Join-Path $installPath 'dsmadmc.exe')) }\r\n\t\t}\r\n\t\tcatch { }\r\n\t\t\r\n\t\tif ($env:DSM_DIR) { $candidates.Add((Join-Path $env:DSM_DIR 'dsmadmc.exe')) }\r\n\t\t\r\n\t\t$candidates.Add('C:\\Program Files\\Tivoli\\TSM\\baclient\\dsmadmc.exe')\r\n\t\t$candidates.Add('C:\\Program Files\\IBM\\TSM\\baclient\\dsmadmc.exe')\r\n\t\t$candidates.Add('C:\\Program Files\\IBM\\SpectrumProtect\\baclient\\dsmadmc.exe')\r\n\t}\r\n\telse\r\n\t{\r\n\t\t# Remote-Logik... (hier ebenfalls Klammern pruefen falls Join-Path genutzt wird)\r\n\t}\r\n\t\r\n\tforeach ($c in $candidates)\r\n\t{\r\n\t\tif (Test-Path $c) { return $c }\r\n\t}\r\n\treturn $null\r\n}"
+    ]
+  },
+  {
+    "Name": "Uninstall-sqmDb2Driver",
+    "Synopsis": "Deinstalliert den IBM DB2 ODBC/CLI-Treiber.",
+    "Params": [],
+    "Examples": [
+      "Uninstall-sqmDb2Driver"
+    ]
+  },
+  {
+    "Name": "Uninstall-sqmJdbcDriver",
+    "Synopsis": "Deinstalliert den Microsoft JDBC Driver for SQL Server.",
+    "Params": [],
+    "Examples": [
+      "Uninstall-sqmJdbcDriver",
+      "Uninstall-sqmJdbcDriver -RemoveClassPath"
+    ]
+  },
+  {
+    "Name": "Uninstall-sqmOdbcDriver",
+    "Synopsis": "Deinstalliert den Microsoft ODBC Driver for SQL Server.",
+    "Params": [],
+    "Examples": [
+      "Uninstall-sqmOdbcDriver",
+      "Uninstall-sqmOdbcDriver -DriverName 'Microsoft ODBC Driver 17 for SQL Server'"
+    ]
+  }
+];
+
+        function renderFunctions(toRender) {
+            const container = document.getElementById('functions-container');
+            container.innerHTML = '';
+
+            toRender.forEach(func => {
+                const card = document.createElement('div');
+                card.className = 'psdb-st-card';
+                card.id = 'func-' + func.Name.toLowerCase().replace(/[^a-z0-9-]/g, '');
+
+                let paramsHtml = '';
+                if (func.Params && func.Params.length > 0) {
+                    paramsHtml = '<div class="psdb-st-section-title">Parameters</div><ul class="psdb-st-params">';
+                    func.Params.forEach(p => {
+                        paramsHtml += '<li class="psdb-st-param">' + escapeHtml(p) + '</li>';
+                    });
+                    paramsHtml += '</ul>';
+                }
+
+                let examplesHtml = '';
+                if (func.Examples && func.Examples.length > 0) {
+                    examplesHtml = '<div class="psdb-st-section-title">Examples</div><div class="psdb-st-examples">';
+                    func.Examples.forEach(ex => {
+                        examplesHtml += '<div class="psdb-st-example">' + escapeHtml(ex) + '</div>';
+                    });
+                    examplesHtml += '</div>';
+                }
+
+                card.innerHTML = 
+                    <div class="psdb-st-card-title">\</div>
+                    <div class="psdb-st-card-synopsis">\</div>
+                    \
+                    \
+                ;
+
+                container.appendChild(card);
+            });
+        }
+
+        function filterFunctions() {
+            const query = document.getElementById('search').value.toLowerCase();
+            const filtered = functions.filter(f =>
+                f.Name.toLowerCase().includes(query) ||
+                (f.Synopsis && f.Synopsis.toLowerCase().includes(query))
+            );
+
+            document.querySelectorAll('.psdb-st-card').forEach(card => {
+                if (filtered.find(f => 'func-' + f.Name.toLowerCase().replace(/[^a-z0-9-]/g, '') === card.id)) {
+                    card.classList.remove('hidden');
+                } else {
+                    card.classList.add('hidden');
+                }
+            });
+
+            updateSidebar(filtered);
+        }
+
+        function updateSidebar(toShow) {
+            const list = document.getElementById('function-list');
+            list.innerHTML = '';
+            toShow.forEach(func => {
+                const item = document.createElement('li');
+                item.className = 'psdb-st-sidebar-item';
+                const link = document.createElement('a');
+                link.className = 'psdb-st-sidebar-link';
+                link.href = '#func-' + func.Name.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                link.textContent = func.Name;
+                item.appendChild(link);
+                list.appendChild(item);
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize
+        renderFunctions(functions);
+        updateSidebar(functions);
+
+        document.getElementById('search').addEventListener('input', filterFunctions);
+    </script>
+</body>
+</html>
