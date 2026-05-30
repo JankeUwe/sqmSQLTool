@@ -203,18 +203,8 @@
             line-height: 1.4;
         }
 
-        .psdb-st-no-data {
-            color: #94a8c0;
-            font-style: italic;
-        }
-
-        .psdb-st-info {
-            background-color: rgba(46, 134, 193, 0.28);
-            color: #ffffff;
-            padding: 1rem;
-            border-radius: 0.375rem;
-            margin-bottom: 1rem;
-            border-left: 4px solid #2e86c1;
+        .hidden {
+            display: none;
         }
 
         @media (max-width: 1024px) {
@@ -245,10 +235,6 @@
             .psdb-st-h1 {
                 font-size: 1.75rem;
             }
-        }
-
-        .hidden {
-            display: none;
         }
     </style>
 </head>
@@ -2135,12 +2121,12 @@
                     examplesHtml += '</div>';
                 }
 
-                card.innerHTML = 
+                card.innerHTML = \
                     <div class="psdb-st-card-title">\</div>
                     <div class="psdb-st-card-synopsis">\</div>
                     \
                     \
-                ;
+                \;
 
                 container.appendChild(card);
             });
