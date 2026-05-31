@@ -212,7 +212,7 @@
 			# IconUri = ''
 
 			# ReleaseNotes of this module
-			ReleaseNotes = 'v1.4.0 - Get-sqmServerHardwareReport: HTML-Hardware-Konfigurationsbericht mit RAM, CPU, Laufwerken, VM-Erkennung (Hyper-V/VMware/VirtualBox/KVM), Netzwerk, OS und SQL Server Instanzen. Remote-faehig via CIM/WMI. v1.3.0 - TLS/Certificate management: Get-sqmTlsStatus (audit TLS protocols + cert binding), Set-sqmSqlTlsCertificate (bind cert to SQL Server, grant ACL to service account), Install-sqmCertificateToStore (distribute PFX/CER to Windows cert stores locally and remote), Set-sqmSsrsHttpsCertificate (configure SSRS/PBIRS HTTPS via WMI). Deployment: Invoke-sqmDeployScripts (sequential numbered SQL script deployment with backup, transaction wrapper, USE-DB check, WhatIf), Invoke-sqmSignModule (Authenticode code signing for cross-domain deployment). Diagnostics: Get-sqmDiskInfoByDriveLetter (disk info by drive letter with clipboard output). SQL Server 2012-2025 compatibility fix in Get-sqmAgHealthReport.'
+			ReleaseNotes = 'See CHANGELOG.md and GitHub: https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.4.0.0'
 		}
 	}
 }
