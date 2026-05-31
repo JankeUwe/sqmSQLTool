@@ -1,0 +1,117 @@
+# =============================================================================
+# sqmSQLTool - Publish to GitHub Release (unsigned, for PSGallery consumption)
+# =============================================================================
+#
+# Laeuft bei: Push eines Release-Tags (v*.*.*)
+#
+# Was passiert:
+#   1. Modul-Dateien als ZIP verpacken
+#   2. ZIP als GitHub Release Asset hochladen
+#   3. Release-Notes aus CHANGELOG.md einfuegen
+#
+# Nach dieser Aktion:
+#   - ZIP ist unter https://github.com/JankeUwe/sqmSQLTool/releases/tag/vX.Y.Z downloadbar
+#   - ZIP kann manuell auf PowerShell Gallery hochgeladen werden
+#   - (Spaeter: SignPath-Integration fuer Code Signing)
+#
+# =============================================================================
+
+name: Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    name: Package & Release
+
+    steps:
+      # ------------------------------------------------------------------
+      # 1. Repository auschecken
+      # ------------------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------
+      # 2. Modul-Version aus PSD1 lesen
+      # ------------------------------------------------------------------
+      - name: Read module version
+        id: version
+        shell: pwsh
+        run: |
+          $psd1 = Import-PowerShellDataFile "sqmSQLTool.psd1"
+          $ver  = $psd1.ModuleVersion
+          Write-Host "Module version: $ver"
+          echo "version=$ver" >> $env:GITHUB_OUTPUT
+          echo "artifact_name=sqmSQLTool-v$ver" >> $env:GITHUB_OUTPUT
+
+      # ------------------------------------------------------------------
+      # 3. Modul als ZIP verpacken (nur Modul-Dateien, keine Dev-Artefakte)
+      # ------------------------------------------------------------------
+      - name: Package module
+        id: package
+        shell: pwsh
+        run: |
+          $outDir  = "dist"
+          $zipName = "sqmSQLTool-v${{ steps.version.outputs.version }}.zip"
+          $zipPath = Join-Path $outDir $zipName
+
+          New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+
+          # Dateien sammeln (nur Modul-relevante, keine Dev-Artefakte)
+          $exclude = @('.git', 'dist', '.github', 'tests', 'Docs', '*.log', '*.jpa', '.psproj*')
+          $files   = Get-ChildItem -Recurse -File | Where-Object {
+            $rel = $_.FullName.Replace("$pwd\", '')
+            $isExcluded = $false
+            foreach ($ex in $exclude) {
+              if ($rel -like "$ex*" -or $rel -like "*\$ex*") {
+                $isExcluded = $true
+                break
+              }
+            }
+            -not $isExcluded
+          }
+
+          Write-Host "Files to package: $($files.Count)"
+          $files | ForEach-Object { Write-Host "  - $($_.Name)" }
+
+          Compress-Archive -Path $files.FullName -DestinationPath $zipPath -Force
+          Write-Host "Created: $zipPath ($(Get-Item $zipPath).Length / 1KB KB)"
+          echo "zip_path=$zipPath"  >> $env:GITHUB_OUTPUT
+          echo "zip_name=$zipName"  >> $env:GITHUB_OUTPUT
+
+      # ------------------------------------------------------------------
+      # 4. Release mit ZIP Asset erstellen
+      # ------------------------------------------------------------------
+      - name: Create Release with ZIP asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          tag_name: ${{ github.ref_name }}
+          fail_on_unmatched_files: false
+          body: |
+            ## sqmSQLTool ${{ steps.version.outputs.version }}
+
+            See [CHANGELOG.md](https://github.com/JankeUwe/sqmSQLTool/blob/main/CHANGELOG.md) for details.
+
+            ### Download & Install
+
+            **PowerShell 5.1+:**
+            ```powershell
+            # From GitHub Release ZIP (manual)
+            # 1. Download sqmSQLTool-v${{ steps.version.outputs.version }}.zip
+            # 2. Extract to C:\Program Files\PowerShell\Modules\sqmSQLTool
+            # 3. Import-Module sqmSQLTool
+
+            # Or via PowerShell Gallery (coming soon)
+            Install-Module sqmSQLTool -Repository PSGallery
+            ```
+
+            ### Note
+            Code signing (Authenticode) will be added in the next release phase.
