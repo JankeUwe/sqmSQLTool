@@ -190,41 +190,118 @@ foreach ($func in $allFunctions)
 }
 
 # Update-Funktionen explizit exportieren (definiert im PSM1, nicht in Public\)
-Export-ModuleMember -Function 'Test-sqmModuleUpdate', 'Update-sqmModule'
+Export-ModuleMember -Function 'Test-sqmModuleUpdate', 'Test-sqmModuleUpdate-PSGallery', 'Test-sqmModuleUpdate-GitHub', 'Test-sqmModuleUpdate-UNC', 'Update-sqmModule'
 
 # =============================================================================
-# Update-Mechanismus
+# Update-Mechanismus mit Fallback-Chain
 # =============================================================================
+# Priorität:
+#   1. PowerShell Gallery (PSGallery)
+#   2. GitHub Releases (fallback)
+#   3. UNC-Pfad (fallback)
+#   4. Warnung ausgeben wenn alle fehlschlagen
 
 <#
 .SYNOPSIS
-    Prueft ob eine neuere Version des MSSQLTools-Moduls im konfigurierten Repository verfuegbar ist.
-.PARAMETER RepositoryPath
-    Pfad zum Update-Repository (ueberschreibt die Konfiguration).
-.PARAMETER Credential
-    Credentials fuer UNC-Freigaben.
+    Prueft ob eine neuere Version des Moduls in PowerShell Gallery verfuegbar ist.
+.PARAMETER ModuleName
+    Name des Moduls (Standard: sqmSQLTool).
 #>
-function Test-sqmModuleUpdate
+function Test-sqmModuleUpdate-PSGallery
 {
 	[CmdletBinding()]
-	param (
-		[string]$RepositoryPath = $script:sqmModuleConfig['UpdateRepository'],
-		[System.Management.Automation.PSCredential]$Credential
-	)
-	if (-not $RepositoryPath)
-	{
-		Write-Verbose "Kein Update-Repository konfiguriert."
-		return $false
-	}
-	# Guard: check if the repository root is reachable before any path operations.
-	# This prevents Join-Path from throwing when a drive letter (e.g. W:) does not exist.
-	if (-not (Test-Path -Path $RepositoryPath -ErrorAction SilentlyContinue))
-	{
-		Write-Verbose "Update-Repository nicht erreichbar: $RepositoryPath"
-		return $false
-	}
+	param ([string]$ModuleName = 'sqmSQLTool')
+
 	try
 	{
+		$galleryModule = Find-Module -Name $ModuleName -Repository PSGallery -ErrorAction Stop
+		$currentVersion = [version]$script:sqmModuleConfig['ModuleVersion']
+		$galleryVersion = [version]$galleryModule.Version
+
+		if ($galleryVersion -gt $currentVersion)
+		{
+			Write-Verbose "PSGallery: Neuere Version verfuegbar ($($galleryModule.Version))"
+			return @{
+				Source = 'PSGallery'
+				Version = $galleryVersion
+				UpdateCommand = "Update-Module -Name $ModuleName -Repository PSGallery -Force"
+			}
+		}
+		return $null
+	}
+	catch
+	{
+		Write-Verbose "PSGallery-Check fehlgeschlagen: $($_.Exception.Message)"
+		return $null
+	}
+}
+
+<#
+.SYNOPSIS
+    Prueft ob eine neuere Version auf GitHub Releases verfuegbar ist.
+.PARAMETER GitHubRepo
+    GitHub Repository (Format: owner/repo, z.B. JankeUwe/sqmSQLTool).
+#>
+function Test-sqmModuleUpdate-GitHub
+{
+	[CmdletBinding()]
+	param ([string]$GitHubRepo = 'JankeUwe/sqmSQLTool')
+
+	try
+	{
+		$latestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/$GitHubRepo/releases/latest" `
+			-Headers @{'Accept' = 'application/vnd.github+json'} `
+			-ErrorAction Stop
+
+		# Version aus Tag extrahieren (v1.4.0.0 -> 1.4.0.0)
+		$tagVersion = $latestRelease.tag_name -replace '^v', ''
+		$currentVersion = [version]$script:sqmModuleConfig['ModuleVersion']
+		$releaseVersion = [version]$tagVersion
+
+		if ($releaseVersion -gt $currentVersion)
+		{
+			Write-Verbose "GitHub: Neuere Version verfuegbar ($tagVersion)"
+			return @{
+				Source = 'GitHub'
+				Version = $releaseVersion
+				URL = $latestRelease.html_url
+				UpdateCommand = "# ZIP von $($latestRelease.html_url) herunterladen und manuell entpacken"
+			}
+		}
+		return $null
+	}
+	catch
+	{
+		Write-Verbose "GitHub-Check fehlgeschlagen: $($_.Exception.Message)"
+		return $null
+	}
+}
+
+<#
+.SYNOPSIS
+    Prueft ob eine neuere Version im UNC-Pfad verfuegbar ist.
+.PARAMETER RepositoryPath
+    UNC-Pfad zum Repository.
+#>
+function Test-sqmModuleUpdate-UNC
+{
+	[CmdletBinding()]
+	param ([string]$RepositoryPath = $script:sqmModuleConfig['UpdateRepository'])
+
+	try
+	{
+		if (-not $RepositoryPath)
+		{
+			Write-Verbose "Kein UNC-Repository konfiguriert."
+			return $null
+		}
+
+		if (-not (Test-Path -Path $RepositoryPath -ErrorAction SilentlyContinue))
+		{
+			Write-Verbose "UNC-Repository nicht erreichbar: $RepositoryPath"
+			return $null
+		}
+
 		$remoteVersionFile = Join-Path $RepositoryPath 'ModuleVersion.txt'
 		if (Test-Path -Path $remoteVersionFile -ErrorAction SilentlyContinue)
 		{
@@ -240,26 +317,65 @@ function Test-sqmModuleUpdate
 			}
 			else
 			{
-				Write-Verbose "Keine Versionsinformation im Repository gefunden."
-				return $false
+				Write-Verbose "Keine Versionsinformation im UNC-Repository gefunden."
+				return $null
 			}
 		}
+
 		$currentVersion = [version]$script:sqmModuleConfig['ModuleVersion']
 		$newVersion     = [version]$remoteVersion
-		return $newVersion -gt $currentVersion
+
+		if ($newVersion -gt $currentVersion)
+		{
+			Write-Verbose "UNC: Neuere Version verfuegbar ($newVersion)"
+			return @{
+				Source = 'UNC'
+				Version = $newVersion
+				Path = $RepositoryPath
+				UpdateCommand = "Update-sqmModule -RepositoryPath '$RepositoryPath'"
+			}
+		}
+		return $null
 	}
 	catch
 	{
-		Write-Warning "Update-Pruefung fehlgeschlagen: $($_.Exception.Message)"
-		return $false
+		Write-Verbose "UNC-Check fehlgeschlagen: $($_.Exception.Message)"
+		return $null
 	}
 }
 
 <#
 .SYNOPSIS
-    Aktualisiert das MSSQLTools-Modul aus dem konfigurierten Repository.
+    Prueft ob eine neuere Version des Moduls verfuegbar ist (Fallback-Chain: PSGallery -> GitHub -> UNC).
+.PARAMETER Credential
+    Credentials fuer UNC-Freigaben.
+#>
+function Test-sqmModuleUpdate
+{
+	[CmdletBinding()]
+	param (
+		[System.Management.Automation.PSCredential]$Credential
+	)
+
+	# Fallback-Chain: PSGallery -> GitHub -> UNC
+	$updateResult = Test-sqmModuleUpdate-PSGallery -ModuleName 'sqmSQLTool'
+	if ($updateResult) { return $updateResult }
+
+	$updateResult = Test-sqmModuleUpdate-GitHub -GitHubRepo 'JankeUwe/sqmSQLTool'
+	if ($updateResult) { return $updateResult }
+
+	$updateResult = Test-sqmModuleUpdate-UNC -RepositoryPath $script:sqmModuleConfig['UpdateRepository']
+	if ($updateResult) { return $updateResult }
+
+	# Keine neuere Version in keinem Repository gefunden
+	return $null
+}
+
+<#
+.SYNOPSIS
+    Aktualisiert das sqmSQLTool-Modul (nur UNC-Repositories unterstuezt; PSGallery/GitHub sind manuell).
 .PARAMETER RepositoryPath
-    Pfad zum Update-Repository.
+    Pfad zum Update-Repository (UNC-Pfad).
 .PARAMETER Credential
     Credentials fuer UNC-Freigaben.
 .PARAMETER Backup
@@ -287,18 +403,21 @@ function Update-sqmModule
 		Write-Error "Repository-Pfad '$RepositoryPath' nicht erreichbar."
 		return
 	}
-	if (-not $Force -and -not (Test-sqmModuleUpdate -RepositoryPath $RepositoryPath))
+
+	$updateInfo = Test-sqmModuleUpdate-UNC -RepositoryPath $RepositoryPath
+	if (-not $Force -and -not $updateInfo)
 	{
 		Write-Host "Keine neuere Version verfuegbar." -ForegroundColor Green
 		return
 	}
+
 	if ($PSCmdlet.ShouldProcess("Modul aus '$RepositoryPath' aktualisieren", "Update"))
 	{
 		try
 		{
 			if ($Backup)
 			{
-				$backupDir = Join-Path $env:TEMP "MSSQLTools_Backup_$(Get-Date -Format 'yyyyMMdd_HHmsqm')"
+				$backupDir = Join-Path $env:TEMP "sqmSQLTool_Backup_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
 				Copy-Item -Path $currentModulePath -Destination $backupDir -Recurse -Force -ErrorAction Stop
 				Write-Host "Backup erstellt: $backupDir" -ForegroundColor Gray
 			}
@@ -323,20 +442,52 @@ function Update-sqmModule
 	}
 }
 
-# Auto-update on module import (only when AutoUpdate = $true, repository is configured and reachable)
-if ($script:sqmModuleConfig['AutoUpdate'] -and $script:sqmModuleConfig['UpdateRepository'])
+# Auto-update on module import (only when AutoUpdate = $true)
+if ($script:sqmModuleConfig['AutoUpdate'])
 {
-	$noUpdate = $env:MSSQLTOOLS_SKIP_AUTO_UPDATE -eq '1'
-	$repoPath = $script:sqmModuleConfig['UpdateRepository']
-	$repoReachable = Test-Path -Path $repoPath -ErrorAction SilentlyContinue
-	if (-not $noUpdate -and $repoReachable)
+	$noUpdate = $env:SQMSQLTOOL_SKIP_AUTO_UPDATE -eq '1'
+	if (-not $noUpdate)
 	{
 		try
 		{
-			if (Test-sqmModuleUpdate)
+			$updateInfo = Test-sqmModuleUpdate
+			if ($updateInfo)
 			{
-				Write-Host "New module version available. Running update..." -ForegroundColor Cyan
-				Update-sqmModule -Force -Backup
+				Write-Host "`n[sqmSQLTool] Neuere Version verfuegbar: $($updateInfo.Version) (via $($updateInfo.Source))" -ForegroundColor Cyan
+
+				if ($updateInfo.Source -eq 'UNC')
+				{
+					# UNC: Automatisches Update
+					Write-Host "[sqmSQLTool] Fuehre Update durch..." -ForegroundColor Cyan
+					Update-sqmModule -Force -Backup
+				}
+				elseif ($updateInfo.Source -eq 'PSGallery')
+				{
+					# PSGallery: Hinweis auf Update-Module
+					Write-Warning @"
+[sqmSQLTool] Update verfuegbar in PowerShell Gallery!
+
+Zum Aktualisieren bitte ausfuehren:
+  Update-Module -Name sqmSQLTool -Repository PSGallery -Force
+
+Oder via Install-Module:
+  Install-Module -Name sqmSQLTool -Repository PSGallery -Force -AllowClobber
+"@
+				}
+				elseif ($updateInfo.Source -eq 'GitHub')
+				{
+					# GitHub: Hinweis auf GitHub Release
+					Write-Warning @"
+[sqmSQLTool] Update verfuegbar auf GitHub!
+
+Release: $($updateInfo.URL)
+
+Zum Aktualisieren:
+1. ZIP herunterladen von: $($updateInfo.URL)/releases/download/v$($updateInfo.Version)/sqmSQLTool-v$($updateInfo.Version).zip
+2. Entpacken nach: `$PROFILE\..\Modules\sqmSQLTool\
+3. PowerShell neu starten oder: Remove-Module sqmSQLTool; Import-Module sqmSQLTool
+"@
+				}
 			}
 		}
 		catch
