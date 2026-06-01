@@ -121,24 +121,71 @@ function Get-sqmADGroupMembers
             {
                 Invoke-sqmLogging -Message "[$group] Abfrage wird gestartet..." -FunctionName $functionName -Level "INFO"
 
-                # Gruppe suchen — Standard ADSI DirectorySearcher
+                # Gruppe suchen — mehrere Methoden
                 $groupEntry = $null
+
+                # Methode 1: Direkter WinNT-Pfad (wie SQL Server HelpLogin)
                 try
                 {
-                    # Standard-Searcher mit default Domain
-                    [System.DirectoryServices.DirectorySearcher]$searcher = [System.DirectoryServices.DirectorySearcher]::new()
-                    $searcher.Filter = "(&(objectClass=group)(sAMAccountName=$group))"
-                    $searchResult = $searcher.FindOne()
-
-                    if ($searchResult)
+                    $domain = ([System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()).Name
+                    $groupEntry = [ADSI]"WinNT://$domain/$group,group"
+                    if ($groupEntry.Name)
                     {
-                        $groupEntry = $searchResult.GetDirectoryEntry()
+                        Invoke-sqmLogging -Message "[$group] Gruppe gefunden via WinNT (Methode 1)." -FunctionName $functionName -Level "VERBOSE"
+                    }
+                    else
+                    {
+                        $groupEntry = $null
                     }
                 }
                 catch
                 {
-                    $warnMsg = "[$group] Fehler bei Gruppensuche: $_"
-                    Invoke-sqmLogging -Message $warnMsg -FunctionName $functionName -Level "WARNING"
+                    Invoke-sqmLogging -Message "[$group] WinNT-Methode fehlgeschlagen, versuche DirectorySearcher..." -FunctionName $functionName -Level "VERBOSE"
+                    $groupEntry = $null
+                }
+
+                # Methode 2: DirectorySearcher mit sAMAccountName
+                if (-not $groupEntry)
+                {
+                    try
+                    {
+                        [System.DirectoryServices.DirectorySearcher]$searcher = [System.DirectoryServices.DirectorySearcher]::new()
+                        $searcher.Filter = "(sAMAccountName=$group)"
+                        $searcher.SearchScope = [System.DirectoryServices.SearchScope]::Subtree
+                        $searchResult = $searcher.FindOne()
+
+                        if ($searchResult)
+                        {
+                            $groupEntry = $searchResult.GetDirectoryEntry()
+                            Invoke-sqmLogging -Message "[$group] Gruppe gefunden via DirectorySearcher (Methode 2)." -FunctionName $functionName -Level "VERBOSE"
+                        }
+                    }
+                    catch
+                    {
+                        Invoke-sqmLogging -Message "[$group] DirectorySearcher fehlgeschlagen: $_" -FunctionName $functionName -Level "VERBOSE"
+                    }
+                }
+
+                # Methode 3: Direkter LDAP-Lookup (falls Gruppe mit CN= angegeben ist)
+                if (-not $groupEntry -and $group -like "*=*")
+                {
+                    try
+                    {
+                        $groupEntry = [ADSI]"LDAP://$group"
+                        if ($groupEntry.Name)
+                        {
+                            Invoke-sqmLogging -Message "[$group] Gruppe gefunden via LDAP DN (Methode 3)." -FunctionName $functionName -Level "VERBOSE"
+                        }
+                        else
+                        {
+                            $groupEntry = $null
+                        }
+                    }
+                    catch
+                    {
+                        Invoke-sqmLogging -Message "[$group] LDAP DN-Lookup fehlgeschlagen: $_" -FunctionName $functionName -Level "VERBOSE"
+                        $groupEntry = $null
+                    }
                 }
 
                 if (-not $groupEntry)
@@ -150,6 +197,7 @@ function Get-sqmADGroupMembers
                             Timestamp   = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
                             MemberCount = 0
                             Members     = @()
+                            OutputPath  = $OutputPath
                             TxtFile     = $null
                             CsvFile     = $null
                             Status      = 'Warning'
@@ -339,6 +387,7 @@ function Get-sqmADGroupMembers
                     Timestamp   = $timestamp
                     MemberCount = $detailRows.Count
                     Members     = $detailRows
+                    OutputPath  = $OutputPath
                     TxtFile     = $txtFile
                     CsvFile     = $csvFile
                     Status      = 'OK'
@@ -354,6 +403,7 @@ function Get-sqmADGroupMembers
                         Timestamp   = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
                         MemberCount = 0
                         Members     = $null
+                        OutputPath  = $OutputPath
                         TxtFile     = $null
                         CsvFile     = $null
                         Status      = 'Error'
