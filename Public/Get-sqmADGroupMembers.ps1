@@ -1,0 +1,501 @@
+<#
+.SYNOPSIS
+    Lists all members of an Active Directory group.
+
+.DESCRIPTION
+    Queries an Active Directory group and returns all members with extended information
+    (Name, SamAccountName, Type, Enabled, Email, Department, Title, LastLogon).
+
+    Uses ADSI (no RSAT required) with automatic range retrieval for large groups (>1500 members).
+    Supports recursive group expansion (nested group resolution).
+
+    Results are saved as TXT report and CSV file in the specified directory.
+    The function also returns an object with the detail data and file paths.
+
+.PARAMETER GroupName
+    Name of the AD group(s). Pipeline-capable.
+
+.PARAMETER DomainController
+    Optional: Specific domain controller to query. If not specified, the default DC is used.
+
+.PARAMETER Recursive
+    If specified, recursively expand nested groups (resolves all transitive members).
+    Default: OFF (only direct members).
+
+.PARAMETER OutputPath
+    Output directory for report files. Default: $env:ProgramData\sqmSQLTool\ADReports
+
+.PARAMETER NoOpen
+    If specified, do not open the report file after creation.
+
+.PARAMETER PassThru
+    Return the result object (default behavior).
+
+.PARAMETER ContinueOnError
+    Continue on error for a group (otherwise the error is thrown).
+
+.PARAMETER EnableException
+    Throw exceptions immediately (overrides ContinueOnError).
+
+.PARAMETER Confirm
+    Request confirmation before writing files.
+
+.PARAMETER WhatIf
+    Shows which files would be created without actually writing them.
+
+.EXAMPLE
+    Get-sqmADGroupMembers -GroupName "DL_SQL_Admins"
+
+.EXAMPLE
+    Get-sqmADGroupMembers -GroupName "DL_SQL_Admins", "DL_SQL_Developers" -OutputPath "D:\Reports"
+
+.EXAMPLE
+    Get-sqmADGroupMembers -GroupName "DL_SQL_Admins" -Recursive -DomainController "DC01.corp.local"
+
+.NOTES
+    Author:       MSSQLTools
+    Prerequisites: Invoke-sqmLogging
+    Default output path: $env:ProgramData\sqmSQLTool\ADReports
+    AD-Method: ADSI (no RSAT required; works on all Windows systems with AD access)
+    Range Retrieval: Automatic for groups with >1500 members
+#>
+function Get-sqmADGroupMembers
+{
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]
+    [OutputType([PSCustomObject])]
+    param (
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true, Position = 0)]
+        [ValidateNotNullOrEmpty()]
+        [string[]]$GroupName,
+
+        [Parameter(Mandatory = $false)]
+        [string]$DomainController,
+
+        [Parameter(Mandatory = $false)]
+        [switch]$Recursive,
+
+        [Parameter(Mandatory = $false)]
+        [string]$OutputPath = "$env:ProgramData\sqmSQLTool\ADReports",
+
+        [Parameter(Mandatory = $false)]
+        [switch]$NoOpen,
+
+        [Parameter(Mandatory = $false)]
+        [switch]$PassThru,
+
+        [Parameter(Mandatory = $false)]
+        [switch]$ContinueOnError,
+
+        [Parameter(Mandatory = $false)]
+        [switch]$EnableException
+    )
+
+    begin
+    {
+        $functionName = $MyInvocation.MyCommand.Name
+        $allGroupResults = [System.Collections.Generic.List[PSCustomObject]]::new()
+
+        # Test ADSI connectivity
+        try
+        {
+            $null = [ADSI]"LDAP://RootDSE"
+            Invoke-sqmLogging -Message "ADSI-Verbindung erfolgreich." -FunctionName $functionName -Level "INFO"
+        }
+        catch
+        {
+            $errMsg = "Fehler: ADSI-Verbindung fehlgeschlagen - kein Domain Controller erreichbar. $_"
+            Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+            throw $errMsg
+        }
+
+        Invoke-sqmLogging -Message "Starte $functionName. OutputPath: $OutputPath | Recursive: $Recursive" -FunctionName $functionName -Level "INFO"
+    }
+
+    process
+    {
+        foreach ($group in $GroupName)
+        {
+            $detailRows = [System.Collections.Generic.List[PSCustomObject]]::new()
+
+            try
+            {
+                Invoke-sqmLogging -Message "[$group] Abfrage wird gestartet..." -FunctionName $functionName -Level "INFO"
+
+                # Gruppe suchen
+                $searchBase = if ($DomainController)
+                {
+                    "LDAP://$DomainController"
+                }
+                else
+                {
+                    "LDAP://"
+                }
+
+                $searcher = [adsisearcher]"(&(objectClass=group)(sAMAccountName=$group))"
+                $searcher.SearchRoot = [ADSI]$searchBase
+                $groupEntry = $searcher.FindOne()
+
+                if (-not $groupEntry)
+                {
+                    $warnMsg = "[$group] Gruppe nicht gefunden oder nicht zugreifbar."
+                    Invoke-sqmLogging -Message $warnMsg -FunctionName $functionName -Level "WARNING"
+                    $allGroupResults.Add([PSCustomObject]@{
+                            GroupName   = $group
+                            Timestamp   = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+                            MemberCount = 0
+                            Members     = @()
+                            TxtFile     = $null
+                            CsvFile     = $null
+                            Status      = 'Warning'
+                            Message     = $warnMsg
+                        })
+                    continue
+                }
+
+                $groupDN = $groupEntry.Properties['distinguishedName'][0]
+                Invoke-sqmLogging -Message "[$group] Gruppe gefunden: DN=$groupDN" -FunctionName $functionName -Level "VERBOSE"
+
+                # Members mit Range-Retrieval (AD liefert >1500 Members in Chunks)
+                $memberDNs = [System.Collections.Generic.List[string]]::new()
+                $rangeStart = 0
+                $rangeSize = 1500
+
+                do
+                {
+                    $rangeEnd = $rangeStart + $rangeSize - 1
+                    $rangeAttr = "member;range=$rangeStart-$rangeEnd"
+
+                    $searcher2 = [adsisearcher]"(objectClass=*)"
+                    $searcher2.SearchRoot = [ADSI]"LDAP://$groupDN"
+                    $searcher2.PropertiesToLoad.Clear()
+                    $searcher2.PropertiesToLoad.Add($rangeAttr) | Out-Null
+
+                    $result = $searcher2.FindOne()
+
+                    if (-not $result)
+                    {
+                        break
+                    }
+
+                    $attrs = $result.Properties
+                    $foundAttr = $null
+
+                    # Finde das tatsaechliche Attribut (mit Bereichs-Suffix)
+                    foreach ($attr in $attrs.PropertyNames)
+                    {
+                        if ($attr -like "member;range=*")
+                        {
+                            $foundAttr = $attr
+                            break
+                        }
+                    }
+
+                    if ($foundAttr -and $result.Properties[$foundAttr].Count -gt 0)
+                    {
+                        foreach ($dn in $result.Properties[$foundAttr])
+                        {
+                            $memberDNs.Add($dn)
+                        }
+
+                        # Pruefen ob wir das Ende erreicht haben (Bereich mit *)
+                        if ($foundAttr -match 'range=\d+-\*')
+                        {
+                            break
+                        }
+
+                        $rangeStart = $rangeEnd + 1
+                    }
+                    else
+                    {
+                        break
+                    }
+                }
+                while ($true)
+
+                Invoke-sqmLogging -Message "[$group] $($memberDNs.Count) Members gefunden." -FunctionName $functionName -Level "INFO"
+
+                # Members verarbeiten
+                if ($Recursive)
+                {
+                    # Recursive: nested groups auflösen
+                    $processedGroups = [System.Collections.Generic.HashSet[string]]::new()
+                    $processedGroups.Add($groupDN) | Out-Null
+
+                    foreach ($memberDN in $memberDNs)
+                    {
+                        _ProcessMemberRecursive -MemberDN $memberDN -GroupPath $group -AllRows $detailRows `
+                            -ProcessedGroups $processedGroups -FunctionName $functionName
+                    }
+                }
+                else
+                {
+                    # Non-recursive: nur direkte Members
+                    foreach ($memberDN in $memberDNs)
+                    {
+                        $details = _GetMemberInfo -MemberDN $memberDN
+                        if ($details)
+                        {
+                            $rowObj = [PSCustomObject]@{
+                                GroupName         = $group
+                                SamAccountName    = $details.SamAccountName
+                                DisplayName       = $details.DisplayName
+                                ObjectClass       = $details.ObjectClass
+                                Enabled           = $details.Enabled
+                                Email             = $details.Email
+                                Department        = $details.Department
+                                Title             = $details.Title
+                                LastLogon         = $details.LastLogon
+                                DistinguishedName = $details.DistinguishedName
+                            }
+                            $detailRows.Add($rowObj)
+                        }
+                    }
+                }
+
+                # Output-Dateien schreiben
+                $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+                $datestamp = Get-Date -Format 'yyyy-MM-dd'
+                $safeGroup = $group -replace '[\\/:*?"<>|]', '_'
+                $txtFile = Join-Path $OutputPath "ADGroupMembers_${safeGroup}_${datestamp}.txt"
+                $csvFile = Join-Path $OutputPath "ADGroupMembers_${safeGroup}_${datestamp}.csv"
+
+                if ($PSCmdlet.ShouldProcess($group, "Erstelle Bericht in $OutputPath"))
+                {
+                    # Verzeichnis anlegen
+                    if (-not (Test-Path $OutputPath))
+                    {
+                        New-Item -ItemType Directory -Path $OutputPath -Force -ErrorAction Stop | Out-Null
+                        Invoke-sqmLogging -Message "Verzeichnis $OutputPath wurde erstellt." -FunctionName $functionName -Level "INFO"
+                    }
+
+                    # TXT-Bericht
+                    $lines = [System.Collections.Generic.List[string]]::new()
+                    $lines.Add("# ================================================================")
+                    $lines.Add("# sqmSQLTool - AD Group Members Report")
+                    $lines.Add("# Gruppe    : $group")
+                    $lines.Add("# DN        : $groupDN")
+                    $lines.Add("# Erstellt  : $timestamp")
+                    $lines.Add("# Rekursiv  : $(if ($Recursive) { 'Ja' } else { 'Nein' })")
+                    $lines.Add("# Members   : $($detailRows.Count)")
+                    $lines.Add("# ================================================================")
+                    $lines.Add("")
+                    $lines.Add(("{0,-30} {1,-25} {2,-15} {3,-8} {4,-30}" -f
+                            'SamAccountName', 'DisplayName', 'Type', 'Enabled', 'Email'))
+                    $lines.Add(("-" * 110))
+
+                    foreach ($row in ($detailRows | Sort-Object SamAccountName))
+                    {
+                        $enabledStr = if ($row.Enabled) { 'Ja' } else { 'Nein' }
+                        $lines.Add(("{0,-30} {1,-25} {2,-15} {3,-8} {4,-30}" -f
+                                $row.SamAccountName, $row.DisplayName, $row.ObjectClass, $enabledStr, $row.Email))
+                    }
+
+                    $lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
+
+                    # CSV-Datei (flach: eine Zeile pro Member)
+                    $detailRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
+
+                    Invoke-sqmLogging -Message "[$group] Bericht erstellt: $txtFile" -FunctionName $functionName -Level "INFO"
+                }
+                else
+                {
+                    Invoke-sqmLogging -Message "[$group] WhatIf: Berichtsdateien wuerden erstellt werden." -FunctionName $functionName -Level "VERBOSE"
+                    $txtFile = $null
+                    $csvFile = $null
+                }
+
+                # Ergebnisobjekt
+                $result = [PSCustomObject]@{
+                    GroupName   = $group
+                    Timestamp   = $timestamp
+                    MemberCount = $detailRows.Count
+                    Members     = $detailRows
+                    TxtFile     = $txtFile
+                    CsvFile     = $csvFile
+                    Status      = 'OK'
+                }
+                $allGroupResults.Add($result)
+            }
+            catch
+            {
+                $errMsg = "Fehler bei Gruppe '$group': $($_.Exception.Message)"
+                Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+                $allGroupResults.Add([PSCustomObject]@{
+                        GroupName   = $group
+                        Timestamp   = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+                        MemberCount = 0
+                        Members     = $null
+                        TxtFile     = $null
+                        CsvFile     = $null
+                        Status      = 'Error'
+                        Message     = $errMsg
+                    })
+                if ($EnableException) { throw }
+                if (-not $ContinueOnError) { throw }
+            }
+        }
+    }
+
+    end
+    {
+        Invoke-sqmLogging -Message "$functionName abgeschlossen. $($allGroupResults.Count) Gruppen verarbeitet." -FunctionName $functionName -Level "INFO"
+
+        if ($PassThru)
+        {
+            return $allGroupResults
+        }
+    }
+}
+
+# ==============================================================================
+# Helper-Funktion: Abrufen von Benutzerinformationen
+# ==============================================================================
+function _GetMemberInfo
+{
+    param([string]$MemberDN)
+
+    try
+    {
+        $memberEntry = [ADSI]"LDAP://$MemberDN"
+
+        # Objekt-Typ bestimmen
+        $objectClass = $memberEntry.objectClass.Value
+        if ($objectClass -is [array])
+        {
+            $objectClass = $objectClass[-1]
+        }
+
+        # Status aus userAccountControl ermitteln
+        $uacValue = $memberEntry.userAccountControl.Value
+        $isEnabled = $true
+        if ($uacValue)
+        {
+            $isEnabled = (($uacValue -band 2) -eq 0)  # Bit 1 (0x0002) ist "disabled"
+        }
+
+        # LastLogon/lastLogonTimestamp
+        $lastLogon = $null
+        $llts = $memberEntry.lastLogonTimestamp.Value
+        if ($llts)
+        {
+            try
+            {
+                $lastLogon = [DateTime]::FromFileTime($llts)
+            }
+            catch
+            {
+                $lastLogon = $null
+            }
+        }
+
+        [PSCustomObject]@{
+            SamAccountName    = $memberEntry.sAMAccountName.Value
+            DisplayName       = $memberEntry.displayName.Value
+            ObjectClass       = $objectClass
+            Enabled           = $isEnabled
+            Email             = $memberEntry.mail.Value
+            Department        = $memberEntry.department.Value
+            Title             = $memberEntry.title.Value
+            LastLogon         = $lastLogon
+            DistinguishedName = $MemberDN
+        }
+    }
+    catch
+    {
+        return $null
+    }
+}
+
+# ==============================================================================
+# Helper-Funktion fuer rekursive Gruppenerweiterung
+# ==============================================================================
+function _ProcessMemberRecursive
+{
+    param(
+        [string]$MemberDN,
+        [string]$GroupPath,
+        [System.Collections.Generic.List[PSCustomObject]]$AllRows,
+        [System.Collections.Generic.HashSet[string]]$ProcessedGroups,
+        [string]$FunctionName
+    )
+
+    if ($ProcessedGroups.Contains($MemberDN))
+    {
+        return
+    }
+
+    try
+    {
+        $memberEntry = [ADSI]"LDAP://$MemberDN"
+
+        # Typ bestimmen
+        $objectClass = $memberEntry.objectClass.Value
+        if ($objectClass -is [array])
+        {
+            $objectClass = $objectClass[-1]
+        }
+
+        # Status bestimmen
+        $uacValue = $memberEntry.userAccountControl.Value
+        $isEnabled = $true
+        if ($uacValue)
+        {
+            $isEnabled = (($uacValue -band 2) -eq 0)
+        }
+
+        # LastLogon
+        $lastLogon = $null
+        $llts = $memberEntry.lastLogonTimestamp.Value
+        if ($llts)
+        {
+            try
+            {
+                $lastLogon = [DateTime]::FromFileTime($llts)
+            }
+            catch
+            {
+                $lastLogon = $null
+            }
+        }
+
+        # Zur Liste hinzufuegen
+        $AllRows.Add([PSCustomObject]@{
+                GroupName         = $GroupPath
+                SamAccountName    = $memberEntry.sAMAccountName.Value
+                DisplayName       = $memberEntry.displayName.Value
+                ObjectClass       = $objectClass
+                Enabled           = $isEnabled
+                Email             = $memberEntry.mail.Value
+                Department        = $memberEntry.department.Value
+                Title             = $memberEntry.title.Value
+                LastLogon         = $lastLogon
+                DistinguishedName = $MemberDN
+            })
+
+        # Wenn Gruppe: rekursiv verarbeiten
+        if ($objectClass -eq 'group')
+        {
+            $ProcessedGroups.Add($MemberDN) | Out-Null
+
+            # Member dieser Gruppe abrufen
+            $searcher = [adsisearcher]"(objectClass=*)"
+            $searcher.SearchRoot = [ADSI]"LDAP://$MemberDN"
+            $searcher.PropertiesToLoad.Clear()
+            $searcher.PropertiesToLoad.Add("member") | Out-Null
+
+            $groupResult = $searcher.FindOne()
+            if ($groupResult -and $groupResult.Properties['member'].Count -gt 0)
+            {
+                foreach ($subMemberDN in $groupResult.Properties['member'])
+                {
+                    _ProcessMemberRecursive -MemberDN $subMemberDN -GroupPath "$GroupPath > $($memberEntry.sAMAccountName.Value)" `
+                        -AllRows $AllRows -ProcessedGroups $ProcessedGroups -FunctionName $FunctionName
+                }
+            }
+        }
+    }
+    catch
+    {
+        return
+    }
+}
