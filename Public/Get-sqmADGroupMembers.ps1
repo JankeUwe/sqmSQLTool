@@ -259,7 +259,7 @@ function Get-sqmADGroupMembers
 
                     Invoke-sqmLogging -Message "[$group] Member-Abruf: Typ=$([System.IO.Path]::GetExtension($path)) (WinNT=$isWinNT, LDAP=$isLDAP)" -FunctionName $functionName -Level "VERBOSE"
 
-                    # WinNT: Members() Methode
+                    # WinNT: Members() Methode — direkt die Member-Objekte verarbeiten
                     if ($isWinNT)
                     {
                         try
@@ -267,10 +267,51 @@ function Get-sqmADGroupMembers
                             $members = $groupEntry.psbase.Invoke("Members")
                             foreach ($member in $members)
                             {
-                                $memberPath = $member.psbase.Path
-                                $memberDNs.Add($memberPath)
+                                try
+                                {
+                                    # WinNT Member ist bereits ein ADSI-Objekt, nicht eine DN
+                                    # Extrahiere Informationen direkt
+                                    $samAccount = $member.name.Value
+                                    $displayName = $member.displayName.Value
+
+                                    # Objekt-Typ bestimmen
+                                    $objectClass = $member.objectClass.Value
+                                    if ($objectClass -is [array]) { $objectClass = $objectClass[-1] }
+
+                                    # Status aus userAccountControl ermitteln
+                                    $uacValue = $member.userAccountControl.Value
+                                    $isEnabled = $true
+                                    if ($uacValue) { $isEnabled = (($uacValue -band 2) -eq 0) }
+
+                                    # LastLogon
+                                    $lastLogon = $null
+                                    $llts = $member.lastLogonTimestamp.Value
+                                    if ($llts) {
+                                        try { $lastLogon = [DateTime]::FromFileTime($llts) } catch { }
+                                    }
+
+                                    # Zusammenstellung der Member-Info
+                                    $memberPath = $member.psbase.Path
+                                    $rowObj = [PSCustomObject]@{
+                                        GroupName         = $group
+                                        SamAccountName    = $samAccount
+                                        DisplayName       = $displayName
+                                        ObjectClass       = $objectClass
+                                        Enabled           = $isEnabled
+                                        Email             = $member.mail.Value
+                                        Department        = $member.department.Value
+                                        Title             = $member.title.Value
+                                        LastLogon         = $lastLogon
+                                        DistinguishedName = $memberPath
+                                    }
+                                    $detailRows.Add($rowObj)
+                                }
+                                catch
+                                {
+                                    Invoke-sqmLogging -Message "[$group] Fehler beim Verarbeiten von WinNT-Member: $_" -FunctionName $functionName -Level "WARNING"
+                                }
                             }
-                            Invoke-sqmLogging -Message "[$group] $($memberDNs.Count) Members via WinNT.Members()" -FunctionName $functionName -Level "VERBOSE"
+                            Invoke-sqmLogging -Message "[$group] $($detailRows.Count) Members via WinNT.Members()" -FunctionName $functionName -Level "VERBOSE"
                         }
                         catch
                         {
@@ -413,6 +454,7 @@ function Get-sqmADGroupMembers
 
                     # TXT-Bericht
                     $lines = [System.Collections.Generic.List[string]]::new()
+                    $lines.Add("# sqmSQLTool - www.powershelldba.de")
                     $lines.Add("# ================================================================")
                     $lines.Add("# sqmSQLTool - AD Group Members Report")
                     $lines.Add("# Gruppe    : $group")
