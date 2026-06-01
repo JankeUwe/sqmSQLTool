@@ -247,84 +247,112 @@ function Get-sqmADGroupMembers
                 $groupDN = $groupEntry.Properties['distinguishedName'][0]
                 Invoke-sqmLogging -Message "[$group] Gruppe gefunden: DN=$groupDN" -FunctionName $functionName -Level "VERBOSE"
 
-                # Members mit Range-Retrieval (AD liefert >1500 Members in Chunks)
+                # Members abrufen (unterschiedlich für WinNT vs LDAP)
                 $memberDNs = [System.Collections.Generic.List[string]]::new()
 
                 if ($groupEntry)
                 {
-                    $rangeStart = 0
-                    $rangeSize = 1500
+                    # Bestimme ob WinNT oder LDAP basierend auf Path
+                    $path = $groupEntry.psbase.Path
+                    $isWinNT = $path -like "WinNT://*"
+                    $isLDAP = $path -like "LDAP://*"
 
-                    do
+                    Invoke-sqmLogging -Message "[$group] Member-Abruf: Typ=$([System.IO.Path]::GetExtension($path)) (WinNT=$isWinNT, LDAP=$isLDAP)" -FunctionName $functionName -Level "VERBOSE"
+
+                    # WinNT: Members() Methode
+                    if ($isWinNT)
                     {
-                        $rangeEnd = $rangeStart + $rangeSize - 1
-                        $rangeAttr = "member;range=$rangeStart-$rangeEnd"
-
                         try
                         {
-                            $attrs = $groupEntry.psbase.Properties
-                            $foundAttr = $null
-
-                            # Versuche das Bereichs-Attribut zu lesen
-                            foreach ($attr in $attrs.PropertyNames)
+                            $members = $groupEntry.psbase.Invoke("Members")
+                            foreach ($member in $members)
                             {
-                                if ($attr -like "member;range=*" -or $attr -eq "member")
-                                {
-                                    $foundAttr = $attr
-                                    break
-                                }
+                                $memberPath = $member.psbase.Path
+                                $memberDNs.Add($memberPath)
                             }
-
-                            if (-not $foundAttr)
-                            {
-                                # Berange das member-Attribut manuell
-                                $members = $groupEntry.psbase.InvokeGet("member;range=$rangeStart-$rangeEnd")
-                                if (-not $members)
-                                {
-                                    # Try ohne Range für kleine Gruppen
-                                    $members = $groupEntry.psbase.InvokeGet("member")
-                                }
-                            }
-                            else
-                            {
-                                $members = $attrs[$foundAttr]
-                            }
-
-                            if ($members -and $members.Count -gt 0)
-                            {
-                                foreach ($dn in $members)
-                                {
-                                    $memberDNs.Add($dn)
-                                }
-
-                                # Pruefen ob wir das Ende erreicht haben
-                                if ($members.Count -lt $rangeSize)
-                                {
-                                    break
-                                }
-
-                                $rangeStart = $rangeEnd + 1
-                            }
-                            else
-                            {
-                                break
-                            }
+                            Invoke-sqmLogging -Message "[$group] $($memberDNs.Count) Members via WinNT.Members()" -FunctionName $functionName -Level "VERBOSE"
                         }
                         catch
                         {
-                            # Fallback: einfach alle member ohne Range abrufen
-                            $members = $groupEntry.psbase.InvokeGet("member")
-                            if ($members)
-                            {
-                                foreach ($dn in $members)
-                                {
-                                    $memberDNs.Add($dn)
-                                }
-                            }
-                            break
+                            Invoke-sqmLogging -Message "[$group] WinNT Members()-Abruf fehlgeschlagen: $_" -FunctionName $functionName -Level "WARNING"
                         }
                     }
-                    while ($true)
+                    # LDAP: Range-Retrieval
+                    else
+                    {
+                        $rangeStart = 0
+                        $rangeSize = 1500
+
+                        do
+                        {
+                            $rangeEnd = $rangeStart + $rangeSize - 1
+
+                            try
+                            {
+                                $attrs = $groupEntry.psbase.Properties
+                                $foundAttr = $null
+
+                                # Versuche das Bereichs-Attribut zu lesen
+                                foreach ($attr in $attrs.PropertyNames)
+                                {
+                                    if ($attr -like "member;range=*" -or $attr -eq "member")
+                                    {
+                                        $foundAttr = $attr
+                                        break
+                                    }
+                                }
+
+                                if (-not $foundAttr)
+                                {
+                                    # Berange das member-Attribut manuell
+                                    $members = $groupEntry.psbase.InvokeGet("member;range=$rangeStart-$rangeEnd")
+                                    if (-not $members)
+                                    {
+                                        # Try ohne Range für kleine Gruppen
+                                        $members = $groupEntry.psbase.InvokeGet("member")
+                                    }
+                                }
+                                else
+                                {
+                                    $members = $attrs[$foundAttr]
+                                }
+
+                                if ($members -and $members.Count -gt 0)
+                                {
+                                    foreach ($dn in $members)
+                                    {
+                                        $memberDNs.Add($dn)
+                                    }
+
+                                    # Pruefen ob wir das Ende erreicht haben
+                                    if ($members.Count -lt $rangeSize)
+                                    {
+                                        break
+                                    }
+
+                                    $rangeStart = $rangeEnd + 1
+                                }
+                                else
+                                {
+                                    break
+                                }
+                            }
+                            catch
+                            {
+                                # Fallback: einfach alle member ohne Range abrufen
+                                $members = $groupEntry.psbase.InvokeGet("member")
+                                if ($members)
+                                {
+                                    foreach ($dn in $members)
+                                    {
+                                        $memberDNs.Add($dn)
+                                    }
+                                }
+                                break
+                            }
+                        }
+                        while ($true)
+                    }
                 }
 
                 Invoke-sqmLogging -Message "[$group] $($memberDNs.Count) Members gefunden." -FunctionName $functionName -Level "INFO"
