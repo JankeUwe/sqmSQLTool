@@ -273,38 +273,48 @@ function Get-sqmADGroupMembers
                             {
                                 try
                                 {
-                                    # WinNT Member ist bereits ein ADSI-Objekt, nicht eine DN
-                                    # Extrahiere Informationen direkt
-                                    $samAccount = $member.name.Value
-                                    $displayName = $member.displayName.Value
+                                    # WinNT Member ist bereits ein ADSI-Objekt
+                                    # Extrahiere Name aus Path wenn Properties nicht erreichbar sind
+                                    $memberPath = $member.psbase.Path
 
-                                    # Objekt-Typ bestimmen
-                                    $objectClass = $member.objectClass.Value
-                                    if ($objectClass -is [array]) { $objectClass = $objectClass[-1] }
-
-                                    # Status aus userAccountControl ermitteln
-                                    $uacValue = $member.userAccountControl.Value
-                                    $isEnabled = $true
-                                    if ($uacValue) { $isEnabled = (($uacValue -band 2) -eq 0) }
-
-                                    # LastLogon
+                                    # Versuche Attribute zu lesen mit Fehlertoleranz
+                                    $samAccount = $null
+                                    $displayName = $null
+                                    $objectClass = "Unknown"
+                                    $isEnabled = $false
+                                    $email = $null
+                                    $department = $null
+                                    $title = $null
                                     $lastLogon = $null
-                                    $llts = $member.lastLogonTimestamp.Value
-                                    if ($llts) {
-                                        try { $lastLogon = [DateTime]::FromFileTime($llts) } catch { }
+
+                                    # Fallback: Extrahiere Namen aus dem WinNT-Path
+                                    # WinNT://DOMAIN/Groupname,group -> Groupname
+                                    if ($memberPath -match "WinNT://[^/]+/([^,]+)") {
+                                        $samAccount = $Matches[1]
+                                        $displayName = $samAccount
                                     }
 
+                                    # Versuche weitere Attribute zu lesen (mit Fehlertoleranz)
+                                    try { $samAccount = $member.psbase.InvokeGet("sAMAccountName") } catch { }
+                                    try { $displayName = $member.psbase.InvokeGet("displayName") } catch { }
+                                    try {
+                                        $cls = $member.psbase.InvokeGet("objectClass")
+                                        if ($cls -is [array]) { $objectClass = $cls[-1] } else { $objectClass = $cls }
+                                    } catch { }
+                                    try { $email = $member.psbase.InvokeGet("mail") } catch { }
+                                    try { $department = $member.psbase.InvokeGet("department") } catch { }
+                                    try { $title = $member.psbase.InvokeGet("title") } catch { }
+
                                     # Zusammenstellung der Member-Info
-                                    $memberPath = $member.psbase.Path
                                     $rowObj = [PSCustomObject]@{
                                         GroupName         = $group
                                         SamAccountName    = $samAccount
                                         DisplayName       = $displayName
                                         ObjectClass       = $objectClass
                                         Enabled           = $isEnabled
-                                        Email             = $member.mail.Value
-                                        Department        = $member.department.Value
-                                        Title             = $member.title.Value
+                                        Email             = $email
+                                        Department        = $department
+                                        Title             = $title
                                         LastLogon         = $lastLogon
                                         DistinguishedName = $memberPath
                                     }
@@ -312,7 +322,7 @@ function Get-sqmADGroupMembers
                                 }
                                 catch
                                 {
-                                    Invoke-sqmLogging -Message "[$group] Fehler beim Verarbeiten von WinNT-Member: $_" -FunctionName $functionName -Level "WARNING"
+                                    Invoke-sqmLogging -Message "[$group] Kritischer Fehler beim Verarbeiten von WinNT-Member: $_" -FunctionName $functionName -Level "WARNING"
                                 }
                             }
                             Invoke-sqmLogging -Message "[$group] $($detailRows.Count) Members via WinNT.Members()" -FunctionName $functionName -Level "VERBOSE"
