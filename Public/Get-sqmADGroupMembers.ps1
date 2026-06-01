@@ -60,7 +60,7 @@ function Get-sqmADGroupMembers
         }
         catch
         {
-            $errMsg = "ADSI-Verbindung fehlgeschlagen — kein Domain Controller erreichbar."
+            $errMsg = "ADSI-Verbindung fehlgeschlagen  - kein Domain Controller erreichbar."
             Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
             throw $errMsg
         }
