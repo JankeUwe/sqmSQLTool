@@ -121,19 +121,25 @@ function Get-sqmADGroupMembers
             {
                 Invoke-sqmLogging -Message "[$group] Abfrage wird gestartet..." -FunctionName $functionName -Level "INFO"
 
-                # Gruppe suchen
-                $searchBase = if ($DomainController)
+                # Gruppe suchen — Standard ADSI DirectorySearcher
+                $groupEntry = $null
+                try
                 {
-                    "LDAP://$DomainController"
-                }
-                else
-                {
-                    "LDAP://"
-                }
+                    # Standard-Searcher mit default Domain
+                    [System.DirectoryServices.DirectorySearcher]$searcher = [System.DirectoryServices.DirectorySearcher]::new()
+                    $searcher.Filter = "(&(objectClass=group)(sAMAccountName=$group))"
+                    $searchResult = $searcher.FindOne()
 
-                $searcher = [adsisearcher]"(&(objectClass=group)(sAMAccountName=$group))"
-                $searcher.SearchRoot = [ADSI]$searchBase
-                $groupEntry = $searcher.FindOne()
+                    if ($searchResult)
+                    {
+                        $groupEntry = $searchResult.GetDirectoryEntry()
+                    }
+                }
+                catch
+                {
+                    $warnMsg = "[$group] Fehler bei Gruppensuche: $_"
+                    Invoke-sqmLogging -Message $warnMsg -FunctionName $functionName -Level "WARNING"
+                }
 
                 if (-not $groupEntry)
                 {
@@ -157,60 +163,83 @@ function Get-sqmADGroupMembers
 
                 # Members mit Range-Retrieval (AD liefert >1500 Members in Chunks)
                 $memberDNs = [System.Collections.Generic.List[string]]::new()
-                $rangeStart = 0
-                $rangeSize = 1500
 
-                do
+                if ($groupEntry)
                 {
-                    $rangeEnd = $rangeStart + $rangeSize - 1
-                    $rangeAttr = "member;range=$rangeStart-$rangeEnd"
+                    $rangeStart = 0
+                    $rangeSize = 1500
 
-                    $searcher2 = [adsisearcher]"(objectClass=*)"
-                    $searcher2.SearchRoot = [ADSI]"LDAP://$groupDN"
-                    $searcher2.PropertiesToLoad.Clear()
-                    $searcher2.PropertiesToLoad.Add($rangeAttr) | Out-Null
-
-                    $result = $searcher2.FindOne()
-
-                    if (-not $result)
+                    do
                     {
-                        break
-                    }
+                        $rangeEnd = $rangeStart + $rangeSize - 1
+                        $rangeAttr = "member;range=$rangeStart-$rangeEnd"
 
-                    $attrs = $result.Properties
-                    $foundAttr = $null
-
-                    # Finde das tatsaechliche Attribut (mit Bereichs-Suffix)
-                    foreach ($attr in $attrs.PropertyNames)
-                    {
-                        if ($attr -like "member;range=*")
+                        try
                         {
-                            $foundAttr = $attr
+                            $attrs = $groupEntry.psbase.Properties
+                            $foundAttr = $null
+
+                            # Versuche das Bereichs-Attribut zu lesen
+                            foreach ($attr in $attrs.PropertyNames)
+                            {
+                                if ($attr -like "member;range=*" -or $attr -eq "member")
+                                {
+                                    $foundAttr = $attr
+                                    break
+                                }
+                            }
+
+                            if (-not $foundAttr)
+                            {
+                                # Berange das member-Attribut manuell
+                                $members = $groupEntry.psbase.InvokeGet("member;range=$rangeStart-$rangeEnd")
+                                if (-not $members)
+                                {
+                                    # Try ohne Range für kleine Gruppen
+                                    $members = $groupEntry.psbase.InvokeGet("member")
+                                }
+                            }
+                            else
+                            {
+                                $members = $attrs[$foundAttr]
+                            }
+
+                            if ($members -and $members.Count -gt 0)
+                            {
+                                foreach ($dn in $members)
+                                {
+                                    $memberDNs.Add($dn)
+                                }
+
+                                # Pruefen ob wir das Ende erreicht haben
+                                if ($members.Count -lt $rangeSize)
+                                {
+                                    break
+                                }
+
+                                $rangeStart = $rangeEnd + 1
+                            }
+                            else
+                            {
+                                break
+                            }
+                        }
+                        catch
+                        {
+                            # Fallback: einfach alle member ohne Range abrufen
+                            $members = $groupEntry.psbase.InvokeGet("member")
+                            if ($members)
+                            {
+                                foreach ($dn in $members)
+                                {
+                                    $memberDNs.Add($dn)
+                                }
+                            }
                             break
                         }
                     }
-
-                    if ($foundAttr -and $result.Properties[$foundAttr].Count -gt 0)
-                    {
-                        foreach ($dn in $result.Properties[$foundAttr])
-                        {
-                            $memberDNs.Add($dn)
-                        }
-
-                        # Pruefen ob wir das Ende erreicht haben (Bereich mit *)
-                        if ($foundAttr -match 'range=\d+-\*')
-                        {
-                            break
-                        }
-
-                        $rangeStart = $rangeEnd + 1
-                    }
-                    else
-                    {
-                        break
-                    }
+                    while ($true)
                 }
-                while ($true)
 
                 Invoke-sqmLogging -Message "[$group] $($memberDNs.Count) Members gefunden." -FunctionName $functionName -Level "INFO"
 
