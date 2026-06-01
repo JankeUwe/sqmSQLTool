@@ -4,7 +4,7 @@ PowerShell-Modul für SQL Server Administration — entwickelt von [dtcSoftware]
 
 ## Übersicht
 
-sqmSQLTool ist ein umfassendes PowerShell-Modul mit 60+ Funktionen für die professionelle SQL Server-Administration. Es baut auf [dbatools](https://dbatools.io) auf und erweitert diese um betriebsspezifische Automatisierungen.
+sqmSQLTool ist ein umfassendes PowerShell-Modul mit 100+ Funktionen für die professionelle SQL Server-Administration. Es baut auf [dbatools](https://dbatools.io) auf und erweitert diese um betriebsspezifische Automatisierungen.
 
 **Anforderungen:**
 - PowerShell 5.1+
