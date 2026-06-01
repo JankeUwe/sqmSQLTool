@@ -244,21 +244,25 @@ function Get-sqmADGroupMembers
                     continue
                 }
 
-                $groupDN = $groupEntry.Properties['distinguishedName'][0]
-                Invoke-sqmLogging -Message "[$group] Gruppe gefunden: DN=$groupDN" -FunctionName $functionName -Level "VERBOSE"
+                # Bestimme ob WinNT oder LDAP basierend auf Path
+                $path = $groupEntry.psbase.Path
+                $isWinNT = $path -like "WinNT://*"
+                $isLDAP = $path -like "LDAP://*"
+
+                # DN auslesen (unterschiedlich für WinNT vs LDAP)
+                $groupDN = if ($isWinNT) {
+                    $path  # WinNT hat keine DN, verwende Path
+                } else {
+                    try { $groupEntry.Properties['distinguishedName'][0] } catch { $null }
+                }
+
+                Invoke-sqmLogging -Message "[$group] Gruppe gefunden: Path=$path, DN=$groupDN (WinNT=$isWinNT, LDAP=$isLDAP)" -FunctionName $functionName -Level "VERBOSE"
 
                 # Members abrufen (unterschiedlich für WinNT vs LDAP)
                 $memberDNs = [System.Collections.Generic.List[string]]::new()
 
                 if ($groupEntry)
                 {
-                    # Bestimme ob WinNT oder LDAP basierend auf Path
-                    $path = $groupEntry.psbase.Path
-                    $isWinNT = $path -like "WinNT://*"
-                    $isLDAP = $path -like "LDAP://*"
-
-                    Invoke-sqmLogging -Message "[$group] Member-Abruf: Typ=$([System.IO.Path]::GetExtension($path)) (WinNT=$isWinNT, LDAP=$isLDAP)" -FunctionName $functionName -Level "VERBOSE"
-
                     # WinNT: Members() Methode — direkt die Member-Objekte verarbeiten
                     if ($isWinNT)
                     {
