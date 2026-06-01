@@ -14,9 +14,15 @@
 
 .PARAMETER GroupName
     Name of the AD group(s). Pipeline-capable.
+    Format: "GroupName" or "DOMAIN\GroupName" or "CN=GroupName,DC=domain,DC=local"
+
+.PARAMETER Domain
+    Optional: Specify the Active Directory domain (e.g., "FITS.LOCAL", "FITS", or "example.com").
+    If not specified, attempts to auto-detect from current domain.
 
 .PARAMETER DomainController
-    Optional: Specific domain controller to query. If not specified, the default DC is used.
+    Optional: Specific domain controller to query (e.g., "DC01.fits.local").
+    If not specified, uses domain auto-detection.
 
 .PARAMETER Recursive
     If specified, recursively expand nested groups (resolves all transitive members).
@@ -47,10 +53,13 @@
     Get-sqmADGroupMembers -GroupName "DL_SQL_Admins"
 
 .EXAMPLE
-    Get-sqmADGroupMembers -GroupName "DL_SQL_Admins", "DL_SQL_Developers" -OutputPath "D:\Reports"
+    Get-sqmADGroupMembers -GroupName "DL_SQL_Admins" -Domain "FITS.LOCAL"
 
 .EXAMPLE
-    Get-sqmADGroupMembers -GroupName "DL_SQL_Admins" -Recursive -DomainController "DC01.corp.local"
+    Get-sqmADGroupMembers -GroupName "Domain Admins", "Enterprise Admins" -Domain "FITS" -OutputPath "D:\Reports"
+
+.EXAMPLE
+    Get-sqmADGroupMembers -GroupName "DL_SQL_Admins" -Recursive -DomainController "DC01.fits.local"
 
 .NOTES
     Author:       MSSQLTools
@@ -67,6 +76,9 @@ function Get-sqmADGroupMembers
         [Parameter(Mandatory = $true, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true, Position = 0)]
         [ValidateNotNullOrEmpty()]
         [string[]]$GroupName,
+
+        [Parameter(Mandatory = $false)]
+        [string]$Domain,
 
         [Parameter(Mandatory = $false)]
         [string]$DomainController,
@@ -121,17 +133,33 @@ function Get-sqmADGroupMembers
             {
                 Invoke-sqmLogging -Message "[$group] Abfrage wird gestartet..." -FunctionName $functionName -Level "INFO"
 
+                # Bestimme Domain
+                $targetDomain = $Domain
+                if (-not $targetDomain)
+                {
+                    try
+                    {
+                        $targetDomain = ([System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()).Name
+                    }
+                    catch
+                    {
+                        $targetDomain = $env:USERDNSDOMAIN
+                    }
+                }
+
+                Invoke-sqmLogging -Message "[$group] Verwende Domain: $targetDomain" -FunctionName $functionName -Level "VERBOSE"
+
                 # Gruppe suchen — mehrere Methoden
                 $groupEntry = $null
+                $cleanGroup = $group -replace '^[^\\]*\\', ''  # Entferne DOMAIN\-Präfix falls vorhanden
 
                 # Methode 1: Direkter WinNT-Pfad (wie SQL Server HelpLogin)
                 try
                 {
-                    $domain = ([System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()).Name
-                    $groupEntry = [ADSI]"WinNT://$domain/$group,group"
+                    $groupEntry = [ADSI]"WinNT://$targetDomain/$cleanGroup,group"
                     if ($groupEntry.Name)
                     {
-                        Invoke-sqmLogging -Message "[$group] Gruppe gefunden via WinNT (Methode 1)." -FunctionName $functionName -Level "VERBOSE"
+                        Invoke-sqmLogging -Message "[$group] Gruppe gefunden via WinNT (Methode 1: $targetDomain)." -FunctionName $functionName -Level "VERBOSE"
                     }
                     else
                     {
@@ -149,15 +177,24 @@ function Get-sqmADGroupMembers
                 {
                     try
                     {
-                        [System.DirectoryServices.DirectorySearcher]$searcher = [System.DirectoryServices.DirectorySearcher]::new()
-                        $searcher.Filter = "(sAMAccountName=$group)"
-                        $searcher.SearchScope = [System.DirectoryServices.SearchScope]::Subtree
-                        $searchResult = $searcher.FindOne()
+                        $rootEntry = if ($targetDomain) {
+                            [ADSI]"LDAP://$targetDomain/RootDSE"
+                        } else {
+                            [ADSI]"LDAP://RootDSE"
+                        }
 
-                        if ($searchResult)
+                        if ($rootEntry.distinguishedName)
                         {
-                            $groupEntry = $searchResult.GetDirectoryEntry()
-                            Invoke-sqmLogging -Message "[$group] Gruppe gefunden via DirectorySearcher (Methode 2)." -FunctionName $functionName -Level "VERBOSE"
+                            [System.DirectoryServices.DirectorySearcher]$searcher = [System.DirectoryServices.DirectorySearcher]::new($rootEntry)
+                            $searcher.Filter = "(sAMAccountName=$cleanGroup)"
+                            $searcher.SearchScope = [System.DirectoryServices.SearchScope]::Subtree
+                            $searchResult = $searcher.FindOne()
+
+                            if ($searchResult)
+                            {
+                                $groupEntry = $searchResult.GetDirectoryEntry()
+                                Invoke-sqmLogging -Message "[$group] Gruppe gefunden via DirectorySearcher (Methode 2: $targetDomain)." -FunctionName $functionName -Level "VERBOSE"
+                            }
                         }
                     }
                     catch
@@ -171,7 +208,8 @@ function Get-sqmADGroupMembers
                 {
                     try
                     {
-                        $groupEntry = [ADSI]"LDAP://$group"
+                        $ldapPath = if ($group -like "LDAP://*") { $group } else { "LDAP://$targetDomain/$group" }
+                        $groupEntry = [ADSI]$ldapPath
                         if ($groupEntry.Name)
                         {
                             Invoke-sqmLogging -Message "[$group] Gruppe gefunden via LDAP DN (Methode 3)." -FunctionName $functionName -Level "VERBOSE"
