@@ -419,10 +419,8 @@ function Get-sqmADGroupMembers
     {
         Invoke-sqmLogging -Message "$functionName abgeschlossen. $($allGroupResults.Count) Gruppen verarbeitet." -FunctionName $functionName -Level "INFO"
 
-        if ($PassThru)
-        {
-            return $allGroupResults
-        }
+        # Gib Ergebnisse IMMER zurück
+        return $allGroupResults
     }
 }
 
