@@ -462,7 +462,7 @@ function _Build-sqmHardwareReportHtml
     # ABSCHNITT: Physikalische Datentraeger
     # -------------------------------------------------------------------------
     $physHtml = "<table class='itbl'><thead><tr>" +
-        "<th>#</th><th>Modell</th><th>Groesse</th><th>Typ</th><th>Interface</th><th>Partitionen</th>" +
+        "<th>DiskNr</th><th>Modell</th><th>Groesse</th><th>Typ</th><th>Interface</th><th>SerienNr.</th><th>Partitionen</th>" +
         "</tr></thead><tbody>"
 
     foreach ($pd in ($d.PhysicalDisks | Sort-Object Index))
@@ -471,21 +471,24 @@ function _Build-sqmHardwareReportHtml
         $pdMedia   = if ($pd.MediaType)    { [string]$pd.MediaType }    else { '' }
         $pdIface   = if ($pd.InterfaceType){ [string]$pd.InterfaceType } else { '' }
         $pdDevId   = if ($pd.DeviceID)     { [string]$pd.DeviceID -replace '^\\\\\.\\PHYSICALDRIVE', '' } else { '' }
+        $pdIndex   = if ($pd.Index) { [string]$pd.Index } else { 'n/a' }
+        $pdSerial  = if ($pd.SerialNumber) { [string]$pd.SerialNumber } else { 'n/a' }
         # SSD-Info aus MSFT_PhysicalDisk wenn verfuegbar
         $ssdType   = if ($d.PhysicalDiskTypes.ContainsKey($pdDevId)) { $d.PhysicalDiskTypes[$pdDevId] } else { '' }
         $typeDisp  = if ($ssdType) { $ssdType } elseif ($pdMedia -match 'SSD|Solid') { 'SSD' } else { $pdMedia }
         $parts     = if ($pd.Partitions) { [string]$pd.Partitions } else { 'n/a' }
 
-        $physHtml += "<tr><td>$(_H ([string]$pd.Index))</td>" +
+        $physHtml += "<tr><td>$(_H $pdIndex)</td>" +
             "<td>$(_H ([string]$pd.Model))</td>" +
             "<td>$(_H $pdSize)</td>" +
             "<td>$(_H $typeDisp)</td>" +
             "<td>$(_H $pdIface)</td>" +
+            "<td>$(_H $pdSerial)</td>" +
             "<td>$(_H $parts)</td></tr>"
     }
     if ($d.PhysicalDisks.Count -eq 0)
     {
-        $physHtml += '<tr><td colspan="6" class="norow">Keine physikalischen Datentraeger gefunden</td></tr>'
+        $physHtml += '<tr><td colspan="7" class="norow">Keine physikalischen Datentraeger gefunden</td></tr>'
     }
     $physHtml += '</tbody></table>'
 
@@ -503,14 +506,16 @@ function _Build-sqmHardwareReportHtml
         $ldFree    = if ($ld.FreeSpace) { _Size ([double]$ld.FreeSpace) } else { 'n/a' }
         $ldUsed    = if ($ld.Size -and $ld.FreeSpace) { _Size ([double]($ld.Size - $ld.FreeSpace)) } else { 'n/a' }
         $pctUsed   = if ($ld.Size -gt 0) { [int](([double]($ld.Size - $ld.FreeSpace) / [double]$ld.Size) * 100) } else { 0 }
-        $barColor  = if ($pctUsed -ge 90) { '#e74c3c' } elseif ($pctUsed -ge 75) { '#f39c12' } else { '#27ae60' }
+        $pctFree   = 100 - $pctUsed
+        $barColor  = if ($pctFree -lt 10) { '#e74c3c' } elseif ($pctUsed -ge 90) { '#e74c3c' } elseif ($pctUsed -ge 75) { '#f39c12' } else { '#27ae60' }
         $bar       = "<div class='dbar'><div class='dfill' style='width:{0}%;background:{1}'></div></div><span class='dpct'>{0}%</span>" -f $pctUsed, $barColor
         $drive     = if ($ld.DeviceID) { "$($ld.DeviceID)\" } else { 'n/a' }
         $fs        = if ($ld.FileSystem) { [string]$ld.FileSystem } else { 'n/a' }
         $volName   = if ($ld.VolumeName) { [string]$ld.VolumeName } else { '' }
+        $warningFlag = if ($pctFree -lt 10) { " ⚠️ KRITISCH" } else { '' }
 
         $logHtml += "<tr><td><strong>$(_H $drive)</strong></td><td>$(_H $volName)</td><td>$(_H $fs)</td>" +
-            "<td>$(_H $ldTotal)</td><td>$(_H $ldUsed)</td><td>$(_H $ldFree)</td><td>$bar</td></tr>"
+            "<td>$(_H $ldTotal)</td><td>$(_H $ldUsed)</td><td>$(_H $ldFree)</td><td>$bar$warningFlag</td></tr>"
     }
     if ($d.LogicalDisks.Count -eq 0)
     {
@@ -870,16 +875,48 @@ function _Build-sqmHardwareReportTxt
         "  Gesamt      : $($flat.TotalDiskGB) GB"
         "  Frei        : $($flat.FreeDiskGB) GB"
         "  Laufwerke   : $($flat.LogicalDrives)"
-        ''
-        "[NETZWERK]"
-        "  IP-Adresse  : $($flat.IPAddress)"
-        "  MAC         : $($flat.MACAddress)"
-        ''
-        "[SQL SERVER]"
-        "  Instanzen   : $(if ($flat.SQLInstances) { $flat.SQLInstances } else { 'keine' })"
-        ''
-        $sep
     )
+
+    # Detaillierte Disk-Infos
+    if ($Data.PhysicalDisks.Count -gt 0)
+    {
+        $lines += ""
+        $lines += "  [PHYSIKALISCHE DISKS]"
+        foreach ($pd in ($Data.PhysicalDisks | Sort-Object Index))
+        {
+            $pdIndex  = if ($pd.Index) { [string]$pd.Index } else { 'n/a' }
+            $pdModel  = if ($pd.Model) { [string]$pd.Model } else { 'n/a' }
+            $pdSize   = if ($pd.Size) { '{0:N0}' -f ([double]$pd.Size / 1GB) + ' GB' } else { 'n/a' }
+            $pdSerial = if ($pd.SerialNumber) { [string]$pd.SerialNumber } else { 'n/a' }
+            $lines += "    Disk $pdIndex : $pdModel ($pdSize, S/N: $pdSerial)"
+        }
+    }
+
+    # Detaillierte Logical Disk-Infos mit < 10% Warnung
+    if ($Data.LogicalDisks.Count -gt 0)
+    {
+        $lines += ""
+        $lines += "  [LOGISCHE LAUFWERKE]"
+        foreach ($ld in ($Data.LogicalDisks | Sort-Object DeviceID))
+        {
+            $drive     = if ($ld.DeviceID) { "$($ld.DeviceID)\" } else { 'n/a' }
+            $total     = if ($ld.Size) { '{0:N0}' -f ([double]$ld.Size / 1GB) + ' GB' } else { 'n/a' }
+            $free      = if ($ld.FreeSpace) { '{0:N0}' -f ([double]$ld.FreeSpace / 1GB) + ' GB' } else { 'n/a' }
+            $pctFree   = if ($ld.Size -gt 0) { [int](([double]$ld.FreeSpace / [double]$ld.Size) * 100) } else { 0 }
+            $warning   = if ($pctFree -lt 10) { " [!!! KRITISCH !!!]" } else { '' }
+            $lines += "    $drive $total Gesamt, $free Frei ($pctFree% frei)$warning"
+        }
+    }
+
+    $lines += ''
+    $lines += "[NETZWERK]"
+    $lines += "  IP-Adresse  : $($flat.IPAddress)"
+    $lines += "  MAC         : $($flat.MACAddress)"
+    $lines += ''
+    $lines += "[SQL SERVER]"
+    $lines += "  Instanzen   : $(if ($flat.SQLInstances) { $flat.SQLInstances } else { 'keine' })"
+    $lines += ''
+    $lines += $sep
 
     $lines -join "`r`n"
 }
