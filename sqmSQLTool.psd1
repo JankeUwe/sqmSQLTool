@@ -164,7 +164,6 @@
 		'Test-sqmDriverInstalled',
 		'Test-sqmMaxDop',
 		'Test-sqmMaxMemory',
-		'Test-sqmModuleUpdate',
 		'Test-sqmOlaInstallation',
 		'Test-sqmSQLFirewall',
 		'Test-sqmSSISPackageCompatibility',
@@ -174,8 +173,7 @@
 		'Test-sqmTsmConnection',
 		'Uninstall-sqmDb2Driver',
 		'Uninstall-sqmJdbcDriver',
-		'Uninstall-sqmOdbcDriver',
-		'Update-sqmModule'
+		'Uninstall-sqmOdbcDriver'
 	)
 	
 	# KORREKTUR #9: Keine Cmdlets im Modul - explizit leer statt '*'
@@ -183,7 +181,7 @@
 	
 	# KORREKTUR #9: Keine Variablen exportieren - explizit leer statt '*'
 	VariablesToExport	   = @()
-	
+
 	# KORREKTUR #9: Keine Aliases - explizit leer statt '*'
 	AliasesToExport	       = @()
 	
@@ -209,7 +207,7 @@
 			# IconUri = ''
 
 			# ReleaseNotes of this module
-			ReleaseNotes = 'See CHANGELOG.md and GitHub: https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.4.0.0'
+			ReleaseNotes = 'See CHANGELOG.md and GitHub: https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.4.3.0'
 		}
 	}
 }
