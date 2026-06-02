@@ -180,33 +180,8 @@ $script:sqmLoggingReady = Test-sqmLoggingPath -Path (Get-sqmConfig -Key "LogPath
 # =============================================================================
 # WICHTIG: Nur EIN Export-ModuleMember Aufruf! Mehrere Aufrufe überschreiben sich.
 
-$allFunctions = Get-ChildItem -Path $PublicPath -Filter *.ps1 -ErrorAction SilentlyContinue |
-                ForEach-Object { $_.BaseName }
-
-# Sammle alle zu exportierenden Funktionen
-$functionsToExport = @()
-
-# Public Funktionen aus .ps1 Dateien
-foreach ($func in $allFunctions)
-{
-	if ($func -like "*-sqm*")
-	{
-		$functionsToExport += $func
-	}
-}
-
-# Update-Funktionen (definiert inline in PSM1, nicht in Public\)
-$functionsToExport += @(
-	'Test-InternetConnectivity',
-	'Test-sqmModuleUpdate',
-	'Test-sqmModuleUpdate-PSGallery',
-	'Test-sqmModuleUpdate-GitHub',
-	'Test-sqmModuleUpdate-UNC',
-	'Update-sqmModule'
-)
-
-# EINMALIGER Export aller Funktionen
-Export-ModuleMember -Function $functionsToExport
+# SCHRITT 5: Wird am Ende der Datei (nach allen Funktionsdefinitionen) ausgeführt
+# Export aller Funktionen nach Laden — siehe Zeile ~650
 
 # =============================================================================
 # Update-Mechanismus mit Fallback-Chain
@@ -552,4 +527,10 @@ Zum Aktualisieren:
 			Write-Verbose "Auto-update check failed: $($_.Exception.Message)"
 		}
 	}
+
+# =============================================================================
+# SCHRITT 5: Export aller Funktionen (nach allen Definitionen)
+# Exportiert ALLE Funktionen, die durch dot-sourcing geladen wurden
+# =============================================================================
+Export-ModuleMember -Function '*'
 }
