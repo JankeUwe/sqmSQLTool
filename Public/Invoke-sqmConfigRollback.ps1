@@ -252,7 +252,7 @@ function Invoke-sqmConfigRollback
 
 					if ($WhatIf)
 					{
-						Invoke-sqmLogging -Message "[WHATIF] $configName: $currentValue -> $snapshotValue" `
+						Invoke-sqmLogging -Message "[WHATIF] ${configName}: $currentValue -> $snapshotValue" `
 							-FunctionName $functionName -Level "INFO"
 						$rollbackResults += [PSCustomObject]@{
 							Setting         = $configName
@@ -335,7 +335,7 @@ function Invoke-sqmConfigRollback
 
 					if ($WhatIf)
 					{
-						Invoke-sqmLogging -Message "[WHATIF] $prop: $currentValue -> $snapshotValue" `
+						Invoke-sqmLogging -Message "[WHATIF] ${prop}: $currentValue -> $snapshotValue" `
 							-FunctionName $functionName -Level "INFO"
 						$rollbackResults += [PSCustomObject]@{
 							Setting         = $prop
