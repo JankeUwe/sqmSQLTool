@@ -33,18 +33,20 @@ function _sqmSplunk_LocalCore {
     $ts      = Get-Date -Format 'yyyyMMdd_HHmmss'
     $logFile = Join-Path $LogPath "SplunkConfig_$ts.log"
 
+    $modeLabel = if ($TestMode) { 'Test' } else { 'Set' }
+    _sqmSplunkWriteLog $logFile "=== Invoke-sqmSplunkConfiguration | Modus: $modeLabel | $(hostname) ==="
+    _sqmSplunkWriteLog $logFile "Logdatei: $logFile"
+
     if (-not $TestMode) {
         $id = [Security.Principal.WindowsIdentity]::GetCurrent()
         $pr = New-Object Security.Principal.WindowsPrincipal($id)
         if (-not $pr.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-            Write-Host 'FEHLER: Administratorrechte erforderlich (Set-Modus).'
+            $msg = 'FEHLER: Administratorrechte erforderlich. PowerShell als Administrator starten und erneut ausfuehren.'
+            _sqmSplunkWriteLog $logFile $msg
+            Write-Warning $msg
             return
         }
     }
-
-    $modeLabel = if ($TestMode) { 'Test' } else { 'Set' }
-    _sqmSplunkWriteLog $logFile "=== Invoke-sqmSplunkConfiguration | Modus: $modeLabel | $(hostname) ==="
-    _sqmSplunkWriteLog $logFile "Logdatei: $logFile"
 
     $instKey = 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL'
     if (-not (Test-Path $instKey)) {
