@@ -1,0 +1,145 @@
+# =============================================================================
+# sqmSQLTool - Publish to PowerShell Gallery
+# =============================================================================
+#
+# Laeuft bei: Push eines Release-Tags (v*.*.*)
+#
+# Was passiert:
+#   1. PowerShell Gallery API Key aus GitHub Secret laden
+#   2. Modul validieren (Test-ModuleManifest)
+#   3. Publish-Module zu PSGallery executieren
+#   4. Bei Fehler: Detaillierter Error Report
+#
+# Voraussetzung:
+#   - GitHub Secret: PSGALLERY_API_KEY (PowerShell Gallery API Key)
+#   - Gespeichert in: https://github.com/JankeUwe/sqmSQLTool/settings/secrets/actions
+#
+# =============================================================================
+
+name: Publish to PowerShell Gallery
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+jobs:
+  publish-psgallery:
+    runs-on: windows-latest
+    name: Publish to PSGallery
+
+    steps:
+      # ------------------------------------------------------------------
+      # 1. Repository auschecken
+      # ------------------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------
+      # 2. Modul-Version aus PSD1 lesen
+      # ------------------------------------------------------------------
+      - name: Read module version
+        id: version
+        shell: pwsh
+        run: |
+          $psd1 = Import-PowerShellDataFile "sqmSQLTool.psd1"
+          $ver  = $psd1.ModuleVersion
+          Write-Host "Module version: $ver"
+          echo "version=$ver" >> $env:GITHUB_OUTPUT
+
+      # ------------------------------------------------------------------
+      # 3. Modul validieren
+      # ------------------------------------------------------------------
+      - name: Validate module manifest
+        shell: pwsh
+        run: |
+          Write-Host "🔍 Validiere Modul-Manifest..."
+          $result = Test-ModuleManifest -Path "sqmSQLTool.psd1" -Verbose
+          if ($result) {
+            Write-Host "✅ Manifest valid"
+            Write-Host "   Version: $($result.Version)"
+            Write-Host "   Functions: $($result.ExportedFunctions.Count)"
+          } else {
+            Write-Host "❌ Manifest invalid"
+            exit 1
+          }
+
+      # ------------------------------------------------------------------
+      # 4. Publish zu PowerShell Gallery
+      # ------------------------------------------------------------------
+      - name: Publish to PowerShell Gallery
+        shell: pwsh
+        env:
+          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        run: |
+          if (-not $env:PSGALLERY_API_KEY) {
+            Write-Host "❌ FEHLER: PSGALLERY_API_KEY GitHub Secret nicht gesetzt!"
+            Write-Host "Setze es unter: https://github.com/JankeUwe/sqmSQLTool/settings/secrets/actions"
+            exit 1
+          }
+
+          Write-Host "🚀 Publish sqmSQLTool ${{ steps.version.outputs.version }} zu PSGallery..."
+          Write-Host ""
+
+          # TLS 1.2 erzwingen (für ältere PS-Versionen)
+          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+
+          try {
+            Publish-Module -Path "." `
+              -NuGetApiKey $env:PSGALLERY_API_KEY `
+              -Repository PSGallery `
+              -Force `
+              -ErrorAction Stop
+
+            Write-Host ""
+            Write-Host "✅ ERFOLG! Modul zu PSGallery gepublisht"
+          } catch {
+            Write-Host ""
+            Write-Host "❌ FEHLER beim Publishing:"
+            Write-Host $_.Exception.Message
+            Write-Host ""
+            Write-Host "Inner Exception:"
+            Write-Host $_.Exception.InnerException.Message
+            exit 1
+          }
+
+      # ------------------------------------------------------------------
+      # 5. Verify auf PSGallery
+      # ------------------------------------------------------------------
+      - name: Verify on PowerShell Gallery
+        shell: pwsh
+        run: |
+          Write-Host "⏳ Warte 10 Sekunden für PSGallery Index Update..."
+          Start-Sleep -Seconds 10
+
+          Write-Host "🔍 Verifiziere auf PSGallery..."
+          try {
+            $module = Find-Module -Name sqmSQLTool -Repository PSGallery -ErrorAction Stop
+            Write-Host "✅ Modul gefunden!"
+            Write-Host "   Name: $($module.Name)"
+            Write-Host "   Version: $($module.Version)"
+            Write-Host "   Author: $($module.Author)"
+            Write-Host "   Published: $($module.PublishedDate)"
+          } catch {
+            Write-Host "⚠️  Modul noch nicht auf PSGallery sichtbar (kann bis 5 Min dauern)"
+          }
+
+      # ------------------------------------------------------------------
+      # 6. Erfolgs-Notification
+      # ------------------------------------------------------------------
+      - name: Success notification
+        if: success()
+        shell: pwsh
+        run: |
+          Write-Host ""
+          Write-Host "🎉 ERFOLG! sqmSQLTool ${{ steps.version.outputs.version }} wurde gepublisht!"
+          Write-Host ""
+          Write-Host "Verfügbar unter:"
+          Write-Host "  🌐 PSGallery: https://www.powershellgallery.com/packages/sqmSQLTool/${{ steps.version.outputs.version }}"
+          Write-Host "  📦 GitHub: https://github.com/JankeUwe/sqmSQLTool/releases/tag/v${{ steps.version.outputs.version }}"
+          Write-Host ""
+          Write-Host "Installation:"
+          Write-Host "  Install-Module sqmSQLTool -Repository PSGallery"
