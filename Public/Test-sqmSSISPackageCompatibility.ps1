@@ -151,10 +151,22 @@ function Test-sqmSSISPackageCompatibility
 
                 try
                 {
-                    $sqlSrv = Connect-DbaInstance @connParams -ErrorAction Stop
+                    # === SQL 2022+ Certificate Workaround ===
+                    # Pre-add TrustServerCertificate for initial connection (safer, handles self-signed certs)
+                    $connectParams = $connParams.Clone()
+                    $connectParams['TrustServerCertificate'] = $true
+
+                    $sqlSrv = Connect-DbaInstance @connectParams -ErrorAction Stop
                     $sqlMajor = $sqlSrv.VersionMajor
 
-                    Invoke-sqmLogging -Message "Connected to SQL $TargetVersion (Major=$sqlMajor)" `
+                    # Ensure subsequent queries also trust certificates
+                    if ($sqlMajor -ge 17)
+                    {
+                        $connParams['TrustServerCertificate'] = $true
+                        Write-Verbose "SQL Server 2022+: TrustServerCertificate enabled for self-signed certificates"
+                    }
+
+                    Invoke-sqmLogging -Message "Connected to SQL Server v$sqlMajor (TargetVersion=$TargetVersion)" `
                         -FunctionName $functionName -Level 'INFO'
 
                     # Check SSISDB exists

@@ -207,10 +207,48 @@ Export-ModuleMember -Function 'Test-sqmModuleUpdate', 'Test-sqmModuleUpdate-PSGa
 .PARAMETER ModuleName
     Name des Moduls (Standard: sqmSQLTool).
 #>
+function Test-InternetConnectivity
+{
+	<#
+	.SYNOPSIS
+	    Prüft ob eine Internetverbindung zu PowerShell Gallery vorhanden ist.
+	.DESCRIPTION
+	    Schneller, non-blocking Check ohne NuGet-Installation zu erzwingen.
+	    Versucht DNS-Auflösung (schnell) und optional HTTP-Verbindung (mit Timeout).
+	#>
+	param(
+		[int]$TimeoutMs = 3000
+	)
+
+	try
+	{
+		# Schneller DNS-Check (funktioniert meist offline auch nicht)
+		$dnsTest = @{
+			Server = 'www.powershellgallery.com'
+			ErrorAction = 'Stop'
+		}
+		$null = [System.Net.Dns]::GetHostEntry($dnsTest.Server)
+		return $true
+	}
+	catch
+	{
+		Write-Verbose "Keine Internetverbindung erkannt (DNS-Auflösung fehlgeschlagen)"
+		return $false
+	}
+}
+
 function Test-sqmModuleUpdate-PSGallery
 {
 	[CmdletBinding()]
 	param ([string]$ModuleName = 'sqmSQLTool')
+
+	# === FLEXIBLE LÖSUNG: Prüfe zuerst Internetverbindung ===
+	# Wenn kein Internet -> kein NuGet-Hang, direkt Fallback
+	if (-not (Test-InternetConnectivity))
+	{
+		Write-Verbose "Keine Internetverbindung: PSGallery-Check übersprungen"
+		return $null
+	}
 
 	try
 	{
@@ -443,6 +481,7 @@ function Update-sqmModule
 }
 
 # Auto-update on module import (only when AutoUpdate = $true)
+# === FLEXIBLE: Vollständige Fallback-Chain (PSGallery wird automat. übersprungen wenn offline) ===
 if ($script:sqmModuleConfig['AutoUpdate'])
 {
 	$noUpdate = $env:SQMSQLTOOL_SKIP_AUTO_UPDATE -eq '1'
@@ -450,6 +489,8 @@ if ($script:sqmModuleConfig['AutoUpdate'])
 	{
 		try
 		{
+			# Vollständige Fallback-Chain: PSGallery (wenn online) -> GitHub -> UNC
+			# PSGallery wird automatisch übersprungen wenn kein Internet erkannt
 			$updateInfo = Test-sqmModuleUpdate
 			if ($updateInfo)
 			{
