@@ -176,21 +176,37 @@ Get-ChildItem -Path $PublicPath -Filter *.ps1 -Recurse -ErrorAction SilentlyCont
 $script:sqmLoggingReady = Test-sqmLoggingPath -Path (Get-sqmConfig -Key "LogPath")
 
 # =============================================================================
-# SCHRITT 5: Public-Funktionen exportieren
+# SCHRITT 5: Public-Funktionen + Update-Funktionen exportieren
 # =============================================================================
+# WICHTIG: Nur EIN Export-ModuleMember Aufruf! Mehrere Aufrufe überschreiben sich.
+
 $allFunctions = Get-ChildItem -Path $PublicPath -Filter *.ps1 -ErrorAction SilentlyContinue |
                 ForEach-Object { $_.BaseName }
 
+# Sammle alle zu exportierenden Funktionen
+$functionsToExport = @()
+
+# Public Funktionen aus .ps1 Dateien
 foreach ($func in $allFunctions)
 {
 	if ($func -like "*-sqm*")
 	{
-		Export-ModuleMember -Function $func
+		$functionsToExport += $func
 	}
 }
 
-# Update-Funktionen explizit exportieren (definiert im PSM1, nicht in Public\)
-Export-ModuleMember -Function 'Test-sqmModuleUpdate', 'Test-sqmModuleUpdate-PSGallery', 'Test-sqmModuleUpdate-GitHub', 'Test-sqmModuleUpdate-UNC', 'Update-sqmModule'
+# Update-Funktionen (definiert inline in PSM1, nicht in Public\)
+$functionsToExport += @(
+	'Test-InternetConnectivity',
+	'Test-sqmModuleUpdate',
+	'Test-sqmModuleUpdate-PSGallery',
+	'Test-sqmModuleUpdate-GitHub',
+	'Test-sqmModuleUpdate-UNC',
+	'Update-sqmModule'
+)
+
+# EINMALIGER Export aller Funktionen
+Export-ModuleMember -Function $functionsToExport
 
 # =============================================================================
 # Update-Mechanismus mit Fallback-Chain
