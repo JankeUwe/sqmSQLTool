@@ -195,7 +195,7 @@
 	PrivateData		       = @{
 		PSData = @{
 			# Tags applied to this module. These help with module discovery in online galleries.
-			Tags = @('SQLServer', 'DBA', 'dbatools', 'Administration', 'HealthCheck', 'Reporting', 'Maintenance', 'Security')
+			Tags = @('SQLServer', 'DBA', 'Automation')
 
 			# A URL to the license for this module.
 			LicenseUri = 'https://github.com/JankeUwe/sqmSQLTool/blob/main/LICENSE'
@@ -211,3 +211,4 @@
 		}
 	}
 }
+
