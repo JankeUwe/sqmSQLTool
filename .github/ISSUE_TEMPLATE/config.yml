@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: PowerShell Gallery
+    url: https://www.powershellgallery.com/packages/sqmSQLTool
+    about: View package on PowerShell Gallery
+  - name: GitHub Discussions
+    url: https://github.com/JankeUwe/sqmSQLTool/discussions
+    about: Ask questions in Discussions
+  - name: Stack Overflow
+    url: https://stackoverflow.com/questions/tagged/powershell+sql-server
+    about: Get help from the community
