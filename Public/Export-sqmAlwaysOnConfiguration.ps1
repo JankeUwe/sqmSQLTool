@@ -10,7 +10,7 @@
 	- Listener configuration (name, port, IPs)
 	- Member databases
 
-	CRITICAL FI-TS CHECK: ReadableSecondary must be 'NO' (not 'NONE', 'READ_ONLY', or 'ALL').
+	CRITICAL FI-TS CHECK: ReadableSecondary must be NO (not NONE, READ_ONLY, or ALL).
 	Any other value triggers a warning unless -NoWarning is specified.
 
 	Results are saved as TXT report and CSV file in the specified directory.
@@ -27,7 +27,7 @@
 
 .PARAMETER NoWarning
 	Suppress FI-TS ReadableSecondary warnings (Write-Warning is skipped).
-	Note: Status will still be 'Warning' if ReadableSecondary != 'NO'.
+	Note: Status will still be Warning if ReadableSecondary != NO.
 
 .PARAMETER NoOpen
 	Do not automatically open the TXT report after creation.
@@ -43,7 +43,7 @@
 
 .EXAMPLE
 	Export-sqmAlwaysOnConfiguration -SqlInstance "SQL01"
-	# Exports all AGs from SQL01, warns if ReadableSecondary != 'NO'
+	# Exports all AGs from SQL01, warns if ReadableSecondary != NO
 
 .EXAMPLE
 	Export-sqmAlwaysOnConfiguration -SqlInstance "SQL01" -NoWarning
@@ -57,7 +57,7 @@
 	Author:       sqmSQLTool
 	Prerequisites: dbatools, Invoke-sqmLogging
 	Default output path: $env:ProgramData\sqmSQLTool\Logs
-	FI-TS Standard: ReadableSecondary MUST be 'NO' on all replicas.
+	FI-TS Standard: ReadableSecondary MUST be NO on all replicas.
 #>
 function Export-sqmAlwaysOnConfiguration
 {
@@ -125,7 +125,7 @@ function Export-sqmAlwaysOnConfiguration
 							ConfigRows               = @()
 							TxtFile                  = $null
 							CsvFile                  = $null
-							Status                   = 'OK'
+							Status                   = "OK"
 						})
 					continue
 				}
@@ -180,16 +180,16 @@ ORDER BY ag.name, adc.database_name
 					$null = $dbsByAg[$agName].Add($db.DatabaseName)
 				}
 
-				# FI-TS Check: ReadableSecondary != 'NO'
+				# FI-TS Check: ReadableSecondary != NO
 				$readableSecondaryIssues = $configRows | Where-Object {
-					$_.ReadableSecondary -ne 'NO' -and $_.ReadableSecondary -ne 'NONE' -and -not [string]::IsNullOrWhiteSpace($_.ReadableSecondary)
+					$_.ReadableSecondary -ne "NO" -and $_.ReadableSecondary -ne "NONE" -and -not [string]::IsNullOrWhiteSpace($_.ReadableSecondary)
 				}
 
 				if ($readableSecondaryIssues.Count -gt 0 -and -not $NoWarning)
 				{
 					foreach ($issue in $readableSecondaryIssues)
 					{
-						Write-Warning "FI-TS: AG '$($issue.AgName)' Replica '$($issue.ReplicaName)': ReadableSecondary = '$($issue.ReadableSecondary)' — FI-TS Standard erfordert 'NO'!"
+						Write-Warning "FI-TS: AG '$($issue.AgName)' Replica '$($issue.ReplicaName)': ReadableSecondary = '$($issue.ReadableSecondary)' - FI-TS Standard erfordert NO!"
 						Invoke-sqmLogging -Message "FI-TS WARNING: ReadableSecondary=$($issue.ReadableSecondary) auf Replikat $($issue.ReplicaName) in AG $($issue.AgName)" -FunctionName $functionName -Level "WARNING"
 					}
 				}
@@ -197,8 +197,8 @@ ORDER BY ag.name, adc.database_name
 				# 4. Berichtsdateien schreiben
 				if ($configRows.Count -gt 0)
 				{
-					$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-					$datestamp = Get-Date -Format 'yyyy-MM-dd'
+					$timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+					$datestamp = Get-Date -Format "yyyy-MM-dd"
 					$safeInst = $instance -replace '[\\/:*?"<>|]', '_'
 					$txtFile = Join-Path $OutputPath "AlwaysOnConfiguration_${safeInst}_${datestamp}.txt"
 					$csvFile = Join-Path $OutputPath "AlwaysOnConfiguration_${safeInst}_${datestamp}.csv"
@@ -214,7 +214,7 @@ ORDER BY ag.name, adc.database_name
 
 						# TXT-Bericht
 						$cntWarn = $readableSecondaryIssues.Count
-						$cntOk = ($configRows | Where-Object { $_.ReadableSecondary -eq 'NO' -or $_.ReadableSecondary -eq 'NONE' -or [string]::IsNullOrWhiteSpace($_.ReadableSecondary) }).Count
+						$cntOk = ($configRows | Where-Object { $_.ReadableSecondary -eq "NO" -or $_.ReadableSecondary -eq "NONE" -or [string]::IsNullOrWhiteSpace($_.ReadableSecondary) }).Count
 						$agCount = ($configRows | Select-Object -ExpandProperty AgName -Unique).Count
 
 						$lines = [System.Collections.Generic.List[string]]::new()
@@ -237,7 +237,7 @@ ORDER BY ag.name, adc.database_name
 							$lines.Add("   BackupPreference   : $($firstRow.BackupPreference)")
 							$lines.Add("   FailureCondition   : $($firstRow.FailureConditionLevel)")
 							$lines.Add("   HealthCheckTimeout : $($firstRow.HealthCheckTimeoutMs) ms")
-							$lines.Add("   DbFailover         : $(if ($firstRow.DbFailoverEnabled) { 'Enabled' } else { 'Disabled' })")
+							$lines.Add("   DbFailover         : $(if ($firstRow.DbFailoverEnabled) { "Enabled" } else { "Disabled" })")
 
 							# Listener
 							if ($firstRow.ListenerName)
@@ -248,22 +248,19 @@ ORDER BY ag.name, adc.database_name
 							# Datenbanken
 							if ($dbsByAg[$agName] -and $dbsByAg[$agName].Count -gt 0)
 							{
-								$dbList = $dbsByAg[$agName] -join ', '
+								$dbList = $dbsByAg[$agName] -join ", "
 								$lines.Add("   Datenbanken        : $dbList")
 							}
 
 							$lines.Add("")
 							$lines.Add("   REPLICAS:")
-							$lines.Add(("{0,-25} {1,-18} {2,-18} {3,-20} {4,-8}" -f
-									'Replica', 'AvailMode', 'FailoverMode', 'ReadableSecondary', 'Backup%'))
+							$lines.Add(("{0,-25} {1,-18} {2,-18} {3,-20} {4,-8}" -f "Replica", "AvailMode", "FailoverMode", "ReadableSecondary", "Backup%"))
 							$lines.Add(("-" * 95))
 
 							foreach ($row in $agRows)
 							{
-								$status = if ($row.ReadableSecondary -eq 'NO' -or $row.ReadableSecondary -eq 'NONE' -or [string]::IsNullOrWhiteSpace($row.ReadableSecondary)) { '✅' } else { '⚠️ ' }
-								$lines.Add(("{0,-25} {1,-18} {2,-18} {3,-20} {4,-8} {5}" -f
-										$row.ReplicaName, $row.AvailabilityMode, $row.FailoverMode,
-										$row.ReadableSecondary, $row.BackupPriority, $status))
+								$status = if ($row.ReadableSecondary -eq "NO" -or $row.ReadableSecondary -eq "NONE" -or [string]::IsNullOrWhiteSpace($row.ReadableSecondary)) { "OK" } else { "WARN" }
+								$lines.Add(("{0,-25} {1,-18} {2,-18} {3,-20} {4,-8} {5}" -f $row.ReplicaName, $row.AvailabilityMode, $row.FailoverMode, $row.ReadableSecondary, $row.BackupPriority, $status))
 							}
 
 							# FI-TS Warnung wenn nötig
@@ -272,7 +269,7 @@ ORDER BY ag.name, adc.database_name
 							{
 								$lines.Add("")
 								$lines.Add("   *** FI-TS WARNING: ReadableSecondary != NO!")
-								$lines.Add("   *** FI-TS Standard erfordert ReadableSecondary = 'NO' auf allen Replicas.")
+								$lines.Add("   *** FI-TS Standard erfordert ReadableSecondary = NO auf allen Replicas.")
 							}
 
 							$lines.Add("")
@@ -307,7 +304,7 @@ ORDER BY ag.name, adc.database_name
 						ConfigRows              = $configRows
 						TxtFile                 = $txtFile
 						CsvFile                 = $csvFile
-						Status                  = if ($readableSecondaryIssues.Count -gt 0) { 'Warning' } else { 'OK' }
+						Status                  = if ($readableSecondaryIssues.Count -gt 0) { "Warning" } else { "OK" }
 					}
 					$allInstanceResults.Add($result)
 
@@ -327,7 +324,7 @@ ORDER BY ag.name, adc.database_name
 						ReplicaCount            = 0
 						ReadableSecondaryCount  = 0
 						ConfigRows              = @()
-						Status                  = 'Error'
+						Status                  = "Error"
 						Message                 = $errMsg
 						TxtFile                 = $null
 						CsvFile                 = $null
