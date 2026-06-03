@@ -68,22 +68,19 @@ function Get-sqmTlsStatus
 		[System.Management.Automation.PSCredential]$Credential,
 
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = '$env:ProgramData\sqmSQLTool\Logs',
+		[string]$OutputPath = "$env:ProgramData\sqmSQLTool\Logs",
 
 		[Parameter(Mandatory = $false)]
-		[int]$WarnDaysBeforeExpiry = 60
+		[int]$WarnDaysBeforeExpiry = 60,
+
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 
 	begin
 	{
 		$functionName = $MyInvocation.MyCommand.Name
 		$allResults = [System.Collections.Generic.List[PSCustomObject]]::new()
-
-		# Resolve literal $env:... in OutputPath at runtime
-		if ($OutputPath -like '*$env:*')
-		{
-			$OutputPath = $OutputPath -replace '\$env:ProgramData', $env:ProgramData
-		}
 
 		if (-not (Test-Path -Path $OutputPath))
 		{
@@ -500,6 +497,13 @@ function Get-sqmTlsStatus
 			}
 
 			$lines | Out-File -FilePath $txtPath -Encoding UTF8
+
+			# Oeffne TXT-Datei wenn nicht -NoOpen
+			if (-not $NoOpen -and $txtPath)
+			{
+				Start-Process $txtPath
+			}
+
 			Invoke-sqmLogging -Message "TXT report saved: $txtPath" -FunctionName $functionName -Level "INFO"
 		}
 		catch

@@ -66,11 +66,13 @@ function Get-sqmAgHealthReport
 		[Parameter(Mandatory = $false)]
 		[int]$MaxSendQueueMB = 50,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = '$env:ProgramData\sqmSQLTool\Logs',
+		[string]$OutputPath = "$env:ProgramData\sqmSQLTool\Logs",
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 	
 	begin
@@ -333,10 +335,16 @@ ORDER BY has.start_time;
 						}
 					}
 					$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
-					
+
 					# CSV-Datei erstellen
 					$healthRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
-					
+
+					# Oeffne TXT-Datei wenn nicht -NoOpen
+					if (-not $NoOpen -and $txtFile)
+					{
+						Start-Process $txtFile
+					}
+
 					Invoke-sqmLogging -Message "[$instance] Health-Bericht erstellt: $txtFile" -FunctionName $functionName -Level "INFO"
 				}
 				else

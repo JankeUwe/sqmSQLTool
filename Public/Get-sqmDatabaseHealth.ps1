@@ -83,11 +83,13 @@ function Get-sqmDatabaseHealth
 		[Parameter(Mandatory = $false)]
 		[switch]$IncludeSystemDatabases,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = '$env:ProgramData\sqmSQLTool\Logs',
+		[string]$OutputPath = "$env:ProgramData\sqmSQLTool\Logs",
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 	
 	begin
@@ -323,10 +325,16 @@ END
 								$e.CheckDbAgeDays, $e.VlfCount, $e.AutoGrowthEvents, $e.LastFullBackup))
 					}
 					$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
-					
+
 					# CSV-Datei
 					$detailRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
-					
+
+					# Oeffne TXT-Datei wenn nicht -NoOpen
+					if (-not $NoOpen -and $txtFile)
+					{
+						Start-Process $txtFile
+					}
+
 					Invoke-sqmLogging -Message "[$instance] Database-Health-Bericht erstellt: $txtFile" -FunctionName $functionName -Level "INFO"
 				}
 				else
