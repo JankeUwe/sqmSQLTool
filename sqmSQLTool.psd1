@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.4.5.0'
+	ModuleVersion		   = '1.4.6.0'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
@@ -74,6 +74,7 @@
 	FunctionsToExport	   = @(
 		'Add-sqmDatabaseToDistributedAg',
 		'Compare-sqmServerConfiguration',
+		'Complete-sqmListenerMigration',
 		'Copy-sqmLogins',
 		'Copy-sqmNTFSPermissions',
 		'Copy-sqmToCentralPath',
@@ -159,6 +160,7 @@
 		'New-sqmOlaUsrDbBackupJob',
 		'New-sqmRandomSaPassword',
 		'New-sqmSqlCertificate',
+		'Prepare-sqmListenerForMigration',
 		'Remove-sqmDatabaseFromAG',
 		'Repair-sqmAlwaysOnDatabases',
 		'Set-sqmBackupExcludePermission',
