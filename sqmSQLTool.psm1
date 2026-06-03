@@ -17,8 +17,8 @@
 # FI-TS-spezifische Werte werden in Schritt 1b gesetzt wenn erkannt.
 # =============================================================================
 $script:sqmModuleConfig = @{
-	LogPath               = "$env:ProgramData\sqmSQLTool\Logs"
-	OutputPath            = "$env:ProgramData\sqmSQLTool\Logs"
+	LogPath               = "C:\System\WinSrvLog\MSSQL"
+	OutputPath            = "C:\System\WinSrvLog\MSSQL"
 	CentralPath           = $null
 	OlaJobNameFull        = "OlaHH-UserDatabases-FULL"
 	OlaJobNameDiff        = "OlaHH-UserDatabases-DIFF"

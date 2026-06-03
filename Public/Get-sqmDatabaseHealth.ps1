@@ -37,7 +37,7 @@
     Include system databases (except tempdb). Default: $false.
 
 .PARAMETER OutputPath
-    Output directory for report files. Default: $env:ProgramData\sqmSQLTool\Logs
+    Output directory for report files. Default: C:\System\WinSrvLog\MSSQL
 
 .PARAMETER ContinueOnError
     Continue on error for an instance (otherwise the error is thrown).
@@ -60,7 +60,7 @@
 .NOTES
     Author:       MSSQLTools
     Prerequisites: dbatools, Invoke-sqmLogging
-    Default output path: $env:ProgramData\sqmSQLTool\Logs
+    Default output path: C:\System\WinSrvLog\MSSQL
     VLF query requires SQL Server 2016+ (sys.dm_db_log_info). On older versions VLF status is shown as 'Unknown'.
 #>
 function Get-sqmDatabaseHealth
@@ -83,7 +83,7 @@ function Get-sqmDatabaseHealth
 		[Parameter(Mandatory = $false)]
 		[switch]$IncludeSystemDatabases,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = "$env:ProgramData\sqmSQLTool\Logs",
+		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]

@@ -42,7 +42,7 @@
     If $true (default), disabled sysadmin logins are also included.
 
 .PARAMETER OutputPath
-    Output directory for report files. Default: $env:ProgramData\sqmSQLTool\Logs
+    Output directory for report files. Default: C:\System\WinSrvLog\MSSQL
 
 .PARAMETER ContinueOnError
     Continue on error for an instance.
@@ -78,7 +78,7 @@ function Get-sqmSysadminAccounts
 		[Parameter(Mandatory = $false)]
 		[bool]$IncludeDisabled = $true,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = "$env:ProgramData\sqmSQLTool\Logs",
+		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]

@@ -28,7 +28,7 @@
 
 .PARAMETER OutputPath
     Directory where the CSV and TXT report files are saved.
-    Default: $env:ProgramData\sqmSQLTool\Logs
+    Default: C:\System\WinSrvLog\MSSQL
 
 .PARAMETER WarnDaysBeforeExpiry
     Number of days before certificate expiry that triggers a Warning status.
@@ -54,7 +54,7 @@
     Author:        sqmSQLTool
     Prerequisites: None (pure PowerShell, Registry, CertStore). PowerShell 5.1 compatible.
     Remote access: Uses Invoke-Command (WinRM) for remote computers.
-    Default output path: $env:ProgramData\sqmSQLTool\Logs
+    Default output path: C:\System\WinSrvLog\MSSQL
 #>
 function Get-sqmTlsStatus
 {
@@ -68,7 +68,7 @@ function Get-sqmTlsStatus
 		[System.Management.Automation.PSCredential]$Credential,
 
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = "$env:ProgramData\sqmSQLTool\Logs",
+		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
 
 		[Parameter(Mandatory = $false)]
 		[int]$WarnDaysBeforeExpiry = 60,
@@ -516,3 +516,4 @@ function Get-sqmTlsStatus
 		return $allResults
 	}
 }
+

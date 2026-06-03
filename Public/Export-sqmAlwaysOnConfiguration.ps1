@@ -71,7 +71,7 @@ function Export-sqmAlwaysOnConfiguration
 		[System.Management.Automation.PSCredential]$SqlCredential,
 
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = "$env:ProgramData\sqmSQLTool\Logs",
+		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
 
 		[Parameter(Mandatory = $false)]
 		[switch]$NoWarning,

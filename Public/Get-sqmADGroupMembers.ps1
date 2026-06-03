@@ -47,7 +47,7 @@ function Get-sqmADGroupMembers
         [string]$Domain,
 
         [Parameter(Mandatory = $false)]
-        [string]$OutputPath = "$env:ProgramData\sqmSQLTool\ADReports"
+        [string]$OutputPath = "C:\System\WinSrvLog\MSSQL"
     )
 
     begin
@@ -292,3 +292,4 @@ function Get-sqmADGroupMembers
         return $allResults
     }
 }
+
