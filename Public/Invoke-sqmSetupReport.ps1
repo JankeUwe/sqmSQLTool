@@ -80,7 +80,10 @@ function Invoke-sqmSetupReport
         [switch]$PassThru,
 
         [Parameter(Mandatory = $false)]
-        [switch]$EnableException
+        [switch]$EnableException,
+
+        [Parameter(Mandatory = $false)]
+        [switch]$NoOpen
     )
 
     begin
@@ -274,6 +277,12 @@ function Invoke-sqmSetupReport
 
             $htmlFile = Join-Path $OutputPath "sqmSetupReport_${safeInstance}_${datestamp}.html"
             $html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+
+            # Oeffne HTML-Datei wenn nicht -NoOpen
+            if (-not $NoOpen -and $htmlFile)
+            {
+                Start-Process $htmlFile
+            }
 
             Invoke-sqmLogging -Message "HTML-Report gespeichert: $htmlFile" -FunctionName $functionName -Level 'INFO'
             Write-Host ""

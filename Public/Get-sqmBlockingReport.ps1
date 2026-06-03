@@ -67,7 +67,9 @@ function Get-sqmBlockingReport
 		[Parameter(Mandatory = $false)]
 		[string]$OutputPath,
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 	
 	begin
@@ -247,6 +249,13 @@ ORDER BY r.wait_time DESC
 				}
 				$csvFile = Join-Path $OutputPath "Blocking_$(($SqlInstance -replace '\\', '_'))_$(Get-Date -Format 'yyyyMMdd_HHmsqm').csv"
 				$blockedSessions | Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
+
+				# Oeffne CSV-Datei wenn nicht -NoOpen
+				if (-not $NoOpen -and $csvFile)
+				{
+					Start-Process $csvFile
+				}
+
 				Invoke-sqmLogging -Message "Blocking-Snapshot gespeichert: $csvFile" -FunctionName $functionName -Level "INFO"
 			}
 			
