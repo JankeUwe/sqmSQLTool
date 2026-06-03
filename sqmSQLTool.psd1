@@ -173,9 +173,9 @@
 		'Test-sqmMaxDop',
 		'Test-sqmMaxMemory',
 		'Test-sqmModuleUpdate',
-		'Test-sqmModuleUpdate-GitHub',
-		'Test-sqmModuleUpdate-PSGallery',
-		'Test-sqmModuleUpdate-UNC',
+		'Test-sqmUpdateViaGitHub',
+		'Test-sqmUpdateViaPSGallery',
+		'Test-sqmUpdateViaUNC',
 		'Test-sqmOlaInstallation',
 		'Test-sqmSQLFirewall',
 		'Test-sqmSqlInstanceInstalled',
@@ -224,4 +224,5 @@
 		}
 	}
 }
+
 

@@ -1,4 +1,4 @@
-﻿<#
+<#
 	===========================================================================
 	 Created with: 	SAPIEN Technologies, Inc., PowerShell Studio 2021 v5.8.183
 	 Created on:   	21.04.2026 15:37
@@ -220,7 +220,7 @@ function Test-InternetConnectivity
 	}
 }
 
-function Test-sqmModuleUpdate-PSGallery
+function Test-sqmUpdateViaPSGallery
 {
 	[CmdletBinding()]
 	param ([string]$ModuleName = 'sqmSQLTool')
@@ -263,7 +263,7 @@ function Test-sqmModuleUpdate-PSGallery
 .PARAMETER GitHubRepo
     GitHub Repository (Format: owner/repo, z.B. JankeUwe/sqmSQLTool).
 #>
-function Test-sqmModuleUpdate-GitHub
+function Test-sqmUpdateViaGitHub
 {
 	[CmdletBinding()]
 	param ([string]$GitHubRepo = 'JankeUwe/sqmSQLTool')
@@ -304,7 +304,7 @@ function Test-sqmModuleUpdate-GitHub
 .PARAMETER RepositoryPath
     UNC-Pfad zum Repository.
 #>
-function Test-sqmModuleUpdate-UNC
+function Test-sqmUpdateViaUNC
 {
 	[CmdletBinding()]
 	param ([string]$RepositoryPath = $script:sqmModuleConfig['UpdateRepository'])
@@ -379,13 +379,13 @@ function Test-sqmModuleUpdate
 	)
 
 	# Fallback-Chain: PSGallery -> GitHub -> UNC
-	$updateResult = Test-sqmModuleUpdate-PSGallery -ModuleName 'sqmSQLTool'
+	$updateResult = Test-sqmUpdateViaPSGallery -ModuleName 'sqmSQLTool'
 	if ($updateResult) { return $updateResult }
 
-	$updateResult = Test-sqmModuleUpdate-GitHub -GitHubRepo 'JankeUwe/sqmSQLTool'
+	$updateResult = Test-sqmUpdateViaGitHub -GitHubRepo 'JankeUwe/sqmSQLTool'
 	if ($updateResult) { return $updateResult }
 
-	$updateResult = Test-sqmModuleUpdate-UNC -RepositoryPath $script:sqmModuleConfig['UpdateRepository']
+	$updateResult = Test-sqmUpdateViaUNC -RepositoryPath $script:sqmModuleConfig['UpdateRepository']
 	if ($updateResult) { return $updateResult }
 
 	# Keine neuere Version in keinem Repository gefunden
@@ -425,7 +425,7 @@ function Update-sqmModule
 		return
 	}
 
-	$updateInfo = Test-sqmModuleUpdate-UNC -RepositoryPath $RepositoryPath
+	$updateInfo = Test-sqmUpdateViaUNC -RepositoryPath $RepositoryPath
 	if (-not $Force -and -not $updateInfo)
 	{
 		Write-Host "Keine neuere Version verfuegbar." -ForegroundColor Green
@@ -527,3 +527,4 @@ Zum Aktualisieren:
 # weil der Check nur beim expliziten Export-ModuleMember Aufruf ausgeloest wird.
 # Private Funktionen (Get-sqmString, Invoke-sqmLogging etc.) bleiben privat da sie nicht
 # in der FunctionsToExport Liste der .psd1 stehen.
+

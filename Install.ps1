@@ -167,7 +167,9 @@ Get-ChildItem -Path $Destination -Recurse -File | ForEach-Object {
 Write-Host "Testing module import..." -ForegroundColor Cyan
 $importOk = $false
 try {
-    Import-Module sqmSQLTool -Force -ErrorAction Stop
+    # Expliziter Pfad zur .psd1 verhindert dass eine alte Version aus PSModulePath geladen wird
+    $psd1Path = Join-Path $Destination "sqmSQLTool.psd1"
+    Import-Module $psd1Path -Force -WarningAction SilentlyContinue -ErrorAction Stop
     $version = (Get-Module sqmSQLTool).Version
     Write-Host "sqmSQLTool v$version successfully loaded." -ForegroundColor Green
     Write-Host "Scope: $Scope  |  Path: $Destination" -ForegroundColor Gray
