@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.4.3.0'
+	ModuleVersion		   = '1.4.4.0'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
@@ -72,6 +72,7 @@
 	# Loesung: Nur .psd1 steuert den Export. Private Funktionen stehen nicht in dieser Liste
 	# und bleiben damit automatisch privat.
 	FunctionsToExport	   = @(
+		'Add-sqmDatabaseToDistributedAg',
 		'Compare-sqmServerConfiguration',
 		'Copy-sqmLogins',
 		'Copy-sqmNTFSPermissions',
@@ -92,6 +93,7 @@
 		'Get-sqmConnectionStats',
 		'Get-sqmDatabaseHealth',
 		'Get-sqmDeadlockReport',
+		'Get-sqmDistributedAgHealth',
 		'Get-sqmDiskBlockSize',
 		'Get-sqmDiskInfoByDriveLetter',
 		'Get-sqmDiskSpaceReport',
@@ -124,6 +126,7 @@
 		'Invoke-sqmCollationChange',
 		'Invoke-sqmConfigRollback',
 		'Invoke-sqmDeployScripts',
+		'Invoke-sqmDistributedFailover',
 		'Invoke-sqmExtendedEvents',
 		'Invoke-sqmFailover',
 		'Invoke-sqmFormatDrive64k',
@@ -169,6 +172,7 @@
 		'Test-InternetConnectivity',
 		'Test-sqmBackupIntegrity',
 		'Test-sqmCostThreshold',
+		'Test-sqmDistributedAgReadiness',
 		'Test-sqmDriverInstalled',
 		'Test-sqmMaxDop',
 		'Test-sqmMaxMemory',
