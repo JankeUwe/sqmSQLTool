@@ -82,7 +82,9 @@ function Get-sqmSysadminAccounts
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 	
 	begin
@@ -349,7 +351,13 @@ ORDER BY sp.type_desc, sp.name;
 					
 					$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
 					$detailRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
-					
+
+					# Oeffne TXT-Datei wenn nicht -NoOpen
+					if (-not $NoOpen -and $txtFile)
+					{
+						Start-Process $txtFile
+					}
+
 					Invoke-sqmLogging -Message "[$instance] Bericht erstellt: $txtFile" -FunctionName $functionName -Level "INFO"
 				}
 				else

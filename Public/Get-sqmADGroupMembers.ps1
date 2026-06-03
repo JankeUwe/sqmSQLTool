@@ -3,12 +3,15 @@
     Lists all members of an Active Directory group.
 
 .DESCRIPTION
-    Simple, reliable function to list members of an AD group.
+    Simple, reliable function to list members of an AD group (including nested groups).
     Useful when SQL Server access fails and you need to check group permissions.
 
+    Supports NESTED GROUPS: Recursively resolves all members, including members of nested groups.
+    Example: If GroupA contains GroupB (which contains User2), both GroupB and User2 are returned.
+
     Methods:
-    1. Get-ADGroupMember (if ActiveDirectory module available)
-    2. LDAP direct query (fallback, no module required)
+    1. Get-ADGroupMember -Recursive (if ActiveDirectory module available) — Resolves nested groups
+    2. LDAP direct query (fallback, no module required) — Direct members only
 
 .PARAMETER GroupName
     Name of the AD group. Pipeline-capable.
@@ -102,7 +105,7 @@ function Get-sqmADGroupMembers
                     if (Get-Module -ListAvailable -Name ActiveDirectory)
                     {
                         Import-Module ActiveDirectory -ErrorAction Stop
-                        $adMembers = Get-ADGroupMember -Identity $cleanGroup -ErrorAction Stop
+                        $adMembers = Get-ADGroupMember -Identity $cleanGroup -Recursive -ErrorAction Stop
                         foreach ($member in $adMembers)
                         {
                             $members.Add([PSCustomObject]@{
