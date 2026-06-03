@@ -1,15 +1,66 @@
 # sqmSQLTool
 
+[![PowerShell Gallery](https://img.shields.io/powershellgallery/v/sqmSQLTool?label=PowerShell%20Gallery&logo=powershell&logoColor=white)](https://www.powershellgallery.com/packages/sqmSQLTool)
+[![PowerShell 5.1+](https://img.shields.io/badge/PowerShell-5.1%2B-blue?logo=powershell&logoColor=white)](https://github.com/PowerShell/PowerShell)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/JankeUwe/sqmSQLTool?style=social)](https://github.com/JankeUwe/sqmSQLTool)
+
 PowerShell-Modul für SQL Server Administration — entwickelt von [dtcSoftware](https://www.powershelldba.de) (Uwe Janke).
 
-## Übersicht
+## 🎯 Übersicht
 
-sqmSQLTool ist ein umfassendes PowerShell-Modul mit 100+ Funktionen für die professionelle SQL Server-Administration. Es baut auf [dbatools](https://dbatools.io) auf und erweitert diese um betriebsspezifische Automatisierungen.
+**sqmSQLTool** ist ein umfassendes PowerShell-Modul mit **100+ Funktionen** für die professionelle SQL Server-Administration. Es baut auf [dbatools](https://dbatools.io) auf und erweitert diese um betriebsspezifische Automatisierungen.
 
-**Anforderungen:**
-- PowerShell 5.1+
-- .NET Framework 4.5+
-- [dbatools](https://dbatools.io) (wird automatisch benötigt)
+**Ideal für:**
+- SQL Server DBAs
+- System Administratoren
+- Automation Engineers
+- Enterprise Umgebungen (besonders AlwaysOn, High Availability)
+
+## 📋 Anforderungen
+
+- **PowerShell** 5.1+ (Windows PowerShell oder PowerShell 7+)
+- **.NET Framework** 4.5+
+- **dbatools** (wird automatisch installiert)
+- **Windows** (SQL Server Administration)
+
+## ⚡ Quick Start
+
+### Installation (One-Liner)
+```powershell
+# Aus PowerShell Gallery (empfohlen)
+Install-Module -Name sqmSQLTool -Repository PSGallery -Scope CurrentUser
+
+# Oder als Admin für alle Benutzer
+Install-Module -Name sqmSQLTool -Repository PSGallery -Scope AllUsers
+
+# Importieren
+Import-Module sqmSQLTool
+```
+
+### Erste Schritte
+```powershell
+# Verfügbare Funktionen anzeigen
+Get-Command -Module sqmSQLTool | Select-Object Name, Synopsis
+
+# Datenbank-Health prüfen
+Get-sqmDatabaseHealth -SqlInstance "YOUR_SERVER"
+
+# Disk-Space Report erzeugen
+Get-sqmDiskSpaceReport -SqlInstance "YOUR_SERVER"
+
+# AlwaysOn AG Status
+Get-sqmAgHealthReport -SqlInstance "YOUR_SERVER"
+```
+
+### Help & Dokumentation
+```powershell
+# Hilfe zu einer Funktion
+Get-Help Get-sqmDatabaseHealth -Full
+
+# Online Help (GitHub)
+Get-Help Get-sqmDatabaseHealth -Online
+```
 
 ## Installation
 
@@ -146,6 +197,50 @@ Import-Module sqmSQLTool
 - **PowerShell Gallery:** [powershellgallery.com/profiles/JankeUwe](https://www.powershellgallery.com/profiles/JankeUwe)
 - **Alle Projekte:** [github.com/JankeUwe](https://github.com/JankeUwe)
 - Entwickler: Uwe Janke, Senior SQL Server DBA | dtcSoftware
+
+## 💬 Support & Community
+
+### Probleme oder Fragen?
+- **GitHub Issues:** [github.com/JankeUwe/sqmSQLTool/issues](https://github.com/JankeUwe/sqmSQLTool/issues) — Bug Reports, Feature Requests
+- **GitHub Discussions:** [github.com/JankeUwe/sqmSQLTool/discussions](https://github.com/JankeUwe/sqmSQLTool/discussions) — Q&A, Tipps, Best Practices
+- **Stack Overflow:** Tag mit `[powershell]` + `[sql-server]`
+- **Email:** uwejanke@googlemail.com
+
+### Community-Kanäle
+- **Reddit:** [/r/PowerShell](https://reddit.com/r/PowerShell), [/r/mssql](https://reddit.com/r/mssql)
+- **Slack:** [sqlcommunity.slack.com](https://sqlcommunity.slack.com) (#powershell, #sql-server)
+- **LinkedIn:** [@uwejanke](https://linkedin.com/in/uwejanke) — Follow für Updates
+
+## 🤝 Beitragen
+
+Wir freuen uns über Beiträge! So kannst du helfen:
+
+1. **Bugs melden:** [Issues](https://github.com/JankeUwe/sqmSQLTool/issues) erstellen
+2. **Features vorschlagen:** [Discussions](https://github.com/JankeUwe/sqmSQLTool/discussions)
+3. **Code beitragen:** Pull Requests sind willkommen
+4. **Dokumentation:** Hilf bei Übersetzungen oder verbesserter Dokumentation
+5. **Feedback:** Erzähl uns, wie du das Tool nutzt!
+
+**Entwickler-Setup:**
+```powershell
+# Repository klonen
+git clone https://github.com/JankeUwe/sqmSQLTool.git
+cd sqmSQLTool
+
+# Abhängigkeiten installieren
+Install-Module -Name dbatools, Pester -Force
+
+# Tests ausführen
+Invoke-Pester .\Tests\ -Verbose
+```
+
+## 📈 Roadmap
+
+- [x] v1.0.0 — Initiale Veröffentlichung
+- [x] v1.4.0+ — AlwaysOn Erweiterungen, Performance Reports
+- [ ] v2.0.0 — PowerShell 7+ Optimierungen, zusätzliche DBaaS-Unterstützung
+- [ ] Code Signing — Zertifikat für LBBW (AllSigned Policy)
+- [ ] Multilingual Support — Deutsche & Englische UI
 
 ## Lizenz
 
