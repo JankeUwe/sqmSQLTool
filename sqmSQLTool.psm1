@@ -176,14 +176,6 @@ Get-ChildItem -Path $PublicPath -Filter *.ps1 -Recurse -ErrorAction SilentlyCont
 $script:sqmLoggingReady = Test-sqmLoggingPath -Path (Get-sqmConfig -Key "LogPath")
 
 # =============================================================================
-# SCHRITT 5: Public-Funktionen + Update-Funktionen exportieren
-# =============================================================================
-# WICHTIG: Nur EIN Export-ModuleMember Aufruf! Mehrere Aufrufe überschreiben sich.
-
-# SCHRITT 5: Wird am Ende der Datei (nach allen Funktionsdefinitionen) ausgeführt
-# Export aller Funktionen nach Laden — siehe Zeile ~650
-
-# =============================================================================
 # Update-Mechanismus mit Fallback-Chain
 # =============================================================================
 # Priorität:
@@ -527,11 +519,13 @@ Zum Aktualisieren:
 			Write-Verbose "Auto-update check failed: $($_.Exception.Message)"
 		}
 	}
+}
 
 # =============================================================================
-# SCHRITT 5: Export nur der PUBLIC Funktionen (nach allen Definitionen)
+# SCHRITT 5: Export nur der PUBLIC Funktionen (NACH ALLEN BEDINGUNGEN!)
 # Die Liste muss EXAKT mit FunctionsToExport in .psd1 übereinstimmen
 # Private Helper (_*) werden NICHT exportiert
+# WICHTIG: MUSS AUSSERHALB aller If-Bedingungen sein, damit immer aufgerufen wird!
 # =============================================================================
 Export-ModuleMember -Function @(
 	'Compare-sqmServerConfiguration',
@@ -649,5 +643,4 @@ Export-ModuleMember -Function @(
 	'Uninstall-sqmJdbcDriver',
 	'Uninstall-sqmOdbcDriver',
 	'Update-sqmModule'
-)
-}
+) -Cmdlet @() -Variable @() -Alias @()
