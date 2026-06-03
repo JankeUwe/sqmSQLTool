@@ -78,7 +78,7 @@ function Get-sqmSysadminAccounts
 		[Parameter(Mandatory = $false)]
 		[bool]$IncludeDisabled = $true,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = '$env:ProgramData\sqmSQLTool\Logs',
+		[string]$OutputPath = "$env:ProgramData\sqmSQLTool\Logs",
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
