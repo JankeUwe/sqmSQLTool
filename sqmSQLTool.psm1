@@ -538,6 +538,7 @@ Export-ModuleMember -Function @(
 	'Copy-sqmLogins',
 	'Copy-sqmNTFSPermissions',
 	'Copy-sqmToCentralPath',
+	'Export-sqmAlwaysOnConfiguration',
 	'Export-sqmDatabaseDocumentation',
 	'Export-sqmServerConfiguration',
 	'Find-sqmDatabaseObject',
