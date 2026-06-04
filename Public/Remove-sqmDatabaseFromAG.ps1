@@ -134,7 +134,7 @@ function Remove-sqmDatabaseFromAG
 					continue
 				}
 				$agName = $agDb.AvailabilityGroupName
-				$secondaryInstances = $agDb | Get-DbaAgReplica -SqlInstance $SqlInstance -SqlCredential $SqlCredential | Where-Object { $_.Role -ne 'Primary' } | Select-Object -ExpandProperty Name
+				$secondaryInstances = Get-DbaAgReplica -SqlInstance $SqlInstance -SqlCredential $SqlCredential | Where-Object { $_.AvailabilityGroupName -eq $agName -and $_.Role -ne 'Primary' } | Select-Object -ExpandProperty Name
 				
 				# Entfernen aus AG
 				$removeAction = "Datenbank '$dbName' aus AG '$agName' entfernen"
