@@ -110,7 +110,7 @@ WHERE agl.group_id = (SELECT group_id FROM sys.availability_groups WHERE name = 
 
 			if (-not $listeners)
 			{
-				throw "Kein Listener auf AG [$AvailabilityGroupName] gefunden. Migration nicht nötig?"
+				throw "Kein Listener auf AG [$AvailabilityGroupName] gefunden. Migration nicht noetig?"
 			}
 
 			# Filter by ListenerName if specified
@@ -216,9 +216,9 @@ ORDER BY DB_NAME(adc.database_id)
 				"================================================================"
 				"SAFE FOR AD TEAM TO PROCEED"
 				"================================================================"
-				"✓ Listener removed from SQL AG"
-				"✓ All databases remain ONLINE (no listener dependency)"
-				"✓ Cluster resource can now be safely deleted/recreated"
+				"[OK] Listener removed from SQL AG"
+				"[OK] All databases remain ONLINE (no listener dependency)"
+				"[OK] Cluster resource can now be safely deleted/recreated"
 				""
 				"AD TEAM TASKS (next 15-30 minutes):"
 				"1. Delete old listener cluster resource (Failover Cluster Manager)"

@@ -198,7 +198,7 @@ AND dns_name = @DnsName
 
 			if ([int]$listenerVerify.C -eq 0)
 			{
-				throw "Listener konnte nicht zu AG hinzugefügt werden. Cluster-Ressource existiert nicht oder Name stimmt nicht überein."
+				throw "Listener konnte nicht zu AG hinzugefuegt werden. Cluster-Ressource existiert nicht oder Name stimmt nicht ueberein."
 			}
 
 			# Step 8: Verify DB status AFTER listener addition
@@ -240,7 +240,7 @@ AND dns_name = @DnsName
 
 			foreach ($db in $dbStatusAfter)
 			{
-				$icon = if ($db.database_state_desc -eq 'ONLINE') { "✓" } else { "✗" }
+				$icon = if ($db.database_state_desc -eq 'ONLINE') { "[OK]" } else { "[FAIL]" }
 				$reportContent += "$icon $($db.DatabaseName.PadRight(30)) [$($db.database_state_desc.PadRight(10))]"
 			}
 
@@ -249,7 +249,7 @@ AND dns_name = @DnsName
 				$reportContent += @(
 					""
 					"================================================================"
-					"⚠️  RECOVERY MODE DETECTED"
+					"WARNING:  RECOVERY MODE DETECTED"
 					"================================================================"
 					"$recoveryCountAfter databases are in RECOVERY MODE."
 					""
@@ -277,7 +277,7 @@ AND dns_name = @DnsName
 				$reportContent += @(
 					""
 					"================================================================"
-					"✓ MIGRATION SUCCESSFUL"
+					"[OK] MIGRATION SUCCESSFUL"
 					"================================================================"
 					"All $($dbStatusAfter.Count) databases are ONLINE."
 					"Listener is properly registered with AG."
