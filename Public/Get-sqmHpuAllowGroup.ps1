@@ -9,8 +9,8 @@
 
         Configuration via Set-sqmConfig:
             Set-sqmConfig -HpuDomainGroupMap @(
-                [PSCustomObject]@{ DomainPattern = 'bayernlb.sfinance.net'; GroupNamePattern = 'Fg_DC_AouAllowManageAuditSecLogSrvAll_Mod' },
-                [PSCustomObject]@{ DomainPattern = '*.sfinance.net';        GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' },
+                [PSCustomObject]@{ DomainPattern = 'your.domain';  GroupNamePattern = 'Fg_DC_AouAllowManageAuditSecLogSrvAll_Mod' },
+                [PSCustomObject]@{ DomainPattern = '*.your.domain'; GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' },
                 [PSCustomObject]@{ DomainPattern = '*';                     GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' }
             )
 
