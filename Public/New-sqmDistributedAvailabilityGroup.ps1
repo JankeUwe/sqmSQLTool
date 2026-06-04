@@ -186,18 +186,19 @@ AVAILABILITY GROUP ON
 			# Step 3b: Register Secondary AG in Distributed AG (CRITICAL!)
 			Invoke-sqmLogging -Message "Registriere Secondary AG [$SecondaryAgName] in Distributed AG" -FunctionName $functionName -Level "INFO"
 
-			$modifySecondaryDagSql = @"
-ALTER AVAILABILITY GROUP [$($PrimaryAgName)_$($SecondaryAgName)]
-MODIFY REPLICA ON N'$SecondaryAgName' WITH
-	(LISTENER_URL = N'tcp://$($SecondaryInstance):5022')
+			$joinSecondaryDagSql = @"
+ALTER AVAILABILITY GROUP [$($PrimaryAgName)_$($SecondaryAgName)] JOIN
+AVAILABILITY GROUP ON
+	N'$PrimaryAgName' WITH (LISTENER_URL = N'tcp://$($PrimaryInstance):5022'),
+	N'$SecondaryAgName' WITH (LISTENER_URL = N'tcp://$($SecondaryInstance):5022')
 "@
 
-			Invoke-DbaQuery @secondaryConnParams -Query $modifySecondaryDagSql -ErrorAction Stop
+			Invoke-DbaQuery @secondaryConnParams -Query $joinSecondaryDagSql -ErrorAction Stop
 
 			$steps.Add([PSCustomObject]@{
 				Step = 'Register Secondary AG'
 				Status = 'OK'
-				Details = "Secondary AG registered in Distributed AG"
+				Details = "Secondary AG joined Distributed AG"
 			})
 
 			# Step 4: Verify creation
