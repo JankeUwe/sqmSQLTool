@@ -46,8 +46,15 @@
     Throw exceptions immediately.
 
 .EXAMPLE
-    New-sqmDistributedAvailabilityGroup -PrimaryInstance "SQL01" -PrimaryAgName "ProductionAG" `
-        -SecondaryInstance "DR-SQL01" -SecondaryAgName "DrAG" -EnableAutoSeed
+    New-sqmDistributedAvailabilityGroup `
+        -PrimaryInstance   "SQL01" `
+        -PrimaryAgName     "ProductionAG" `
+        -PrimaryFqdn       "SQL01.domain.local" `
+        -SecondaryInstance "DR-SQL01" `
+        -SecondaryAgName   "DrAG" `
+        -SecondaryFqdn     "DR-SQL01.domain.local" `
+        -ServiceAccount    "DOMAIN\SqlServiceAccount" `
+        -SeedingMode       Automatic
 
 .NOTES
     Author:       MSSQLTools
@@ -67,6 +74,14 @@ function New-sqmDistributedAvailabilityGroup
 		[string]$SecondaryInstance,
 		[Parameter(Mandatory = $true)]
 		[string]$SecondaryAgName,
+		[Parameter(Mandatory = $true)]
+		[string]$PrimaryFqdn,
+		[Parameter(Mandatory = $true)]
+		[string]$SecondaryFqdn,
+		[Parameter(Mandatory = $false)]
+		[string]$EndpointName = 'Hadr_endpoint',
+		[Parameter(Mandatory = $false)]
+		[string]$ServiceAccount,
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
 		[Parameter(Mandatory = $false)]
@@ -159,17 +174,40 @@ WHERE ag.name = @AgName AND ars.is_local = 1
 
 			$seedingModeSql = if ($EnableAutoSeed -or $SeedingMode -eq 'Automatic') { 'AUTOMATIC' } else { 'MANUAL' }
 
+			# Step 3a: Service Account Login + GRANT CONNECT (wenn angegeben)
+			if ($ServiceAccount)
+			{
+				Invoke-sqmLogging -Message "Erstelle Service Account Login und GRANT CONNECT auf beiden Seiten" -FunctionName $functionName -Level "INFO"
+
+				$grantSql = @"
+IF NOT EXISTS (SELECT * FROM sys.server_principals WHERE name = '$ServiceAccount')
+BEGIN
+    CREATE LOGIN [$ServiceAccount] FROM WINDOWS
+END
+GRANT CONNECT ON ENDPOINT::[$EndpointName] TO [$ServiceAccount]
+"@
+				Invoke-DbaQuery @primaryConnParams -Query $grantSql -ErrorAction Stop
+				Invoke-DbaQuery @secondaryConnParams -Query $grantSql -ErrorAction Stop
+
+				$steps.Add([PSCustomObject]@{
+					Step = 'Grant Endpoint Access'
+					Status = 'OK'
+					Details = "ServiceAccount=$ServiceAccount Endpoint=$EndpointName"
+				})
+			}
+
+			# Step 3b: Distributed AG erstellen mit FQDN
 			$createDagSql = @"
 CREATE AVAILABILITY GROUP [$($PrimaryAgName)_$($SecondaryAgName)]
 WITH (DISTRIBUTED)
 AVAILABILITY GROUP ON
     N'$PrimaryAgName' WITH
-        (LISTENER_URL = N'tcp://$($PrimaryInstance):5022',
+        (LISTENER_URL = N'TCP://$($PrimaryFqdn):5022',
          AVAILABILITY_MODE = ASYNCHRONOUS_COMMIT,
          FAILOVER_MODE = MANUAL,
          SEEDING_MODE = $seedingModeSql),
     N'$SecondaryAgName' WITH
-        (LISTENER_URL = N'tcp://$($SecondaryInstance):5022',
+        (LISTENER_URL = N'TCP://$($SecondaryFqdn):5022',
          AVAILABILITY_MODE = ASYNCHRONOUS_COMMIT,
          FAILOVER_MODE = MANUAL,
          SEEDING_MODE = $seedingModeSql)
@@ -180,23 +218,36 @@ AVAILABILITY GROUP ON
 			$steps.Add([PSCustomObject]@{
 				Step = 'Create Distributed AG'
 				Status = 'OK'
-				Details = "SeedingMode=$seedingModeSql"
+				Details = "SeedingMode=$seedingModeSql PrimaryFqdn=$PrimaryFqdn SecondaryFqdn=$SecondaryFqdn"
 			})
 
-			# Step 3b: Register Secondary AG in Distributed AG (CRITICAL!)
+			# Step 3c: GRANT CREATE ANY DATABASE auf Secondary AG fuer AutoSeed
+			if ($seedingModeSql -eq 'AUTOMATIC')
+			{
+				$grantCreateSql = "ALTER AVAILABILITY GROUP [$SecondaryAgName] GRANT CREATE ANY DATABASE"
+				Invoke-DbaQuery @secondaryConnParams -Query $grantCreateSql -ErrorAction Stop
+
+				$steps.Add([PSCustomObject]@{
+					Step = 'Grant Create Any Database'
+					Status = 'OK'
+					Details = "AutoSeed benoetigt CREATE ANY DATABASE auf Secondary AG"
+				})
+			}
+
+			# Step 3d: Secondary AG in Distributed AG registrieren (CRITICAL!)
 			Invoke-sqmLogging -Message "Registriere Secondary AG [$SecondaryAgName] in Distributed AG" -FunctionName $functionName -Level "INFO"
 
 			$joinSecondaryDagSql = @"
 ALTER AVAILABILITY GROUP [$($PrimaryAgName)_$($SecondaryAgName)] JOIN
 AVAILABILITY GROUP ON
 	N'$PrimaryAgName' WITH (
-		LISTENER_URL = N'tcp://$($PrimaryInstance):5022',
+		LISTENER_URL = N'TCP://$($PrimaryFqdn):5022',
 		AVAILABILITY_MODE = ASYNCHRONOUS_COMMIT,
 		FAILOVER_MODE = MANUAL,
 		SEEDING_MODE = $seedingModeSql
 	),
 	N'$SecondaryAgName' WITH (
-		LISTENER_URL = N'tcp://$($SecondaryInstance):5022',
+		LISTENER_URL = N'TCP://$($SecondaryFqdn):5022',
 		AVAILABILITY_MODE = ASYNCHRONOUS_COMMIT,
 		FAILOVER_MODE = MANUAL,
 		SEEDING_MODE = $seedingModeSql
