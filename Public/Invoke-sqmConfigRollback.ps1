@@ -104,9 +104,6 @@ function Invoke-sqmConfigRollback
 		[string[]]$Category = @('All'),
 
 		[Parameter(Mandatory = $false)]
-		[switch]$WhatIf,
-
-		[Parameter(Mandatory = $false)]
 		[switch]$Force,
 
 		[Parameter(Mandatory = $false)]
