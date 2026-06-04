@@ -125,7 +125,6 @@ SELECT
 FROM sys.availability_groups ag
 JOIN sys.availability_replicas ar ON ar.group_id = ag.group_id
 JOIN sys.dm_hadr_availability_replica_states ars ON ars.replica_id = ar.replica_id
-LEFT JOIN sys.dm_hadr_distributed_ag_replica_member_status dag ON dag.replica_id = ar.replica_id
 LEFT JOIN sys.dm_hadr_database_replica_states adbrs ON adbrs.replica_id = ar.replica_id
 WHERE ag.is_distributed = 1
 ORDER BY ag.name, ars.role_desc DESC, ar.replica_server_name, DB_NAME(adbrs.database_id);

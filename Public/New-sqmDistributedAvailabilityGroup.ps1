@@ -157,7 +157,7 @@ WHERE ag.name = @AgName AND ars.is_local = 1
 			# Step 3: Create Distributed AG on primary
 			Invoke-sqmLogging -Message "Erstelle Distributed AG [$PrimaryAgName-$SecondaryAgName]" -FunctionName $functionName -Level "INFO"
 
-			$seedingModeSql = if ($EnableAutoSeed) { 'AUTOMATIC' } else { 'MANUAL' }
+			$seedingModeSql = if ($EnableAutoSeed -or $SeedingMode -eq 'Automatic') { 'AUTOMATIC' } else { 'MANUAL' }
 
 			$createDagSql = @"
 CREATE AVAILABILITY GROUP [$($PrimaryAgName)_$($SecondaryAgName)]
