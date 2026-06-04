@@ -267,9 +267,9 @@ function Get-sqmClusterInfo
 		}
 		
 		[PSCustomObject]@{
-			Name = $group.Name
+			Name = $group.Name.Trim()
 			State = $group.State
-			OwnerNode = $group.OwnerNode
+			OwnerNode = $group.OwnerNode.Trim()
 			IPAddresses = @($ipAddresses)
 		}
 	}

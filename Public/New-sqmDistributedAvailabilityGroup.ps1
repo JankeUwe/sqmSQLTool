@@ -189,8 +189,18 @@ AVAILABILITY GROUP ON
 			$joinSecondaryDagSql = @"
 ALTER AVAILABILITY GROUP [$($PrimaryAgName)_$($SecondaryAgName)] JOIN
 AVAILABILITY GROUP ON
-	N'$PrimaryAgName' WITH (LISTENER_URL = N'tcp://$($PrimaryInstance):5022'),
-	N'$SecondaryAgName' WITH (LISTENER_URL = N'tcp://$($SecondaryInstance):5022')
+	N'$PrimaryAgName' WITH (
+		LISTENER_URL = N'tcp://$($PrimaryInstance):5022',
+		AVAILABILITY_MODE = ASYNCHRONOUS_COMMIT,
+		FAILOVER_MODE = MANUAL,
+		SEEDING_MODE = $seedingModeSql
+	),
+	N'$SecondaryAgName' WITH (
+		LISTENER_URL = N'tcp://$($SecondaryInstance):5022',
+		AVAILABILITY_MODE = ASYNCHRONOUS_COMMIT,
+		FAILOVER_MODE = MANUAL,
+		SEEDING_MODE = $seedingModeSql
+	)
 "@
 
 			Invoke-DbaQuery @secondaryConnParams -Query $joinSecondaryDagSql -ErrorAction Stop
