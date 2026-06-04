@@ -59,7 +59,7 @@
     CRITICAL:     DNS update is a manual step. See output for required changes.
     Timing:       Run this BEFORE failover, then trigger failover once DNS is updated.
 #>
-function Move-sqmAgListener
+function Move-sqmAlwaysOnListener
 {
 	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 	[OutputType([PSCustomObject])]

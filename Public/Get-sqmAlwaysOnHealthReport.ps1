@@ -52,7 +52,7 @@
     Prerequisites: dbatools, Invoke-sqmLogging
     Default output path: C:\System\WinSrvLog\MSSQL
 #>
-function Get-sqmAgHealthReport
+function Get-sqmAlwaysOnHealthReport
 {
 	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]
 	[OutputType([PSCustomObject])]

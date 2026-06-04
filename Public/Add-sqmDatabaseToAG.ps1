@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
 Adds one or more databases to an Always On availability group (AutoSeed).
 
@@ -42,7 +42,7 @@ Add-sqmDatabaseToAvailabilityGroup -AvailabilityGroup "AG1" -All
 .NOTES
 Requires Automatic Seeding on all replicas (can be enabled separately with Invoke-sqmSqlAlwaysOnAutoseeding).
 #>
-function Invoke-sqmAddDatabaseToAG
+function Add-sqmDatabaseToAG
 	
 {
 	[CmdletBinding(DefaultParameterSetName = 'Specific', SupportsShouldProcess = $true, ConfirmImpact = 'None')]

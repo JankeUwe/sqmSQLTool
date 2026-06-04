@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.4.6.0'
+	ModuleVersion		   = '1.4.7.0'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
@@ -72,6 +72,7 @@
 	# Loesung: Nur .psd1 steuert den Export. Private Funktionen stehen nicht in dieser Liste
 	# und bleiben damit automatisch privat.
 	FunctionsToExport	   = @(
+		'Add-sqmDatabaseToAG',
 		'Add-sqmDatabaseToDistributedAg',
 		'Compare-sqmServerConfiguration',
 		'Complete-sqmListenerMigration',
@@ -85,7 +86,7 @@
 		'Get-sqmADAccountStatus',
 		'Get-sqmADGroupMembers',
 		'Get-sqmAgentJobHistory',
-		'Get-sqmAgHealthReport',
+		'Get-sqmAlwaysOnHealthReport',
 		'Get-sqmAutoGrowthReport',
 		'Get-sqmBlockingReport',
 		'Get-sqmCertificateReport',
@@ -123,7 +124,7 @@
 		'Install-sqmOdbcDriver',
 		'Install-sqmOlaMaintenanceSolution',
 		'Install-sqmSsrsReportServer',
-		'Invoke-sqmAddDatabaseToAG',
+		'Add-sqmDatabaseToAG',
 		'Invoke-sqmCollationChange',
 		'Invoke-sqmConfigRollback',
 		'Invoke-sqmDeployScripts',
@@ -149,7 +150,7 @@
 		'Invoke-sqmTsmConfiguration',
 		'Invoke-sqmUpdateStatistics',
 		'Invoke-sqmUserDatabaseBackup',
-		'Move-sqmAgListener',
+		'Move-sqmAlwaysOnListener',
 		'New-sqmAgentProxy',
 		'New-sqmAlwaysOnRepairJob',
 		'New-sqmBackupMaintenanceJob',
