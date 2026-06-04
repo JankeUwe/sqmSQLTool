@@ -136,7 +136,6 @@
 		'Invoke-sqmLogShrink',
 		'Invoke-sqmMonitoringKey',
 		'Invoke-sqmPatchAnalysis',
-		'Move-sqmAgListener',
 		'Invoke-sqmPerfBaseline',
 		'Invoke-sqmQueryStore',
 		'Invoke-sqmRestoreDatabase',
@@ -150,6 +149,7 @@
 		'Invoke-sqmTsmConfiguration',
 		'Invoke-sqmUpdateStatistics',
 		'Invoke-sqmUserDatabaseBackup',
+		'Move-sqmAgListener',
 		'New-sqmAgentProxy',
 		'New-sqmAlwaysOnRepairJob',
 		'New-sqmBackupMaintenanceJob',
@@ -228,7 +228,7 @@
 			# IconUri = ''
 
 			# ReleaseNotes of this module
-			ReleaseNotes = 'See CHANGELOG.md and GitHub: https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.4.3.0'
+			ReleaseNotes = 'See CHANGELOG.md and GitHub: https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.4.6.0'
 		}
 	}
 }
