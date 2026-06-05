@@ -34,10 +34,10 @@ Request confirmation.
 Test only (no changes).
 
 .EXAMPLE
-Add-sqmDatabaseToAvailabilityGroup -AvailabilityGroup "AG1" -Database "SalesDB"
+Add-sqmDatabaseToAG -AvailabilityGroup "AG1" -Database "SalesDB"
 
 .EXAMPLE
-Add-sqmDatabaseToAvailabilityGroup -AvailabilityGroup "AG1" -All
+Add-sqmDatabaseToAG -AvailabilityGroup "AG1" -All
 
 .NOTES
 Requires Automatic Seeding on all replicas (can be enabled separately with Invoke-sqmSqlAlwaysOnAutoseeding).
