@@ -314,6 +314,24 @@ SELECT dns_name AS ListenerName FROM sys.availability_group_listeners
 				$sanIdx++
 			}
 			
+			# SAN-Erweiterung nur generieren wenn SANs vorhanden (leeres _continue_ = 0x80070057!)
+			$sanExtensionBlock = ''
+			if ($sanList.Count -gt 0)
+			{
+				$sanContinueValue = ($sanList | ForEach-Object {
+					if ($_ -match '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$') { "ipaddress=$_&" }
+					else { "dns=$_&" }
+				}) -join ''
+				$sanContinueValue = $sanContinueValue.TrimEnd('&')
+
+				$sanExtensionBlock = @"
+
+[Extensions]
+2.5.29.17 = "{text}"
+_continue_ = "$sanContinueValue"
+"@
+			}
+
 			$infContent = @"
 [Version]
 Signature = "`$Windows NT`$"
@@ -336,13 +354,7 @@ HashAlgorithm          = SHA256
 
 [EnhancedKeyUsageExtension]
 OID = $($ekuOids -join "`r`nOID = ")
-
-[Extensions]
-2.5.29.17 = "{text}"
-_continue_ = $($sanList | ForEach-Object {
-					if ($_ -match '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$') { "ipaddress=$_&" }
-					else { "dns=$_&" }
-				} | Out-String | ForEach-Object { $_.TrimEnd() -replace "&`r`n$", "" })
+$sanExtensionBlock
 "@
 			
 			$infContent | Out-File -FilePath $infFile -Encoding ASCII -Force
