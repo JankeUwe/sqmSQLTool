@@ -124,7 +124,6 @@
 		'Install-sqmOdbcDriver',
 		'Install-sqmOlaMaintenanceSolution',
 		'Install-sqmSsrsReportServer',
-		'Add-sqmDatabaseToAG',
 		'Invoke-sqmCollationChange',
 		'Invoke-sqmConfigRollback',
 		'Invoke-sqmDeployScripts',
@@ -181,10 +180,6 @@
 		'Test-sqmDriverInstalled',
 		'Test-sqmMaxDop',
 		'Test-sqmMaxMemory',
-		'Test-sqmModuleUpdate',
-		'Test-sqmUpdateViaGitHub',
-		'Test-sqmUpdateViaPSGallery',
-		'Test-sqmUpdateViaUNC',
 		'Test-sqmOlaInstallation',
 		'Test-sqmSQLFirewall',
 		'Test-sqmSqlInstanceInstalled',
@@ -194,8 +189,7 @@
 		'Test-sqmTsmConnection',
 		'Uninstall-sqmDb2Driver',
 		'Uninstall-sqmJdbcDriver',
-		'Uninstall-sqmOdbcDriver',
-		'Update-sqmModule'
+		'Uninstall-sqmOdbcDriver'
 	)
 	
 	# KORREKTUR #9: Keine Cmdlets im Modul - explizit leer statt '*'
