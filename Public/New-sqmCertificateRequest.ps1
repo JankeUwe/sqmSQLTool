@@ -47,7 +47,7 @@
     Automatically extended with: FQDN, NetBIOS name, AG listener (if detected).
 
 .PARAMETER KeyLength
-    Key length in bits. Default: 2048. Recommended for new installations: 4096.
+    Key length in bits. Default: 4096.
 
 .PARAMETER ValidityYears
     Desired validity period in years (information for the CA, not guaranteed). Default: 3.
@@ -121,7 +121,7 @@ function New-sqmCertificateRequest
 		[string[]]$SubjectAlternativeNames = @(),
 		[Parameter(Mandatory = $false)]
 		[ValidateSet(2048, 4096)]
-		[int]$KeyLength = 2048,
+		[int]$KeyLength = 4096,
 		[Parameter(Mandatory = $false)]
 		[ValidateRange(1, 10)]
 		[int]$ValidityYears = 3,
@@ -350,7 +350,6 @@ ProviderName           = "Microsoft RSA SChannel Cryptographic Provider"
 ProviderType           = 12
 RequestType            = PKCS10
 KeyUsage               = 0xa0
-HashAlgorithm          = SHA256
 
 [EnhancedKeyUsageExtension]
 OID = $($ekuOids -join "`r`nOID = ")
@@ -430,7 +429,6 @@ $sanExtensionBlock
 			$lines.Add("-" * 40)
 			$lines.Add("  Subject (DN) : $finalSubject")
 			$lines.Add("  Key Length   : $KeyLength Bit")
-			$lines.Add("  Hash Algo    : SHA-256")
 			$lines.Add("  Laufzeit     : $ValidityYears Jahr(e) (Entscheidung liegt bei der CA)")
 			$lines.Add("  Key Usage    : $keyUsage")
 			$lines.Add("  EKU OIDs     : $($ekuOids -join ', ')")
