@@ -366,7 +366,7 @@
 	<span class="psdb-st-func-name">Get-sqmAlwaysOnHealthReport</span>
 	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
 	</div>
-	<div class="psdb-st-func-desc">Retrieves for each AG on the specified instance:     - Synchronization status of all replicas     - LSN lag between primary and secondaries (redo queue, send queue)     - Database status per replic</div>
+	<div class="psdb-st-func-desc">Creates a detailed health report for all Always On availability groups on an instance.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -385,7 +385,7 @@
 	<span class="psdb-st-func-name">Add-sqmDatabaseToAG</span>
 	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
 	</div>
-	<div class="psdb-st-func-desc">- Checks whether the database is already in an AG. - Sets recovery mode to Full (if necessary). - Drops existing databases on all secondary replicas. - Adds the database to the AG using Automatic S</div>
+	<div class="psdb-st-func-desc">Adds one or more databases to an Always On availability group (AutoSeed).</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -404,7 +404,7 @@
 	<span class="psdb-st-func-name">Invoke-sqmFailover</span>
 	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
 	</div>
-	<div class="psdb-st-func-desc">Checks before failover: synchronization status, redo queue size.     Performs the failover: ALTER AVAILABILITY GROUP ... FAILOVER on the target secondary.     Checks after failover: new primary reacha</div>
+	<div class="psdb-st-func-desc">Performs a controlled AlwaysOn AG failover with pre- and post-checks.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -423,7 +423,7 @@
 	<span class="psdb-st-func-name">Invoke-sqmSqlAlwaysOnAutoseeding</span>
 	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
 	</div>
-	<div class="psdb-st-func-desc">Configures the seeding mode of all replicas of one or more Availability Groups to "Automatic". Using the -All switch forces processing of all Availability Groups on the instance.  If the SqlInstan</div>
+	<div class="psdb-st-func-desc">Enables Automatic Seeding on all replicas of an Always On Availability Group.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -446,7 +446,7 @@
 	<span class="psdb-st-func-name">New-sqmAlwaysOnRepairJob</span>
 	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
 	</div>
-	<div class="psdb-st-func-desc">The job is created on the specified SQL instance and uses the PowerShell subsystem to call the Repair-sqmAlwaysOnDatabases function. The job can run on a schedule (e.g. hourly) or be started manuall</div>
+	<div class="psdb-st-func-desc">Creates a SQL Server Agent job that regularly runs Repair-sqmAlwaysOnDatabases.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -465,7 +465,7 @@
 	<span class="psdb-st-func-name">Remove-sqmDatabaseFromAG</span>
 	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
 	</div>
-	<div class="psdb-st-func-desc">The function automatically detects which Availability Group the specified database belongs to, removes it from the group, and then deletes it from all secondary replicas. System databases are ignore</div>
+	<div class="psdb-st-func-desc">Removes one or more databases from their Always On Availability Group.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -484,7 +484,7 @@
 	<span class="psdb-st-func-name">Sync-sqmAgNode</span>
 	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
 	</div>
-	<div class="psdb-st-func-desc">Automatically detects the current primary and all Availability Groups of the     specified instance. All AGs are processed individually.      Synchronizes the following object types from primary to</div>
+	<div class="psdb-st-func-desc">Synchronizes SQL Server objects from the primary replica to all secondary replicas of an Availability Group.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -508,7 +508,7 @@
 	<span class="psdb-st-func-name">Invoke-sqmLogShrink</span>
 	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
 	</div>
-	<div class="psdb-st-func-desc">Executes DBCC SHRINKFILE on the log file(s). Calculates the target size     as a percentage of the current size (ShrinkTargetPercent) with a     lower threshold (MinTargetMB). Handles Always On AGs </div>
+	<div class="psdb-st-func-desc">Shrinks the transaction log file (LDF) of one or more databases.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -527,7 +527,7 @@
 	<span class="psdb-st-func-name">Invoke-sqmRestoreDatabase</span>
 	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
 	</div>
-	<div class="psdb-st-func-desc">The function performs a controlled database restore. It automatically detects whether the target database belongs to an AlwaysOn availability group and removes it from the AG if so (including deleti</div>
+	<div class="psdb-st-func-desc">Restores a database from a backup file, with support for single-server and AlwaysOn environments.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -556,7 +556,7 @@ Invoke-sqmRestoreDatabase -SqlInstance &quot;SQL01&quot; -BackupFiles $backupSeq
 	<span class="psdb-st-func-name">Invoke-sqmUserDatabaseBackup</span>
 	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
 	</div>
-	<div class="psdb-st-func-desc">Backs up all or selected user databases (no system databases) in full backup mode. The target path is read from the server properties (BackupDirectory) and must end with "User-Db".  If the SqlInstance</div>
+	<div class="psdb-st-func-desc">Backs up user databases on a SQL Server instance.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 9 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -604,7 +604,7 @@ Invoke-sqmRestoreDatabase -SqlInstance &quot;SQL01&quot; -BackupFiles $backupSeq
 	<span class="psdb-st-func-name">New-sqmBackupMaintenanceJob</span>
 	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
 	</div>
-	<div class="psdb-st-func-desc">Creates a single SQL Agent job containing two PowerShell steps:  	Step 1 — Sync-BackupExcludeTable 	    Calls Sync-sqmBackupExcludeTable to synchronise master.dbo.sqm_BackupExclude with the 	    curre</div>
+	<div class="psdb-st-func-desc">Creates a SQL Agent job with two steps that implement the full dynamic backup maintenance workflow.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -713,7 +713,7 @@ Invoke-sqmRestoreDatabase -SqlInstance &quot;SQL01&quot; -BackupFiles $backupSeq
 	<span class="psdb-st-func-name">Set-sqmBackupExcludePermission</span>
 	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
 	</div>
-	<div class="psdb-st-func-desc">Ensures that the specified Windows group or SQL login has the necessary permissions to read and modify the backup exclude table master.dbo.sqm_BackupExclude.  The function performs the following steps</div>
+	<div class="psdb-st-func-desc">Grants SELECT, INSERT, and UPDATE permissions on master.dbo.sqm_BackupExclude to a login.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -736,7 +736,7 @@ Invoke-sqmRestoreDatabase -SqlInstance &quot;SQL01&quot; -BackupFiles $backupSeq
 	<span class="psdb-st-func-name">Sync-sqmBackupExcludeTable</span>
 	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
 	</div>
-	<div class="psdb-st-func-desc">Ensures the table master.dbo.sqm_BackupExclude exists on the target SQL Server instance. If the table does not exist it is created automatically.  After the table has been created or verified, the fun</div>
+	<div class="psdb-st-func-desc">Creates and synchronises the backup exclude table in the master database.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -763,7 +763,7 @@ Invoke-sqmRestoreDatabase -SqlInstance &quot;SQL01&quot; -BackupFiles $backupSeq
 	<span class="psdb-st-func-name">Test-sqmBackupIntegrity</span>
 	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
 	</div>
-	<div class="psdb-st-func-desc">Executes RESTORE VERIFYONLY on a backup file (local or optionally remote).     Returns $true if the check was successful, otherwise $false.     Can verify multiple files in sequence (e.g. stripes).</div>
+	<div class="psdb-st-func-desc">Verifies one or more backup files using RESTORE VERIFYONLY.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 1 Beispiel anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -783,7 +783,7 @@ Invoke-sqmRestoreDatabase -SqlInstance &quot;SQL01&quot; -BackupFiles $backupSeq
 	<span class="psdb-st-func-name">Get-sqmADAccountStatus</span>
 	<span class="psdb-st-badge psdb-st-badge-sicherheit">Sicherheit</span>
 	</div>
-	<div class="psdb-st-func-desc">Determines the account status using the ActiveDirectory module (RSAT) with         automatic fallback to ADSI if RSAT is not available.         Returns a detailed PSObject with Enabled, LockedOut, P</div>
+	<div class="psdb-st-func-desc">Checks the status of an Active Directory user account.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -996,7 +996,7 @@ Invoke-sqmRestoreDatabase -SqlInstance &quot;SQL01&quot; -BackupFiles $backupSeq
 	<span class="psdb-st-func-name">Get-sqmADGroupMembers</span>
 	<span class="psdb-st-badge psdb-st-badge-sicherheit">Sicherheit</span>
 	</div>
-	<div class="psdb-st-func-desc">Simple, reliable function to list members of an AD group.     Useful when SQL Server access fails and you need to check group permissions.      Methods:     1. Get-ADGroupMember (if ActiveDirectory mo</div>
+	<div class="psdb-st-func-desc">Lists all members of an Active Directory group.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1015,7 +1015,7 @@ Invoke-sqmRestoreDatabase -SqlInstance &quot;SQL01&quot; -BackupFiles $backupSeq
 	<span class="psdb-st-func-name">Get-sqmSysadminAccounts</span>
 	<span class="psdb-st-badge psdb-st-badge-sicherheit">Sicherheit</span>
 	</div>
-	<div class="psdb-st-func-desc">Queries sys.server_principals and sys.server_role_members and returns     all direct members of the sysadmin server role.      Per login the following information is determined:     - Login name a</div>
+	<div class="psdb-st-func-desc">Retrieves all logins with sysadmin rights on a SQL Server instance.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1374,7 +1374,7 @@ ORDER BY sp.type_desc, sp.name;
 	<span class="psdb-st-func-name">Invoke-sqmLoginAudit</span>
 	<span class="psdb-st-badge psdb-st-badge-sicherheit">Sicherheit</span>
 	</div>
-	<div class="psdb-st-func-desc">Checks per login:     - POLICY VIOLATIONS (CHECK_POLICY/EXPIRATION/MUST_CHANGE)     - Password age and whether it was never changed     - Inactive / never-used logins     - Duplicate SIDs (failed </div>
+	<div class="psdb-st-func-desc">Comprehensive audit of all SQL Server logins on one or more instances.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1393,7 +1393,7 @@ ORDER BY sp.type_desc, sp.name;
 	<span class="psdb-st-func-name">Invoke-sqmSaObfuscation</span>
 	<span class="psdb-st-badge psdb-st-badge-sicherheit">Sicherheit</span>
 	</div>
-	<div class="psdb-st-func-desc">Performs the following steps:     1. Checks that at least one other active login with sysadmin rights exists (aborts otherwise).     2. Identifies the SA account via its fixed SID 0x01 (rename-safe)</div>
+	<div class="psdb-st-func-desc">Obfuscates the SA account on a SQL Server instance by renaming it, disabling it, and setting a random password.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1412,7 +1412,7 @@ ORDER BY sp.type_desc, sp.name;
 	<span class="psdb-st-func-name">Set-sqmDatabaseOwner</span>
 	<span class="psdb-st-badge psdb-st-badge-sicherheit">Sicherheit</span>
 	</div>
-	<div class="psdb-st-func-desc">Checks and corrects the database owner on one or more SQL Server instances.     Typical use case: after restores or migrations the owner is often a login that no     longer exists or is incorrect. T</div>
+	<div class="psdb-st-func-desc">Sets the owner of one or more databases to a uniform login.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1444,7 +1444,7 @@ ORDER BY sp.type_desc, sp.name;
 	<span class="psdb-st-func-name">Copy-sqmNTFSPermissions</span>
 	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
 	</div>
-	<div class="psdb-st-func-desc">Reads the explicit NTFS permissions for each file system object (folder/file) below     the source path and applies them to the corresponding object below the destination path.     The target structur</div>
+	<div class="psdb-st-func-desc">Copies NTFS permissions (ACLs) from a source path to a destination path.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1463,7 +1463,7 @@ ORDER BY sp.type_desc, sp.name;
 	<span class="psdb-st-func-name">Get-sqmConnectionStats</span>
 	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
 	</div>
-	<div class="psdb-st-func-desc">Reads sys.dm_exec_sessions and sys.dm_exec_connections and groups     by application, login, host or database. Shows connection load,     active requests, CPU usage and oldest connections.</div>
+	<div class="psdb-st-func-desc">Analyzes active SQL Server connections and connection statistics.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1486,7 +1486,7 @@ ORDER BY sp.type_desc, sp.name;
 	<span class="psdb-st-func-name">Get-sqmDatabaseHealth</span>
 	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
 	</div>
-	<div class="psdb-st-func-desc">Checks per database:     - Recovery model     - Last DBCC CHECKDB execution and whether it was error-free     - Last backup times (Full / Diff / Log)     - AutoGrowth events in the last -HistoryDa</div>
+	<div class="psdb-st-func-desc">Aggregated health report for all databases on an instance.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1505,7 +1505,7 @@ ORDER BY sp.type_desc, sp.name;
 	<span class="psdb-st-func-name">Get-sqmDiskInfoByDriveLetter</span>
 	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
 	</div>
-	<div class="psdb-st-func-desc">Accepts a drive letter, determines the associated disk number (disk number)     and returns the total size, free space, percentage free and the serial number     (LUN serial number) of the physical di</div>
+	<div class="psdb-st-func-desc">Returns disk information for a given drive letter.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1528,7 +1528,7 @@ ORDER BY sp.type_desc, sp.name;
 	<span class="psdb-st-func-name">Get-sqmDiskSpaceReport</span>
 	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
 	</div>
-	<div class="psdb-st-func-desc">Queries sys.dm_os_volume_stats for all database files and determines:     - Free disk space per volume     - Total size of database files on the volume     - AutoGrowth volume over the last -Histor</div>
+	<div class="psdb-st-func-desc">Determines free disk space on all SQL-relevant volumes and estimates time to exhaustion based on growth data.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1547,7 +1547,7 @@ ORDER BY sp.type_desc, sp.name;
 	<span class="psdb-st-func-name">Get-sqmOperationStatus</span>
 	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
 	</div>
-	<div class="psdb-st-func-desc">The function monitors active SQL Server operations (backup, restore, AutoSeed) and calculates the progress and estimated remaining time. It combines information from: - Backup and restore progress: </div>
+	<div class="psdb-st-func-desc">Displays progress and estimated remaining time for active backup, restore and AutoSeed operations.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1570,7 +1570,7 @@ ORDER BY sp.type_desc, sp.name;
 	<span class="psdb-st-func-name">Get-sqmOrphanedFiles</span>
 	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
 	</div>
-	<div class="psdb-st-func-desc">Reads all registered database files from sys.master_files and compares them     with the files actually present in the directories.     Files that exist on the file system but are not registered in sy</div>
+	<div class="psdb-st-func-desc">Finds MDF/LDF/NDF database files that are not assigned to any database.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1589,7 +1589,7 @@ ORDER BY sp.type_desc, sp.name;
 	<span class="psdb-st-func-name">Get-sqmSpnReport</span>
 	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
 	</div>
-	<div class="psdb-st-func-desc">Automatically determines all SQL Server services on the specified computer,     identifies the service account per instance and derives the AD account for     the SPN check.      Supported service acc</div>
+	<div class="psdb-st-func-desc">Checks the registered SPNs for SQL Server instances (default and named instances).</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1617,7 +1617,7 @@ ORDER BY sp.type_desc, sp.name;
 	<span class="psdb-st-func-name">Get-sqmSQLInstanceCheck</span>
 	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
 	</div>
-	<div class="psdb-st-func-desc">The function performs a series of best practice checks: - Max Degree of Parallelism (MAXDOP) - recommendation based on number of cores - Max Server Memory - should not be too high (reserve for OS) </div>
+	<div class="psdb-st-func-desc">Checks a SQL Server instance against best practices.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1636,7 +1636,7 @@ ORDER BY sp.type_desc, sp.name;
 	<span class="psdb-st-func-name">Get-sqmTempDbRecommendation</span>
 	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
 	</div>
-	<div class="psdb-st-func-desc">Checks the number and size of TempDB files, autogrow settings and the path.     Recommends file count (matching CPU core count, max 8), equal sizes, MB-based autogrow,     and separate drives where po</div>
+	<div class="psdb-st-func-desc">Analyzes the TempDB configuration and provides optimization recommendations.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 1 Beispiel anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1747,7 +1747,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Invoke-sqmPatchAnalysis</span>
 	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
 	</div>
-	<div class="psdb-st-func-desc">Reads the installed SQL Server version (ProductVersion) and compares it     against an embedded reference table of known builds. Indicates whether the     instance is current, how many builds it lags </div>
+	<div class="psdb-st-func-desc">Compares the installed SQL Server version with known CU/SP builds.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1770,7 +1770,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Invoke-sqmSetupReport</span>
 	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
 	</div>
-	<div class="psdb-st-func-desc">Fuehrt alle konfigurierten Setup-Checks durch und erzeugt einen HTML-Report     mit OK/WARN/ERROR-Badges. Welche Checks ausgefuehrt werden haengt vom     CheckProfile in der Modulkonfiguration ab:    </div>
+	<div class="psdb-st-func-desc">Professional SQL Server Setup Report with critical issues, security, and database overview.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1793,7 +1793,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">New-sqmAgentProxy</span>
 	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
 	</div>
-	<div class="psdb-st-func-desc">Legt in einem Schritt einen neuen SQL Server Credential an und erstellt darauf     basierend einen SQL Server Agent Proxy. Die Windows-Credentials werden interaktiv     per Get-Credential abgefragt. D</div>
+	<div class="psdb-st-func-desc">Erstellt einen SQL Server Credential und einen SQL Agent Proxy und verbindet beide.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 5 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1838,7 +1838,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Test-sqmCostThreshold</span>
 	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
 	</div>
-	<div class="psdb-st-func-desc">Liest den aktuellen Wert von CostThresholdForParallelism per SMO und     vergleicht ihn mit dem konfigurierbaren Mindestwert (Standard: 50).     Der SQL Server Default von 5 ist fuer moderne Systeme i</div>
+	<div class="psdb-st-func-desc">Prueft ob CostThresholdForParallelism auf dem empfohlenen Wert liegt.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1857,7 +1857,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Test-sqmTempDbFileCount</span>
 	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
 	</div>
-	<div class="psdb-st-func-desc">Liest die Anzahl der TempDB-Datendateien (Typ = Rows, ohne Log) per SMO und     vergleicht sie mit der Anzahl der CPU-Kerne des Servers (max 8 gemaess     Microsoft-Empfehlung).      Hintergrund: Zu w</div>
+	<div class="psdb-st-func-desc">Prueft ob die Anzahl der TempDB-Datendateien der empfohlenen CPU-Anzahl entspricht.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1881,7 +1881,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Get-sqmAutoGrowthReport</span>
 	<span class="psdb-st-badge psdb-st-badge-performance">Performance</span>
 	</div>
-	<div class="psdb-st-func-desc">Analyzes all data and log files of the accessible databases and evaluates their AutoGrowth settings.     Returns warnings for percent-based growth, growth values that are too small or too large, and</div>
+	<div class="psdb-st-func-desc">Creates an AutoGrowth configuration report for all database files on a SQL Server instance.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1900,7 +1900,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Get-sqmBlockingReport</span>
 	<span class="psdb-st-badge psdb-st-badge-performance">Performance</span>
 	</div>
-	<div class="psdb-st-func-desc">Reads sys.dm_exec_requests, sys.dm_exec_sessions and sys.dm_exec_sql_text     and builds complete blocking chains. For each blocked session the following is returned:       - Blocking SPID and its S</div>
+	<div class="psdb-st-func-desc">Retrieves current blocking chains on a SQL Server instance.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1927,7 +1927,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Get-sqmDeadlockReport</span>
 	<span class="psdb-st-badge psdb-st-badge-performance">Performance</span>
 	</div>
-	<div class="psdb-st-func-desc">The System Health session (always active since SQL Server 2008) logs all     deadlocks as XML in the ring buffer. This function reads that buffer,     parses the deadlock graphs and returns for each</div>
+	<div class="psdb-st-func-desc">Reads and analyzes deadlock events from the System Health Extended Event session.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1955,7 +1955,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Get-sqmIndexFragmentation</span>
 	<span class="psdb-st-badge psdb-st-badge-performance">Performance</span>
 	</div>
-	<div class="psdb-st-func-desc">Returns the fragmentation level (%) for all indexes and recommends an action:         - 5-30%  -> REORGANIZE         - >30%   -> REBUILD     Output can be restricted to specific databases, tables or a</div>
+	<div class="psdb-st-func-desc">Analyzes index fragmentation in one or more databases.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -1974,7 +1974,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Get-sqmLongRunningQueries</span>
 	<span class="psdb-st-badge psdb-st-badge-performance">Performance</span>
 	</div>
-	<div class="psdb-st-func-desc">Reads sys.dm_exec_requests, sys.dm_exec_sessions, sys.dm_exec_sql_text and     sys.dm_exec_query_plan and returns all active requests that exceed the     configured thresholds.      Per query the </div>
+	<div class="psdb-st-func-desc">Identifies long-running queries on a SQL Server instance.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2001,7 +2001,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Get-sqmMissingIndexes</span>
 	<span class="psdb-st-badge psdb-st-badge-performance">Performance</span>
 	</div>
-	<div class="psdb-st-func-desc">Reads sys.dm_db_missing_index_details, sys.dm_db_missing_index_groups and     sys.dm_db_missing_index_group_stats and calculates an impact score     (using the Microsoft formula) and a ready-to-use </div>
+	<div class="psdb-st-func-desc">Retrieves missing index recommendations from the SQL Server DMV cache.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2030,7 +2030,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Get-sqmPerfCounters</span>
 	<span class="psdb-st-badge psdb-st-badge-performance">Performance</span>
 	</div>
-	<div class="psdb-st-func-desc">Returns the most important SQL Server performance counters:     Buffer Cache Hit Ratio, Page Life Expectancy, Batch Requests/sec,     compilations, lock waits, memory, connections, scans and more.    </div>
+	<div class="psdb-st-func-desc">Reads SQL Server performance counters from sys.dm_os_performance_counters.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2049,7 +2049,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Get-sqmWaitStatistics</span>
 	<span class="psdb-st-badge psdb-st-badge-performance">Performance</span>
 	</div>
-	<div class="psdb-st-func-desc">Reads the cumulative wait statistics of the instance, filters out known idle waits     and returns the top-N waits with category and recommended action.     Optional: snapshot comparison (before/after</div>
+	<div class="psdb-st-func-desc">Reads and analyzes SQL Server wait statistics from sys.dm_os_wait_stats.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2068,7 +2068,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Invoke-sqmExtendedEvents</span>
 	<span class="psdb-st-badge psdb-st-badge-performance">Performance</span>
 	</div>
-	<div class="psdb-st-func-desc">Creates, starts, stops, reads and evaluates Extended Events sessions.      Operating modes (switches, combinable):       -Create    Creates a new XEvent session based on a template.       -Start     S</div>
+	<div class="psdb-st-func-desc">Manages Extended Events sessions for performance analysis on SQL Server.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2095,7 +2095,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Invoke-sqmPerfBaseline</span>
 	<span class="psdb-st-badge psdb-st-badge-performance">Performance</span>
 	</div>
-	<div class="psdb-st-func-desc">Capture: Saves the current snapshot of sys.dm_os_wait_stats and     sys.dm_os_performance_counters as a JSON file.     Compare: Calculates the delta between two baselines.     List:    Lists all saved</div>
+	<div class="psdb-st-func-desc">Creates, compares or lists performance baselines (wait stats + perf counters).</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2119,7 +2119,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Invoke-sqmQueryStore</span>
 	<span class="psdb-st-badge psdb-st-badge-performance">Performance</span>
 	</div>
-	<div class="psdb-st-func-desc">Comprehensive Query Store management for one, multiple or all user databases.      Operating modes (switches, combinable):       -Configure  Enables and configures the Query Store (ALTER DATABASE SET </div>
+	<div class="psdb-st-func-desc">Configures the Query Store, reads from it, detects issues and saves reports.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2146,7 +2146,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Invoke-sqmUpdateStatistics</span>
 	<span class="psdb-st-badge psdb-st-badge-performance">Performance</span>
 	</div>
-	<div class="psdb-st-func-desc">Executes UPDATE STATISTICS with configurable options (scan percentage, only modified statistics, etc.).     Can be restricted to specific databases, tables, or statistics.</div>
+	<div class="psdb-st-func-desc">Updates statistics in one or more databases.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 1 Beispiel anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2166,7 +2166,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Invoke-sqmFormatDrive64k</span>
 	<span class="psdb-st-badge psdb-st-badge-wartung">Wartung</span>
 	</div>
-	<div class="psdb-st-func-desc">Process:         1. Safety checks (not C:, NTFS, one primary partition).         2. Save drive metadata (letter, label, partition size).         3. Check allocation unit via Get-Volume / fsutil.      </div>
+	<div class="psdb-st-func-desc">Checks an NTFS drive for 64 KB allocation unit size and formats it with 65536 byte cluster size if needed.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2190,7 +2190,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Test-sqmOlaInstallation</span>
 	<span class="psdb-st-badge psdb-st-badge-wartung">Wartung</span>
 	</div>
-	<div class="psdb-st-func-desc">Tests for the presence of the stored procedure 'DatabaseBackup' in the 'master' schema.     Optionally checks whether the 'CommandLog' table and 'DatabaseIntegrityCheck' etc. are also present.</div>
+	<div class="psdb-st-func-desc">Checks whether Ola Hallengren's Maintenance Solution is installed on a SQL Server instance.</div>
 	</div>
 
 	<div class="psdb-st-func-card" id="f-testsqmsqlfirewall">
@@ -2198,7 +2198,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Test-sqmSQLFirewall</span>
 	<span class="psdb-st-badge psdb-st-badge-wartung">Wartung</span>
 	</div>
-	<div class="psdb-st-func-desc">Attempts to establish a TCP connection to the specified SQL Server and port.     By default, port 1433 (default instance) is used.      For named instances, the SQL Browser service (UDP 1434) can addi</div>
+	<div class="psdb-st-func-desc">Tests whether the firewall and network allow a TCP connection to SQL Server.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2231,7 +2231,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Compare-sqmServerConfiguration</span>
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">Konfiguration</span>
 	</div>
-	<div class="psdb-st-func-desc">Displays differences in the following areas: sp_configure, instance properties (Collation, Version, MaxMemory), database settings (optional). Output as a list with old/new values.</div>
+	<div class="psdb-st-func-desc">Compares important configuration settings between two SQL Server instances.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 1 Beispiel anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2246,7 +2246,7 @@ function Get-sqmTempDbRecommendation
 	<span class="psdb-st-func-name">Get-sqmConfig</span>
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">Konfiguration</span>
 	</div>
-	<div class="psdb-st-func-desc">Without parameters, the entire configuration is returned as a hashtable.     With -Key, the value of the requested key is returned.     If the key does not exist, a warning is shown and $null is ret</div>
+	<div class="psdb-st-func-desc">Returns the current module configuration.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2286,7 +2286,7 @@ function Get-sqmConfig
 	<span class="psdb-st-func-name">Get-sqmServerSetting</span>
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">Konfiguration</span>
 	</div>
-	<div class="psdb-st-func-desc">The function queries either a named property value (e.g. "BackupDirectory") from the object returned by Connect-DbaInstance, or lists all properties with -All.  If no SqlInstance parameter is speci</div>
+	<div class="psdb-st-func-desc">Reads one or all server properties from a SQL Server instance.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2379,7 +2379,7 @@ Get-sqmServerSetting -SqlInstance &quot;SQL01&quot; -SqlCredential $cred -All</p
 	<span class="psdb-st-func-name">Invoke-sqmSsisConfiguration</span>
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">Konfiguration</span>
 	</div>
-	<div class="psdb-st-func-desc">Performs a complete initial or re-configuration of SSIS:     1. SSIS service (service account + startup type)     2. SSISDB catalog (incl. CLR activation, properties)     3. AlwaysOn AG integration</div>
+	<div class="psdb-st-func-desc">Configures SQL Server Integration Services (SSIS) fully automatically. Supports standalone and AlwaysOn AG environments, local and remote.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2398,7 +2398,7 @@ Get-sqmServerSetting -SqlInstance &quot;SQL01&quot; -SqlCredential $cred -All</p
 	<span class="psdb-st-func-name">Set-sqmConfig</span>
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">Konfiguration</span>
 	</div>
-	<div class="psdb-st-func-desc">Allows setting of LogPath, OutputPath, CentralPath, Ola job names,     TSM management classes, the HPU domain group mapping, and the     SSRS installer path (SsrsInstallerPath).     Each path is va</div>
+	<div class="psdb-st-func-desc">Sets one or more configuration values for the MSSQLTools module.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2766,7 +2766,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Set-sqmSsrsConfiguration</span>
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">Konfiguration</span>
 	</div>
-	<div class="psdb-st-func-desc">Performs a complete initial or re-configuration of SSRS.         Supports Native Mode and SharePoint Integrated Mode (automatic detection).          Configurable areas (individually disableable): </div>
+	<div class="psdb-st-func-desc">Configures SQL Server Reporting Services (SSRS) fully automatically. Supports local and remote installation as well as AlwaysOn environments.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2785,7 +2785,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Set-sqmTcpPort</span>
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">Konfiguration</span>
 	</div>
-	<div class="psdb-st-func-desc">Setzt den statischen TCP-Port fuer eine SQL Server-Instanz.     Der Port wird aus BasePort und PortIncrement berechnet:         - Default-Instanz (MSSQLSERVER): Port = BasePort         - Named Instanc</div>
+	<div class="psdb-st-func-desc">Konfiguriert den TCP-Port einer SQL Server-Instanz ueber die Registry.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2806,7 +2806,7 @@ function Set-sqmConfig
 <span class="psdb-st-func-name">Export-sqmServerConfiguration</span>
 <span class="psdb-st-badge psdb-st-badge-konfiguration">Konfiguration</span>
 </div>
-<div class="psdb-st-func-desc">Exports all SQL Server configuration settings to a JSON snapshot file. Captures sp_configure, instance properties, services, TempDB, Database Mail and linked servers. Use before changes for rollback capability.</div>
+<div class="psdb-st-func-desc">Exports all SQL Server configuration settings to a JSON snapshot file.</div>
 <div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">&#9658; 1 Beispiel anzeigen</div>
 <div class="psdb-st-examples">
 <div class="psdb-st-example">
@@ -2819,7 +2819,7 @@ function Set-sqmConfig
 <span class="psdb-st-func-name">Invoke-sqmConfigRollback</span>
 <span class="psdb-st-badge psdb-st-badge-konfiguration">Konfiguration</span>
 </div>
-<div class="psdb-st-func-desc">Restores SQL Server configuration from a previously exported JSON snapshot. Supports -WhatIf to preview changes. Rolls back sp_configure, instance properties and service start modes.</div>
+<div class="psdb-st-func-desc">Restores SQL Server configuration from a previously exported snapshot.</div>
 <div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">&#9658; 1 Beispiel anzeigen</div>
 <div class="psdb-st-examples">
 <div class="psdb-st-example">
@@ -2835,7 +2835,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Export-sqmDatabaseDocumentation</span>
 	<span class="psdb-st-badge psdb-st-badge-inventar">Inventar</span>
 	</div>
-	<div class="psdb-st-func-desc">Documents per database:     - General properties (status, recovery model, collation, owner, creation date, compatibility level)     - Size (data, log, total in MB)     - Filegroups and files (name,</div>
+	<div class="psdb-st-func-desc">Creates structured HTML and CSV documentation for all databases on a SQL Server instance.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2862,7 +2862,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Find-sqmDatabaseObject</span>
 	<span class="psdb-st-badge psdb-st-badge-inventar">Inventar</span>
 	</div>
-	<div class="psdb-st-func-desc">Searches user databases for tables, views, procedures, functions, triggers, synonyms.     Returns the location (database, schema, object type, name). Can filter by SQL text (full definition).</div>
+	<div class="psdb-st-func-desc">Searches all (or selected) databases on an instance for an object name.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2881,7 +2881,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Get-sqmLinkedServerUsage</span>
 	<span class="psdb-st-badge psdb-st-badge-inventar">Inventar</span>
 	</div>
-	<div class="psdb-st-func-desc">Searches the definitions of all user databases for references to linked servers.     Shows the referenced linked server, the object and the database. Optionally includes dependent jobs.</div>
+	<div class="psdb-st-func-desc">Analyzes which database objects (procedures, functions, views, triggers, SQL Agent jobs) access linked servers.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 1 Beispiel anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2896,7 +2896,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Invoke-sqmInstanceInventory</span>
 	<span class="psdb-st-badge psdb-st-badge-inventar">Inventar</span>
 	</div>
-	<div class="psdb-st-func-desc">Documents the following areas:     - Instance (version, edition, patch level, collation, memory, CPU, sp_configure)     - Databases (name, status, recovery, size, last backups, owner, collation)   </div>
+	<div class="psdb-st-func-desc">Creates a complete inventory of a SQL Server instance as a structured report (TXT + CSV).</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2920,7 +2920,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Get-sqmClusterInfo</span>
 	<span class="psdb-st-badge psdb-st-badge-monitoring">Cluster</span>
 	</div>
-	<div class="psdb-st-func-desc">This function queries a Windows Failover Cluster and returns an object containing the cluster name,     a list of nodes, and a list of roles (cluster groups).     For each role, the associated IP ad</div>
+	<div class="psdb-st-func-desc">Retrieves information about a Windows Failover Cluster: cluster name, nodes and roles including IP addresses.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2943,7 +2943,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Test-sqmSsasDirectoryPermissions</span>
 	<span class="psdb-st-badge psdb-st-badge-monitoring">Cluster</span>
 	</div>
-	<div class="psdb-st-func-desc">Determines the directory paths for an SSAS instance from the registry,     checks whether the SSAS service account has FullControl access to these directories,     and sets any missing permissions a</div>
+	<div class="psdb-st-func-desc">Checks and corrects NTFS permissions for SSAS directories (Data, Log, Temp, Backup).</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2964,7 +2964,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Test-sqmSSISPackageCompatibility</span>
 	<span class="psdb-st-badge psdb-st-badge-monitoring">Cluster</span>
 	</div>
-	<div class="psdb-st-func-desc">Tests whether SSIS packages will run in a target SQL Server version.     Checks deprecated features, encoding issues, and connection types.      Supports two package sources:     1. SSISDB Catalog (de</div>
+	<div class="psdb-st-func-desc">Validates SSIS package compatibility for SQL Server upgrades (2016 - 2025).</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -2993,7 +2993,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Get-sqmCertificateReport</span>
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">TLS</span>
 	</div>
-	<div class="psdb-st-func-desc">Checks all security-relevant certificates on one or more instances:      MASTER KEY       - Checks whether a Database Master Key exists in master (required for certificates)       - Checks whether</div>
+	<div class="psdb-st-func-desc">Creates a comprehensive report on SQL Server certificates and their expiration dates.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3023,7 +3023,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Get-sqmTlsStatus</span>
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">TLS</span>
 	</div>
-	<div class="psdb-st-func-desc">Get-sqmTlsStatus connects to each target computer (locally or via Invoke-Command for remotes),     reads the SQL Server instance list from the registry, and for each instance checks:      - The TLS ce</div>
+	<div class="psdb-st-func-desc">Audits TLS/SSL configuration and certificate status for all SQL Server instances on one or more computers.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3047,7 +3047,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Install-sqmCertificate</span>
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">TLS</span>
 	</div>
-	<div class="psdb-st-func-desc">Supports three input formats:       PFX   (.pfx)  - Certificate + private key in one file (CA-signed or exported)       CER+PVK       - Certificate (.cer) + encrypted private key (.pvk) separately </div>
+	<div class="psdb-st-func-desc">Installs a certificate (self-signed or CA-signed) in SQL Server and automatically binds it to the configured purpose.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3081,7 +3081,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Install-sqmCertificateToStore</span>
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">TLS</span>
 	</div>
-	<div class="psdb-st-func-desc">Reads a certificate file (.cer, .crt, or .pfx) and installs it into the     specified Windows certificate store (LocalMachine) on one or more computers.      Use cases:       - Distribute a CA root ce</div>
+	<div class="psdb-st-func-desc">Installs a certificate file into the Windows certificate store - locally or on multiple remote computers.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3115,7 +3115,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">New-sqmCertificateRequest</span>
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">TLS</span>
 	</div>
-	<div class="psdb-st-func-desc">Reads all relevant properties of the existing certificate from SQL Server     (Subject, SANs, purpose, endpoint binding) and creates:      1. INF file (certreq configuration) with all fields from t</div>
+	<div class="psdb-st-func-desc">Creates a CSR (Certificate Signing Request) and an order data sheet for a CA-signed certificate based on an existing SQL Server certificate.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3142,7 +3142,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">New-sqmSqlCertificate</span>
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">TLS</span>
 	</div>
-	<div class="psdb-st-func-desc">Reads all relevant properties of the existing certificate (Subject, purpose,     endpoint binding, TDE binding) and creates a new self-signed certificate directly     in SQL Server using CREATE CERT</div>
+	<div class="psdb-st-func-desc">Creates a new self-signed SQL Server certificate as a renewal of an existing one.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3168,7 +3168,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Set-sqmSqlTlsCertificate</span>
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">TLS</span>
 	</div>
-	<div class="psdb-st-func-desc">Replaces the default self-signed auto-generated SQL Server TLS certificate with a     proper certificate from the LocalMachine\My store. This eliminates SSL/TLS connection     warnings in client appli</div>
+	<div class="psdb-st-func-desc">Binds a Windows certificate from the Machine store to SQL Server as the TLS certificate.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3194,7 +3194,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Set-sqmSsrsHttpsCertificate</span>
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">TLS</span>
 	</div>
-	<div class="psdb-st-func-desc">Eliminates browser security warnings by binding a valid certificate to the SSRS 		or Power BI Report Server (PBIRS) HTTPS endpoint via the WMI configuration interface.  		The function performs the fol</div>
+	<div class="psdb-st-func-desc">Binds a Windows certificate to SSRS or Power BI Report Server for HTTPS access.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3233,7 +3233,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Invoke-sqmTsmConfiguration</span>
 	<span class="psdb-st-badge psdb-st-badge-tsm">TSM</span>
 	</div>
-	<div class="psdb-st-func-desc">Reads the existing dsm.opt, adds or replaces the relevant entries,     and writes the file back. Before each change a backup copy (dsm.opt.bak)     is automatically created.      Configured sectio</div>
+	<div class="psdb-st-func-desc">Configures the IBM Spectrum Protect (TSM) client options file dsm.opt for use with SQL Server backup directories.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3256,7 +3256,7 @@ function Set-sqmConfig
 	<span class="psdb-st-func-name">Test-sqmTsmConnection</span>
 	<span class="psdb-st-badge psdb-st-badge-tsm">TSM</span>
 	</div>
-	<div class="psdb-st-func-desc">Locates dsmadmc.exe on the local or remote computer, reads the TSM configuration     from dsm.opt (server name, user name, password) if not provided explicitly,     and executes a 'show version' com</div>
+	<div class="psdb-st-func-desc">Tests the connection to an IBM Spectrum Protect (TSM) server using dsmadmc.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3514,7 +3514,7 @@ function _FindDsmadmcPath
 	<span class="psdb-st-func-name">Invoke-sqmDeployScripts</span>
 	<span class="psdb-st-badge psdb-st-badge-deployment">Deployment</span>
 	</div>
-	<div class="psdb-st-func-desc">Runs all SQL script files whose filename starts with a numeric prefix (e.g. 001_CreateTable.sql)     in ascending numeric order against the specified database. Before execution the function:      - Va</div>
+	<div class="psdb-st-func-desc">Executes numbered SQL scripts from a directory sequentially against a SQL Server database.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 6 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3556,7 +3556,7 @@ function _FindDsmadmcPath
 	<span class="psdb-st-func-name">Invoke-sqmSignModule</span>
 	<span class="psdb-st-badge psdb-st-badge-deployment">Deployment</span>
 	</div>
-	<div class="psdb-st-func-desc">Signs .ps1, .psm1, and .psd1 files (configurable) under a module root directory recursively.     Works with any code signing certificate: commercial OV cert, self-signed cert, or a     SignPath-export</div>
+	<div class="psdb-st-func-desc">Signs all PowerShell script files in a module directory using Set-AuthenticodeSignature.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 5 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3595,7 +3595,7 @@ function _FindDsmadmcPath
 	<span class="psdb-st-func-name">Copy-sqmLogins</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Transfers SQL and Windows logins from a source instance to a target instance.      Process:         1. Disable policy  (Set-sqmSqlPolicyState -State Disable, if -DisablePolicy $true)         2. Co</div>
+	<div class="psdb-st-func-desc">Copies logins from a source SQL Server instance to a target instance.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3628,7 +3628,7 @@ function _FindDsmadmcPath
 	<span class="psdb-st-func-name">Copy-sqmToCentralPath</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">If no CentralPath is configured, the function exits without error.     Source files that do not exist are skipped.</div>
+	<div class="psdb-st-func-desc">Copies one or more files to the configured CentralPath.</div>
 	</div>
 
 	<div class="psdb-st-func-card" id="f-getsqmagentjobhistory">
@@ -3636,7 +3636,7 @@ function _FindDsmadmcPath
 	<span class="psdb-st-func-name">Get-sqmAgentJobHistory</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Returns the last execution(s) of all or selected SQL Agent jobs.     Can filter by job name, status (success/failure) and time range.     By default, the last 7 days are shown.</div>
+	<div class="psdb-st-func-desc">Displays the execution history of SQL Agent jobs.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3655,7 +3655,7 @@ function _FindDsmadmcPath
 	<span class="psdb-st-func-name">Get-sqmDiskBlockSize</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Liest die NTFS-Allokationseinheit (Blockgroesse) der angegebenen Laufwerke     per WMI (Win32_Volume) und prueft ob die fuer SQL Server empfohlenen     64 KB (65536 Bytes) konfiguriert sind.      Kann</div>
+	<div class="psdb-st-func-desc">Prueft die NTFS-Blockgroesse (Cluster-Groesse) von Laufwerken auf 64KB.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3682,7 +3682,7 @@ function _FindDsmadmcPath
 	<span class="psdb-st-func-name">Get-sqmHpuAllowGroup</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Reads the domain-group mapping from the module configuration (key: HpuDomainGroupMap).         Each entry contains a DomainPattern (wildcard) and a GroupNamePattern (sAMAccountName filter).         Th</div>
+	<div class="psdb-st-func-desc">Searches for the HPU allow group in Active Directory based on configurable domain/group mappings.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3790,7 +3790,7 @@ function Get-sqmHpuAllowGroup
 	<span class="psdb-st-func-name">Get-sqmServerHardwareReport</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Sammelt Systeminformationen via CIM/WMI und generiert einen detaillierten HTML-Report mit:     - Betriebssystem (Windows-Version, Build, Laufzeit, Domain)     - Prozessor (Modell, Sockel, physikalisch</div>
+	<div class="psdb-st-func-desc">Erstellt einen HTML-Hardware-Konfigurationsbericht fuer einen oder mehrere Server.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 6 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3826,7 +3826,7 @@ function Get-sqmHpuAllowGroup
 	<span class="psdb-st-func-name">Install-sqmAdModule</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">First checks whether the ActiveDirectory module is already available.     If not, the function attempts installation using four methods in the following     order (fallback chain):          1. Win</div>
+	<div class="psdb-st-func-desc">Ensures that the ActiveDirectory PowerShell module (RSAT) is installed.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3853,7 +3853,7 @@ function Get-sqmHpuAllowGroup
 	<span class="psdb-st-func-name">Install-sqmDb2Driver</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Prueft ob ein DB2-Treiber bereits vorhanden ist (via Test-sqmDriverInstalled -DriverType DB2).     Bei Bedarf: Fuehrt den IBM-Installer still aus.      Unterstuetzte Installer-Formate:         - db2_o</div>
+	<div class="psdb-st-func-desc">Installiert den IBM DB2 ODBC/CLI-Treiber.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3872,7 +3872,7 @@ function Get-sqmHpuAllowGroup
 	<span class="psdb-st-func-name">Install-sqmJdbcDriver</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Prueft ob der JDBC-Treiber bereits vorhanden ist (via Test-sqmDriverInstalled).     Bei Bedarf: Kopiert die .jar-Datei aus dem SourcePath in den Zielpfad     und setzt optional die CLASSPATH-Umgebungs</div>
+	<div class="psdb-st-func-desc">Installiert den Microsoft JDBC Driver for SQL Server.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3891,7 +3891,7 @@ function Get-sqmHpuAllowGroup
 	<span class="psdb-st-func-name">Install-sqmOdbcDriver</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Prueft ob der ODBC-Treiber bereits vorhanden ist (via Test-sqmDriverInstalled).     Bei Bedarf: Fuehrt den Installer still aus.      Unterstuetzte Installer-Formate:         - .msi : msiexec /i /quiet</div>
+	<div class="psdb-st-func-desc">Installiert den Microsoft ODBC Driver for SQL Server.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3910,7 +3910,7 @@ function Get-sqmHpuAllowGroup
 	<span class="psdb-st-func-name">Install-sqmOlaMaintenanceSolution</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Downloads the latest version of the Maintenance Solution from GitHub     (https://github.com/olahallengren/sql-server-maintenance-solution/archive/refs/heads/main.zip),     extracts the required scr</div>
+	<div class="psdb-st-func-desc">Installs or updates Ola Hallengren's Maintenance Solution on a SQL Server instance.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -3929,7 +3929,7 @@ function Get-sqmHpuAllowGroup
 	<span class="psdb-st-func-name">Install-sqmSsrsReportServer</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Executes the following steps in sequence:      [1] Check prerequisites         - Administrator rights on the target computer         - Installer (.exe or .msi) found in the configured share (SsrsInsta</div>
+	<div class="psdb-st-func-desc">Installs SQL Server Reporting Services 2022 from a network share and automatically configures the instance afterwards.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -4288,7 +4288,7 @@ function Invoke-sqmMonitoringKey
 	<span class="psdb-st-func-name">New-sqmOlaMaintenanceJobs</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Creates three fully configured SQL Agent jobs on the specified SQL Server instance     that call Ola Hallengren's IndexOptimize and DatabaseIntegrityCheck procedures.      Prerequisite: Ola Halleng</div>
+	<div class="psdb-st-func-desc">Creates three SQL Agent jobs for Ola Hallengren's Maintenance Solution: IndexOptimize (user DBs) and IntegrityCheck (user and system DBs).</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -4307,7 +4307,7 @@ function Invoke-sqmMonitoringKey
 	<span class="psdb-st-func-name">New-sqmRandomSaPassword</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Erstellt ein kryptografisch sicheres Passwort das die SQL Server     Passwort-Richtlinie erfuellt:         - Mindestlaenge konfigurierbar (Standard: 20 Zeichen)         - Mindestens 1 Grossbuchstabe (</div>
+	<div class="psdb-st-func-desc">Generiert ein zufaelliges, richtlinienkonformes SA-Passwort.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -4332,7 +4332,7 @@ function Invoke-sqmMonitoringKey
 	<span class="psdb-st-func-name">Repair-sqmAlwaysOnDatabases</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">- Determines all databases in all Availability Groups. - Checks whether a database is problematic (synchronization status not 'HEALTHY' or 'SYNCHRONIZED'). - Ensures that Automatic Seeding is enable</div>
+	<div class="psdb-st-func-desc">Checks all AlwaysOn databases for problems and repairs them (Remove -&gt; Cleanup -&gt; Add).</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -4351,7 +4351,7 @@ function Invoke-sqmMonitoringKey
 	<span class="psdb-st-func-name">Set-sqmSqlPolicyState</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Uses dbatools (Get-DbaPbmPolicy) to check whether the specified policy exists on     the target instance, and then toggles only that policy via its SMO object.      Unlike older scripts, this does </div>
+	<div class="psdb-st-func-desc">Enables or disables a single Policy-Based Management policy on a SQL Server instance.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -4397,7 +4397,7 @@ function Invoke-sqmMonitoringKey
 	<span class="psdb-st-func-name">Test-sqmMaxDop</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Liest den aktuellen MAXDOP-Wert aus sys.configurations und vergleicht     ihn mit der Microsoft-Empfehlung:         Empfehlung: min(8, Anzahl logischer CPUs)      Sonderwert 0 bedeutet "kein Limit" = </div>
+	<div class="psdb-st-func-desc">Prueft ob MAXDOP (Max Degree of Parallelism) korrekt konfiguriert ist.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -4416,7 +4416,7 @@ function Invoke-sqmMonitoringKey
 	<span class="psdb-st-func-name">Test-sqmMaxMemory</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Liest den aktuellen "max server memory (MB)"-Wert und vergleicht ihn     mit der Empfehlung (90% des physischen RAM).      Sonderwert 2147483647 (= 2^31 - 1) bedeutet "nicht konfiguriert" (SQL-Standar</div>
+	<div class="psdb-st-func-desc">Prueft ob SQL Server Max Server Memory korrekt konfiguriert ist.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -4458,7 +4458,7 @@ function Invoke-sqmMonitoringKey
 	<span class="psdb-st-func-name">Uninstall-sqmDb2Driver</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Sucht den installierten IBM DB2-Treiber in der Windows-Uninstall-Registry         und fuehrt eine stille Deinstallation durch (msiexec /x fuer MSI-basierte         Installationen, alternativ Setup.exe</div>
+	<div class="psdb-st-func-desc">Deinstalliert den IBM DB2 ODBC/CLI-Treiber.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 1 Beispiel anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -4473,7 +4473,7 @@ function Invoke-sqmMonitoringKey
 	<span class="psdb-st-func-name">Uninstall-sqmJdbcDriver</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Entfernt vorhandene mssql-jdbc*.jar Dateien aus dem Standard-Installationsverzeichnis         des Microsoft JDBC Driver for SQL Server. Da JDBC als JAR-Datei deployed wird         (kein MSI), genuegt </div>
+	<div class="psdb-st-func-desc">Deinstalliert den Microsoft JDBC Driver for SQL Server.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -4492,7 +4492,7 @@ function Invoke-sqmMonitoringKey
 	<span class="psdb-st-func-name">Uninstall-sqmOdbcDriver</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
-	<div class="psdb-st-func-desc">Sucht den installierten Microsoft ODBC Driver for SQL Server in der         Windows-Uninstall-Registry und fuehrt eine stille Deinstallation via         msiexec /x durch. Wird typischerweise vor einer</div>
+	<div class="psdb-st-func-desc">Deinstalliert den Microsoft ODBC Driver for SQL Server.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
@@ -4803,6 +4803,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 		}
 	</script>
 	</div>
+
 
 
 
