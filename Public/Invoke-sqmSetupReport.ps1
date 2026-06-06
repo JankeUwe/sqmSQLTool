@@ -106,23 +106,26 @@ function Invoke-sqmSetupReport
             $backupJobStatus = if ($backupJobCount -eq 0) { 'NO BACKUP JOBS' } elseif ($backupJobsEnabled -eq $backupJobCount) { "OK ($backupJobCount jobs)" } else { "WARNING ($backupJobsEnabled/$backupJobCount enabled)" }
             $backupStatusColor = if ($backupJobCount -gt 0 -and $backupJobsEnabled -eq $backupJobCount) { 'green' } else { 'orange' }
 
-            # Max Memory
+            # Max Memory (synchronized with Test-sqmMaxMemory logic)
             $maxMem = $server.Configuration.MaxServerMemory.ConfigValue
             $totalMem = [math]::Round($server.PhysicalMemory / 1024, 0)
             $unconfiguredValue = 2147483647
+            $lowerBound = [math]::Round($totalMem * 0.85)
+            $upperBound = [math]::Round($totalMem * 0.95)
+
             if ($maxMem -eq $unconfiguredValue)
             {
-                $maxMemStatus = 'NOT CONFIGURED'
+                $maxMemStatus = "NOT CONFIGURED (default)"
                 $maxMemColor = 'orange'
             }
-            elseif ($maxMem -gt [math]::Round($totalMem * 0.95))
+            elseif ($maxMem -gt $upperBound)
             {
-                $maxMemStatus = "TOO HIGH ($maxMem MB > 95%)"
+                $maxMemStatus = "TOO HIGH ($maxMem MB > $upperBound MB)"
                 $maxMemColor = 'orange'
             }
-            elseif ($maxMem -lt [math]::Round($totalMem * 0.85))
+            elseif ($maxMem -lt $lowerBound)
             {
-                $maxMemStatus = "TOO LOW ($maxMem MB < 85%)"
+                $maxMemStatus = "TOO LOW ($maxMem MB < $lowerBound MB)"
                 $maxMemColor = 'orange'
             }
             else
@@ -144,29 +147,36 @@ function Invoke-sqmSetupReport
             catch { }
             $sysadminList = if ($sysadmins.Count -gt 0) { $sysadmins -join ', ' } else { 'None' }
 
-            # Logins with Advanced Permissions
+            # Logins with Server Roles (only server-level roles)
             $advancedLogins = @()
             try
             {
+                $serverRoles = @('sysadmin', 'serveradmin', 'securityadmin', 'processadmin', 'dbcreator', 'diskadmin')
                 $allLogins = Get-DbaLogin -SqlInstance $server -ErrorAction SilentlyContinue
                 foreach ($login in $allLogins)
                 {
                     $roles = @()
-                    foreach ($role in @('sysadmin', 'serveradmin', 'securityadmin', 'processadmin', 'dbcreator', 'diskadmin'))
+                    foreach ($role in $serverRoles)
                     {
-                        if ((Get-DbaServerRole -SqlInstance $server -Login $login.Name -ErrorAction SilentlyContinue | Where-Object { $_.Role -eq $role }).Count -gt 0)
+                        try
                         {
-                            $roles += $role
+                            $query = "SELECT IS_SRVROLEMEMBER('$role', '$($login.Name)') AS IsMember"
+                            $result = Invoke-DbaQuery -SqlInstance $server -Query $query -ErrorAction SilentlyContinue
+                            if ($result -and $result.IsMember -eq 1)
+                            {
+                                $roles += $role
+                            }
                         }
+                        catch { }
                     }
                     if ($roles.Count -gt 0)
                     {
-                        $advancedLogins += "$($login.Name) [$($roles -join ',')]"
+                        $advancedLogins += "$($login.Name) [$($roles -join ', ')]"
                     }
                 }
             }
             catch { }
-            $advancedLoginList = if ($advancedLogins.Count -gt 0) { $advancedLogins -join ' | ' } else { 'None with extended roles' }
+            $advancedLoginList = if ($advancedLogins.Count -gt 0) { $advancedLogins -join ' | ' } else { 'None with server roles' }
 
             # CLR Status
             $clrEnabled = $server.Configuration.IsSqlClrEnabled.ConfigValue
@@ -211,18 +221,25 @@ function Invoke-sqmSetupReport
             catch { }
             $serviceAccountList = if ($serviceAccounts.Count -gt 0) { $serviceAccounts -join ' | ' } else { 'Unable to determine' }
 
-            # SPN Status (Simple Check)
-            $spnOk = 'Not checked'
+            # SPN Status (List all SPNs)
+            $spnList = 'Not checked'
+            $spnDetails = @()
             try
             {
                 $spnReport = Get-sqmSpnReport -ComputerName $env:COMPUTERNAME -ErrorAction SilentlyContinue
-                if ($spnReport)
+                if ($spnReport -and $spnReport.DetailRows)
                 {
-                    $missingSPNs = @($spnReport.DetailRows | Where-Object { $_.Status -eq 'Missing' }).Count
-                    $spnOk = if ($missingSPNs -eq 0) { 'OK (all SPNs registered)' } else { "WARNING ($missingSPNs missing)" }
+                    foreach ($row in $spnReport.DetailRows)
+                    {
+                        $spnDetails += "$($row.SPN) [$($row.Status)]"
+                    }
+                    $spnList = if ($spnDetails.Count -gt 0) { $spnDetails -join ' | ' } else { 'No SPNs found' }
                 }
             }
-            catch { }
+            catch
+            {
+                $spnList = 'Error retrieving SPNs'
+            }
 
             # Splunk Status (Config + Service Test)
             $splunkOk = 'Not configured'
@@ -302,7 +319,7 @@ function Invoke-sqmSetupReport
                 -XPStatus $xpStatus `
                 -XPColor $xpColor `
                 -ServiceAccounts $serviceAccountList `
-                -SPNStatus $spnOk `
+                -SPNList $spnList `
                 -SplunkStatus $splunkOk `
                 -MAXDOP $maxdopStatus `
                 -CostThreshold $ctpStatus `
@@ -365,7 +382,7 @@ function _Build-ModernReportHtml
         [string]$XPStatus,
         [string]$XPColor,
         [string]$ServiceAccounts,
-        [string]$SPNStatus,
+        [string]$SPNList,
         [string]$SplunkStatus,
         [string]$MAXDOP,
         [string]$CostThreshold,
@@ -446,7 +463,7 @@ function _Build-ModernReportHtml
 <div class="container">
 
   <!-- CRITICAL ISSUES -->
-  <div class="section-title">🔴 CRITICAL ISSUES</div>
+  <div class="section-title">CRITICAL ISSUES</div>
   <div class="cards-grid">
     <div class="card $SAStatusColor">
       <div class="card-label">SA Account</div>
@@ -466,7 +483,7 @@ function _Build-ModernReportHtml
   </div>
 
   <!-- SECURITY -->
-  <div class="section-title">🔒 SECURITY</div>
+  <div class="section-title">SECURITY</div>
   <div class="cards-grid">
     <div class="card">
       <div class="card-label">Sysadmin Accounts</div>
@@ -486,19 +503,19 @@ function _Build-ModernReportHtml
     </div>
     <div class="info-block">
       <h3>Infrastructure</h3>
-      <p><span class="info-label">SPNs:</span> $SPNStatus</p>
+      <p><span class="info-label">SPNs:</span> $(_HtmlEncode $SPNList)</p>
       <p><span class="info-label">Splunk:</span> $SplunkStatus</p>
     </div>
   </div>
 
   <!-- SERVICE ACCOUNTS -->
-  <div class="section-title">👤 SERVICE ACCOUNTS</div>
+  <div class="section-title">SERVICE ACCOUNTS</div>
   <div class="info-block">
     <p>$(_HtmlEncode $ServiceAccounts)</p>
   </div>
 
   <!-- CONFIGURATION -->
-  <div class="section-title">⚙️ CONFIGURATION</div>
+  <div class="section-title">CONFIGURATION</div>
   <div class="info-grid">
     <div class="info-block">
       <h3>Query Execution</h3>
@@ -512,7 +529,7 @@ function _Build-ModernReportHtml
   </div>
 
   <!-- DATABASES -->
-  <div class="section-title">📊 DATABASES</div>
+  <div class="section-title">DATABASES</div>
   <table>
     <thead>
       <tr>
