@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Prepares an AG listener for cluster-level migration without downtime.
 
@@ -39,7 +39,7 @@
 
 .EXAMPLE
     # STEP 1: Prepare listener before AD team deletes it
-    Prepare-sqmListenerForMigration -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG"
+    Invoke-sqmListenerMigrationPrep -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG"
 
     # STEP 2: Wait 15 minutes for DNS/application timeout
 
@@ -52,7 +52,7 @@
     CRITICAL:     Do NOT skip this step. Run BEFORE cluster team deletes listener.
     Timing:       Requires 15-30 min wait for DNS TTL and app connection timeout.
 #>
-function Prepare-sqmListenerForMigration
+function Invoke-sqmListenerMigrationPrep
 {
 	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 	[OutputType([PSCustomObject])]
@@ -288,3 +288,6 @@ ORDER BY DB_NAME(adc.database_id)
 		}
 	}
 }
+
+# Backward compatibility: old name "Prepare-sqmListenerForMigration" -> new name "Invoke-sqmListenerMigrationPrep"
+Set-Alias -Name 'Prepare-sqmListenerForMigration' -Value 'Invoke-sqmListenerMigrationPrep' -Force

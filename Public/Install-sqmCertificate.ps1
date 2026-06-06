@@ -264,7 +264,7 @@ function Install-sqmCertificate
 			
 			if (-not $existingInSql)
 			{
-				$importSql = Build-sqmCertImportSql `
+				$importSql = New-sqmCertImportSql `
 													-CertificateName $CertificateName `
 													-CertFile $CertFile `
 													-PrivateKeyFile $PrivateKeyFile `
@@ -642,7 +642,7 @@ function Get-sqmCertFileInfo
 	}
 }
 
-function Build-sqmCertImportSql
+function New-sqmCertImportSql
 {
 	param (
 		[string]$CertificateName,
@@ -706,3 +706,6 @@ FROM FILE = N'$CertFile';
 		$plainPwd = $null # Passwort aus Speicher entfernen
 	}
 }
+
+# Backward compatibility: old name "Build-sqmCertImportSql" -> new name "New-sqmCertImportSql"
+Set-Alias -Name 'Build-sqmCertImportSql' -Value 'New-sqmCertImportSql' -Force

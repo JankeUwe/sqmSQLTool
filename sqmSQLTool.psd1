@@ -160,7 +160,7 @@
 		'New-sqmOlaUsrDbBackupJob',
 		'New-sqmRandomSaPassword',
 		'New-sqmSqlCertificate',
-		'Prepare-sqmListenerForMigration',
+		'Invoke-sqmListenerMigrationPrep',
 		'Remove-sqmDatabaseFromAG',
 		'Repair-sqmAlwaysOnDatabases',
 		'Set-sqmBackupExcludePermission',

@@ -178,7 +178,7 @@ ORDER BY ImpactScore DESC
 				}
 				
 				# CREATE INDEX-Statement generieren
-				$createStmt = Build-sqmCreateIndexStatement `
+				$createStmt = New-sqmCreateIndexStatement `
 															-DatabaseName $row.DatabaseName `
 															-SchemaName $row.SchemaName `
 															-TableName $row.TableName `
@@ -247,7 +247,7 @@ ORDER BY ImpactScore DESC
 # ---------------------------------------------------------------------------
 # Private Hilfsfunktion: CREATE INDEX-Statement generieren
 # ---------------------------------------------------------------------------
-function Build-sqmCreateIndexStatement
+function New-sqmCreateIndexStatement
 {
 	param (
 		[string]$DatabaseName,
@@ -283,6 +283,9 @@ function Build-sqmCreateIndexStatement
 	$stmt += "CREATE NONCLUSTERED INDEX [" + $idxName + "]" + "`r`n"
 	$stmt += "ON [" + $SchemaName + "].[" + $TableName + "] (" + $keyColStr + ")"
 	$stmt += $includeClause + ";"
-	
+
 	return $stmt
 }
+
+# Backward compatibility: old name "Build-sqmCreateIndexStatement" -> new name "New-sqmCreateIndexStatement"
+Set-Alias -Name 'Build-sqmCreateIndexStatement' -Value 'New-sqmCreateIndexStatement' -Force

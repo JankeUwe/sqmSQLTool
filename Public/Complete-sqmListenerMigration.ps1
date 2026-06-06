@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Completes listener migration after cluster team recreates the listener resource.
 
@@ -35,7 +35,7 @@
     Throw exceptions immediately.
 
 .EXAMPLE
-    # STEP 1: DBA runs Prepare-sqmListenerForMigration
+    # STEP 1: DBA runs Invoke-sqmListenerMigrationPrep
     # STEP 2: AD team deletes/recreates listener role (15-30 min wait)
     # STEP 3: DBA runs this function
 
