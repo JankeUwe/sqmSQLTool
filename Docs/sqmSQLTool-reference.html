@@ -367,15 +367,62 @@
 	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
 	</div>
 	<div class="psdb-st-func-desc">Creates a detailed health report for all Always On availability groups on an instance.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">&#9658; 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Get-sqmAlwaysOnHealthReport</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmAlwaysOnHealthReport</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmAgHealthReport</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmAgHealthReport -SqlInstance &quot;SQL01&quot; -MaxRedoQueueMB 200 -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">&quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; | Invoke-sqmPatchAnalysis</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmPatchAnalysis -SqlInstance &quot;SQL01&quot;,&quot;SQL02&quot; -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration -ComputerName &quot;SSRS01&quot; -DatabaseServer &quot;AG_Listener&quot; -PbmPolicyName &quot;Password Policy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Lokalen Server analysieren - Report wird automatisch im Browser geoeffnet
+    Get-sqmServerHardwareReport</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Remote-Server
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Mehrere Server, eigener Report-Pfad
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; -ReportPath &quot;C:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Nur speichern, nicht oeffnen - Dateipfad zurueckgeben
+    $path = Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -NoOpen -PassThru
+    Write-Host &quot;Report: $path&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># CSV-Export fuer Weiterverarbeitung in Excel
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot; -OutputFormat CSV -NoOpen</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Alle Formate auf einmal (HTML + CSV + TXT)
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -OutputFormat All -NoOpen -PassThru</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Read BackupDirectory from the local server
+$backupPath = Get-sqmServerSetting -Name &quot;BackupDirectory&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Show all properties
+Get-sqmServerSetting -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># All properties from a remote instance with credentials
+$cred = Get-Credential
+Get-sqmServerSetting -SqlInstance &quot;SQL01&quot; -SqlCredential $cred -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Basic deploy with automatic backup
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Deploy with job number embedded in log filename
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -JobNumber &quot;AU-2026-042&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Skip backup - requires interactive confirmation
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SkipBackup</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># WhatIf dry run - no SQL executed, only pre-checks and summary table
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -WhatIf</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># No outer transaction - scripts manage their own transactions
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -NoWrapTransaction</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># SQL Server authentication
+    $cred = Get-Credential
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SqlCredential $cred</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmAgHealthReport</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Get-sqmAlwaysOnHealthReport -SqlInstance "SQL01" -MaxRedoQueueMB 200 -OutputPath "D:\Reports"</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmAlwaysOnHealthReport -SqlInstance &quot;SQL01&quot; -MaxRedoQueueMB 200 -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example-label">Beispiel</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmAgHealthReport -SqlInstance &quot;SQL01&quot; -MaxRedoQueueMB 200 -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+</div>
 	</div>
 	</div>
 	</div>
@@ -1016,355 +1063,62 @@ Invoke-sqmRestoreDatabase -SqlInstance &quot;SQL01&quot; -BackupFiles $backupSeq
 	<span class="psdb-st-badge psdb-st-badge-sicherheit">Sicherheit</span>
 	</div>
 	<div class="psdb-st-func-desc">Retrieves all logins with sysadmin rights on a SQL Server instance.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">&#9658; 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Get-sqmSysadminAccounts</div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmAgHealthReport</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmAgHealthReport -SqlInstance &quot;SQL01&quot; -MaxRedoQueueMB 200 -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmPatchAnalysis -SqlInstance &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">&quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; | Invoke-sqmPatchAnalysis</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmPatchAnalysis -SqlInstance &quot;SQL01&quot;,&quot;SQL02&quot; -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration -ComputerName &quot;SSRS01&quot; -DatabaseServer &quot;AG_Listener&quot; -PbmPolicyName &quot;Password Policy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Lokalen Server analysieren - Report wird automatisch im Browser geoeffnet
+    Get-sqmServerHardwareReport</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Remote-Server
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Mehrere Server, eigener Report-Pfad
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; -ReportPath &quot;C:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Nur speichern, nicht oeffnen - Dateipfad zurueckgeben
+    $path = Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -NoOpen -PassThru
+    Write-Host &quot;Report: $path&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># CSV-Export fuer Weiterverarbeitung in Excel
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot; -OutputFormat CSV -NoOpen</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Alle Formate auf einmal (HTML + CSV + TXT)
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -OutputFormat All -NoOpen -PassThru</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Read BackupDirectory from the local server
+$backupPath = Get-sqmServerSetting -Name &quot;BackupDirectory&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Show all properties
+Get-sqmServerSetting -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># All properties from a remote instance with credentials
+$cred = Get-Credential
+Get-sqmServerSetting -SqlInstance &quot;SQL01&quot; -SqlCredential $cred -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Basic deploy with automatic backup
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Deploy with job number embedded in log filename
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -JobNumber &quot;AU-2026-042&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Skip backup - requires interactive confirmation
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SkipBackup</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># WhatIf dry run - no SQL executed, only pre-checks and summary table
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -WhatIf</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># No outer transaction - scripts manage their own transactions
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -NoWrapTransaction</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># SQL Server authentication
+    $cred = Get-Credential
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SqlCredential $cred</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmSysadminAccounts</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Get-sqmSysadminAccounts -SqlInstance "SQL01" -ExcludeSysAccounts</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">#&gt;
-function Get-sqmSysadminAccounts
-{
-	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = &#39;None&#39;)]
-	[OutputType([PSCustomObject])]
-	param (
-		[Parameter(Mandatory = $false, ValueFromPipeline = $true)]
-		[string[]]$SqlInstance = @($env:COMPUTERNAME),
-		[Parameter(Mandatory = $false)]
-		[System.Management.Automation.PSCredential]$SqlCredential,
-		[Parameter(Mandatory = $false)]
-		[string[]]$ExcludeLogin = @(),
-		[Parameter(Mandatory = $false)]
-		[switch]$ExcludeSysAccounts,
-		[Parameter(Mandatory = $false)]
-		[bool]$IncludeDisabled = $true,
-		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = &#39;$env:ProgramData\sqmSQLTool\Logs&#39;,
-		[Parameter(Mandatory = $false)]
-		[switch]$ContinueOnError,
-		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
-	)
-	
-	begin
-	{
-		$functionName = $MyInvocation.MyCommand.Name
-		$allInstanceResults = [System.Collections.Generic.List[PSCustomObject]]::new()
-		
-		if (-not (Get-Module -ListAvailable -Name dbatools))
-		{
-			$errMsg = &quot;dbatools-Modul nicht gefunden.&quot;
-			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level &quot;ERROR&quot;
-			throw $errMsg
-		}
-		
-		Invoke-sqmLogging -Message &quot;Starte $functionName mit OutputPath: $OutputPath&quot; -FunctionName $functionName -Level &quot;INFO&quot;
-		
-		# Systemkonten-Muster fuer -ExcludeSysAccounts
-		$sysAccountPatterns = @(
-			&#39;NT SERVICE\*&#39;,
-			&#39;NT AUTHORITY\SYSTEM&#39;,
-			&#39;NT AUTHORITY\NETWORK SERVICE&#39;,
-			&#39;NT AUTHORITY\LOCAL SERVICE&#39;,
-			&#39;NT AUTHORITY\*&#39;,
-			&#39;##MS_*##&#39;
-		)
-		
-		if ($ExcludeSysAccounts)
-		{
-			$ExcludeLogin = @($ExcludeLogin) + $sysAccountPatterns | Sort-Object -Unique
-			Invoke-sqmLogging -Message &quot;ExcludeSysAccounts: $($sysAccountPatterns.Count) Systemmuster hinzugefuegt.&quot; -FunctionName $functionName -Level &quot;DEBUG&quot;
-		}
-		
-		# Hilfsfunktion fuer Ausschlusspruefung
-		function _IsExcluded
-		{
-			param ([string]$Name,
-				[string[]]$Patterns)
-			if (-not $Patterns) { return $false }
-			foreach ($p in $Patterns)
-			{
-				if ($Name -like $p) { return $true }
-			}
-			return $false
-		}
-	}
-	
-	process
-	{
-		foreach ($instance in $SqlInstance)
-		{
-			$connParams = @{ SqlInstance = $instance }
-			if ($SqlCredential) { $connParams[&#39;SqlCredential&#39;] = $SqlCredential }
-			
-			$detailRows = [System.Collections.Generic.List[PSCustomObject]]::new()
-			
-			try
-			{
-				Invoke-sqmLogging -Message &quot;[$instance] Starte Sysadmin-Audit ...&quot; -FunctionName $functionName -Level &quot;INFO&quot;
-				
-				$disabledFilter = if ($IncludeDisabled) { &#39;&#39; }
-				else { &#39;AND sp.is_disabled = 0&#39; }
-				
-				# Achtung: password_last_set_time und last_login_date wurden entfernt,
-				# da sie in aelteren SQL Server-Versionen nicht existieren.
-				$query = @&quot;
-SELECT
-    sp.name                                          AS LoginName,
-    sp.type_desc                                     AS LoginType,
-    sp.is_disabled                                   AS IsDisabled,
-    CASE WHEN sp.sid = 0x01 THEN 1 ELSE 0 END        AS IsSa,
-    sp.create_date                                   AS CreateDate,
-    sp.modify_date                                   AS ModifyDate,
-    NULL                                             AS LastPasswordChange,
-    NULL                                             AS LastLogin,
-    sp.default_database_name                         AS DefaultDatabase
-FROM sys.server_principals       sp
-JOIN sys.server_role_members     rm ON rm.member_principal_id = sp.principal_id
-JOIN sys.server_principals       sr ON sr.principal_id        = rm.role_principal_id
-WHERE sr.name        = &#39;sysadmin&#39;
-  AND sp.type        IN (&#39;S&#39;,&#39;U&#39;,&#39;G&#39;,&#39;R&#39;)
-  AND sp.principal_id &gt; 1
-  $disabledFilter
-ORDER BY sp.type_desc, sp.name;
-&quot;@
-				$rows = Invoke-DbaQuery @connParams -Query $query -EnableException:$EnableException
-				
-				if (-not $rows)
-				{
-					$msg = &quot;Keine sysadmin-Logins auf &#39;$instance&#39; gefunden (unerwartet).&quot;
-					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level &quot;WARNING&quot;
-					$detailRows.Add([PSCustomObject]@{
-							SqlInstance	       = $instance
-							LoginName		   = &#39;(keine)&#39;
-							LoginType		   = &#39;n/a&#39;
-							IsEnabled		   = $null
-							IsSa			   = $false
-							LastPasswordChange = $null
-							LastLogin		   = $null
-							CreateDate		   = $null
-							Status			   = &#39;Error&#39;
-							Message		       = $msg
-						})
-				}
-				else
-				{
-					Invoke-sqmLogging -Message &quot;[$instance] $($rows.Count) sysadmin-Login(s) gefunden.&quot; -FunctionName $functionName -Level &quot;INFO&quot;
-					
-					foreach ($row in $rows)
-					{
-						$loginName = $row.LoginName
-						$isSa = [bool]$row.IsSa
-						$isEnabled = -not [bool]$row.IsDisabled
-						$excluded = _IsExcluded $loginName $ExcludeLogin
-						$isBuiltinAdmins = ($loginName -eq &#39;BUILTIN\Administrators&#39;)
-						
-						$status = if ($isSa) { &#39;SA&#39; }
-						elseif ($isBuiltinAdmins) { &#39;BuiltinAdmins&#39; }
-						elseif ($excluded) { &#39;Excluded&#39; }
-						elseif (-not $isEnabled) { &#39;Disabled&#39; }
-						else { &#39;Unexpected&#39; }
-						
-						$msg = switch ($status)
-						{
-							&#39;SA&#39;            { &#39;SA-Konto (SID 0x01).&#39; }
-							&#39;BuiltinAdmins&#39; { &#39;BUILTIN\Administrators hat Sysadmin-Rechte - SICHERHEITSPRueFUNG ERFORDERLICH.&#39; }
-							&#39;Excluded&#39;      { &#39;Ausgeschlossen via -ExcludeLogin.&#39; }
-							&#39;Disabled&#39;      { &#39;Login hat sysadmin-Rechte, ist aber deaktiviert.&#39; }
-							&#39;Unexpected&#39;    { &#39;Sysadmin-Login - kein Ausschluss definiert.&#39; }
-						}
-						
-						$createDate = if ($row.CreateDate) { $row.CreateDate.ToString(&#39;yyyy-MM-dd&#39;) }
-						else { $null }
-						
-						$detailRows.Add([PSCustomObject]@{
-								SqlInstance = $instance
-								LoginName   = $loginName
-								LoginType   = $row.LoginType
-								IsEnabled   = $isEnabled
-								IsSa	    = $isSa
-								LastPasswordChange = $null # Nicht verfuegbar in aelteren Versionen
-								LastLogin   = $null # Nicht verfuegbar in aelteren Versionen
-								CreateDate  = $createDate
-								Status	    = $status
-								Message	    = $msg
-							})
-					}
-				}
-				
-				# Statistik
-				$cntSa = ($detailRows | Where-Object Status -eq &#39;SA&#39;).Count
-				$cntExcluded = ($detailRows | Where-Object Status -eq &#39;Excluded&#39;).Count
-				$cntDisabled = ($detailRows | Where-Object Status -eq &#39;Disabled&#39;).Count
-				$cntUnexpected = ($detailRows | Where-Object Status -eq &#39;Unexpected&#39;).Count
-				$cntBuiltinAdmins = ($detailRows | Where-Object Status -eq &#39;BuiltinAdmins&#39;).Count
-				
-				Invoke-sqmLogging -Message (&quot;[$instance] Gesamt: $($detailRows.Count) | SA: $cntSa | Ausgeschlossen: $cntExcluded | &quot; +
-					&quot;Deaktiviert: $cntDisabled | Unerwartet: $cntUnexpected | BUILTIN\\Admins: $cntBuiltinAdmins&quot;) -FunctionName $functionName -Level &quot;INFO&quot;
-				
-				# Dateien schreiben
-				$timestamp = Get-Date -Format &#39;yyyy-MM-dd HH:mm:ss&#39;
-				$datestamp = Get-Date -Format &#39;yyyy-MM-dd&#39;
-				$safeInst = $instance -replace &#39;[\\/:*?&quot;&lt;&gt;|]&#39;, &#39;_&#39;
-				$txtFile = Join-Path $OutputPath &quot;SysadminAccounts_${safeInst}_${datestamp}.txt&quot;
-				$csvFile = Join-Path $OutputPath &quot;SysadminAccounts_${safeInst}_${datestamp}.csv&quot;
-				
-				if ($PSCmdlet.ShouldProcess($instance, &quot;Erstelle Sysadmin-Bericht in $OutputPath&quot;))
-				{
-					if (-not (Test-Path $OutputPath))
-					{
-						New-Item -ItemType Directory -Path $OutputPath -Force -ErrorAction Stop | Out-Null
-						Invoke-sqmLogging -Message &quot;Verzeichnis $OutputPath wurde erstellt.&quot; -FunctionName $functionName -Level &quot;INFO&quot;
-					}
-					
-					# TXT-Bericht (identisch zum vorherigen, daher hier ausgelassen - bitte aus Original uebernehmen)
-					# ... (der Code fuer die TXT-Erstellung bleibt unveraendert)
-					$lines = [System.Collections.Generic.List[string]]::new()
-					$lines.Add(&quot;# ================================================================&quot;)
-					$lines.Add(&quot;# MSSQLTools - Sysadmin-Konten Bericht&quot;)
-					$lines.Add(&quot;# Instanz   : $instance&quot;)
-					$lines.Add(&quot;# Erstellt  : $timestamp&quot;)
-					$lines.Add(&quot;# Gesamt    : $($detailRows.Count) Logins&quot;)
-					$lines.Add(&quot;# SA        : $cntSa&quot;)
-					$lines.Add(&quot;# Ausgesch. : $cntExcluded&quot;)
-					$lines.Add(&quot;# Deaktiv.  : $cntDisabled&quot;)
-					$lines.Add(&quot;# Unerwartet: $cntUnexpected  ? PRueFEN&quot;)
-					$lines.Add(&quot;# BUILTIN\\Adm: $cntBuiltinAdmins  ? SICHERHEITSPRueFUNG&quot;)
-					$lines.Add(&quot;# SysExclude: $(if ($ExcludeSysAccounts) { &#39;Ja (NT SERVICE\*, NT AUTHORITY\*, ##MS_*##)&#39; }
-							else { &#39;Nein (manuell via -ExcludeLogin)&#39; })&quot;)
-					$lines.Add(&quot;# ================================================================&quot;)
-					
-					# BUILTIN\Administrators
-					$builtinEntries = $detailRows | Where-Object { $_.Status -eq &#39;BuiltinAdmins&#39; }
-					$lines.Add(&quot;&quot;); $lines.Add(&quot;# ================================================================&quot;)
-					$lines.Add(&quot;# BUILTIN\Administrators - SICHERHEITSPRueFUNG ERFORDERLICH ($cntBuiltinAdmins)&quot;)
-					$lines.Add(&quot;# ================================================================&quot;)
-					if ($builtinEntries)
-					{
-						foreach ($e in $builtinEntries)
-						{
-							$lines.Add((&quot;  Name   : {0}&quot; -f $e.LoginName))
-							$lines.Add((&quot;  Typ    : {0}  |  Aktiv: {1}  |  Erstellt: {2}&quot; -f $e.LoginType, $e.IsEnabled, $e.CreateDate))
-							$lines.Add(&quot;  ? Empfehlung: Pruefen ob BUILTIN\Administrators Sysadmin-Rechte&quot;)
-							$lines.Add(&quot;    gemaess Sicherheitsrichtlinie zulaessig sind. Ggf. entfernen:&quot;)
-							$lines.Add(&quot;    EXEC sp_dropsrvrolemember &#39;BUILTIN\Administrators&#39;,&#39;sysadmin&#39;;&quot;)
-						}
-					}
-					else { $lines.Add(&quot;  (nicht vorhanden - kein Befund)&quot;) }
-					
-					# Unerwartete Konten
-					$unexpected = $detailRows | Where-Object { $_.Status -eq &#39;Unexpected&#39; }
-					$lines.Add(&quot;&quot;); $lines.Add(&quot;# ----------------------------------------------------------------&quot;)
-					$lines.Add(&quot;# UNERWARTETE SYSADMIN-KONTEN ($cntUnexpected)  ? PRueFEN&quot;)
-					$lines.Add(&quot;# ----------------------------------------------------------------&quot;)
-					if ($unexpected)
-					{
-						foreach ($e in ($unexpected | Sort-Object LoginType, LoginName))
-						{
-							$lines.Add((&quot;  {0,-40} {1,-20} Enabled:{2,-5} Erstellt:{3}&quot; -f $e.LoginName, $e.LoginType, $e.IsEnabled, $e.CreateDate))
-						}
-					}
-					else { $lines.Add(&quot;  (keine)&quot;) }
-					
-					# Deaktivierte Konten
-					$disabledEntries = $detailRows | Where-Object { $_.Status -eq &#39;Disabled&#39; }
-					$lines.Add(&quot;&quot;); $lines.Add(&quot;# ----------------------------------------------------------------&quot;)
-					$lines.Add(&quot;# DEAKTIVIERTE SYSADMIN-KONTEN ($cntDisabled)&quot;)
-					$lines.Add(&quot;# ----------------------------------------------------------------&quot;)
-					if ($disabledEntries)
-					{
-						foreach ($e in ($disabledEntries | Sort-Object LoginName))
-						{
-							$lines.Add(&quot;  $($e.LoginName)  [$($e.LoginType)]  Erstellt: $($e.CreateDate)&quot;)
-						}
-					}
-					else { $lines.Add(&quot;  (keine)&quot;) }
-					
-					# SA-Konto
-					$saEntry = $detailRows | Where-Object { $_.Status -eq &#39;SA&#39; }
-					$lines.Add(&quot;&quot;); $lines.Add(&quot;# ----------------------------------------------------------------&quot;)
-					$lines.Add(&quot;# SA-KONTO (SID 0x01)&quot;)
-					$lines.Add(&quot;# ----------------------------------------------------------------&quot;)
-					if ($saEntry)
-					{
-						foreach ($e in $saEntry)
-						{
-							$lines.Add((&quot;  Name: {0,-40} Enabled: {1}&quot; -f $e.LoginName, $e.IsEnabled))
-						}
-					}
-					else { $lines.Add(&quot;  (nicht gefunden)&quot;) }
-					
-					# Ausgeschlossene Konten
-					$excludedEntries = $detailRows | Where-Object { $_.Status -eq &#39;Excluded&#39; }
-					$lines.Add(&quot;&quot;); $lines.Add(&quot;# ----------------------------------------------------------------&quot;)
-					$lines.Add(&quot;# AUSGESCHLOSSENE KONTEN ($cntExcluded)&quot;)
-					$lines.Add(&quot;# ----------------------------------------------------------------&quot;)
-					if ($excludedEntries)
-					{
-						foreach ($e in ($excludedEntries | Sort-Object LoginType, LoginName))
-						{
-							$lines.Add((&quot;  {0,-40} {1,-20} Enabled:{2}&quot; -f $e.LoginName, $e.LoginType, $e.IsEnabled))
-						}
-					}
-					else { $lines.Add(&quot;  (keine)&quot;) }
-					
-					$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
-					$detailRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
-					
-					Invoke-sqmLogging -Message &quot;[$instance] Bericht erstellt: $txtFile&quot; -FunctionName $functionName -Level &quot;INFO&quot;
-				}
-				else
-				{
-					Invoke-sqmLogging -Message &quot;[$instance] WhatIf: Berichtsdateien wuerden erstellt werden.&quot; -FunctionName $functionName -Level &quot;VERBOSE&quot;
-					$txtFile = $null
-					$csvFile = $null
-				}
-				
-				if ($cntBuiltinAdmins -gt 0)
-				{
-					Invoke-sqmLogging -Message (&quot;[$instance] BUILTIN\Administrators hat Sysadmin-Rechte - Sicherheitspruefung erforderlich!&quot;) -FunctionName $functionName -Level &quot;WARNING&quot;
-				}
-				if ($cntUnexpected -gt 0)
-				{
-					Invoke-sqmLogging -Message (&quot;[$instance] $cntUnexpected unerwartete(s) sysadmin-Konto(en) gefunden.&quot;) -FunctionName $functionName -Level &quot;WARNING&quot;
-				}
-				
-				$instanceResult = [PSCustomObject]@{
-					SqlInstance							     = $instance
-					Timestamp							     = $timestamp
-					DetailRows							     = $detailRows
-					TxtFile								     = $txtFile
-					CsvFile								     = $csvFile
-					Status								     = if ($cntUnexpected -gt 0 -or $cntBuiltinAdmins -gt 0) { &#39;Warning&#39; } else { &#39;OK&#39; }
-				}
-				$allInstanceResults.Add($instanceResult)
-			}
-			catch
-			{
-				$errMsg = &quot;Fehler auf &#39;$instance&#39;: $($_.Exception.Message)&quot;
-				Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level &quot;ERROR&quot;
-				$allInstanceResults.Add([PSCustomObject]@{
-						SqlInstance = $instance
-						Status	    = &#39;Error&#39;
-						Message	    = $errMsg
-						DetailRows  = $null
-						TxtFile	    = $null
-						CsvFile	    = $null
-					})
-				if ($EnableException) { throw }
-				if (-not $ContinueOnError) { throw $_ }
-			}
-		}
-	}
-	
-	end
-	{
-		Invoke-sqmLogging -Message &quot;$functionName abgeschlossen. $($allInstanceResults.Count) Instanzen verarbeitet.&quot; -FunctionName $functionName -Level &quot;INFO&quot;
-		return $allInstanceResults
-	}
-}</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example-label">Beispiel</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmSysadminAccounts -SqlInstance &quot;SQL01&quot; -ExcludeSysAccounts</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+</div>
 	</div>
 	</div>
 	</div>
@@ -1375,15 +1129,62 @@ ORDER BY sp.type_desc, sp.name;
 	<span class="psdb-st-badge psdb-st-badge-sicherheit">Sicherheit</span>
 	</div>
 	<div class="psdb-st-func-desc">Comprehensive audit of all SQL Server logins on one or more instances.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">&#9658; 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Invoke-sqmLoginAudit</div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmAgHealthReport</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmAgHealthReport -SqlInstance &quot;SQL01&quot; -MaxRedoQueueMB 200 -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmPatchAnalysis -SqlInstance &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">&quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; | Invoke-sqmPatchAnalysis</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmPatchAnalysis -SqlInstance &quot;SQL01&quot;,&quot;SQL02&quot; -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration -ComputerName &quot;SSRS01&quot; -DatabaseServer &quot;AG_Listener&quot; -PbmPolicyName &quot;Password Policy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Lokalen Server analysieren - Report wird automatisch im Browser geoeffnet
+    Get-sqmServerHardwareReport</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Remote-Server
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Mehrere Server, eigener Report-Pfad
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; -ReportPath &quot;C:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Nur speichern, nicht oeffnen - Dateipfad zurueckgeben
+    $path = Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -NoOpen -PassThru
+    Write-Host &quot;Report: $path&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># CSV-Export fuer Weiterverarbeitung in Excel
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot; -OutputFormat CSV -NoOpen</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Alle Formate auf einmal (HTML + CSV + TXT)
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -OutputFormat All -NoOpen -PassThru</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Read BackupDirectory from the local server
+$backupPath = Get-sqmServerSetting -Name &quot;BackupDirectory&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Show all properties
+Get-sqmServerSetting -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># All properties from a remote instance with credentials
+$cred = Get-Credential
+Get-sqmServerSetting -SqlInstance &quot;SQL01&quot; -SqlCredential $cred -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Basic deploy with automatic backup
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Deploy with job number embedded in log filename
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -JobNumber &quot;AU-2026-042&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Skip backup - requires interactive confirmation
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SkipBackup</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># WhatIf dry run - no SQL executed, only pre-checks and summary table
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -WhatIf</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># No outer transaction - scripts manage their own transactions
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -NoWrapTransaction</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># SQL Server authentication
+    $cred = Get-Credential
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SqlCredential $cred</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmLoginAudit</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Invoke-sqmLoginAudit -SqlInstance "SQL01" -CheckAdOrphans -IncludeSystemLogins</div>
+	<div class="psdb-st-example-label">Beispiel</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmLoginAudit -SqlInstance &quot;SQL01&quot; -CheckAdOrphans -IncludeSystemLogins</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+</div>
 	</div>
 	</div>
 	</div>
@@ -1615,23 +1416,16 @@ ORDER BY sp.type_desc, sp.name;
 	<div class="psdb-st-func-card" id="f-getsqmsqlinstancecheck">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Get-sqmSQLInstanceCheck</span>
-	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
+	<span class="psdb-st-badge psdb-st-badge psdb-st-badge-diagnose">diagnose</span>
 	</div>
 	<div class="psdb-st-func-desc">Checks a SQL Server instance against best practices.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">&#9658; 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Get-sqmSQLInstanceCheck</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmSQLInstanceCheck</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmSQLInstanceCheck</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmSQLInstanceCheck -SqlInstance &quot;SQL01\INSTANCE&quot; -Detailed</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
 	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Get-sqmSQLInstanceCheck -SqlInstance "SQL01\INSTANCE" -Detailed</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmSQLInstanceCheck -SqlInstance &quot;SQL01\INSTANCE&quot; -Detailed</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-getsqmtempdbrecommendation">
+</div>
+<div class="psdb-st-func-card" id="f-getsqmtempdbrecommendation">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Get-sqmTempDbRecommendation</span>
 	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
@@ -1639,128 +1433,65 @@ ORDER BY sp.type_desc, sp.name;
 	<div class="psdb-st-func-desc">Analyzes the TempDB configuration and provides optimization recommendations.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 1 Beispiel anzeigen</div>
 	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Get-sqmTempDbRecommendation -SqlInstance "SQL01"</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">#&gt;
-function Get-sqmTempDbRecommendation
-{
-	[CmdletBinding()]
-	[OutputType([PSCustomObject])]
-	param (
-		[Parameter(Mandatory = $false)]
-		[string]$SqlInstance = $env:COMPUTERNAME,
-		[Parameter(Mandatory = $false)]
-		[System.Management.Automation.PSCredential]$SqlCredential,
-		[Parameter(Mandatory = $false)]
-		[string]$OutputPath,
-		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
-	)
 	
-	begin
-	{
-		$functionName = $MyInvocation.MyCommand.Name
-		if (-not (Get-Module -ListAvailable -Name dbatools))
-		{
-			throw &quot;dbatools-Modul nicht gefunden.&quot;
-		}
-	}
-	
-	process
-	{
-		try
-		{
-			$server = Connect-DbaInstance -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction Stop
-			$tempdb = $server.Databases[&#39;tempdb&#39;]
-			$cpuCount = $server.Processors
-			$idealFileCount = [Math]::Min($cpuCount, 8)
-			
-			$files = $tempdb.FileGroups[0].Files
-			$fileCount = $files.Count
-			$fileSizeMB = $files | ForEach-Object { [math]::Round($_.Size / 1024, 2) }
-			$fileGrowth = $files.ForEach(&#39;Growth&#39;) | ForEach-Object { ($_ / 1024) } # in MB
-			$growthTypes = $files.ForEach(&#39;GrowthType&#39;)
-			$paths = $files.ForEach(&#39;FileName&#39;) | ForEach-Object { Split-Path $_ -Parent }
-			
-			# Bewertung
-			$status = &#39;OK&#39;
-			$messages = [System.Collections.Generic.List[string]]::new()
-			if ($fileCount -ne $idealFileCount)
-			{
-				$status = &#39;Warning&#39;
-				$messages.Add(&quot;Anzahl TempDB-Dateien: $fileCount (empfohlen $idealFileCount).&quot;)
-			}
-			$sizeDifferences = ($fileSizeMB | Select-Object -Unique).Count -gt 1
-			if ($sizeDifferences)
-			{
-				$status = &#39;Warning&#39;
-				$messages.Add(&quot;TempDB-Dateien haben unterschiedliche Groessen: $($fileSizeMB -join &#39;, &#39;) MB.&quot;)
-			}
-			$hasPercent = $growthTypes -contains &#39;Percent&#39;
-			if ($hasPercent)
-			{
-				$status = &#39;Warning&#39;
-				$messages.Add(&quot;Autogrow in Prozent wird verwendet (MB empfohlen).&quot;)
-			}
-			$hasLargeGrow = $fileGrowth -gt 1024
-			if ($hasLargeGrow)
-			{
-				$status = &#39;Warning&#39;
-				$messages.Add(&quot;Autogrow-Schrittweite &gt;1024 MB: $($fileGrowth -join &#39;, &#39;) MB.&quot;)
-			}
-			$uniquePaths = $paths | Select-Object -Unique
-			if ($uniquePaths.Count -eq 1)
-			{
-				$messages.Add(&quot;Alle TempDB-Dateien liegen auf demselben Laufwerk ($($uniquePaths[0])) - fuer optimale Leistung separate Laufwerke empfehlenswert.&quot;)
-				if ($status -eq &#39;OK&#39;) { $status = &#39;Info&#39; }
-			}
-			if ($messages.Count -eq 0) { $messages.Add(&quot;TempDB-Konfiguration ist optimal.&quot;) }
-			
-			$result = [PSCustomObject]@{
-				SqlInstance	     = $SqlInstance
-				Status		     = $status
-				FileCount	     = $fileCount
-				RecommendedCount = $idealFileCount
-				FileSizesMB	     = $fileSizeMB
-				GrowthMB		 = $fileGrowth
-				Paths		     = $paths
-				Recommendations  = ($messages -join &#39; &#39;)
-			}
-			
-			if ($OutputPath) { $result | Export-Csv -Path $OutputPath -NoTypeInformation -Encoding UTF8 -Force }
-			return $result
-		}
-		catch
-		{
-			Invoke-sqmLogging -Message $_.Exception.Message -FunctionName $functionName -Level &quot;ERROR&quot;
-			if ($EnableException) { throw }
-			return $null
-		}
-	}
-}</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-invokesqmpatchanalysis">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Invoke-sqmPatchAnalysis</span>
-	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnose</span>
-	</div>
-	<div class="psdb-st-func-desc">Compares the installed SQL Server version with known CU/SP builds.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Invoke-sqmPatchAnalysis -SqlInstance "SQL01"</div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">&quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; | Invoke-sqmPatchAnalysis</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmPatchAnalysis -SqlInstance &quot;SQL01&quot;,&quot;SQL02&quot; -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">&quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; | Invoke-sqmPatchAnalysis</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmPatchAnalysis -SqlInstance &quot;SQL01&quot;,&quot;SQL02&quot; -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration -ComputerName &quot;SSRS01&quot; -DatabaseServer &quot;AG_Listener&quot; -PbmPolicyName &quot;Password Policy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Lokalen Server analysieren - Report wird automatisch im Browser geoeffnet
+    Get-sqmServerHardwareReport</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Remote-Server
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Mehrere Server, eigener Report-Pfad
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; -ReportPath &quot;C:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Nur speichern, nicht oeffnen - Dateipfad zurueckgeben
+    $path = Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -NoOpen -PassThru
+    Write-Host &quot;Report: $path&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># CSV-Export fuer Weiterverarbeitung in Excel
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot; -OutputFormat CSV -NoOpen</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Alle Formate auf einmal (HTML + CSV + TXT)
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -OutputFormat All -NoOpen -PassThru</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Read BackupDirectory from the local server
+$backupPath = Get-sqmServerSetting -Name &quot;BackupDirectory&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Show all properties
+Get-sqmServerSetting -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># All properties from a remote instance with credentials
+$cred = Get-Credential
+Get-sqmServerSetting -SqlInstance &quot;SQL01&quot; -SqlCredential $cred -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Basic deploy with automatic backup
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Deploy with job number embedded in log filename
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -JobNumber &quot;AU-2026-042&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Skip backup - requires interactive confirmation
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SkipBackup</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># WhatIf dry run - no SQL executed, only pre-checks and summary table
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -WhatIf</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># No outer transaction - scripts manage their own transactions
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -NoWrapTransaction</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># SQL Server authentication
+    $cred = Get-Credential
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SqlCredential $cred</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmPatchAnalysis -SqlInstance &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">"SQL01","SQL02","SQL03" | Invoke-sqmPatchAnalysis</div>
+	<div class="psdb-st-example-label">Beispiel</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">&quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; | Invoke-sqmPatchAnalysis</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Invoke-sqmPatchAnalysis -SqlInstance "SQL01","SQL02" -OutputPath "D:\Reports"</div>
+	<div class="psdb-st-example-label">Beispiel</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmPatchAnalysis -SqlInstance &quot;SQL01&quot;,&quot;SQL02&quot; -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+</div>
 	</div>
 	</div>
 	</div>
@@ -2229,19 +1960,15 @@ function Get-sqmTempDbRecommendation
 	<div class="psdb-st-func-card" id="f-comparesqmserverconfiguration">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Compare-sqmServerConfiguration</span>
-	<span class="psdb-st-badge psdb-st-badge-konfiguration">Konfiguration</span>
+	<span class="psdb-st-badge psdb-st-badge psdb-st-badge-konfiguration">konfiguration</span>
 	</div>
 	<div class="psdb-st-func-desc">Compares important configuration settings between two SQL Server instances.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 1 Beispiel anzeigen</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">&#9658; 1 Beispiel anzeigen</div>
 	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Compare-sqmServerConfiguration -SourceInstance "SQL01" -TargetInstance "SQL02"</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Compare-sqmServerConfiguration -SourceInstance &quot;SQL01&quot; -TargetInstance &quot;SQL02&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Compare-sqmServerConfiguration -SourceInstance &quot;SQL01&quot; -TargetInstance &quot;SQL02&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
 	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-getsqmconfig">
+</div>
+<div class="psdb-st-func-card" id="f-getsqmconfig">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Get-sqmConfig</span>
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">Konfiguration</span>
@@ -2253,54 +1980,72 @@ function Get-sqmTempDbRecommendation
 	<div class="psdb-st-example-label">Get-sqmConfig</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmConfig</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
+	
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Show all properties
+Get-sqmServerSetting -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># All properties from a remote instance with credentials
+$cred = Get-Credential
+Get-sqmServerSetting -SqlInstance &quot;SQL01&quot; -SqlCredential $cred -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">&quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; | Invoke-sqmPatchAnalysis</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmPatchAnalysis -SqlInstance &quot;SQL01&quot;,&quot;SQL02&quot; -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration -ComputerName &quot;SSRS01&quot; -DatabaseServer &quot;AG_Listener&quot; -PbmPolicyName &quot;Password Policy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Lokalen Server analysieren - Report wird automatisch im Browser geoeffnet
+    Get-sqmServerHardwareReport</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Remote-Server
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Mehrere Server, eigener Report-Pfad
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; -ReportPath &quot;C:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Nur speichern, nicht oeffnen - Dateipfad zurueckgeben
+    $path = Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -NoOpen -PassThru
+    Write-Host &quot;Report: $path&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># CSV-Export fuer Weiterverarbeitung in Excel
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot; -OutputFormat CSV -NoOpen</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Alle Formate auf einmal (HTML + CSV + TXT)
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -OutputFormat All -NoOpen -PassThru</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Read BackupDirectory from the local server
+$backupPath = Get-sqmServerSetting -Name &quot;BackupDirectory&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Show all properties
+Get-sqmServerSetting -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># All properties from a remote instance with credentials
+$cred = Get-Credential
+Get-sqmServerSetting -SqlInstance &quot;SQL01&quot; -SqlCredential $cred -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Basic deploy with automatic backup
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Deploy with job number embedded in log filename
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -JobNumber &quot;AU-2026-042&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Skip backup - requires interactive confirmation
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SkipBackup</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># WhatIf dry run - no SQL executed, only pre-checks and summary table
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -WhatIf</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># No outer transaction - scripts manage their own transactions
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -NoWrapTransaction</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># SQL Server authentication
+    $cred = Get-Credential
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SqlCredential $cred</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Read BackupDirectory from the local server
+$backupPath = Get-sqmServerSetting -Name &quot;BackupDirectory&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Get-sqmConfig -Key 'OutputPath'</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">#&gt;
-function Get-sqmConfig
-{
-	[CmdletBinding()]
-	param (
-		[Parameter(Mandatory = $false)]
-		[string]$Key
-	)
-	if ($Key)
-	{
-		if ($script:sqmModuleConfig.ContainsKey($Key))
-		{
-			return $script:sqmModuleConfig[$Key]
-		}
-		else
-		{
-			Write-Warning &quot;Konfigurationsschluessel &#39;$Key&#39; existiert nicht. Verfuegbare Schluessel: $($script:sqmModuleConfig.Keys -join &#39;, &#39;)&quot;
-			return $null
-		}
-	}
-	return $script:sqmModuleConfig
-}</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-getsqmserversetting">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Get-sqmServerSetting</span>
-	<span class="psdb-st-badge psdb-st-badge-konfiguration">Konfiguration</span>
-	</div>
-	<div class="psdb-st-func-desc">Reads one or all server properties from a SQL Server instance.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Read BackupDirectory from the local server</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">$backupPath = Get-sqmServerSetting -Name &quot;BackupDirectory&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example-label">Beispiel</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Show all properties
+Get-sqmServerSetting -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Show all properties</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmServerSetting -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># All properties from a remote instance with credentials</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">$cred = Get-Credential
+	<div class="psdb-st-example-label">Beispiel</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># All properties from a remote instance with credentials
+$cred = Get-Credential
 Get-sqmServerSetting -SqlInstance &quot;SQL01&quot; -SqlCredential $cred -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+</div>
 	</div>
 	</div>
 	</div>
@@ -2401,365 +2146,14 @@ Get-sqmServerSetting -SqlInstance &quot;SQL01&quot; -SqlCredential $cred -All</p
 	<div class="psdb-st-func-desc">Sets one or more configuration values for the MSSQLTools module.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 4 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Set-sqmConfig -LogPath "D:\Logs" -OlaJobNameFull "Prod-FULL"</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmConfig -LogPath &quot;D:\Logs&quot; -OlaJobNameFull &quot;Prod-FULL&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Set-sqmConfig -TsmManagementClasses @('MC_10','MC_30','MC_100')</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmConfig -TsmManagementClasses @(&#39;MC_10&#39;,&#39;MC_30&#39;,&#39;MC_100&#39;)</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Set-sqmConfig -HpuDomainGroupMap @(</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">        [PSCustomObject]@{ DomainPattern = &#39;*.sfinance.net&#39;; GroupNamePattern = &#39;Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod&#39; },
-        [PSCustomObject]@{ DomainPattern = &#39;*&#39;;              GroupNamePattern = &#39;Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod&#39; }
-    )</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Set-sqmConfig -SsrsInstallerPath '\\srv-share\Software\SSRS2022\SQLServerReportingServices.exe'</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">#&gt;
-function Set-sqmConfig
-{
-	[CmdletBinding(SupportsShouldProcess = $true)]
-	param (
-		[Parameter(Mandatory = $false)]
-		[string]$LogPath,
-		[Parameter(Mandatory = $false)]
-		[string]$OutputPath,
-		[Parameter(Mandatory = $false)]
-		[string]$CentralPath,
-		[Parameter(Mandatory = $false)]
-		[string]$OlaJobNameFull,
-		[Parameter(Mandatory = $false)]
-		[string]$OlaJobNameDiff,
-		[Parameter(Mandatory = $false)]
-		[string]$OlaJobNameLog,
-		[Parameter(Mandatory = $false)]
-		[string]$OlaJobNameIndexOpt,
-		[Parameter(Mandatory = $false)]
-		[string]$OlaJobNameIntUserDb,
-		[Parameter(Mandatory = $false)]
-		[string]$OlaJobNameIntSysDb,
-		[Parameter(Mandatory = $false)]
-		[string]$OlaJobNameSysDbBackup,
-		[Parameter(Mandatory = $false)]
-		[string[]]$TsmManagementClasses,
-		[Parameter(Mandatory = $false)]
-		[bool]$AutoUpdate,
-		[Parameter(Mandatory = $false)]
-		[string]$UpdateRepository,
-		[Parameter(Mandatory = $false)]
-		[string]$DefaultPolicy,
-		[Parameter(Mandatory = $false)]
-		[PSCustomObject[]]$HpuDomainGroupMap,
-		[Parameter(Mandatory = $false)]
-		[string]$SsrsInstallerPath,
-		[Parameter(Mandatory = $false)]
-		[ValidateSet(&#39;Auto&#39;, &#39;FiTs&#39;, &#39;Generic&#39;)]
-		[string]$CheckProfile,
-		[Parameter(Mandatory = $false)]
-		[ValidateRange(1, 1000)]
-		[int]$CheckCostThresholdMin,
-		[Parameter(Mandatory = $false)]
-		[ValidateRange(1, 64)]
-		[int]$CheckTempDbMaxFiles,
-		[Parameter(Mandatory = $false)]
-		[ValidateSet(4096, 8192, 16384, 32768, 65536, 131072)]
-		[int]$CheckDiskBlockSize,
-		[Parameter(Mandatory = $false)]
-		[ValidateSet(&#39;de-DE&#39;, &#39;en-US&#39;)]
-		[string]$Language,
-		[Parameter(Mandatory = $false)]
-		[switch]$PassThru
-	)
-	
-	# Hilfsfunktion zum Pruefen/Erstellen eines Pfads
-	# Pfad-Existenz und Schreibbarkeit werden geprueft wenn moeglich.
-	# Nicht-erreichbare Pfade erzeugen nur eine Warnung - kein Fehler.
-	# Konfiguration wird trotzdem gespeichert (Pfad kann spaeter entstehen).
-	function Test-AndCreatePath($Path, $Purpose)
-	{
-		if (-not $Path) { return $true }
-		if ($Path -match &#39;^\s*$&#39;)
-		{
-			Write-Error &quot;Pfad fuer $Purpose darf nicht leer sein.&quot;
-			return $false
-		}
-		try
-		{
-			if (-not (Test-Path $Path))
-			{
-				New-Item -ItemType Directory -Path $Path -Force -ErrorAction Stop | Out-Null
-				Write-Verbose &quot;Verzeichnis &#39;$Path&#39; ($Purpose) wurde erstellt.&quot;
-			}
-			# Schreibtest nur wenn Pfad erreichbar - Fehler hier ist nicht kritisch
-			try
-			{
-				$testFile = Join-Path $Path &quot;test_$(Get-Random).tmp&quot;
-				New-Item -ItemType File -Path $testFile -Force -ErrorAction Stop | Out-Null
-				Remove-Item -Path $testFile -Force -ErrorAction SilentlyContinue
-			}
-			catch
-			{
-				Write-Warning &quot;Pfad &#39;$Path&#39; ($Purpose) ist nicht beschreibbar: $($_.Exception.Message). Konfiguration wird trotzdem gespeichert.&quot;
-			}
-			return $true
-		}
-		catch
-		{
-			# Verzeichnis konnte nicht erstellt werden - nur warnen, nicht abbrechen
-			Write-Warning &quot;Pfad &#39;$Path&#39; ($Purpose) konnte nicht erstellt werden: $($_.Exception.Message). Wird spaeter automatisch angelegt. Konfiguration wird gespeichert.&quot;
-			return $true
-		}
-	}
-	
-	$updated = $false
-	$globalConfig = $script:sqmModuleConfig
-	
-	# Pfad-Parameter
-	if ($PSBoundParameters.ContainsKey(&#39;LogPath&#39;))
-	{
-		if (Test-AndCreatePath $LogPath &quot;LogPath&quot;)
-		{
-			$globalConfig[&#39;LogPath&#39;] = $LogPath
-			$updated = $true
-		}
-		else { return }
-	}
-	if ($PSBoundParameters.ContainsKey(&#39;OutputPath&#39;))
-	{
-		if (Test-AndCreatePath $OutputPath &quot;OutputPath&quot;)
-		{
-			$globalConfig[&#39;OutputPath&#39;] = $OutputPath
-			$updated = $true
-		}
-		else { return }
-	}
-	if ($PSBoundParameters.ContainsKey(&#39;CentralPath&#39;))
-	{
-		if ($CentralPath)
-		{
-			if (Test-AndCreatePath $CentralPath &quot;CentralPath&quot;)
-			{
-				$globalConfig[&#39;CentralPath&#39;] = $CentralPath
-				$updated = $true
-			}
-			else { return }
-		}
-		else
-		{
-			$globalConfig[&#39;CentralPath&#39;] = $null
-			$updated = $true
-		}
-	}
-	
-	# Ola-Job-Namen
-	if ($PSBoundParameters.ContainsKey(&#39;OlaJobNameFull&#39;))
-	{
-		if (-not [string]::IsNullOrWhiteSpace($OlaJobNameFull))
-		{
-			$globalConfig[&#39;OlaJobNameFull&#39;] = $OlaJobNameFull
-			$updated = $true
-		}
-		else { Write-Error &quot;OlaJobNameFull darf nicht leer sein.&quot;; return }
-	}
-	if ($PSBoundParameters.ContainsKey(&#39;OlaJobNameDiff&#39;))
-	{
-		if (-not [string]::IsNullOrWhiteSpace($OlaJobNameDiff))
-		{
-			$globalConfig[&#39;OlaJobNameDiff&#39;] = $OlaJobNameDiff
-			$updated = $true
-		}
-		else { Write-Error &quot;OlaJobNameDiff darf nicht leer sein.&quot;; return }
-	}
-	if ($PSBoundParameters.ContainsKey(&#39;OlaJobNameLog&#39;))
-	{
-		if (-not [string]::IsNullOrWhiteSpace($OlaJobNameLog))
-		{
-			$globalConfig[&#39;OlaJobNameLog&#39;] = $OlaJobNameLog
-			$updated = $true
-		}
-		else { Write-Error &quot;OlaJobNameLog darf nicht leer sein.&quot;; return }
-	}
-	if ($PSBoundParameters.ContainsKey(&#39;OlaJobNameIndexOpt&#39;))
-	{
-		if (-not [string]::IsNullOrWhiteSpace($OlaJobNameIndexOpt))
-		{
-			$globalConfig[&#39;OlaJobNameIndexOpt&#39;] = $OlaJobNameIndexOpt
-			$updated = $true
-		}
-		else { Write-Error &quot;OlaJobNameIndexOpt darf nicht leer sein.&quot;; return }
-	}
-	if ($PSBoundParameters.ContainsKey(&#39;OlaJobNameIntUserDb&#39;))
-	{
-		if (-not [string]::IsNullOrWhiteSpace($OlaJobNameIntUserDb))
-		{
-			$globalConfig[&#39;OlaJobNameIntUserDb&#39;] = $OlaJobNameIntUserDb
-			$updated = $true
-		}
-		else { Write-Error &quot;OlaJobNameIntUserDb darf nicht leer sein.&quot;; return }
-	}
-	if ($PSBoundParameters.ContainsKey(&#39;OlaJobNameIntSysDb&#39;))
-	{
-		if (-not [string]::IsNullOrWhiteSpace($OlaJobNameIntSysDb))
-		{
-			$globalConfig[&#39;OlaJobNameIntSysDb&#39;] = $OlaJobNameIntSysDb
-			$updated = $true
-		}
-		else { Write-Error &quot;OlaJobNameIntSysDb darf nicht leer sein.&quot;; return }
-	}
-	if ($PSBoundParameters.ContainsKey(&#39;OlaJobNameSysDbBackup&#39;))
-	{
-		if (-not [string]::IsNullOrWhiteSpace($OlaJobNameSysDbBackup))
-		{
-			$globalConfig[&#39;OlaJobNameSysDbBackup&#39;] = $OlaJobNameSysDbBackup
-			$updated = $true
-		}
-		else { Write-Error &quot;OlaJobNameSysDbBackup darf nicht leer sein.&quot;; return }
-	}
-	
-	# TSM Management-Klassen
-	if ($PSBoundParameters.ContainsKey(&#39;TsmManagementClasses&#39;))
-	{
-		if ($TsmManagementClasses -and $TsmManagementClasses.Count -gt 0)
-		{
-			$globalConfig[&#39;TsmManagementClasses&#39;] = $TsmManagementClasses
-			$updated = $true
-		}
-		else
-		{
-			Write-Error &quot;TsmManagementClasses darf nicht leer sein.&quot;
-			return
-		}
-	}
-	
-	# Update-Einstellungen
-	if ($PSBoundParameters.ContainsKey(&#39;AutoUpdate&#39;))
-	{
-		$globalConfig[&#39;AutoUpdate&#39;] = $AutoUpdate
-		$updated = $true
-	}
-	if ($PSBoundParameters.ContainsKey(&#39;UpdateRepository&#39;))
-	{
-		$globalConfig[&#39;UpdateRepository&#39;] = $UpdateRepository
-		$updated = $true
-	}
-	
-	# Default Policy Name
-	if ($PSBoundParameters.ContainsKey(&#39;DefaultPolicy&#39;))
-	{
-		if (-not [string]::IsNullOrWhiteSpace($DefaultPolicy))
-		{
-			$globalConfig[&#39;DefaultPolicy&#39;] = $DefaultPolicy
-			$updated = $true
-		}
-		else { Write-Error &quot;DefaultPolicy darf nicht leer sein.&quot;; return }
-	}
-	
-	# HPU-Domain-Gruppen-Mapping
-	if ($PSBoundParameters.ContainsKey(&#39;HpuDomainGroupMap&#39;))
-	{
-		if ($HpuDomainGroupMap -and $HpuDomainGroupMap.Count -gt 0)
-		{
-			# Pflichtfelder jedes Eintrags pruefen
-			foreach ($entry in $HpuDomainGroupMap)
-			{
-				if ([string]::IsNullOrWhiteSpace($entry.DomainPattern))
-				{
-					Write-Error &quot;HpuDomainGroupMap: Jeder Eintrag benoetigt ein nicht-leeres Feld &#39;DomainPattern&#39;.&quot;
-					return
-				}
-				if ([string]::IsNullOrWhiteSpace($entry.GroupNamePattern))
-				{
-					Write-Error &quot;HpuDomainGroupMap: Jeder Eintrag benoetigt ein nicht-leeres Feld &#39;GroupNamePattern&#39;.&quot;
-					return
-				}
-			}
-			$globalConfig[&#39;HpuDomainGroupMap&#39;] = $HpuDomainGroupMap
-			$updated = $true
-		}
-		else
-		{
-			Write-Error &quot;HpuDomainGroupMap darf nicht leer sein.&quot;
-			return
-		}
-	}
-	
-	# SSRS-Installer-Pfad
-	if ($PSBoundParameters.ContainsKey(&#39;SsrsInstallerPath&#39;))
-	{
-		if (-not [string]::IsNullOrWhiteSpace($SsrsInstallerPath))
-		{
-			$ext = [System.IO.Path]::GetExtension($SsrsInstallerPath).ToLower()
-			if ($ext -notin @(&#39;.exe&#39;, &#39;.msi&#39;))
-			{
-				Write-Error &quot;SsrsInstallerPath: Nur .exe oder .msi-Dateien sind gueltig (angegeben: &#39;$SsrsInstallerPath&#39;).&quot;
-				return
-			}
-			$globalConfig[&#39;SsrsInstallerPath&#39;] = $SsrsInstallerPath
-			$updated = $true
-		}
-		else
-		{
-			Write-Error &quot;SsrsInstallerPath darf nicht leer sein.&quot;
-			return
-		}
-	}
-	
-	# Check-Profil und Grenzwerte
-	if ($PSBoundParameters.ContainsKey(&#39;CheckProfile&#39;))
-	{
-		$globalConfig[&#39;CheckProfile&#39;] = $CheckProfile
-		$updated = $true
-	}
-	if ($PSBoundParameters.ContainsKey(&#39;CheckCostThresholdMin&#39;))
-	{
-		$globalConfig[&#39;CheckCostThresholdMin&#39;] = $CheckCostThresholdMin
-		$updated = $true
-	}
-	if ($PSBoundParameters.ContainsKey(&#39;CheckTempDbMaxFiles&#39;))
-	{
-		$globalConfig[&#39;CheckTempDbMaxFiles&#39;] = $CheckTempDbMaxFiles
-		$updated = $true
-	}
-	if ($PSBoundParameters.ContainsKey(&#39;CheckDiskBlockSize&#39;))
-	{
-		$globalConfig[&#39;CheckDiskBlockSize&#39;] = $CheckDiskBlockSize
-		$updated = $true
-	}
-
-	# Ausgabe-Sprache
-	if ($PSBoundParameters.ContainsKey(&#39;Language&#39;))
-	{
-		$globalConfig[&#39;Language&#39;] = $Language
-		$script:_strings = $null    # String-Cache invalidieren
-		$updated = $true
-	}
-
-	if (-not $updated)
-	{
-		Write-Warning &quot;Es wurde kein gueltiger Konfigurationsparameter angegeben.&quot;
-		return
-	}
-	
-	# Persistenz: JSON-Datei schreiben
-	$configFile = Join-Path $env:APPDATA &quot;MSSQLTools\config.json&quot;
-	$configDir = Split-Path $configFile -Parent
-	if (-not (Test-Path $configDir))
-	{
-		New-Item -ItemType Directory -Path $configDir -Force | Out-Null
-	}
-	$globalConfig | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Force
-	Write-Verbose &quot;Konfiguration gespeichert: $configFile&quot;
-	
-	if ($PassThru)
-	{
-		return Get-sqmConfig
-	}
-}</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmConfig -LogPath &quot;D:\Logs&quot; -OlaJobNameFull &quot;Prod-FULL&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmConfig -TsmManagementClasses @('MC_10','MC_30','MC_100')</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmConfig -HpuDomainGroupMap @(
+        [PSCustomObject]@{ DomainPattern = '*.sfinance.net'; GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' },
+        [PSCustomObject]@{ DomainPattern = '*';              GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' }
+    )</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmConfig -SsrsInstallerPath '\\srv-share\Software\SSRS2022\SQLServerReportingServices.exe'</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
 
 	<div class="psdb-st-func-card" id="f-setsqmssrsconfiguration">
 	<div class="psdb-st-func-header">
@@ -2767,15 +2161,62 @@ function Set-sqmConfig
 	<span class="psdb-st-badge psdb-st-badge-konfiguration">Konfiguration</span>
 	</div>
 	<div class="psdb-st-func-desc">Configures SQL Server Reporting Services (SSRS) fully automatically. Supports local and remote installation as well as AlwaysOn environments.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">&#9658; 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Set-sqmSsrsConfiguration</div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration -ComputerName &quot;SSRS01&quot; -DatabaseServer &quot;AG_Listener&quot; -PbmPolicyName &quot;Password Policy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">&quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; | Invoke-sqmPatchAnalysis</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmPatchAnalysis -SqlInstance &quot;SQL01&quot;,&quot;SQL02&quot; -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration -ComputerName &quot;SSRS01&quot; -DatabaseServer &quot;AG_Listener&quot; -PbmPolicyName &quot;Password Policy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Lokalen Server analysieren - Report wird automatisch im Browser geoeffnet
+    Get-sqmServerHardwareReport</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Remote-Server
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Mehrere Server, eigener Report-Pfad
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; -ReportPath &quot;C:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Nur speichern, nicht oeffnen - Dateipfad zurueckgeben
+    $path = Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -NoOpen -PassThru
+    Write-Host &quot;Report: $path&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># CSV-Export fuer Weiterverarbeitung in Excel
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot; -OutputFormat CSV -NoOpen</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Alle Formate auf einmal (HTML + CSV + TXT)
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -OutputFormat All -NoOpen -PassThru</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Read BackupDirectory from the local server
+$backupPath = Get-sqmServerSetting -Name &quot;BackupDirectory&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Show all properties
+Get-sqmServerSetting -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># All properties from a remote instance with credentials
+$cred = Get-Credential
+Get-sqmServerSetting -SqlInstance &quot;SQL01&quot; -SqlCredential $cred -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Basic deploy with automatic backup
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Deploy with job number embedded in log filename
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -JobNumber &quot;AU-2026-042&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Skip backup - requires interactive confirmation
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SkipBackup</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># WhatIf dry run - no SQL executed, only pre-checks and summary table
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -WhatIf</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># No outer transaction - scripts manage their own transactions
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -NoWrapTransaction</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># SQL Server authentication
+    $cred = Get-Credential
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SqlCredential $cred</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Set-sqmSsrsConfiguration -ComputerName "SSRS01" -DatabaseServer "AG_Listener" -PbmPolicyName "Password Policy"</div>
+	<div class="psdb-st-example-label">Beispiel</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration -ComputerName &quot;SSRS01&quot; -DatabaseServer &quot;AG_Listener&quot; -PbmPolicyName &quot;Password Policy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+</div>
 	</div>
 	</div>
 	</div>
@@ -3259,250 +2700,9 @@ function Set-sqmConfig
 	<div class="psdb-st-func-desc">Tests the connection to an IBM Spectrum Protect (TSM) server using dsmadmc.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmTsmConnection</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Test-sqmTsmConnection</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmTsmConnection -ComputerName "SQL01" -UserName "tsm_admin" -Password (Read-Host -AsSecureString)</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">#&gt;
-function Test-sqmTsmConnection
-{
-	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = &#39;None&#39;)]
-	[OutputType([PSCustomObject])]
-	param (
-		[Parameter(Mandatory = $false)]
-		[string]$ComputerName = $env:COMPUTERNAME,
-		[Parameter(Mandatory = $false)]
-		[string]$DsmadmcPath,
-		[Parameter(Mandatory = $false)]
-		[string]$UserName,
-		[Parameter(Mandatory = $false)]
-		[System.Security.SecureString]$Password,
-		[Parameter(Mandatory = $false)]
-		[string]$ServerName,
-		[Parameter(Mandatory = $false)]
-		[string]$DsmOptPath,
-		[Parameter(Mandatory = $false)]
-		[System.Management.Automation.PSCredential]$Credential,
-		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
-	)
-	
-	begin
-	{
-		$functionName = $MyInvocation.MyCommand.Name
-		Invoke-sqmLogging -Message &quot;Starte $functionName auf $ComputerName&quot; -FunctionName $functionName -Level &quot;INFO&quot;
-	}
-	
-	process
-	{
-		$result = [PSCustomObject]@{
-			Success	    = $false
-			Message	    = $null
-			DsmadmcPath = $null
-			ServerName  = $null
-			UserName    = $null
-			Output	    = $null
-			ErrorOutput = $null
-		}
-		
-		try
-		{
-			# ---- 1. dsmadmc.exe Pfad ermitteln ----
-			$dsmadmc = if ($DsmadmcPath) { $DsmadmcPath }
-			else { _FindDsmadmcPath -ComputerName $ComputerName -Credential $Credential }
-			if (-not $dsmadmc)
-			{
-				$msg = &quot;dsmadmc nicht gefunden. Bitte TSM-Client installieren oder -DsmadmcPath angeben.&quot;
-				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level &quot;ERROR&quot;
-				if ($EnableException) { throw $msg }
-				$result.Message = $msg
-				return $result
-			}
-			$result.DsmadmcPath = $dsmadmc
-			Invoke-sqmLogging -Message &quot;Verwende dsmadmc: $dsmadmc&quot; -FunctionName $functionName -Level &quot;VERBOSE&quot;
-			
-			# ---- 2. TSM-Konfiguration aus dsm.opt lesen (falls nicht alle Parameter angegeben) ----
-			$effUserName = $UserName
-			$effPassword = $Password
-			$effServerName = $ServerName
-			
-			if (-not $effUserName -or -not $effPassword -or -not $effServerName)
-			{
-				$cfg = Get-sqmTsmConfiguration -ComputerName $ComputerName -DsmOptPath $DsmOptPath -Credential $Credential -IncludePasswordPlain -ErrorAction Stop
-				if (-not $cfg.Success)
-				{
-					throw &quot;TSM-Konfiguration konnte nicht gelesen werden: $($cfg.ErrorMessage)&quot;
-				}
-				if (-not $effServerName) { $effServerName = $cfg.ServerName }
-				if (-not $effUserName) { $effUserName = $cfg.UserName }
-				if (-not $effPassword -and $cfg.Password) { $effPassword = $cfg.Password }
-			}
-			
-			if (-not $effUserName)
-			{
-				$msg = &quot;Kein TSM-Benutzername angegeben und kein USERID in dsm.opt gefunden.&quot;
-				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level &quot;ERROR&quot;
-				if ($EnableException) { throw $msg }
-				$result.Message = $msg
-				return $result
-			}
-			if (-not $effPassword)
-			{
-				$msg = &quot;Kein TSM-Kennwort angegeben und kein PASSWORD in dsm.opt gefunden.&quot;
-				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level &quot;ERROR&quot;
-				if ($EnableException) { throw $msg }
-				$result.Message = $msg
-				return $result
-			}
-			if (-not $effServerName)
-			{
-				$msg = &quot;Kein TSM-Server angegeben und kein TCPServeraddress in dsm.opt gefunden.&quot;
-				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level &quot;ERROR&quot;
-				if ($EnableException) { throw $msg }
-				$result.Message = $msg
-				return $result
-			}
-			$result.UserName = $effUserName
-			$result.ServerName = $effServerName
-			Invoke-sqmLogging -Message &quot;TSM-Server: $effServerName, Benutzer: $effUserName&quot; -FunctionName $functionName -Level &quot;INFO&quot;
-			
-			# ---- 3. Kennwort aus SecureString extrahieren ----
-			$plainPwd = _SecureToPlain $effPassword
-			
-			# ---- 4. dsmadmc-Befehl aufbauen ----
-			$cmdArgs = &quot;-id=$effUserName -password=$plainPwd -se=$effServerName -dataonly=yes show version&quot;
-			Invoke-sqmLogging -Message &quot;Fuehre dsmadmc aus: $dsmadmc $cmdArgs&quot; -FunctionName $functionName -Level &quot;VERBOSE&quot;
-			
-			# ---- 5. Befehl ausfuehren ----
-			$output = $null
-			$errorOut = $null
-			$exitCode = 0
-			$isLocal = $ComputerName -in @($env:COMPUTERNAME, &#39;localhost&#39;, &#39;127.0.0.1&#39;, &#39;.&#39;)
-			
-			if ($PSCmdlet.ShouldProcess(&quot;TSM-Verbindung zu $effServerName mit Benutzer $effUserName&quot;, &quot;Pruefen&quot;))
-			{
-				if ($isLocal)
-				{
-					$psi = New-Object System.Diagnostics.ProcessStartInfo
-					$psi.FileName = $dsmadmc
-					$psi.Arguments = $cmdArgs
-					$psi.UseShellExecute = $false
-					$psi.RedirectStandardOutput = $true
-					$psi.RedirectStandardError = $true
-					$psi.CreateNoWindow = $true
-					$p = [System.Diagnostics.Process]::Start($psi)
-					$output = $p.StandardOutput.ReadToEnd()
-					$errorOut = $p.StandardError.ReadToEnd()
-					$p.WaitForExit()
-					$exitCode = $p.ExitCode
-				}
-				else
-				{
-					$scriptBlock = {
-						param ($exe,
-							$args)
-						$psi = New-Object System.Diagnostics.ProcessStartInfo
-						$psi.FileName = $exe
-						$psi.Arguments = $args
-						$psi.UseShellExecute = $false
-						$psi.RedirectStandardOutput = $true
-						$psi.RedirectStandardError = $true
-						$psi.CreateNoWindow = $true
-						$p = [System.Diagnostics.Process]::Start($psi)
-						$out = $p.StandardOutput.ReadToEnd()
-						$err = $p.StandardError.ReadToEnd()
-						$p.WaitForExit()
-						return @{ ExitCode = $p.ExitCode; Output = $out; Error = $err }
-					}
-					$session = New-PSSession -ComputerName $ComputerName -Credential $Credential -ErrorAction Stop
-					$remoteResult = Invoke-Command -Session $session -ScriptBlock $scriptBlock -ArgumentList $dsmadmc, $cmdArgs -ErrorAction Stop
-					$exitCode = $remoteResult.ExitCode
-					$output = $remoteResult.Output
-					$errorOut = $remoteResult.Error
-					Remove-PSSession $session
-				}
-				
-				$result.Output = $output
-				$result.ErrorOutput = $errorOut
-				
-				if ($exitCode -eq 0 -and $output -match &#39;IBM Spectrum Protect&#39;)
-				{
-					$result.Success = $true
-					$result.Message = &quot;Verbindung zu TSM-Server &#39;$effServerName&#39; mit Benutzer &#39;$effUserName&#39; erfolgreich.&quot;
-					Invoke-sqmLogging -Message $result.Message -FunctionName $functionName -Level &quot;INFO&quot;
-				}
-				else
-				{
-					$result.Success = $false
-					$result.Message = &quot;Fehler bei TSM-Verbindung (Exitcode $exitCode). Ausgabe: $output $errorOut&quot;.Trim()
-					Invoke-sqmLogging -Message $result.Message -FunctionName $functionName -Level &quot;ERROR&quot;
-				}
-			}
-			else
-			{
-				$result.Success = $false
-				$result.Message = &quot;WhatIf: Verbindungstest wuerde ausgefuehrt.&quot;
-				Invoke-sqmLogging -Message $result.Message -FunctionName $functionName -Level &quot;VERBOSE&quot;
-			}
-		}
-		catch
-		{
-			$errMsg = &quot;Allgemeiner Fehler: $($_.Exception.Message)&quot;
-			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level &quot;ERROR&quot;
-			if ($EnableException) { throw }
-			$result.Message = $errMsg
-		}
-		return $result
-	}
-	
-	end
-	{
-		Invoke-sqmLogging -Message &quot;$functionName abgeschlossen.&quot; -FunctionName $functionName -Level &quot;INFO&quot;
-	}
-}
-
-# ---- Hilfsfunktionen (lokal) ----
-function _FindDsmadmcPath
-{
-	param ([string]$ComputerName,
-		[System.Management.Automation.PSCredential]$Credential)
-	
-	$isLocal = $ComputerName -in @($env:COMPUTERNAME, &#39;localhost&#39;, &#39;127.0.0.1&#39;, &#39;.&#39;)
-	$candidates = [System.Collections.Generic.List[string]]::new()
-	
-	if ($isLocal)
-	{
-		try
-		{
-			$regPath = &#39;HKLM:\SOFTWARE\IBM\ADSM\CurrentVersion&#39;
-			$installPath = (Get-ItemProperty $regPath -Name &#39;InstallPath&#39; -ErrorAction SilentlyContinue).InstallPath
-			# KORREKTUR: Doppelte Klammern fuer den Methodenaufruf
-			if ($installPath) { $candidates.Add((Join-Path $installPath &#39;dsmadmc.exe&#39;)) }
-		}
-		catch { }
-		
-		if ($env:DSM_DIR) { $candidates.Add((Join-Path $env:DSM_DIR &#39;dsmadmc.exe&#39;)) }
-		
-		$candidates.Add(&#39;C:\Program Files\Tivoli\TSM\baclient\dsmadmc.exe&#39;)
-		$candidates.Add(&#39;C:\Program Files\IBM\TSM\baclient\dsmadmc.exe&#39;)
-		$candidates.Add(&#39;C:\Program Files\IBM\SpectrumProtect\baclient\dsmadmc.exe&#39;)
-	}
-	else
-	{
-		# Remote-Logik... (hier ebenfalls Klammern pruefen falls Join-Path genutzt wird)
-	}
-	
-	foreach ($c in $candidates)
-	{
-		if (Test-Path $c) { return $c }
-	}
-	return $null
-}</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Test-sqmTsmConnection</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Test-sqmTsmConnection -ComputerName &quot;SQL01&quot; -UserName &quot;tsm_admin&quot; -Password (Read-Host -AsSecureString)</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
 
 	</section>
 
@@ -3515,38 +2715,108 @@ function _FindDsmadmcPath
 	<span class="psdb-st-badge psdb-st-badge-deployment">Deployment</span>
 	</div>
 	<div class="psdb-st-func-desc">Executes numbered SQL scripts from a directory sequentially against a SQL Server database.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 6 Beispiele anzeigen</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">&#9658; 6 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Basic deploy with automatic backup</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Basic deploy with automatic backup
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Deploy with job number embedded in log filename
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -JobNumber &quot;AU-2026-042&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Skip backup - requires interactive confirmation
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SkipBackup</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># WhatIf dry run - no SQL executed, only pre-checks and summary table
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -WhatIf</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># No outer transaction - scripts manage their own transactions
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -NoWrapTransaction</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># SQL Server authentication
+    $cred = Get-Credential
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SqlCredential $cred</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">&quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; | Invoke-sqmPatchAnalysis</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmPatchAnalysis -SqlInstance &quot;SQL01&quot;,&quot;SQL02&quot; -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration -ComputerName &quot;SSRS01&quot; -DatabaseServer &quot;AG_Listener&quot; -PbmPolicyName &quot;Password Policy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Lokalen Server analysieren - Report wird automatisch im Browser geoeffnet
+    Get-sqmServerHardwareReport</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Remote-Server
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Mehrere Server, eigener Report-Pfad
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; -ReportPath &quot;C:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Nur speichern, nicht oeffnen - Dateipfad zurueckgeben
+    $path = Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -NoOpen -PassThru
+    Write-Host &quot;Report: $path&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># CSV-Export fuer Weiterverarbeitung in Excel
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot; -OutputFormat CSV -NoOpen</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Alle Formate auf einmal (HTML + CSV + TXT)
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -OutputFormat All -NoOpen -PassThru</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Read BackupDirectory from the local server
+$backupPath = Get-sqmServerSetting -Name &quot;BackupDirectory&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Show all properties
+Get-sqmServerSetting -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># All properties from a remote instance with credentials
+$cred = Get-Credential
+Get-sqmServerSetting -SqlInstance &quot;SQL01&quot; -SqlCredential $cred -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Basic deploy with automatic backup
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Deploy with job number embedded in log filename
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -JobNumber &quot;AU-2026-042&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Skip backup - requires interactive confirmation
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SkipBackup</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># WhatIf dry run - no SQL executed, only pre-checks and summary table
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -WhatIf</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># No outer transaction - scripts manage their own transactions
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -NoWrapTransaction</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># SQL Server authentication
+    $cred = Get-Credential
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SqlCredential $cred</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Basic deploy with automatic backup
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
         -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Deploy with job number embedded in log filename</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+	<div class="psdb-st-example-label">Beispiel</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Deploy with job number embedded in log filename
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
         -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -JobNumber &quot;AU-2026-042&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Skip backup - requires interactive confirmation</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+	<div class="psdb-st-example-label">Beispiel</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Skip backup - requires interactive confirmation
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
         -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SkipBackup</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># WhatIf dry run - no SQL executed, only pre-checks and summary table</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+	<div class="psdb-st-example-label">Beispiel</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># WhatIf dry run - no SQL executed, only pre-checks and summary table
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
         -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -WhatIf</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># No outer transaction - scripts manage their own transactions</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+	<div class="psdb-st-example-label">Beispiel</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># No outer transaction - scripts manage their own transactions
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
         -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -NoWrapTransaction</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># SQL Server authentication</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    $cred = Get-Credential
+	<div class="psdb-st-example-label">Beispiel</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># SQL Server authentication
+    $cred = Get-Credential
     Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
         -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SqlCredential $cred</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+</div>
 	</div>
 	</div>
 	</div>
@@ -3685,105 +2955,9 @@ function _FindDsmadmcPath
 	<div class="psdb-st-func-desc">Searches for the HPU allow group in Active Directory based on configurable domain/group mappings.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 2 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Get-sqmHpuAllowGroup</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmHpuAllowGroup</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Get-sqmHpuAllowGroup -EnableException</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">#&gt;
-function Get-sqmHpuAllowGroup
-{
-    [CmdletBinding()]
-    [OutputType([string])]
-    param (
-        [Parameter(Mandatory = $false)]
-        [switch]$EnableException
-    )
-    $functionName = $MyInvocation.MyCommand.Name
-    # ?? 1. Domain des lokalen Rechners ermitteln ????????????????????????????
-    try
-    {
-        $currentDomain = (Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop).Domain
-    }
-    catch
-    {
-        $msg = &quot;Domain konnte nicht ermittelt werden: $($_.Exception.Message)&quot;
-        Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level &#39;ERROR&#39;
-        if ($EnableException) { throw $msg }
-        return $null
-    }
-    Invoke-sqmLogging -Message &quot;Starte $functionName. Lokale Domain: &#39;$currentDomain&#39;&quot; `
-                      -FunctionName $functionName -Level &#39;INFO&#39;
-    # ?? 2. Mapping aus der Konfiguration lesen ??????????????????????????????
-    $domainGroupMap = Get-sqmConfig -Key &#39;HpuDomainGroupMap&#39;
-    if (-not $domainGroupMap -or $domainGroupMap.Count -eq 0)
-    {
-        $msg = &quot;Konfigurationsschluessel &#39;HpuDomainGroupMap&#39; ist nicht gesetzt. &quot; +
-               &quot;Bitte Set-sqmConfig -HpuDomainGroupMap &lt;...&gt; ausfuehren.&quot;
-        Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level &#39;ERROR&#39;
-        if ($EnableException) { throw $msg }
-        Write-Warning $msg
-        return $null
-    }
-    # ?? 3. Passenden Mapping-Eintrag per Wildcard-Match suchen ?????????????
-    $matchedEntry = $null
-    foreach ($entry in $domainGroupMap)
-    {
-        if ($currentDomain -like $entry.DomainPattern)
-        {
-            $matchedEntry = $entry
-            Invoke-sqmLogging -Message &quot;Domain &#39;$currentDomain&#39; trifft Pattern &#39;$($entry.DomainPattern)&#39;.&quot; `
-                              -FunctionName $functionName -Level &#39;INFO&#39;
-            break
-        }
-    }
-    if (-not $matchedEntry)
-    {
-        $msg = &quot;Kein Mapping-Eintrag fuer Domain &#39;$currentDomain&#39; gefunden.&quot;
-        Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level &#39;WARNING&#39;
-        if ($EnableException) { throw $msg }
-        Write-Warning $msg
-        return $null
-    }
-    $groupNamePattern = $matchedEntry.GroupNamePattern
-    # ?? 4. AD-Suche ????????????????????????????????????????????????????????
-    try
-    {
-        $ldapFilter = &quot;(&amp;(objectCategory=group)(sAMAccountName=*$groupNamePattern))&quot;
-        Invoke-sqmLogging -Message &quot;LDAP-Filter: $ldapFilter&quot; -FunctionName $functionName -Level &#39;INFO&#39;
-        $searcher                    = [adsisearcher]$ldapFilter
-        $searcher.PageSize           = 20
-        foreach ($prop in @(&#39;name&#39;, &#39;distinguishedname&#39;))
-        {
-            $searcher.PropertiesToLoad.Add($prop) | Out-Null
-        }
-        $result = $searcher.FindOne()
-    }
-    catch
-    {
-        $msg = &quot;AD-Suche fehlgeschlagen: $($_.Exception.Message)&quot;
-        Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level &#39;ERROR&#39;
-        if ($EnableException) { throw $msg }
-        Write-Warning $msg
-        return $null
-    }
-    # ?? 5. Ergebnis auswerten ???????????????????????????????????????????????
-    if ($null -eq $result)
-    {
-        $msg = &quot;Keine HPU-Allow-Gruppe &#39;*$groupNamePattern&#39; in Domain &#39;$currentDomain&#39; gefunden.&quot;
-        Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level &#39;WARNING&#39;
-        if ($EnableException) { throw $msg }
-        Write-Warning $msg
-        return $null
-    }
-    $dn = ($result.Properties[&#39;distinguishedname&#39;])[0]
-    Invoke-sqmLogging -Message &quot;Gruppe gefunden: $dn&quot; -FunctionName $functionName -Level &#39;INFO&#39;
-    return $dn
-}</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmHpuAllowGroup</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmHpuAllowGroup -EnableException</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
 
 	<div class="psdb-st-func-card" id="f-getsqmserverhardwarereport">
 	<div class="psdb-st-func-header">
@@ -3791,32 +2965,96 @@ function Get-sqmHpuAllowGroup
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Sonstige</span>
 	</div>
 	<div class="psdb-st-func-desc">Erstellt einen HTML-Hardware-Konfigurationsbericht fuer einen oder mehrere Server.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 6 Beispiele anzeigen</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">&#9658; 6 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Lokalen Server analysieren - Report wird automatisch im Browser geoeffnet</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmServerHardwareReport</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Lokalen Server analysieren - Report wird automatisch im Browser geoeffnet
+    Get-sqmServerHardwareReport</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Remote-Server
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Mehrere Server, eigener Report-Pfad
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; -ReportPath &quot;C:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Nur speichern, nicht oeffnen - Dateipfad zurueckgeben
+    $path = Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -NoOpen -PassThru
+    Write-Host &quot;Report: $path&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># CSV-Export fuer Weiterverarbeitung in Excel
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot; -OutputFormat CSV -NoOpen</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Alle Formate auf einmal (HTML + CSV + TXT)
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -OutputFormat All -NoOpen -PassThru</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">&quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; | Invoke-sqmPatchAnalysis</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmPatchAnalysis -SqlInstance &quot;SQL01&quot;,&quot;SQL02&quot; -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Set-sqmSsrsConfiguration -ComputerName &quot;SSRS01&quot; -DatabaseServer &quot;AG_Listener&quot; -PbmPolicyName &quot;Password Policy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Lokalen Server analysieren - Report wird automatisch im Browser geoeffnet
+    Get-sqmServerHardwareReport</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Remote-Server
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Mehrere Server, eigener Report-Pfad
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; -ReportPath &quot;C:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Nur speichern, nicht oeffnen - Dateipfad zurueckgeben
+    $path = Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -NoOpen -PassThru
+    Write-Host &quot;Report: $path&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># CSV-Export fuer Weiterverarbeitung in Excel
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot; -OutputFormat CSV -NoOpen</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Alle Formate auf einmal (HTML + CSV + TXT)
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -OutputFormat All -NoOpen -PassThru</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Read BackupDirectory from the local server
+$backupPath = Get-sqmServerSetting -Name &quot;BackupDirectory&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Show all properties
+Get-sqmServerSetting -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># All properties from a remote instance with credentials
+$cred = Get-Credential
+Get-sqmServerSetting -SqlInstance &quot;SQL01&quot; -SqlCredential $cred -All</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Basic deploy with automatic backup
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Deploy with job number embedded in log filename
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -JobNumber &quot;AU-2026-042&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Skip backup - requires interactive confirmation
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SkipBackup</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># WhatIf dry run - no SQL executed, only pre-checks and summary table
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -WhatIf</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># No outer transaction - scripts manage their own transactions
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -NoWrapTransaction</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># SQL Server authentication
+    $cred = Get-Credential
+    Invoke-sqmDeployScripts -SqlInstance &quot;SQLSERVER01&quot; -Database &quot;SalesDB&quot; `
+        -ScriptPath &quot;D:\Deploy\v2.3&quot; -LogPath &quot;D:\Logs\Deploy&quot; -SqlCredential $cred</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Lokalen Server analysieren - Report wird automatisch im Browser geoeffnet
+    Get-sqmServerHardwareReport</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Remote-Server</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example-label">Beispiel</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Remote-Server
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Mehrere Server, eigener Report-Pfad</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; -ReportPath &quot;C:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example-label">Beispiel</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Mehrere Server, eigener Report-Pfad
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot; -ReportPath &quot;C:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Nur speichern, nicht oeffnen - Dateipfad zurueckgeben</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    $path = Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -NoOpen -PassThru
+	<div class="psdb-st-example-label">Beispiel</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Nur speichern, nicht oeffnen - Dateipfad zurueckgeben
+    $path = Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -NoOpen -PassThru
     Write-Host &quot;Report: $path&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># CSV-Export fuer Weiterverarbeitung in Excel</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot; -OutputFormat CSV -NoOpen</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example-label">Beispiel</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># CSV-Export fuer Weiterverarbeitung in Excel
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot;,&quot;SQL02&quot; -OutputFormat CSV -NoOpen</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Alle Formate auf einmal (HTML + CSV + TXT)</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -OutputFormat All -NoOpen -PassThru</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example-label">Beispiel</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Alle Formate auf einmal (HTML + CSV + TXT)
+    Get-sqmServerHardwareReport -ComputerName &quot;SQL01&quot; -OutputFormat All -NoOpen -PassThru</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+</div>
 	</div>
 	</div>
 	</div>
@@ -3960,328 +3198,10 @@ function Get-sqmHpuAllowGroup
 	<div class="psdb-st-func-desc">Reads or writes the registry key HKLM:\<RegistryBase>\dtcSoftware\sqmSQLTool on     the specified computers. The key controls which monitoring components are active:     SQL monitoring level (None/S</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ 3 Beispiele anzeigen</div>
 	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Invoke-sqmMonitoringKey</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmMonitoringKey</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Invoke-sqmMonitoringKey -Operation Set -SQL Standard -TSM 1 -AutoDetectSQLFreeSpaceVersion</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmMonitoringKey -Operation Set -SQL Standard -TSM 1 -AutoDetectSQLFreeSpaceVersion</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">"SQL01","SQL02" | Invoke-sqmMonitoringKey -Operation Set -SQL Full -TSM 1</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">#&gt;
-function Invoke-sqmMonitoringKey
-{
-	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = &#39;None&#39;)]
-	[OutputType([PSCustomObject])]
-	param (
-		[Parameter(Mandatory = $false, ValueFromPipeline = $true)]
-		[Alias(&#39;Computer&#39;, &#39;Server&#39;)]
-		[string[]]$ComputerName = @($env:COMPUTERNAME),
-		[Parameter(Mandatory = $false)]
-		[ValidateSet(&#39;Get&#39;, &#39;Set&#39;)]
-		[string]$Operation = &#39;Get&#39;,
-		[Parameter(Mandatory = $false)]
-		[ValidateSet(&#39;None&#39;, &#39;Standard&#39;, &#39;Full&#39;)]
-		[string]$SQL,
-		[Parameter(Mandatory = $false)]
-		[ValidateSet(&#39;Standard&#39;, &#39;Cluster&#39;)]
-		[string]$SQLFreeSpaceVersion,
-		[Parameter(Mandatory = $false)]
-		[ValidateSet(0, 1)]
-		[Nullable[int]]$TSM,
-		[Parameter(Mandatory = $false)]
-		[string]$RegistryBase = &#39;System&#39;,
-		[Parameter(Mandatory = $false)]
-		[switch]$AutoDetectSQLFreeSpaceVersion,
-		[Parameter(Mandatory = $false)]
-		[System.Management.Automation.PSCredential]$Credential,
-		[Parameter(Mandatory = $false)]
-		[switch]$ContinueOnError,
-		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
-	)
-	
-	begin
-	{
-		$functionName = $MyInvocation.MyCommand.Name
-		$regSubKey = &quot;$RegistryBase\dtcSoftware\sqmSQLTool&quot;
-		$regPath = &quot;HKLM:\$regSubKey&quot;
-		
-		$sqlToDword = @{ &#39;None&#39; = 0; &#39;Standard&#39; = 1; &#39;Full&#39; = 2 }
-		$sqlDesc = @{ 0 = &#39;NoMonitoring&#39;; 1 = &#39;ServiceMonitoring&#39;; 2 = &#39;FullMonitoring&#39; }
-		$tsmDesc = @{ 0 = &#39;Inactive&#39;; 1 = &#39;Active&#39; }
-		
-		$allResults = [System.Collections.Generic.List[PSCustomObject]]::new()
-	}
-	
-	process
-	{
-		foreach ($computer in $ComputerName)
-		{
-			try
-			{
-				Invoke-sqmLogging -Message &quot;[$computer] Operation: $Operation&quot; -FunctionName $functionName -Level &quot;INFO&quot;
-				
-				$effectiveFreeSpaceVersion = $SQLFreeSpaceVersion
-				
-				# AutoDetect (nur bei Set)
-				if ($Operation -eq &#39;Set&#39; -and $AutoDetectSQLFreeSpaceVersion -and [string]::IsNullOrWhiteSpace($effectiveFreeSpaceVersion))
-				{
-					Invoke-sqmLogging -Message &quot;[$computer] AutoDetect SQLFreeSpaceVersion ...&quot; -FunctionName $functionName -Level &quot;INFO&quot;
-					try
-					{
-						if (-not (Get-Module -ListAvailable -Name dbatools))
-						{
-							Invoke-sqmLogging -Message &quot;dbatools nicht gefunden - AutoDetect uebersprungen, verwende &#39;Standard&#39;.&quot; -FunctionName $functionName -Level &quot;WARNING&quot;
-							$effectiveFreeSpaceVersion = &#39;Standard&#39;
-						}
-						else
-						{
-							$agCheck = Get-DbaAvailabilityGroup -SqlInstance $computer -ErrorAction SilentlyContinue
-							$effectiveFreeSpaceVersion = if ($agCheck) { &#39;Cluster&#39; }
-							else { &#39;Standard&#39; }
-							Invoke-sqmLogging -Message &quot;[$computer] AutoDetect Ergebnis: $effectiveFreeSpaceVersion&quot; -FunctionName $functionName -Level &quot;INFO&quot;
-						}
-					}
-					catch
-					{
-						Invoke-sqmLogging -Message &quot;[$computer] AutoDetect fehlgeschlagen: $($_.Exception.Message)&quot; -FunctionName $functionName -Level &quot;WARNING&quot;
-						$effectiveFreeSpaceVersion = &#39;Standard&#39;
-					}
-				}
-				
-				# Schreibvorgang
-				if ($Operation -eq &#39;Set&#39;)
-				{
-					if ([string]::IsNullOrWhiteSpace($SQL) -and [string]::IsNullOrWhiteSpace($effectiveFreeSpaceVersion) -and $null -eq $TSM)
-					{
-						Invoke-sqmLogging -Message &quot;[$computer] Keine Werte zum Setzen angegeben.&quot; -FunctionName $functionName -Level &quot;WARNING&quot;
-						continue
-					}
-					
-					if ($PSCmdlet.ShouldProcess($computer, &quot;Setze Monitoring-Registry-Werte in &#39;$regPath&#39;&quot;))
-					{
-						# Stelle sicher, dass der Schluessel existiert (lokal/remote)
-						$keyExists = $false
-						try
-						{
-							if ($computer -eq $env:COMPUTERNAME -or $computer -eq &#39;localhost&#39; -or $computer -eq &#39;.&#39;)
-							{
-								$fullPath = &quot;HKLM:\$regSubKey&quot;
-								if (-not (Test-Path $fullPath))
-								{
-									New-Item -Path $fullPath -Force -ErrorAction Stop | Out-Null
-									Invoke-sqmLogging -Message &quot;[$computer] Registry-Schluessel erstellt: $fullPath&quot; -FunctionName $functionName -Level &quot;INFO&quot;
-								}
-								$keyExists = $true
-							}
-							else
-							{
-								# Remote: Pruefe/Erstelle ueber Invoke-Command
-								$sb = {
-									param ($sk)
-									$fullPath = &quot;HKLM:\$sk&quot;
-									if (-not (Test-Path $fullPath))
-									{
-										New-Item -Path $fullPath -Force -ErrorAction Stop | Out-Null
-										Write-Output &quot;CREATED&quot;
-									}
-									else
-									{
-										Write-Output &quot;EXISTS&quot;
-									}
-								}
-								$invokeParams = @{
-									ComputerName = $computer
-									ScriptBlock  = $sb
-									ArgumentList = $regSubKey
-									ErrorAction  = &#39;Stop&#39;
-								}
-								if ($Credential) { $invokeParams[&#39;Credential&#39;] = $Credential }
-								$result = Invoke-Command @invokeParams
-								if ($result -eq &#39;CREATED&#39;)
-								{
-									Invoke-sqmLogging -Message &quot;[$computer] Registry-Schluessel remote erstellt: HKLM:\$regSubKey&quot; -FunctionName $functionName -Level &quot;INFO&quot;
-								}
-								$keyExists = $true
-							}
-						}
-						catch
-						{
-							Invoke-sqmLogging -Message &quot;[$computer] Fehler bei Schluesselerstellung: $($_.Exception.Message)&quot; -FunctionName $functionName -Level &quot;ERROR&quot;
-							throw
-						}
-						
-						# Nun Werte setzen
-						$values = @{ }
-						if (-not [string]::IsNullOrWhiteSpace($SQL)) { $values[&#39;SQL&#39;] = $sqlToDword[$SQL] }
-						if (-not [string]::IsNullOrWhiteSpace($effectiveFreeSpaceVersion)) { $values[&#39;SQLFreeSpaceVersion&#39;] = $effectiveFreeSpaceVersion }
-						if ($null -ne $TSM) { $values[&#39;TSM&#39;] = [int]$TSM }
-						
-						if ($computer -eq $env:COMPUTERNAME -or $computer -eq &#39;localhost&#39; -or $computer -eq &#39;.&#39;)
-						{
-							$fullPath = &quot;HKLM:\$regSubKey&quot;
-							foreach ($entry in $values.GetEnumerator())
-							{
-								$type = if ($entry.Value -is [int]) { &#39;DWord&#39; }
-								else { &#39;String&#39; }
-								Set-ItemProperty -Path $fullPath -Name $entry.Key -Value $entry.Value -Type $type -ErrorAction Stop
-							}
-						}
-						else
-						{
-							$sb2 = {
-								param ($sk,
-									$vals)
-								$fullPath = &quot;HKLM:\$sk&quot;
-								foreach ($entry in $vals.GetEnumerator())
-								{
-									$type = if ($entry.Value -is [int]) { &#39;DWord&#39; }
-									else { &#39;String&#39; }
-									Set-ItemProperty -Path $fullPath -Name $entry.Key -Value $entry.Value -Type $type -ErrorAction Stop
-								}
-								return $true
-							}
-							$invokeParams2 = @{
-								ComputerName = $computer
-								ScriptBlock  = $sb2
-								ArgumentList = $regSubKey, $values
-								ErrorAction  = &#39;Stop&#39;
-							}
-							if ($Credential) { $invokeParams2[&#39;Credential&#39;] = $Credential }
-							Invoke-Command @invokeParams2 | Out-Null
-						}
-						Invoke-sqmLogging -Message &quot;[$computer] Werte erfolgreich gesetzt.&quot; -FunctionName $functionName -Level &quot;INFO&quot;
-					}
-					else
-					{
-						Invoke-sqmLogging -Message &quot;[$computer] WhatIf: Schreibvorgang uebersprungen.&quot; -FunctionName $functionName -Level &quot;VERBOSE&quot;
-					}
-				}
-				
-				# Lesen (immer, auch nach Set)
-				# Hier wird der Schluessel NICHT erstellt - nur lesen
-				$current = $null
-				try
-				{
-					if ($computer -eq $env:COMPUTERNAME -or $computer -eq &#39;localhost&#39; -or $computer -eq &#39;.&#39;)
-					{
-						$fullPath = &quot;HKLM:\$regSubKey&quot;
-						if (Test-Path $fullPath)
-						{
-							$key = Get-ItemProperty -Path $fullPath -ErrorAction Stop
-							$current = @{
-								SQL = $key.SQL
-								SQLFreeSpaceVersion = $key.SQLFreeSpaceVersion
-								TSM = $key.TSM
-								_KeyExists = $true
-							}
-						}
-						else
-						{
-							$current = @{ _KeyExists = $false }
-						}
-					}
-					else
-					{
-						$sbRead = {
-							param ($sk)
-							$fullPath = &quot;HKLM:\$sk&quot;
-							if (Test-Path $fullPath)
-							{
-								$key = Get-ItemProperty -Path $fullPath -ErrorAction Stop
-								return @{
-									SQL = $key.SQL
-									SQLFreeSpaceVersion = $key.SQLFreeSpaceVersion
-									TSM = $key.TSM
-									_KeyExists = $true
-								}
-							}
-							else
-							{
-								return @{ _KeyExists = $false }
-							}
-						}
-						$invokeRead = @{
-							ComputerName = $computer
-							ScriptBlock  = $sbRead
-							ArgumentList = $regSubKey
-							ErrorAction  = &#39;Stop&#39;
-						}
-						if ($Credential) { $invokeRead[&#39;Credential&#39;] = $Credential }
-						$current = Invoke-Command @invokeRead
-					}
-				}
-				catch
-				{
-					throw &quot;Registry-Lesen fehlgeschlagen: $($_.Exception.Message)&quot;
-				}
-				
-				$status = if ($Operation -eq &#39;Set&#39;) { if ($current._KeyExists) { &#39;Updated&#39; }
-					else { &#39;Created&#39; } }
-				elseif ($current._KeyExists) { &#39;OK&#39; }
-				else { &#39;KeyNotFound&#39; }
-				
-				$sqlVal = $current.SQL
-				$tsmVal = $current.TSM
-				$fsvVal = $current.SQLFreeSpaceVersion
-				$sqlText = if ($null -ne $sqlVal -and $sqlDesc.ContainsKey([int]$sqlVal)) { $sqlDesc[[int]$sqlVal] }
-				else { &#39;(nicht gesetzt)&#39; }
-				$tsmText = if ($null -ne $tsmVal -and $tsmDesc.ContainsKey([int]$tsmVal)) { $tsmDesc[[int]$tsmVal] }
-				else { &#39;(nicht gesetzt)&#39; }
-				
-				$msg = switch ($status)
-				{
-					&#39;KeyNotFound&#39; { &quot;Registry-Schluessel &#39;$regPath&#39; nicht vorhanden.&quot; }
-					&#39;Created&#39;     { &quot;Schluessel neu erstellt und Werte gesetzt.&quot; }
-					&#39;Updated&#39;     { &quot;Werte aktualisiert.&quot; }
-					default       { &quot;Werte erfolgreich ausgelesen.&quot; }
-				}
-				
-				$allResults.Add([PSCustomObject]@{
-						ComputerName = $computer
-						RegistryPath = &quot;HKLM:\$regSubKey&quot;
-						SQL		     = $sqlVal
-						SQL_Description = $sqlText
-						SQLFreeSpaceVersion = $fsvVal
-						TSM		     = $tsmVal
-						TSM_Description = $tsmText
-						Status	     = $status
-						Message	     = $msg
-					})
-			}
-			catch
-			{
-				$errMsg = $_.Exception.Message
-				Invoke-sqmLogging -Message &quot;[$computer] Fehler: $errMsg&quot; -FunctionName $functionName -Level &quot;ERROR&quot;
-				$allResults.Add([PSCustomObject]@{
-						ComputerName = $computer
-						RegistryPath = &quot;HKLM:\$regSubKey&quot;
-						SQL		     = $null
-						SQL_Description = &#39;(Fehler)&#39;
-						SQLFreeSpaceVersion = $null
-						TSM		     = $null
-						TSM_Description = &#39;(Fehler)&#39;
-						Status	     = &#39;Failed&#39;
-						Message	     = $errMsg
-					})
-				if ($EnableException) { throw }
-				if (-not $ContinueOnError) { throw }
-			}
-		}
-	}
-	
-	end
-	{
-		Invoke-sqmLogging -Message &quot;$functionName abgeschlossen.&quot; -FunctionName $functionName -Level &quot;INFO&quot;
-		return $allResults
-	}
-}</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmMonitoringKey</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmMonitoringKey -Operation Set -SQL Standard -TSM 1 -AutoDetectSQLFreeSpaceVersion</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+	<div class="psdb-st-example"><div class="psdb-st-example-label">Beispiel</div><div class="psdb-st-pre-wrap"><pre class="psdb-st-code">&quot;SQL01&quot;,&quot;SQL02&quot; | Invoke-sqmMonitoringKey -Operation Set -SQL Full -TSM 1</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div></div>
+</div>
 
 	<div class="psdb-st-func-card" id="f-newsqmolamaintenancejobs">
 	<div class="psdb-st-func-header">
@@ -4803,6 +3723,12 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 		}
 	</script>
 	</div>
+
+
+
+
+
+
 
 
 
