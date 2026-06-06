@@ -20,7 +20,7 @@
 
 .PARAMETER ExportPath
     Optionaler Pfad fuer die verschluesselte Passwort-Datei.
-    Z.B.: C:\Temp\sa_password.txt
+    Z.B.: C:\System\Passwords\sa_password.txt
     Wenn leer: kein Export.
 
 .OUTPUTS
@@ -32,8 +32,8 @@
     # Gibt SecureString zurueck
 
 .EXAMPLE
-    $pwd = New-sqmRandomSaPassword -Length 24 -ExportPath 'C:\Temp\sa.txt'
-    # SecureString + DPAPI-Export nach C:\Temp\sa.txt
+    $pwd = New-sqmRandomSaPassword -Length 24 -ExportPath 'C:\System\Passwords\sa.txt'
+    # SecureString + DPAPI-Export nach C:\System\Passwords\sa.txt
 
 .EXAMPLE
     # Klartext anzeigen (nur fuer Debugging):

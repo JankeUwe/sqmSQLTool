@@ -31,7 +31,7 @@
 
 .PARAMETER BackupPath
     Temporary backup path on C: for data backup before formatting.
-    Default: C:\Temp\DriveBackup.
+    Default: C:\System\DriveBackup.
     Must reside on drive C:.
 
 .PARAMETER Force
@@ -60,7 +60,7 @@
     Invoke-sqmFormatDrive64k -DriveLetter D
 
     Checks drive D: and formats it with 64 KB clusters if needed.
-    Data is backed up to C:\Temp\DriveBackup first.
+    Data is backed up to C:\System\DriveBackup first.
 
 .EXAMPLE
     Invoke-sqmFormatDrive64k -DriveLetter E -BackupPath "C:\Backup\DriveTemp" -Force
@@ -96,7 +96,7 @@ function Invoke-sqmFormatDrive64k
 		[string]$DriveLetter,
 
 		[Parameter(Mandatory = $false)]
-		[string]$BackupPath = 'C:\Temp\DriveBackup',
+		[string]$BackupPath = 'C:\System\DriveBackup',
 
 		[Parameter(Mandatory = $false)]
 		[switch]$Force
