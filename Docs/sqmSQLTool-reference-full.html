@@ -256,7 +256,7 @@
         <main class="psdb-st-content">
             <div class="psdb-st-header">
                 <h1 class="psdb-st-h1">sqmSQLTool</h1>
-                <p class="psdb-st-subtitle">Command Reference - 109 Functions</p>
+                <p class="psdb-st-subtitle">Command Reference - 124 Functions</p>
             </div>
 
             <div class="psdb-st-functions" id="functions-container"></div>
@@ -282,6 +282,37 @@
     ]
   },
   {
+    "Name": "Add-sqmDatabaseToAG",
+    "Synopsis": "Adds one or more databases to an Always On availability group (AutoSeed).",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "AvailabilityGroup",
+      "All",
+      "EnableException"
+    ],
+    "Examples": [
+      "Add-sqmDatabaseToAG -AvailabilityGroup \"AG1\" -Database \"SalesDB\"",
+      "Add-sqmDatabaseToAG -AvailabilityGroup \"AG1\" -All"
+    ]
+  },
+  {
+    "Name": "Add-sqmDatabaseToDistributedAg",
+    "Synopsis": "Adds a database to a Distributed AlwaysOn Availability Group.",
+    "Params": [
+      "SqlInstance",
+      "AvailabilityGroupName",
+      "DatabaseName",
+      "SecondaryInstance",
+      "BackupPath",
+      "SqlCredential",
+      "EnableException"
+    ],
+    "Examples": [
+      "Add-sqmDatabaseToDistributedAg -SqlInstance \"SQL01\" -AvailabilityGroupName \"MyDAG\" -DatabaseName \"MyDb\" -SecondaryInstance \"DR-SQL01\""
+    ]
+  },
+  {
     "Name": "Compare-sqmServerConfiguration",
     "Synopsis": "Compares important configuration settings between two SQL Server instances.",
     "Params": [
@@ -293,6 +324,21 @@
     ],
     "Examples": [
       "Compare-sqmServerConfiguration -SourceInstance \"SQL01\" -TargetInstance \"SQL02\""
+    ]
+  },
+  {
+    "Name": "Complete-sqmListenerMigration",
+    "Synopsis": "Completes listener migration after cluster team recreates the listener resource.",
+    "Params": [
+      "SqlInstance",
+      "AvailabilityGroupName",
+      "ListenerName",
+      "SqlCredential",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "# STEP 1: DBA runs Invoke-sqmListenerMigrationPrep"
     ]
   },
   {
@@ -451,7 +497,7 @@
     ]
   },
   {
-    "Name": "Get-sqmAgHealthReport",
+    "Name": "Get-sqmAlwaysOnHealthReport",
     "Synopsis": "Creates a detailed health report for all Always On availability groups on an instance.",
     "Params": [
       "SqlCredential",
@@ -490,7 +536,8 @@
       "SqlCredential",
       "MinWaitSeconds",
       "OutputPath",
-      "EnableException"
+      "EnableException",
+      "NoOpen"
     ],
     "Examples": [
       "Get-sqmBlockingReport",
@@ -644,6 +691,21 @@
     "Examples": [
       "Get-sqmDiskSpaceReport",
       "Get-sqmDiskSpaceReport -SqlInstance \"SQL01\" -WarnThresholdPct 15 -OutputPath \"D:\\Reports\""
+    ]
+  },
+  {
+    "Name": "Get-sqmDistributedAgHealth",
+    "Synopsis": "Creates a detailed health report for Distributed AlwaysOn Availability Groups.",
+    "Params": [
+      "SqlCredential",
+      "OutputPath",
+      "ContinueOnError",
+      "EnableException",
+      "NoOpen"
+    ],
+    "Examples": [
+      "Get-sqmDistributedAgHealth -SqlInstance \"SQL01\"",
+      "Get-sqmDistributedAgHealth -SqlInstance \"SQL01\", \"SQL02\" -OutputPath \"D:\\Reports\""
     ]
   },
   {
@@ -854,7 +916,7 @@
     ],
     "Examples": [
       "Get-sqmSysadminAccounts",
-      "Get-sqmSysadminAccounts -SqlInstance \"SQL01\" -ExcludeSysAccounts\r\n#>\r\nfunction Get-sqmSysadminAccounts\r\n{\r\n\t[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]\r\n\t[OutputType([PSCustomObject])]\r\n\tparam (\r\n\t\t[Parameter(Mandatory = $false, ValueFromPipeline = $true)]\r\n\t\t[string[]]$SqlInstance = @($env:COMPUTERNAME),\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[System.Management.Automation.PSCredential]$SqlCredential,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string[]]$ExcludeLogin = @(),\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[switch]$ExcludeSysAccounts,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[bool]$IncludeDisabled = $true,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$OutputPath = \"$env:ProgramData\\sqmSQLTool\\Logs\",\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[switch]$ContinueOnError,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[switch]$EnableException,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[switch]$NoOpen\r\n\t)\r\n\t\r\n\tbegin\r\n\t{\r\n\t\t$functionName = $MyInvocation.MyCommand.Name\r\n\t\t$allInstanceResults = [System.Collections.Generic.List[PSCustomObject]]::new()\r\n\t\t\r\n\t\tif (-not (Get-Module -ListAvailable -Name dbatools))\r\n\t\t{\r\n\t\t\t$errMsg = \"dbatools-Modul nicht gefunden.\"\r\n\t\t\tInvoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level \"ERROR\"\r\n\t\t\tthrow $errMsg\r\n\t\t}\r\n\t\t\r\n\t\tInvoke-sqmLogging -Message \"Starte $functionName mit OutputPath: $OutputPath\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\r\n\t\t# Systemkonten-Muster fuer -ExcludeSysAccounts\r\n\t\t$sysAccountPatterns = @(\r\n\t\t\t'NT SERVICE\\*',\r\n\t\t\t'NT AUTHORITY\\SYSTEM',\r\n\t\t\t'NT AUTHORITY\\NETWORK SERVICE',\r\n\t\t\t'NT AUTHORITY\\LOCAL SERVICE',\r\n\t\t\t'NT AUTHORITY\\*',\r\n\t\t\t'##MS_*##'\r\n\t\t)\r\n\t\t\r\n\t\tif ($ExcludeSysAccounts)\r\n\t\t{\r\n\t\t\t$ExcludeLogin = @($ExcludeLogin) + $sysAccountPatterns | Sort-Object -Unique\r\n\t\t\tInvoke-sqmLogging -Message \"ExcludeSysAccounts: $($sysAccountPatterns.Count) Systemmuster hinzugefuegt.\" -FunctionName $functionName -Level \"DEBUG\"\r\n\t\t}\r\n\t\t\r\n\t\t# Hilfsfunktion fuer Ausschlusspruefung\r\n\t\tfunction _IsExcluded\r\n\t\t{\r\n\t\t\tparam ([string]$Name,\r\n\t\t\t\t[string[]]$Patterns)\r\n\t\t\tif (-not $Patterns) { return $false }\r\n\t\t\tforeach ($p in $Patterns)\r\n\t\t\t{\r\n\t\t\t\tif ($Name -like $p) { return $true }\r\n\t\t\t}\r\n\t\t\treturn $false\r\n\t\t}\r\n\t}\r\n\t\r\n\tprocess\r\n\t{\r\n\t\tforeach ($instance in $SqlInstance)\r\n\t\t{\r\n\t\t\t$connParams = @{ SqlInstance = $instance }\r\n\t\t\tif ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }\r\n\t\t\t\r\n\t\t\t$detailRows = [System.Collections.Generic.List[PSCustomObject]]::new()\r\n\t\t\t\r\n\t\t\ttry\r\n\t\t\t{\r\n\t\t\t\tInvoke-sqmLogging -Message \"[$instance] Starte Sysadmin-Audit ...\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\r\n\t\t\t\t$disabledFilter = if ($IncludeDisabled) { '' }\r\n\t\t\t\telse { 'AND sp.is_disabled = 0' }\r\n\t\t\t\t\r\n\t\t\t\t# Achtung: password_last_set_time und last_login_date wurden entfernt,\r\n\t\t\t\t# da sie in aelteren SQL Server-Versionen nicht existieren.\r\n\t\t\t\t$query = @\"\r\nSELECT\r\n    sp.name                                          AS LoginName,\r\n    sp.type_desc                                     AS LoginType,\r\n    sp.is_disabled                                   AS IsDisabled,\r\n    CASE WHEN sp.sid = 0x01 THEN 1 ELSE 0 END        AS IsSa,\r\n    sp.create_date                                   AS CreateDate,\r\n    sp.modify_date                                   AS ModifyDate,\r\n    NULL                                             AS LastPasswordChange,\r\n    NULL                                             AS LastLogin,\r\n    sp.default_database_name                         AS DefaultDatabase\r\nFROM sys.server_principals       sp\r\nJOIN sys.server_role_members     rm ON rm.member_principal_id = sp.principal_id\r\nJOIN sys.server_principals       sr ON sr.principal_id        = rm.role_principal_id\r\nWHERE sr.name        = 'sysadmin'\r\n  AND sp.type        IN ('S','U','G','R')\r\n  AND sp.principal_id > 1\r\n  $disabledFilter\r\nORDER BY sp.type_desc, sp.name;\r\n\"@\r\n\t\t\t\t$rows = Invoke-DbaQuery @connParams -Query $query -EnableException:$EnableException\r\n\t\t\t\t\r\n\t\t\t\tif (-not $rows)\r\n\t\t\t\t{\r\n\t\t\t\t\t$msg = \"Keine sysadmin-Logins auf '$instance' gefunden (unerwartet).\"\r\n\t\t\t\t\tInvoke-sqmLogging -Message $msg -FunctionName $functionName -Level \"WARNING\"\r\n\t\t\t\t\t$detailRows.Add([PSCustomObject]@{\r\n\t\t\t\t\t\t\tSqlInstance\t       = $instance\r\n\t\t\t\t\t\t\tLoginName\t\t   = '(keine)'\r\n\t\t\t\t\t\t\tLoginType\t\t   = 'n/a'\r\n\t\t\t\t\t\t\tIsEnabled\t\t   = $null\r\n\t\t\t\t\t\t\tIsSa\t\t\t   = $false\r\n\t\t\t\t\t\t\tLastPasswordChange = $null\r\n\t\t\t\t\t\t\tLastLogin\t\t   = $null\r\n\t\t\t\t\t\t\tCreateDate\t\t   = $null\r\n\t\t\t\t\t\t\tStatus\t\t\t   = 'Error'\r\n\t\t\t\t\t\t\tMessage\t\t       = $msg\r\n\t\t\t\t\t\t})\r\n\t\t\t\t}\r\n\t\t\t\telse\r\n\t\t\t\t{\r\n\t\t\t\t\tInvoke-sqmLogging -Message \"[$instance] $($rows.Count) sysadmin-Login(s) gefunden.\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\t\r\n\t\t\t\t\tforeach ($row in $rows)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\t$loginName = $row.LoginName\r\n\t\t\t\t\t\t$isSa = [bool]$row.IsSa\r\n\t\t\t\t\t\t$isEnabled = -not [bool]$row.IsDisabled\r\n\t\t\t\t\t\t$excluded = _IsExcluded $loginName $ExcludeLogin\r\n\t\t\t\t\t\t$isBuiltinAdmins = ($loginName -eq 'BUILTIN\\Administrators')\r\n\t\t\t\t\t\t\r\n\t\t\t\t\t\t$status = if ($isSa) { 'SA' }\r\n\t\t\t\t\t\telseif ($isBuiltinAdmins) { 'BuiltinAdmins' }\r\n\t\t\t\t\t\telseif ($excluded) { 'Excluded' }\r\n\t\t\t\t\t\telseif (-not $isEnabled) { 'Disabled' }\r\n\t\t\t\t\t\telse { 'Unexpected' }\r\n\t\t\t\t\t\t\r\n\t\t\t\t\t\t$msg = switch ($status)\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t'SA'            { 'SA-Konto (SID 0x01).' }\r\n\t\t\t\t\t\t\t'BuiltinAdmins' { 'BUILTIN\\Administrators hat Sysadmin-Rechte - SICHERHEITSPRueFUNG ERFORDERLICH.' }\r\n\t\t\t\t\t\t\t'Excluded'      { 'Ausgeschlossen via -ExcludeLogin.' }\r\n\t\t\t\t\t\t\t'Disabled'      { 'Login hat sysadmin-Rechte, ist aber deaktiviert.' }\r\n\t\t\t\t\t\t\t'Unexpected'    { 'Sysadmin-Login - kein Ausschluss definiert.' }\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t\t\r\n\t\t\t\t\t\t$createDate = if ($row.CreateDate) { $row.CreateDate.ToString('yyyy-MM-dd') }\r\n\t\t\t\t\t\telse { $null }\r\n\t\t\t\t\t\t\r\n\t\t\t\t\t\t$detailRows.Add([PSCustomObject]@{\r\n\t\t\t\t\t\t\t\tSqlInstance = $instance\r\n\t\t\t\t\t\t\t\tLoginName   = $loginName\r\n\t\t\t\t\t\t\t\tLoginType   = $row.LoginType\r\n\t\t\t\t\t\t\t\tIsEnabled   = $isEnabled\r\n\t\t\t\t\t\t\t\tIsSa\t    = $isSa\r\n\t\t\t\t\t\t\t\tLastPasswordChange = $null # Nicht verfuegbar in aelteren Versionen\r\n\t\t\t\t\t\t\t\tLastLogin   = $null # Nicht verfuegbar in aelteren Versionen\r\n\t\t\t\t\t\t\t\tCreateDate  = $createDate\r\n\t\t\t\t\t\t\t\tStatus\t    = $status\r\n\t\t\t\t\t\t\t\tMessage\t    = $msg\r\n\t\t\t\t\t\t\t})\r\n\t\t\t\t\t}\r\n\t\t\t\t}\r\n\t\t\t\t\r\n\t\t\t\t# Statistik\r\n\t\t\t\t$cntSa = ($detailRows | Where-Object Status -eq 'SA').Count\r\n\t\t\t\t$cntExcluded = ($detailRows | Where-Object Status -eq 'Excluded').Count\r\n\t\t\t\t$cntDisabled = ($detailRows | Where-Object Status -eq 'Disabled').Count\r\n\t\t\t\t$cntUnexpected = ($detailRows | Where-Object Status -eq 'Unexpected').Count\r\n\t\t\t\t$cntBuiltinAdmins = ($detailRows | Where-Object Status -eq 'BuiltinAdmins').Count\r\n\t\t\t\t\r\n\t\t\t\tInvoke-sqmLogging -Message (\"[$instance] Gesamt: $($detailRows.Count) | SA: $cntSa | Ausgeschlossen: $cntExcluded | \" +\r\n\t\t\t\t\t\"Deaktiviert: $cntDisabled | Unerwartet: $cntUnexpected | BUILTIN\\\\Admins: $cntBuiltinAdmins\") -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\r\n\t\t\t\t# Dateien schreiben\r\n\t\t\t\t$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'\r\n\t\t\t\t$datestamp = Get-Date -Format 'yyyy-MM-dd'\r\n\t\t\t\t$safeInst = $instance -replace '[\\\\/:*?\"<>|]', '_'\r\n\t\t\t\t$txtFile = Join-Path $OutputPath \"SysadminAccounts_${safeInst}_${datestamp}.txt\"\r\n\t\t\t\t$csvFile = Join-Path $OutputPath \"SysadminAccounts_${safeInst}_${datestamp}.csv\"\r\n\t\t\t\t\r\n\t\t\t\tif ($PSCmdlet.ShouldProcess($instance, \"Erstelle Sysadmin-Bericht in $OutputPath\"))\r\n\t\t\t\t{\r\n\t\t\t\t\tif (-not (Test-Path $OutputPath))\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tNew-Item -ItemType Directory -Path $OutputPath -Force -ErrorAction Stop | Out-Null\r\n\t\t\t\t\t\tInvoke-sqmLogging -Message \"Verzeichnis $OutputPath wurde erstellt.\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\t}\r\n\t\t\t\t\t\r\n\t\t\t\t\t# TXT-Bericht (identisch zum vorherigen, daher hier ausgelassen - bitte aus Original uebernehmen)\r\n\t\t\t\t\t# ... (der Code fuer die TXT-Erstellung bleibt unveraendert)\r\n\t\t\t\t\t$lines = [System.Collections.Generic.List[string]]::new()\r\n\t\t\t\t\t$lines.Add(\"# ================================================================\")\r\n\t\t\t\t\t$lines.Add(\"# MSSQLTools - Sysadmin-Konten Bericht\")\r\n\t\t\t\t\t$lines.Add(\"# Instanz   : $instance\")\r\n\t\t\t\t\t$lines.Add(\"# Erstellt  : $timestamp\")\r\n\t\t\t\t\t$lines.Add(\"# Gesamt    : $($detailRows.Count) Logins\")\r\n\t\t\t\t\t$lines.Add(\"# SA        : $cntSa\")\r\n\t\t\t\t\t$lines.Add(\"# Ausgesch. : $cntExcluded\")\r\n\t\t\t\t\t$lines.Add(\"# Deaktiv.  : $cntDisabled\")\r\n\t\t\t\t\t$lines.Add(\"# Unerwartet: $cntUnexpected  ? PRueFEN\")\r\n\t\t\t\t\t$lines.Add(\"# BUILTIN\\\\Adm: $cntBuiltinAdmins  ? SICHERHEITSPRueFUNG\")\r\n\t\t\t\t\t$lines.Add(\"# SysExclude: $(if ($ExcludeSysAccounts) { 'Ja (NT SERVICE\\*, NT AUTHORITY\\*, ##MS_*##)' }\r\n\t\t\t\t\t\t\telse { 'Nein (manuell via -ExcludeLogin)' })\")\r\n\t\t\t\t\t$lines.Add(\"# ================================================================\")\r\n\t\t\t\t\t\r\n\t\t\t\t\t# BUILTIN\\Administrators\r\n\t\t\t\t\t$builtinEntries = $detailRows | Where-Object { $_.Status -eq 'BuiltinAdmins' }\r\n\t\t\t\t\t$lines.Add(\"\"); $lines.Add(\"# ================================================================\")\r\n\t\t\t\t\t$lines.Add(\"# BUILTIN\\Administrators - SICHERHEITSPRueFUNG ERFORDERLICH ($cntBuiltinAdmins)\")\r\n\t\t\t\t\t$lines.Add(\"# ================================================================\")\r\n\t\t\t\t\tif ($builtinEntries)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tforeach ($e in $builtinEntries)\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$lines.Add((\"  Name   : {0}\" -f $e.LoginName))\r\n\t\t\t\t\t\t\t$lines.Add((\"  Typ    : {0}  |  Aktiv: {1}  |  Erstellt: {2}\" -f $e.LoginType, $e.IsEnabled, $e.CreateDate))\r\n\t\t\t\t\t\t\t$lines.Add(\"  ? Empfehlung: Pruefen ob BUILTIN\\Administrators Sysadmin-Rechte\")\r\n\t\t\t\t\t\t\t$lines.Add(\"    gemaess Sicherheitsrichtlinie zulaessig sind. Ggf. entfernen:\")\r\n\t\t\t\t\t\t\t$lines.Add(\"    EXEC sp_dropsrvrolemember 'BUILTIN\\Administrators','sysadmin';\")\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse { $lines.Add(\"  (nicht vorhanden - kein Befund)\") }\r\n\t\t\t\t\t\r\n\t\t\t\t\t# Unerwartete Konten\r\n\t\t\t\t\t$unexpected = $detailRows | Where-Object { $_.Status -eq 'Unexpected' }\r\n\t\t\t\t\t$lines.Add(\"\"); $lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\t$lines.Add(\"# UNERWARTETE SYSADMIN-KONTEN ($cntUnexpected)  ? PRueFEN\")\r\n\t\t\t\t\t$lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\tif ($unexpected)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tforeach ($e in ($unexpected | Sort-Object LoginType, LoginName))\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$lines.Add((\"  {0,-40} {1,-20} Enabled:{2,-5} Erstellt:{3}\" -f $e.LoginName, $e.LoginType, $e.IsEnabled, $e.CreateDate))\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse { $lines.Add(\"  (keine)\") }\r\n\t\t\t\t\t\r\n\t\t\t\t\t# Deaktivierte Konten\r\n\t\t\t\t\t$disabledEntries = $detailRows | Where-Object { $_.Status -eq 'Disabled' }\r\n\t\t\t\t\t$lines.Add(\"\"); $lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\t$lines.Add(\"# DEAKTIVIERTE SYSADMIN-KONTEN ($cntDisabled)\")\r\n\t\t\t\t\t$lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\tif ($disabledEntries)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tforeach ($e in ($disabledEntries | Sort-Object LoginName))\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$lines.Add(\"  $($e.LoginName)  [$($e.LoginType)]  Erstellt: $($e.CreateDate)\")\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse { $lines.Add(\"  (keine)\") }\r\n\t\t\t\t\t\r\n\t\t\t\t\t# SA-Konto\r\n\t\t\t\t\t$saEntry = $detailRows | Where-Object { $_.Status -eq 'SA' }\r\n\t\t\t\t\t$lines.Add(\"\"); $lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\t$lines.Add(\"# SA-KONTO (SID 0x01)\")\r\n\t\t\t\t\t$lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\tif ($saEntry)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tforeach ($e in $saEntry)\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$lines.Add((\"  Name: {0,-40} Enabled: {1}\" -f $e.LoginName, $e.IsEnabled))\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse { $lines.Add(\"  (nicht gefunden)\") }\r\n\t\t\t\t\t\r\n\t\t\t\t\t# Ausgeschlossene Konten\r\n\t\t\t\t\t$excludedEntries = $detailRows | Where-Object { $_.Status -eq 'Excluded' }\r\n\t\t\t\t\t$lines.Add(\"\"); $lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\t$lines.Add(\"# AUSGESCHLOSSENE KONTEN ($cntExcluded)\")\r\n\t\t\t\t\t$lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\tif ($excludedEntries)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tforeach ($e in ($excludedEntries | Sort-Object LoginType, LoginName))\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$lines.Add((\"  {0,-40} {1,-20} Enabled:{2}\" -f $e.LoginName, $e.LoginType, $e.IsEnabled))\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse { $lines.Add(\"  (keine)\") }\r\n\t\t\t\t\t\r\n\t\t\t\t\t$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force\r\n\t\t\t\t\t$detailRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force\r\n\r\n\t\t\t\t\t# Oeffne TXT-Datei wenn nicht -NoOpen\r\n\t\t\t\t\tif (-not $NoOpen -and $txtFile)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tStart-Process $txtFile\r\n\t\t\t\t\t}\r\n\r\n\t\t\t\t\tInvoke-sqmLogging -Message \"[$instance] Bericht erstellt: $txtFile\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t}\r\n\t\t\t\telse\r\n\t\t\t\t{\r\n\t\t\t\t\tInvoke-sqmLogging -Message \"[$instance] WhatIf: Berichtsdateien wuerden erstellt werden.\" -FunctionName $functionName -Level \"VERBOSE\"\r\n\t\t\t\t\t$txtFile = $null\r\n\t\t\t\t\t$csvFile = $null\r\n\t\t\t\t}\r\n\t\t\t\t\r\n\t\t\t\tif ($cntBuiltinAdmins -gt 0)\r\n\t\t\t\t{\r\n\t\t\t\t\tInvoke-sqmLogging -Message (\"[$instance] BUILTIN\\Administrators hat Sysadmin-Rechte - Sicherheitspruefung erforderlich!\") -FunctionName $functionName -Level \"WARNING\"\r\n\t\t\t\t}\r\n\t\t\t\tif ($cntUnexpected -gt 0)\r\n\t\t\t\t{\r\n\t\t\t\t\tInvoke-sqmLogging -Message (\"[$instance] $cntUnexpected unerwartete(s) sysadmin-Konto(en) gefunden.\") -FunctionName $functionName -Level \"WARNING\"\r\n\t\t\t\t}\r\n\t\t\t\t\r\n\t\t\t\t$instanceResult = [PSCustomObject]@{\r\n\t\t\t\t\tSqlInstance\t\t\t\t\t\t\t     = $instance\r\n\t\t\t\t\tTimestamp\t\t\t\t\t\t\t     = $timestamp\r\n\t\t\t\t\tDetailRows\t\t\t\t\t\t\t     = $detailRows\r\n\t\t\t\t\tTxtFile\t\t\t\t\t\t\t\t     = $txtFile\r\n\t\t\t\t\tCsvFile\t\t\t\t\t\t\t\t     = $csvFile\r\n\t\t\t\t\tStatus\t\t\t\t\t\t\t\t     = if ($cntUnexpected -gt 0 -or $cntBuiltinAdmins -gt 0) { 'Warning' } else { 'OK' }\r\n\t\t\t\t}\r\n\t\t\t\t$allInstanceResults.Add($instanceResult)\r\n\t\t\t}\r\n\t\t\tcatch\r\n\t\t\t{\r\n\t\t\t\t$errMsg = \"Fehler auf '$instance': $($_.Exception.Message)\"\r\n\t\t\t\tInvoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level \"ERROR\"\r\n\t\t\t\t$allInstanceResults.Add([PSCustomObject]@{\r\n\t\t\t\t\t\tSqlInstance = $instance\r\n\t\t\t\t\t\tStatus\t    = 'Error'\r\n\t\t\t\t\t\tMessage\t    = $errMsg\r\n\t\t\t\t\t\tDetailRows  = $null\r\n\t\t\t\t\t\tTxtFile\t    = $null\r\n\t\t\t\t\t\tCsvFile\t    = $null\r\n\t\t\t\t\t})\r\n\t\t\t\tif ($EnableException) { throw }\r\n\t\t\t\tif (-not $ContinueOnError) { throw $_ }\r\n\t\t\t}\r\n\t\t}\r\n\t}\r\n\t\r\n\tend\r\n\t{\r\n\t\tInvoke-sqmLogging -Message \"$functionName abgeschlossen. $($allInstanceResults.Count) Instanzen verarbeitet.\" -FunctionName $functionName -Level \"INFO\"\r\n\t\treturn $allInstanceResults\r\n\t}\r\n}"
+      "Get-sqmSysadminAccounts -SqlInstance \"SQL01\" -ExcludeSysAccounts\r\n#>\r\nfunction Get-sqmSysadminAccounts\r\n{\r\n\t[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]\r\n\t[OutputType([PSCustomObject])]\r\n\tparam (\r\n\t\t[Parameter(Mandatory = $false, ValueFromPipeline = $true)]\r\n\t\t[string[]]$SqlInstance = @($env:COMPUTERNAME),\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[System.Management.Automation.PSCredential]$SqlCredential,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string[]]$ExcludeLogin = @(),\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[switch]$ExcludeSysAccounts,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[bool]$IncludeDisabled = $true,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[string]$OutputPath = \"C:\\System\\WinSrvLog\\MSSQL\",\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[switch]$ContinueOnError,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[switch]$EnableException,\r\n\t\t[Parameter(Mandatory = $false)]\r\n\t\t[switch]$NoOpen\r\n\t)\r\n\t\r\n\tbegin\r\n\t{\r\n\t\t$functionName = $MyInvocation.MyCommand.Name\r\n\t\t$allInstanceResults = [System.Collections.Generic.List[PSCustomObject]]::new()\r\n\t\t\r\n\t\tif (-not (Get-Module -ListAvailable -Name dbatools))\r\n\t\t{\r\n\t\t\t$errMsg = \"dbatools-Modul nicht gefunden.\"\r\n\t\t\tInvoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level \"ERROR\"\r\n\t\t\tthrow $errMsg\r\n\t\t}\r\n\t\t\r\n\t\tInvoke-sqmLogging -Message \"Starte $functionName mit OutputPath: $OutputPath\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\r\n\t\t# Systemkonten-Muster fuer -ExcludeSysAccounts\r\n\t\t$sysAccountPatterns = @(\r\n\t\t\t'NT SERVICE\\*',\r\n\t\t\t'NT AUTHORITY\\SYSTEM',\r\n\t\t\t'NT AUTHORITY\\NETWORK SERVICE',\r\n\t\t\t'NT AUTHORITY\\LOCAL SERVICE',\r\n\t\t\t'NT AUTHORITY\\*',\r\n\t\t\t'##MS_*##'\r\n\t\t)\r\n\t\t\r\n\t\tif ($ExcludeSysAccounts)\r\n\t\t{\r\n\t\t\t$ExcludeLogin = @($ExcludeLogin) + $sysAccountPatterns | Sort-Object -Unique\r\n\t\t\tInvoke-sqmLogging -Message \"ExcludeSysAccounts: $($sysAccountPatterns.Count) Systemmuster hinzugefuegt.\" -FunctionName $functionName -Level \"DEBUG\"\r\n\t\t}\r\n\t\t\r\n\t\t# Hilfsfunktion fuer Ausschlusspruefung\r\n\t\tfunction _IsExcluded\r\n\t\t{\r\n\t\t\tparam ([string]$Name,\r\n\t\t\t\t[string[]]$Patterns)\r\n\t\t\tif (-not $Patterns) { return $false }\r\n\t\t\tforeach ($p in $Patterns)\r\n\t\t\t{\r\n\t\t\t\tif ($Name -like $p) { return $true }\r\n\t\t\t}\r\n\t\t\treturn $false\r\n\t\t}\r\n\t}\r\n\t\r\n\tprocess\r\n\t{\r\n\t\tforeach ($instance in $SqlInstance)\r\n\t\t{\r\n\t\t\t$connParams = @{ SqlInstance = $instance }\r\n\t\t\tif ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }\r\n\t\t\t\r\n\t\t\t$detailRows = [System.Collections.Generic.List[PSCustomObject]]::new()\r\n\t\t\t\r\n\t\t\ttry\r\n\t\t\t{\r\n\t\t\t\tInvoke-sqmLogging -Message \"[$instance] Starte Sysadmin-Audit ...\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\r\n\t\t\t\t$disabledFilter = if ($IncludeDisabled) { '' }\r\n\t\t\t\telse { 'AND sp.is_disabled = 0' }\r\n\t\t\t\t\r\n\t\t\t\t# Achtung: password_last_set_time und last_login_date wurden entfernt,\r\n\t\t\t\t# da sie in aelteren SQL Server-Versionen nicht existieren.\r\n\t\t\t\t$query = @\"\r\nSELECT\r\n    sp.name                                          AS LoginName,\r\n    sp.type_desc                                     AS LoginType,\r\n    sp.is_disabled                                   AS IsDisabled,\r\n    CASE WHEN sp.sid = 0x01 THEN 1 ELSE 0 END        AS IsSa,\r\n    sp.create_date                                   AS CreateDate,\r\n    sp.modify_date                                   AS ModifyDate,\r\n    NULL                                             AS LastPasswordChange,\r\n    NULL                                             AS LastLogin,\r\n    sp.default_database_name                         AS DefaultDatabase\r\nFROM sys.server_principals       sp\r\nJOIN sys.server_role_members     rm ON rm.member_principal_id = sp.principal_id\r\nJOIN sys.server_principals       sr ON sr.principal_id        = rm.role_principal_id\r\nWHERE sr.name        = 'sysadmin'\r\n  AND sp.type        IN ('S','U','G','R')\r\n  AND sp.principal_id > 1\r\n  $disabledFilter\r\nORDER BY sp.type_desc, sp.name;\r\n\"@\r\n\t\t\t\t$rows = Invoke-DbaQuery @connParams -Query $query -EnableException:$EnableException\r\n\t\t\t\t\r\n\t\t\t\tif (-not $rows)\r\n\t\t\t\t{\r\n\t\t\t\t\t$msg = \"Keine sysadmin-Logins auf '$instance' gefunden (unerwartet).\"\r\n\t\t\t\t\tInvoke-sqmLogging -Message $msg -FunctionName $functionName -Level \"WARNING\"\r\n\t\t\t\t\t$detailRows.Add([PSCustomObject]@{\r\n\t\t\t\t\t\t\tSqlInstance\t       = $instance\r\n\t\t\t\t\t\t\tLoginName\t\t   = '(keine)'\r\n\t\t\t\t\t\t\tLoginType\t\t   = 'n/a'\r\n\t\t\t\t\t\t\tIsEnabled\t\t   = $null\r\n\t\t\t\t\t\t\tIsSa\t\t\t   = $false\r\n\t\t\t\t\t\t\tLastPasswordChange = $null\r\n\t\t\t\t\t\t\tLastLogin\t\t   = $null\r\n\t\t\t\t\t\t\tCreateDate\t\t   = $null\r\n\t\t\t\t\t\t\tStatus\t\t\t   = 'Error'\r\n\t\t\t\t\t\t\tMessage\t\t       = $msg\r\n\t\t\t\t\t\t})\r\n\t\t\t\t}\r\n\t\t\t\telse\r\n\t\t\t\t{\r\n\t\t\t\t\tInvoke-sqmLogging -Message \"[$instance] $($rows.Count) sysadmin-Login(s) gefunden.\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\t\r\n\t\t\t\t\tforeach ($row in $rows)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\t$loginName = $row.LoginName\r\n\t\t\t\t\t\t$isSa = [bool]$row.IsSa\r\n\t\t\t\t\t\t$isEnabled = -not [bool]$row.IsDisabled\r\n\t\t\t\t\t\t$excluded = _IsExcluded $loginName $ExcludeLogin\r\n\t\t\t\t\t\t$isBuiltinAdmins = ($loginName -eq 'BUILTIN\\Administrators')\r\n\t\t\t\t\t\t\r\n\t\t\t\t\t\t$status = if ($isSa) { 'SA' }\r\n\t\t\t\t\t\telseif ($isBuiltinAdmins) { 'BuiltinAdmins' }\r\n\t\t\t\t\t\telseif ($excluded) { 'Excluded' }\r\n\t\t\t\t\t\telseif (-not $isEnabled) { 'Disabled' }\r\n\t\t\t\t\t\telse { 'Unexpected' }\r\n\t\t\t\t\t\t\r\n\t\t\t\t\t\t$msg = switch ($status)\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t'SA'            { 'SA-Konto (SID 0x01).' }\r\n\t\t\t\t\t\t\t'BuiltinAdmins' { 'BUILTIN\\Administrators hat Sysadmin-Rechte - SICHERHEITSPRueFUNG ERFORDERLICH.' }\r\n\t\t\t\t\t\t\t'Excluded'      { 'Ausgeschlossen via -ExcludeLogin.' }\r\n\t\t\t\t\t\t\t'Disabled'      { 'Login hat sysadmin-Rechte, ist aber deaktiviert.' }\r\n\t\t\t\t\t\t\t'Unexpected'    { 'Sysadmin-Login - kein Ausschluss definiert.' }\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t\t\r\n\t\t\t\t\t\t$createDate = if ($row.CreateDate) { $row.CreateDate.ToString('yyyy-MM-dd') }\r\n\t\t\t\t\t\telse { $null }\r\n\t\t\t\t\t\t\r\n\t\t\t\t\t\t$detailRows.Add([PSCustomObject]@{\r\n\t\t\t\t\t\t\t\tSqlInstance = $instance\r\n\t\t\t\t\t\t\t\tLoginName   = $loginName\r\n\t\t\t\t\t\t\t\tLoginType   = $row.LoginType\r\n\t\t\t\t\t\t\t\tIsEnabled   = $isEnabled\r\n\t\t\t\t\t\t\t\tIsSa\t    = $isSa\r\n\t\t\t\t\t\t\t\tLastPasswordChange = $null # Nicht verfuegbar in aelteren Versionen\r\n\t\t\t\t\t\t\t\tLastLogin   = $null # Nicht verfuegbar in aelteren Versionen\r\n\t\t\t\t\t\t\t\tCreateDate  = $createDate\r\n\t\t\t\t\t\t\t\tStatus\t    = $status\r\n\t\t\t\t\t\t\t\tMessage\t    = $msg\r\n\t\t\t\t\t\t\t})\r\n\t\t\t\t\t}\r\n\t\t\t\t}\r\n\t\t\t\t\r\n\t\t\t\t# Statistik\r\n\t\t\t\t$cntSa = ($detailRows | Where-Object Status -eq 'SA').Count\r\n\t\t\t\t$cntExcluded = ($detailRows | Where-Object Status -eq 'Excluded').Count\r\n\t\t\t\t$cntDisabled = ($detailRows | Where-Object Status -eq 'Disabled').Count\r\n\t\t\t\t$cntUnexpected = ($detailRows | Where-Object Status -eq 'Unexpected').Count\r\n\t\t\t\t$cntBuiltinAdmins = ($detailRows | Where-Object Status -eq 'BuiltinAdmins').Count\r\n\t\t\t\t\r\n\t\t\t\tInvoke-sqmLogging -Message (\"[$instance] Gesamt: $($detailRows.Count) | SA: $cntSa | Ausgeschlossen: $cntExcluded | \" +\r\n\t\t\t\t\t\"Deaktiviert: $cntDisabled | Unerwartet: $cntUnexpected | BUILTIN\\\\Admins: $cntBuiltinAdmins\") -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\r\n\t\t\t\t# Dateien schreiben\r\n\t\t\t\t$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'\r\n\t\t\t\t$datestamp = Get-Date -Format 'yyyy-MM-dd'\r\n\t\t\t\t$safeInst = $instance -replace '[\\\\/:*?\"<>|]', '_'\r\n\t\t\t\t$txtFile = Join-Path $OutputPath \"SysadminAccounts_${safeInst}_${datestamp}.txt\"\r\n\t\t\t\t$csvFile = Join-Path $OutputPath \"SysadminAccounts_${safeInst}_${datestamp}.csv\"\r\n\t\t\t\t\r\n\t\t\t\tif ($PSCmdlet.ShouldProcess($instance, \"Erstelle Sysadmin-Bericht in $OutputPath\"))\r\n\t\t\t\t{\r\n\t\t\t\t\tif (-not (Test-Path $OutputPath))\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tNew-Item -ItemType Directory -Path $OutputPath -Force -ErrorAction Stop | Out-Null\r\n\t\t\t\t\t\tInvoke-sqmLogging -Message \"Verzeichnis $OutputPath wurde erstellt.\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t\t}\r\n\t\t\t\t\t\r\n\t\t\t\t\t# TXT-Bericht (identisch zum vorherigen, daher hier ausgelassen - bitte aus Original uebernehmen)\r\n\t\t\t\t\t# ... (der Code fuer die TXT-Erstellung bleibt unveraendert)\r\n\t\t\t\t\t$lines = [System.Collections.Generic.List[string]]::new()\r\n\t\t\t\t\t$lines.Add(\"# ================================================================\")\r\n\t\t\t\t\t$lines.Add(\"# MSSQLTools - Sysadmin-Konten Bericht\")\r\n\t\t\t\t\t$lines.Add(\"# Instanz   : $instance\")\r\n\t\t\t\t\t$lines.Add(\"# Erstellt  : $timestamp\")\r\n\t\t\t\t\t$lines.Add(\"# Gesamt    : $($detailRows.Count) Logins\")\r\n\t\t\t\t\t$lines.Add(\"# SA        : $cntSa\")\r\n\t\t\t\t\t$lines.Add(\"# Ausgesch. : $cntExcluded\")\r\n\t\t\t\t\t$lines.Add(\"# Deaktiv.  : $cntDisabled\")\r\n\t\t\t\t\t$lines.Add(\"# Unerwartet: $cntUnexpected  ? PRueFEN\")\r\n\t\t\t\t\t$lines.Add(\"# BUILTIN\\\\Adm: $cntBuiltinAdmins  ? SICHERHEITSPRueFUNG\")\r\n\t\t\t\t\t$lines.Add(\"# SysExclude: $(if ($ExcludeSysAccounts) { 'Ja (NT SERVICE\\*, NT AUTHORITY\\*, ##MS_*##)' }\r\n\t\t\t\t\t\t\telse { 'Nein (manuell via -ExcludeLogin)' })\")\r\n\t\t\t\t\t$lines.Add(\"# ================================================================\")\r\n\t\t\t\t\t\r\n\t\t\t\t\t# BUILTIN\\Administrators\r\n\t\t\t\t\t$builtinEntries = $detailRows | Where-Object { $_.Status -eq 'BuiltinAdmins' }\r\n\t\t\t\t\t$lines.Add(\"\"); $lines.Add(\"# ================================================================\")\r\n\t\t\t\t\t$lines.Add(\"# BUILTIN\\Administrators - SICHERHEITSPRueFUNG ERFORDERLICH ($cntBuiltinAdmins)\")\r\n\t\t\t\t\t$lines.Add(\"# ================================================================\")\r\n\t\t\t\t\tif ($builtinEntries)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tforeach ($e in $builtinEntries)\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$lines.Add((\"  Name   : {0}\" -f $e.LoginName))\r\n\t\t\t\t\t\t\t$lines.Add((\"  Typ    : {0}  |  Aktiv: {1}  |  Erstellt: {2}\" -f $e.LoginType, $e.IsEnabled, $e.CreateDate))\r\n\t\t\t\t\t\t\t$lines.Add(\"  ? Empfehlung: Pruefen ob BUILTIN\\Administrators Sysadmin-Rechte\")\r\n\t\t\t\t\t\t\t$lines.Add(\"    gemaess Sicherheitsrichtlinie zulaessig sind. Ggf. entfernen:\")\r\n\t\t\t\t\t\t\t$lines.Add(\"    EXEC sp_dropsrvrolemember 'BUILTIN\\Administrators','sysadmin';\")\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse { $lines.Add(\"  (nicht vorhanden - kein Befund)\") }\r\n\t\t\t\t\t\r\n\t\t\t\t\t# Unerwartete Konten\r\n\t\t\t\t\t$unexpected = $detailRows | Where-Object { $_.Status -eq 'Unexpected' }\r\n\t\t\t\t\t$lines.Add(\"\"); $lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\t$lines.Add(\"# UNERWARTETE SYSADMIN-KONTEN ($cntUnexpected)  ? PRueFEN\")\r\n\t\t\t\t\t$lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\tif ($unexpected)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tforeach ($e in ($unexpected | Sort-Object LoginType, LoginName))\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$lines.Add((\"  {0,-40} {1,-20} Enabled:{2,-5} Erstellt:{3}\" -f $e.LoginName, $e.LoginType, $e.IsEnabled, $e.CreateDate))\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse { $lines.Add(\"  (keine)\") }\r\n\t\t\t\t\t\r\n\t\t\t\t\t# Deaktivierte Konten\r\n\t\t\t\t\t$disabledEntries = $detailRows | Where-Object { $_.Status -eq 'Disabled' }\r\n\t\t\t\t\t$lines.Add(\"\"); $lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\t$lines.Add(\"# DEAKTIVIERTE SYSADMIN-KONTEN ($cntDisabled)\")\r\n\t\t\t\t\t$lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\tif ($disabledEntries)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tforeach ($e in ($disabledEntries | Sort-Object LoginName))\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$lines.Add(\"  $($e.LoginName)  [$($e.LoginType)]  Erstellt: $($e.CreateDate)\")\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse { $lines.Add(\"  (keine)\") }\r\n\t\t\t\t\t\r\n\t\t\t\t\t# SA-Konto\r\n\t\t\t\t\t$saEntry = $detailRows | Where-Object { $_.Status -eq 'SA' }\r\n\t\t\t\t\t$lines.Add(\"\"); $lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\t$lines.Add(\"# SA-KONTO (SID 0x01)\")\r\n\t\t\t\t\t$lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\tif ($saEntry)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tforeach ($e in $saEntry)\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$lines.Add((\"  Name: {0,-40} Enabled: {1}\" -f $e.LoginName, $e.IsEnabled))\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse { $lines.Add(\"  (nicht gefunden)\") }\r\n\t\t\t\t\t\r\n\t\t\t\t\t# Ausgeschlossene Konten\r\n\t\t\t\t\t$excludedEntries = $detailRows | Where-Object { $_.Status -eq 'Excluded' }\r\n\t\t\t\t\t$lines.Add(\"\"); $lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\t$lines.Add(\"# AUSGESCHLOSSENE KONTEN ($cntExcluded)\")\r\n\t\t\t\t\t$lines.Add(\"# ----------------------------------------------------------------\")\r\n\t\t\t\t\tif ($excludedEntries)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tforeach ($e in ($excludedEntries | Sort-Object LoginType, LoginName))\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t$lines.Add((\"  {0,-40} {1,-20} Enabled:{2}\" -f $e.LoginName, $e.LoginType, $e.IsEnabled))\r\n\t\t\t\t\t\t}\r\n\t\t\t\t\t}\r\n\t\t\t\t\telse { $lines.Add(\"  (keine)\") }\r\n\t\t\t\t\t\r\n\t\t\t\t\t$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force\r\n\t\t\t\t\t$detailRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force\r\n\r\n\t\t\t\t\t# Oeffne TXT-Datei wenn nicht -NoOpen\r\n\t\t\t\t\tif (-not $NoOpen -and $txtFile)\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\tStart-Process $txtFile\r\n\t\t\t\t\t}\r\n\r\n\t\t\t\t\tInvoke-sqmLogging -Message \"[$instance] Bericht erstellt: $txtFile\" -FunctionName $functionName -Level \"INFO\"\r\n\t\t\t\t}\r\n\t\t\t\telse\r\n\t\t\t\t{\r\n\t\t\t\t\tInvoke-sqmLogging -Message \"[$instance] WhatIf: Berichtsdateien wuerden erstellt werden.\" -FunctionName $functionName -Level \"VERBOSE\"\r\n\t\t\t\t\t$txtFile = $null\r\n\t\t\t\t\t$csvFile = $null\r\n\t\t\t\t}\r\n\t\t\t\t\r\n\t\t\t\tif ($cntBuiltinAdmins -gt 0)\r\n\t\t\t\t{\r\n\t\t\t\t\tInvoke-sqmLogging -Message (\"[$instance] BUILTIN\\Administrators hat Sysadmin-Rechte - Sicherheitspruefung erforderlich!\") -FunctionName $functionName -Level \"WARNING\"\r\n\t\t\t\t}\r\n\t\t\t\tif ($cntUnexpected -gt 0)\r\n\t\t\t\t{\r\n\t\t\t\t\tInvoke-sqmLogging -Message (\"[$instance] $cntUnexpected unerwartete(s) sysadmin-Konto(en) gefunden.\") -FunctionName $functionName -Level \"WARNING\"\r\n\t\t\t\t}\r\n\t\t\t\t\r\n\t\t\t\t$instanceResult = [PSCustomObject]@{\r\n\t\t\t\t\tSqlInstance\t\t\t\t\t\t\t     = $instance\r\n\t\t\t\t\tTimestamp\t\t\t\t\t\t\t     = $timestamp\r\n\t\t\t\t\tDetailRows\t\t\t\t\t\t\t     = $detailRows\r\n\t\t\t\t\tTxtFile\t\t\t\t\t\t\t\t     = $txtFile\r\n\t\t\t\t\tCsvFile\t\t\t\t\t\t\t\t     = $csvFile\r\n\t\t\t\t\tStatus\t\t\t\t\t\t\t\t     = if ($cntUnexpected -gt 0 -or $cntBuiltinAdmins -gt 0) { 'Warning' } else { 'OK' }\r\n\t\t\t\t}\r\n\t\t\t\t$allInstanceResults.Add($instanceResult)\r\n\t\t\t}\r\n\t\t\tcatch\r\n\t\t\t{\r\n\t\t\t\t$errMsg = \"Fehler auf '$instance': $($_.Exception.Message)\"\r\n\t\t\t\tInvoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level \"ERROR\"\r\n\t\t\t\t$allInstanceResults.Add([PSCustomObject]@{\r\n\t\t\t\t\t\tSqlInstance = $instance\r\n\t\t\t\t\t\tStatus\t    = 'Error'\r\n\t\t\t\t\t\tMessage\t    = $errMsg\r\n\t\t\t\t\t\tDetailRows  = $null\r\n\t\t\t\t\t\tTxtFile\t    = $null\r\n\t\t\t\t\t\tCsvFile\t    = $null\r\n\t\t\t\t\t})\r\n\t\t\t\tif ($EnableException) { throw }\r\n\t\t\t\tif (-not $ContinueOnError) { throw $_ }\r\n\t\t\t}\r\n\t\t}\r\n\t}\r\n\t\r\n\tend\r\n\t{\r\n\t\tInvoke-sqmLogging -Message \"$functionName abgeschlossen. $($allInstanceResults.Count) Instanzen verarbeitet.\" -FunctionName $functionName -Level \"INFO\"\r\n\t\treturn $allInstanceResults\r\n\t}\r\n}"
     ]
   },
   {
@@ -1060,21 +1122,6 @@
     ]
   },
   {
-    "Name": "Invoke-sqmAddDatabaseToAG",
-    "Synopsis": "Adds one or more databases to an Always On availability group (AutoSeed).",
-    "Params": [
-      "SqlInstance",
-      "SqlCredential",
-      "AvailabilityGroup",
-      "All",
-      "EnableException"
-    ],
-    "Examples": [
-      "Add-sqmDatabaseToAG -AvailabilityGroup \"AG1\" -Database \"SalesDB\"",
-      "Add-sqmDatabaseToAG -AvailabilityGroup \"AG1\" -All"
-    ]
-  },
-  {
     "Name": "Invoke-sqmCollationChange",
     "Synopsis": "Automatically changes the server collation of a SQL Server instance.",
     "Params": [
@@ -1101,7 +1148,6 @@
       "SqlInstance",
       "SqlCredential",
       "SnapshotPath",
-      "WhatIf",
       "Force",
       "EnableException"
     ],
@@ -1133,6 +1179,24 @@
       "# WhatIf dry run - no SQL executed, only pre-checks and summary table",
       "# No outer transaction - scripts manage their own transactions",
       "# SQL Server authentication"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmDistributedFailover",
+    "Synopsis": "Initiates failover of a Distributed AlwaysOn AG.",
+    "Params": [
+      "SqlInstance",
+      "AvailabilityGroupName",
+      "SqlCredential",
+      "OutputPath",
+      "Force",
+      "Rollback",
+      "EnableException"
+    ],
+    "Examples": [
+      "Invoke-sqmDistributedFailover -SqlInstance \"SQL01\" -AvailabilityGroupName \"MyDAG\" -Force",
+      "Invoke-sqmDistributedFailover -SqlInstance \"SQL01\" -AvailabilityGroupName \"MyDAG\" -WhatIf",
+      "# Rollback zum alten System nach fehlgeschlagenem Failover:"
     ]
   },
   {
@@ -1212,6 +1276,21 @@
     "Examples": [
       "Invoke-sqmInstanceInventory",
       "Invoke-sqmInstanceInventory -SqlInstance \"SQL01\", \"SQL02\" -ContinueOnError"
+    ]
+  },
+  {
+    "Name": "Invoke-sqmListenerMigrationPrep",
+    "Synopsis": "Prepares an AG listener for cluster-level migration without downtime.",
+    "Params": [
+      "SqlInstance",
+      "AvailabilityGroupName",
+      "ListenerName",
+      "SqlCredential",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "# STEP 1: Prepare listener before AD team deletes it"
     ]
   },
   {
@@ -1397,7 +1476,8 @@
       "CheckProfile",
       "OutputPath",
       "PassThru",
-      "EnableException"
+      "EnableException",
+      "NoOpen"
     ],
     "Examples": [
       "# Am Ende von PostInstall - CheckProfile aus Modulkonfiguration\r\n    Invoke-sqmSetupReport -SqlInstance \"SQL01\"",
@@ -1537,6 +1617,23 @@
     ]
   },
   {
+    "Name": "Move-sqmAlwaysOnListener",
+    "Synopsis": "Migrates an AG Listener from one Availability Group to another.",
+    "Params": [
+      "SqlInstance",
+      "SourceAgName",
+      "TargetAgName",
+      "TargetInstance",
+      "ListenerName",
+      "SqlCredential",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "# Move listener from Primary AG to Secondary AG (before failover)"
+    ]
+  },
+  {
     "Name": "New-sqmAgentProxy",
     "Synopsis": "Erstellt einen SQL Server Credential und einen SQL Agent Proxy und verbindet beide.",
     "Params": [
@@ -1573,6 +1670,32 @@
     "Examples": [
       "# Creates an hourly job\r\nNew-sqmAlwaysOnRepairJob",
       "# Daily job at 2 AM\r\nNew-sqmAlwaysOnRepairJob -Schedule \"FREQ=DAILY;INTERVAL=1\" -StartTime \"02:00:00\""
+    ]
+  },
+  {
+    "Name": "New-sqmAutoLoginSyncJob",
+    "Synopsis": "Creates a SQL Agent job to automatically synchronize logins in an AlwaysOn Availability Group.",
+    "Params": [
+      "SqlInstance",
+      "AvailabilityGroupName",
+      "JobName",
+      "Schedule",
+      "CustomScheduleFrequency",
+      "CustomScheduleInterval",
+      "TimeOfDay",
+      "DayOfWeek",
+      "IncludeSystemLogins",
+      "AdjustAuthMode",
+      "Force",
+      "BackupLogins",
+      "NotificationEmail",
+      "Overwrite",
+      "EnableException"
+    ],
+    "Examples": [
+      "New-sqmAutoLoginSyncJob -SqlInstance \"SQL01\" -AvailabilityGroupName \"ProdAG\" -Schedule Daily -TimeOfDay \"02:00\"",
+      "New-sqmAutoLoginSyncJob -SqlInstance \"SQL01\" -AvailabilityGroupName \"ProdAG\" -Schedule Weekly -DayOfWeek Sunday -TimeOfDay \"03:00\" -IncludeSystemLogins",
+      "New-sqmAutoLoginSyncJob -SqlInstance \"SQL01\" -AvailabilityGroupName \"ProdAG\" -Schedule Custom -CustomScheduleFrequency Hourly -CustomScheduleInterval 4"
     ]
   },
   {
@@ -1628,6 +1751,28 @@
       "# CSR based on an existing certificate\r\n    New-sqmCertificateRequest -SqlInstance \"SQL01\" -CertificateName \"AG_CERT\"",
       "# New CSR without template, all fields specified manually\r\n    New-sqmCertificateRequest -SqlInstance \"SQL01\" -Purpose \"SSL\" `\r\n        -Subject \"CN=SQL01.firma.de,O=Firma GmbH,L=Muenchen,C=DE\" `\r\n        -SubjectAlternativeNames @(\"sql01.firma.de\",\"sql01\",\"192.168.1.10\") `\r\n        -KeyLength 4096 -ValidityYears 2",
       "# CSR with output to a specific directory\r\n    New-sqmCertificateRequest -SqlInstance \"SQL01\" -CertificateName \"TLS_CERT\" `\r\n        -OutputPath \"D:\\CertRequests\""
+    ]
+  },
+  {
+    "Name": "New-sqmDistributedAvailabilityGroup",
+    "Synopsis": "Creates a new Distributed AlwaysOn Availability Group.",
+    "Params": [
+      "PrimaryInstance",
+      "PrimaryAgName",
+      "SecondaryInstance",
+      "SecondaryAgName",
+      "PrimaryFqdn",
+      "SecondaryFqdn",
+      "EndpointName",
+      "ServiceAccount",
+      "SqlCredential",
+      "EnableAutoSeed",
+      "SeedingMode",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "New-sqmDistributedAvailabilityGroup `"
     ]
   },
   {
@@ -1991,6 +2136,33 @@
     ]
   },
   {
+    "Name": "Sync-sqmLoginsToAlwaysOn",
+    "Synopsis": "Synchronizes logins from the primary replica to all secondary replicas in an AlwaysOn Availability Group.",
+    "Params": [
+      "SqlInstance",
+      "AvailabilityGroupName",
+      "SqlCredential",
+      "SourceCredential",
+      "DestinationCredential",
+      "IncludeSystemLogins",
+      "AdjustAuthMode",
+      "RestartServiceIfRequired",
+      "DisablePolicy",
+      "Force",
+      "SafeForceMode",
+      "BackupLogins",
+      "BackupPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "Sync-sqmLoginsToAlwaysOn -SqlInstance \"SQL01\" -AvailabilityGroupName \"ProdAG\"",
+      "Sync-sqmLoginsToAlwaysOn -SqlInstance \"SQL01\" -AvailabilityGroupName \"ProdAG\" -IncludeSystemLogins",
+      "Sync-sqmLoginsToAlwaysOn -SqlInstance \"SQL01\" -AvailabilityGroupName \"ProdAG\" -ExcludeLogin \"TempUser_*\"",
+      "Sync-sqmLoginsToAlwaysOn -SqlInstance \"SQL01\" -AvailabilityGroupName \"ProdAG\" -Force -BackupLogins",
+      "Sync-sqmLoginsToAlwaysOn -SqlInstance \"SQL01\" -AvailabilityGroupName \"ProdAG\" `"
+    ]
+  },
+  {
     "Name": "Test-sqmBackupIntegrity",
     "Synopsis": "Verifies one or more backup files using RESTORE VERIFYONLY.",
     "Params": [
@@ -2015,6 +2187,20 @@
     "Examples": [
       "Test-sqmCostThreshold -SqlInstance \"SQL01\"",
       "Test-sqmCostThreshold -SqlInstance \"SQL01\" -MinRecommendedValue 25"
+    ]
+  },
+  {
+    "Name": "Test-sqmDistributedAgReadiness",
+    "Synopsis": "Tests Distributed AlwaysOn AG readiness for failover.",
+    "Params": [
+      "SqlInstance",
+      "SqlCredential",
+      "TargetInstance",
+      "OutputPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "Test-sqmDistributedAgReadiness -SqlInstance \"SQL01\" -TargetInstance \"DR-SQL01\""
     ]
   },
   {
@@ -2052,6 +2238,20 @@
     "Examples": [
       "Test-sqmMaxMemory -SqlInstance 'MSSQLSERVER'",
       "Test-sqmMaxMemory -SqlInstance 'SQL01\\INST01' | Where-Object { $_.Status -ne 'OK' }"
+    ]
+  },
+  {
+    "Name": "Test-sqmModuleUpdate",
+    "Synopsis": "Checks all configured update sources for a newer sqmSQLTool version.",
+    "Params": [
+      "Source",
+      "RepositoryPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "Test-sqmModuleUpdate",
+      "Test-sqmModuleUpdate -Source GitHub",
+      "Test-sqmModuleUpdate -Source UNC -RepositoryPath \"\\\\fileserver\\dba\\sqmSQLTool\""
     ]
   },
   {
@@ -2158,6 +2358,43 @@
     ]
   },
   {
+    "Name": "Test-sqmUpdateViaGitHub",
+    "Synopsis": "Checks if a newer version of sqmSQLTool is available on GitHub.",
+    "Params": [
+      "Owner",
+      "Repository",
+      "EnableException"
+    ],
+    "Examples": [
+      "Test-sqmUpdateViaGitHub",
+      "$result = Test-sqmUpdateViaGitHub"
+    ]
+  },
+  {
+    "Name": "Test-sqmUpdateViaPSGallery",
+    "Synopsis": "Checks if a newer version of sqmSQLTool is available on PowerShell Gallery.",
+    "Params": [
+      "ModuleName",
+      "EnableException"
+    ],
+    "Examples": [
+      "Test-sqmUpdateViaPSGallery",
+      "$result = Test-sqmUpdateViaPSGallery"
+    ]
+  },
+  {
+    "Name": "Test-sqmUpdateViaUNC",
+    "Synopsis": "Checks if a newer version of sqmSQLTool is available on a UNC share.",
+    "Params": [
+      "RepositoryPath",
+      "EnableException"
+    ],
+    "Examples": [
+      "Test-sqmUpdateViaUNC",
+      "Test-sqmUpdateViaUNC -RepositoryPath \"\\\\fileserver\\dba\\sqmSQLTool\""
+    ]
+  },
+  {
     "Name": "Uninstall-sqmDb2Driver",
     "Synopsis": "Deinstalliert den IBM DB2 ODBC/CLI-Treiber.",
     "Params": [],
@@ -2181,6 +2418,22 @@
     "Examples": [
       "Uninstall-sqmOdbcDriver",
       "Uninstall-sqmOdbcDriver -DriverName 'Microsoft ODBC Driver 17 for SQL Server'"
+    ]
+  },
+  {
+    "Name": "Update-sqmModule",
+    "Synopsis": "Updates the sqmSQLTool module from GitHub, PSGallery or a UNC share.",
+    "Params": [
+      "Source",
+      "RepositoryPath",
+      "Destination",
+      "Force",
+      "EnableException"
+    ],
+    "Examples": [
+      "Update-sqmModule",
+      "Update-sqmModule -Source GitHub -Force",
+      "Update-sqmModule -Source UNC -RepositoryPath \"\\\\fileserver\\dba\\sqmSQLTool\""
     ]
   }
 ];
@@ -2270,4 +2523,3 @@
     </script>
 </body>
 </html>
-
