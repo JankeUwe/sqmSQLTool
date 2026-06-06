@@ -1469,20 +1469,16 @@
   },
   {
     "Name": "Invoke-sqmSetupReport",
-    "Synopsis": "Erstellt einen HTML-Abschlussbericht nach SQL Server Setup / PostInstall.",
+    "Synopsis": "Professional SQL Server Setup Report with critical issues, security, and database overview.",
     "Params": [
       "SqlInstance",
       "SqlCredential",
-      "CheckProfile",
       "OutputPath",
       "PassThru",
-      "EnableException",
       "NoOpen"
     ],
     "Examples": [
-      "# Am Ende von PostInstall - CheckProfile aus Modulkonfiguration\r\n    Invoke-sqmSetupReport -SqlInstance \"SQL01\"",
-      "# FI-TS-Checks erzwingen (z.B. fuer Tests ausserhalb der Domaene)\r\n    Invoke-sqmSetupReport -SqlInstance \"SQL01\" -CheckProfile FiTs -PassThru",
-      "# Nur generische Checks - kein FI-TS-Profil\r\n    Invoke-sqmSetupReport -SqlInstance \"SQL01\" -CheckProfile Generic"
+      "Invoke-sqmSetupReport -SqlInstance \"SQL01\""
     ]
   },
   {
@@ -1889,7 +1885,7 @@
     ],
     "Examples": [
       "$pwd = New-sqmRandomSaPassword",
-      "$pwd = New-sqmRandomSaPassword -Length 24 -ExportPath 'C:\\Temp\\sa.txt'",
+      "$pwd = New-sqmRandomSaPassword -Length 24 -ExportPath 'C:\\System\\Passwords\\sa.txt'",
       "# Klartext anzeigen (nur fuer Debugging):"
     ]
   },
