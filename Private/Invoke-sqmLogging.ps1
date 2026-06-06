@@ -27,17 +27,31 @@ function Invoke-sqmLogging
 		[ValidateSet('INFO', 'WARNING', 'ERROR', 'DEBUG', 'VERBOSE')]
 		[string]$Level = 'INFO'
 	)
-	
+
 	# KORREKTUR #7: $script: statt $Global:
 	$logPath = Get-sqmConfig -Key "LogPath"
-	
+
 	if ($script:sqmLoggingReady -and $logPath)
 	{
-		$dateStamp = Get-Date -Format "yyyyMMdd"
-		$fileName = "sqmSQLTool_$($dateStamp)_$($FunctionName).log"
-		$fullPath = Join-Path $logPath $fileName
-		
-		$timestamp = Get-Date -Format "HH:mm:ss"
-		"[$timestamp] [$Level] $Message" | Out-File -FilePath $fullPath -Append -Encoding UTF8
+		try
+		{
+			# Sicherstellung dass LogPath existiert (könnte nach Modulimport gelöscht worden sein)
+			if (-not (Test-Path $logPath -PathType Container))
+			{
+				New-Item -ItemType Directory -Path $logPath -Force -ErrorAction Stop | Out-Null
+			}
+
+			$dateStamp = Get-Date -Format "yyyyMMdd"
+			$fileName = "sqmSQLTool_$($dateStamp)_$($FunctionName).log"
+			$fullPath = Join-Path $logPath $fileName
+
+			$timestamp = Get-Date -Format "HH:mm:ss"
+			"[$timestamp] [$Level] $Message" | Out-File -FilePath $fullPath -Append -Encoding UTF8 -ErrorAction Stop
+		}
+		catch
+		{
+			# Fehler beim Schreiben als letzten Resort zu Console ausgeben (anstatt stumm zu scheitern)
+			Write-Warning "Logging-Fehler für $FunctionName`: $($_.Exception.Message)"
+		}
 	}
 }
