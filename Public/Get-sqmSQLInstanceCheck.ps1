@@ -93,19 +93,38 @@ function Get-sqmSQLInstanceCheck
 				Message	     = if ($maxdop -eq 0) { "MAXDOP=0 kann zu uebermaessiger Parallelisierung fuehren." } elseif ($maxdop -eq 1) { "MAXDOP=1 deaktiviert Parallelisierung - nicht empfohlen fuer moderne Hardware." } elseif (-not $maxdopOk) { "MAXDOP zu hoch ($maxdop). Empfohlen max. $recommendedMaxdop." } else { "In Ordnung." }
 			}
 			
-			# 2. Max Server Memory
+			# 2. Max Server Memory (synchronisiert mit Test-sqmMaxMemory Logik)
 			$maxMem = $server.Configuration.MaxServerMemory.ConfigValue
 			$totalMem = [math]::Round($server.PhysicalMemory / 1024, 0) # in MB
-			$recommendedMem = if ($totalMem -le 4096) { $totalMem - 512 }
-			elseif ($totalMem -le 16384) { $totalMem - 1024 }
-			else { $totalMem - 4096 }
-			$maxMemOk = ($maxMem -le $totalMem - 512) -and ($maxMem -gt 0)
+			$recommendedMem = [math]::Round($totalMem * 0.90)  # 90% empfohlen
+			$lowerBound = [math]::Round($totalMem * 0.85)      # 85% Untergrenze
+			$upperBound = [math]::Round($totalMem * 0.95)      # 95% Obergrenze
+
+			# Auswertung (identisch mit Test-sqmMaxMemory)
+			$unconfiguredValue = 2147483647
+			if ($maxMem -eq $unconfiguredValue) {
+				$maxMemStatus = "Warning"
+				$maxMemMsg = "Max Server Memory ist nicht konfiguriert (Default-Wert). Empfohlen: $recommendedMem MB (90% von $totalMem MB)"
+			}
+			elseif ($maxMem -gt $upperBound) {
+				$maxMemStatus = "Warning"
+				$maxMemMsg = "Max Server Memory zu hoch ($maxMem MB, >95% RAM). Obergrenze: $upperBound MB empfohlen"
+			}
+			elseif ($maxMem -lt $lowerBound) {
+				$maxMemStatus = "Warning"
+				$maxMemMsg = "Max Server Memory zu niedrig ($maxMem MB, <85% RAM). Untergrenze: $lowerBound MB"
+			}
+			else {
+				$maxMemStatus = "OK"
+				$maxMemMsg = "Max Server Memory OK ($maxMem MB). Toleranz: $lowerBound - $upperBound MB"
+			}
+
 			$results += [PSCustomObject]@{
 				Check	     = "Max Server Memory"
 				CurrentValue = "$maxMem MB"
-				Recommended  = "$recommendedMem MB (Reserve fuer OS)"
-				Status	     = if ($maxMem -eq 0) { "Failed" } elseif ($maxMem -le $totalMem - 512) { "OK" } else { "Warning" }
-				Message	     = if ($maxMem -eq 0) { "Max Server Memory ist nicht konfiguriert (0). Dies kann zu Problemen mit dem Betriebssystem fuehren." } elseif ($maxMem -gt $totalMem - 512) { "Max Server Memory zu hoch ($maxMem MB). Lassen Sie mindestens 4-8 GB fuer das OS frei." } else { "OK." }
+				Recommended  = "$recommendedMem MB (90% von $totalMem MB RAM)"
+				Status	     = $maxMemStatus
+				Message	     = $maxMemMsg
 			}
 			
 			# 3. Cost Threshold for Parallelism
@@ -146,8 +165,100 @@ function Get-sqmSQLInstanceCheck
 				Status	     = if ($saOk) { "OK" } else { "Failed" }
 				Message	     = if ($saName -eq 'sa' -and -not $saDisabled) { "SA-Konto heisst noch 'sa' und ist aktiviert - Sicherheitsrisiko." } elseif ($saName -eq 'sa') { "SA-Konto heisst noch 'sa' (aber deaktiviert)." } else { "OK." }
 			}
-			
-			# 6. Backup Directory (falls vorhanden und Detailed)
+
+			# 6. Sysadmin Accounts (WHO)
+			try
+			{
+				$sysadminLogins = @()
+				$sysadminLogins = Get-DbaLogin -SqlInstance $server | Where-Object { $_.IsSysAdmin -eq $true } | Select-Object -ExpandProperty Name
+				$sysadminCount = @($sysadminLogins).Count
+				$sysadminList = if ($sysadminCount -gt 0) { $sysadminLogins -join ', ' } else { 'None' }
+
+				$results += [PSCustomObject]@{
+					Check	     = "Sysadmin Accounts"
+					CurrentValue = "$sysadminCount Konto(n): $sysadminList"
+					Recommended  = "Sollte auf wenige Accounts begrenzt werden (idealerweise Windows-Gruppen)"
+					Status	     = if ($sysadminCount -le 2) { "OK" } elseif ($sysadminCount -le 4) { "Warning" } else { "Warning" }
+					Message	     = if ($sysadminCount -le 2) { "Angemessene Anzahl von Sysadmin-Accounts." } else { "Viele Sysadmin-Accounts ($sysadminCount) - sollte auf ein Minimum beschraenkt werden." }
+				}
+			}
+			catch
+			{
+				$results += [PSCustomObject]@{
+					Check	     = "Sysadmin Accounts"
+					CurrentValue = "Fehler beim Lesen"
+					Recommended  = "-"
+					Status	     = "Error"
+					Message	     = $_.Exception.Message
+				}
+			}
+
+			# 7. CLR Status (Common Language Runtime)
+			try
+			{
+				$clrEnabled = $server.Configuration.IsSqlClrEnabled.ConfigValue
+				$results += [PSCustomObject]@{
+					Check	     = "CLR (Common Language Runtime)"
+					CurrentValue = if ($clrEnabled) { "Enabled" } else { "Disabled" }
+					Recommended  = "Disabled (unless required for stored procedures)"
+					Status	     = if ($clrEnabled) { "Warning" } else { "OK" }
+					Message	     = if ($clrEnabled) { "CLR ist aktiviert - Nutzen Sie diese Funktion?" } else { "CLR ist deaktiviert - OK (Sicherheitspraktik)." }
+				}
+			}
+			catch
+			{
+				$results += [PSCustomObject]@{
+					Check	     = "CLR Status"
+					CurrentValue = "Fehler beim Lesen"
+					Recommended  = "-"
+					Status	     = "Error"
+					Message	     = $_.Exception.Message
+				}
+			}
+
+			# 8. Relevante SQL-Konfigurationen
+			try
+			{
+				$configs = @()
+				$configNames = @(
+					'Database Mail XPs',
+					'ad hoc distributed queries',
+					'remote admin connections',
+					'Agent XPs',
+					'OLE Automation Procedures'
+				)
+
+				foreach ($configName in $configNames)
+				{
+					$cfgValue = $server.Configuration | Where-Object { $_.DisplayName -eq $configName } | Select-Object -First 1
+					if ($cfgValue)
+					{
+						$status = $cfgValue.ConfigValue
+						$configs += "$($configName): $(if ($status) { 'Enabled' } else { 'Disabled' })"
+					}
+				}
+
+				$configList = if ($configs.Count -gt 0) { $configs -join ' | ' } else { 'Keine XP konfiguriert' }
+				$results += [PSCustomObject]@{
+					Check	     = "SQL XPs und Erweiterte Konfigurationen"
+					CurrentValue = $configList
+					Recommended  = "Nur aktiviert wenn notwendig (Sicherheitsrisiko)"
+					Status	     = "Info"
+					Message	     = "Ueberpruefe regelmassig ob diese XPs noch benoetigt werden."
+				}
+			}
+			catch
+			{
+				$results += [PSCustomObject]@{
+					Check	     = "SQL Konfigurationen"
+					CurrentValue = "Fehler beim Lesen"
+					Recommended  = "-"
+					Status	     = "Error"
+					Message	     = $_.Exception.Message
+				}
+			}
+
+			# 9. Backup Directory (falls vorhanden und Detailed)
 			if ($Detailed)
 			{
 				$backupDir = $server.BackupDirectory
