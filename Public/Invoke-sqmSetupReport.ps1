@@ -241,25 +241,20 @@ function Invoke-sqmSetupReport
                 $spnList = 'Error retrieving SPNs'
             }
 
-            # Splunk Status (Check environment variables + service)
+            # Splunk Status (via Invoke-sqmSplunkConfiguration -Test)
             $splunkStatus = 'Not configured'
             try
             {
-                # Check if any MSSQL*_Log environment variable is set
-                $envVars = [Environment]::GetEnvironmentVariables([System.EnvironmentVariableTarget]::Machine)
-                $splunkVars = @($envVars.Keys | Where-Object { $_ -like 'MSSQL*_Log' })
-
-                if ($splunkVars.Count -gt 0)
+                $splunkResult = Invoke-sqmSplunkConfiguration -Mode Test -ErrorAction SilentlyContinue
+                if ($splunkResult)
                 {
-                    # Check if SplunkForwarder service exists
-                    $splunkService = Get-Service -Name 'SplunkForwarder' -ErrorAction SilentlyContinue
-                    if ($splunkService)
+                    if ($splunkResult.IsConfigured)
                     {
-                        $splunkStatus = "Configured (service $($splunkService.Status))"
+                        $splunkStatus = "Configured (service: $($splunkResult.ServiceStatus))"
                     }
                     else
                     {
-                        $splunkStatus = 'Configured (service not found)'
+                        $splunkStatus = 'Not configured'
                     }
                 }
             }

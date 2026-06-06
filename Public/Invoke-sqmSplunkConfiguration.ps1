@@ -380,15 +380,57 @@ function Invoke-sqmSplunkConfiguration {
         if (-not $LogPath) { $LogPath = '$env:ProgramData\sqmSQLTool\Logs' }
     }
 
+    $result = [PSCustomObject]@{
+        ComputerName = $env:COMPUTERNAME
+        Mode         = $Mode
+        Status       = 'Unknown'
+        Message      = ''
+        IsConfigured = $false
+        ServiceStatus = $null
+    }
+
     _sqmSplunkGuiLog "Invoke-sqmSplunkConfiguration | Modus: $Mode | ParameterSet: $($PSCmdlet.ParameterSetName)" $LogCallback
 
-    if ($Remote) {
-        _sqmSplunk_ForOU -SearchOU $SearchOU -Mode $Mode `
-                         -LogPath $LogPath -Credential $Credential -LogCallback $LogCallback
-    } elseif ($ComputerList) {
-        _sqmSplunk_ForList -ComputerList $ComputerList -Mode $Mode `
-                           -LogPath $LogPath -Credential $Credential -LogCallback $LogCallback
-    } else {
-        _sqmSplunk_LocalCore -LogPath $LogPath -TestMode ($Mode -eq 'Test')
+    try
+    {
+        if ($Remote) {
+            return (_sqmSplunk_ForOU -SearchOU $SearchOU -Mode $Mode `
+                                     -LogPath $LogPath -Credential $Credential -LogCallback $LogCallback)
+        }
+        elseif ($ComputerList) {
+            return (_sqmSplunk_ForList -ComputerList $ComputerList -Mode $Mode `
+                                       -LogPath $LogPath -Credential $Credential -LogCallback $LogCallback)
+        }
+        else
+        {
+            # Local execution - must return PSCustomObject
+            _sqmSplunk_LocalCore -LogPath $LogPath -TestMode ($Mode -eq 'Test')
+
+            # Check actual configuration
+            $envVars = [Environment]::GetEnvironmentVariables([System.EnvironmentVariableTarget]::Machine)
+            $splunkVars = @($envVars.Keys | Where-Object { $_ -like 'MSSQL*_Log' })
+            $result.IsConfigured = $splunkVars.Count -gt 0
+
+            if ($result.IsConfigured)
+            {
+                $svc = Get-Service -Name 'SplunkForwarder' -ErrorAction SilentlyContinue
+                $result.ServiceStatus = if ($svc) { $svc.Status.ToString() } else { 'NotFound' }
+                $result.Status = 'Success'
+                $result.Message = "Configured with $($splunkVars.Count) environment variable(s), Service: $($result.ServiceStatus)"
+            }
+            else
+            {
+                $result.Status = 'NotConfigured'
+                $result.Message = 'No Splunk environment variables found'
+            }
+
+            return $result
+        }
+    }
+    catch
+    {
+        $result.Status = 'Error'
+        $result.Message = $_.Exception.Message
+        return $result
     }
 }
