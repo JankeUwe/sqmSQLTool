@@ -33,6 +33,7 @@
 
 .PARAMETER AvailabilityGroupName
     Name of the Availability Group. If not specified, the first AG found on the instance is used.
+    If multiple AGs exist: Warning is displayed, first AG is used. Specify explicitly to avoid ambiguity.
 
 .PARAMETER SqlCredential
     PSCredential for all replicas (source and destination).
@@ -149,7 +150,47 @@ function Sync-sqmLoginsToAlwaysOn
 		try
 		{
 			# -------------------------------------------------------------------
-			# 1. Get primary replica and list of secondaries
+			# 1. Resolve AvailabilityGroupName (if empty, use first AG)
+			# -------------------------------------------------------------------
+			$agQuery = @"
+SELECT name FROM sys.availability_groups
+ORDER BY creation_date DESC
+"@
+
+			$allAgs = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $srcCred -Query $agQuery -ErrorAction Stop
+
+			if (-not $allAgs)
+			{
+				throw "Keine Availability Groups auf $SqlInstance gefunden."
+			}
+
+			# Determine which AG to use
+			if ([string]::IsNullOrWhiteSpace($AvailabilityGroupName))
+			{
+				$AvailabilityGroupName = if ($allAgs -is [System.Collections.Generic.List[PSCustomObject]]) { $allAgs[0].name } else { $allAgs.name }
+
+				# Warn if multiple AGs exist
+				if (@($allAgs).Count -gt 1)
+				{
+					$agList = ($allAgs | ForEach-Object { $_.name }) -join ', '
+					Invoke-sqmLogging -Message "⚠️ WARNUNG: Mehrere Availability Groups gefunden [$agList]. Verwende erste: '$AvailabilityGroupName'. Tipp: Verwende -AvailabilityGroupName um AG explizit zu wählen." `
+									  -FunctionName $functionName -Level 'WARNING'
+				}
+			}
+			else
+			{
+				# Verify that specified AG exists
+				$agExists = $allAgs | Where-Object { $_.name -eq $AvailabilityGroupName }
+				if (-not $agExists)
+				{
+					throw "Availability Group '$AvailabilityGroupName' nicht gefunden auf $SqlInstance. Verfügbar: $(($allAgs | ForEach-Object { $_.name }) -join ', ')"
+				}
+			}
+
+			Invoke-sqmLogging -Message "Verwende Availability Group: '$AvailabilityGroupName'" -FunctionName $functionName -Level 'INFO'
+
+			# -------------------------------------------------------------------
+			# 2. Get primary replica and list of secondaries
 			# -------------------------------------------------------------------
 			$query = @"
 SELECT
@@ -162,7 +203,7 @@ INNER JOIN sys.dm_hadr_availability_replica_states drs
     ON ar.replica_id = drs.replica_id
 WHERE ar.group_id IN (
     SELECT group_id FROM sys.availability_groups
-    WHERE name = ISNULL(N'$AvailabilityGroupName', (SELECT TOP 1 name FROM sys.availability_groups))
+    WHERE name = N'$AvailabilityGroupName'
 )
 ORDER BY drs.is_primary_replica DESC
 "@
@@ -171,7 +212,7 @@ ORDER BY drs.is_primary_replica DESC
 
 			if (-not $replicas)
 			{
-				throw "Keine Availability Group oder Replicas gefunden auf $SqlInstance"
+				throw "Keine Availability Group oder Replicas gefunden auf $SqlInstance für AG '$AvailabilityGroupName'"
 			}
 
 			$primaryReplica = $replicas | Where-Object { $_.is_primary_replica -eq 1 }

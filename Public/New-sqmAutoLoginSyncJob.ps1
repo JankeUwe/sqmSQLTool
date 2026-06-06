@@ -23,7 +23,8 @@
     The SQL Server instance (Primary replica). Default: $env:COMPUTERNAME
 
 .PARAMETER AvailabilityGroupName
-    Name of the Availability Group.
+    Name of the Availability Group. If not specified, the first AG found on the instance is used.
+    If multiple AGs exist: Warning is displayed, first AG is used. Specify explicitly to avoid ambiguity.
 
 .PARAMETER JobName
     Name for the SQL Agent job. Default: "sqmLoginSync_<AGName>"
@@ -91,11 +92,11 @@ function New-sqmAutoLoginSyncJob
 		[Parameter(Mandatory = $false, Position = 0)]
 		[string]$SqlInstance = $env:COMPUTERNAME,
 
-		[Parameter(Mandatory = $true)]
+		[Parameter(Mandatory = $false)]
 		[string]$AvailabilityGroupName,
 
 		[Parameter(Mandatory = $false)]
-		[string]$JobName = "sqmLoginSync_$AvailabilityGroupName",
+		[string]$JobName,
 
 		[Parameter(Mandatory = $false)]
 		[ValidateSet('Daily', 'Weekly', 'Custom')]
@@ -137,7 +138,59 @@ function New-sqmAutoLoginSyncJob
 	begin
 	{
 		$functionName = $MyInvocation.MyCommand.Name
-		Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance für AG '$AvailabilityGroupName'" `
+
+		# -------------------------------------------------------------------
+		# Resolve AvailabilityGroupName (if empty, use first AG)
+		# -------------------------------------------------------------------
+		$agQuery = @"
+SELECT name FROM sys.availability_groups
+ORDER BY creation_date DESC
+"@
+
+		try
+		{
+			$allAgs = Invoke-DbaQuery -SqlInstance $SqlInstance -Query $agQuery -ErrorAction Stop
+		}
+		catch
+		{
+			throw "Fehler beim Abfragen von Availability Groups auf $SqlInstance : $($_.Exception.Message)"
+		}
+
+		if (-not $allAgs)
+		{
+			throw "Keine Availability Groups auf $SqlInstance gefunden."
+		}
+
+		# Determine which AG to use
+		if ([string]::IsNullOrWhiteSpace($AvailabilityGroupName))
+		{
+			$AvailabilityGroupName = if ($allAgs -is [System.Collections.Generic.List[PSCustomObject]]) { $allAgs[0].name } else { $allAgs.name }
+
+			# Warn if multiple AGs exist
+			if (@($allAgs).Count -gt 1)
+			{
+				$agList = ($allAgs | ForEach-Object { $_.name }) -join ', '
+				Invoke-sqmLogging -Message "⚠️ WARNUNG: Mehrere Availability Groups gefunden [$agList]. Verwende erste: '$AvailabilityGroupName'. Tipp: Verwende -AvailabilityGroupName um AG explizit zu wählen." `
+								  -FunctionName $functionName -Level 'WARNING'
+			}
+		}
+		else
+		{
+			# Verify that specified AG exists
+			$agExists = $allAgs | Where-Object { $_.name -eq $AvailabilityGroupName }
+			if (-not $agExists)
+			{
+				throw "Availability Group '$AvailabilityGroupName' nicht gefunden auf $SqlInstance. Verfügbar: $(($allAgs | ForEach-Object { $_.name }) -join ', ')"
+			}
+		}
+
+		# Set JobName if not provided
+		if ([string]::IsNullOrWhiteSpace($JobName))
+		{
+			$JobName = "sqmLoginSync_$AvailabilityGroupName"
+		}
+
+		Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance für AG '$AvailabilityGroupName' (Job: '$JobName')" `
 						  -FunctionName $functionName -Level 'INFO'
 	}
 
