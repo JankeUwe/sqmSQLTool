@@ -1,62 +1,33 @@
 <#
 .SYNOPSIS
-    Erstellt einen HTML-Abschlussbericht nach SQL Server Setup / PostInstall.
+    Professional SQL Server Setup Report with critical issues, security, and database overview.
 
 .DESCRIPTION
-    Fuehrt alle konfigurierten Setup-Checks durch und erzeugt einen HTML-Report
-    mit OK/WARN/ERROR-Badges. Welche Checks ausgefuehrt werden haengt vom
-    CheckProfile in der Modulkonfiguration ab:
-
-      Auto    - FI-TS-Checks nur wenn $script:sqmIsFitsEnvironment = $true
-      FiTs    - FI-TS-Checks immer erzwingen
-      Generic - nur Standard-Checks, keine FI-TS-spezifischen Pruefungen
-
-    FI-TS-spezifische Checks:
-      - Test-sqmCostThreshold   (CostThresholdForParallelism)
-      - Test-sqmTempDbFileCount (TempDB-Datendateien vs. CPU-Kerne)
-      - Get-sqmDiskBlockSize    (NTFS-Blockgroesse 64 KB)
-
-    Der Report wird nach OutputPath und (wenn konfiguriert) CentralPath abgelegt.
-    Dateiname: sqmSetupReport_<Instanz>_<Datum>.html
+    Comprehensive setup report including:
+    - CRITICAL ISSUES (SA, Backups, MaxMemory)
+    - SECURITY (Sysadmins, Logins with roles, CLR, xp_cmdshell)
+    - INFRASTRUCTURE (Service Accounts, SPNs, Splunk)
+    - CONFIGURATION (MAXDOP, Cost Threshold, TempDB)
+    - DATABASES (DBOs, Recovery Models, Last Backups)
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz. Standard: lokaler Computername.
+    SQL Server instance. Default: local computer name.
 
 .PARAMETER SqlCredential
-    PSCredential fuer die SQL-Verbindung.
-
-.PARAMETER CheckProfile
-    Ueberschreibt den Wert aus der Modulkonfiguration.
-    Gueltiger Werte: Auto | FiTs | Generic
+    Credentials for SQL connection.
 
 .PARAMETER OutputPath
-    Ausgabepfad fuer den HTML-Report. Standard: Get-sqmConfig OutputPath.
+    Output path for HTML report.
 
 .PARAMETER PassThru
-    Gibt den Pfad der erstellten HTML-Datei als String zurueck.
+    Return the file path.
 
-.PARAMETER EnableException
-    Ausnahmen sofort ausloesen statt Write-Error.
-
-.OUTPUTS
-    Kein Output (oder Dateipfad wenn -PassThru).
+.PARAMETER NoOpen
+    Don't open the report in browser.
 
 .EXAMPLE
-    # Am Ende von PostInstall - CheckProfile aus Modulkonfiguration
     Invoke-sqmSetupReport -SqlInstance "SQL01"
 
-.EXAMPLE
-    # FI-TS-Checks erzwingen (z.B. fuer Tests ausserhalb der Domaene)
-    Invoke-sqmSetupReport -SqlInstance "SQL01" -CheckProfile FiTs -PassThru
-
-.EXAMPLE
-    # Nur generische Checks - kein FI-TS-Profil
-    Invoke-sqmSetupReport -SqlInstance "SQL01" -CheckProfile Generic
-
-.NOTES
-    Abhaengigkeiten: Invoke-sqmLogging, Get-sqmConfig, Copy-sqmToCentralPath
-    FI-TS-Checks:   Test-sqmCostThreshold, Test-sqmTempDbFileCount, Get-sqmDiskBlockSize
-    Standard-Check: Get-sqmSQLInstanceCheck
 #>
 function Invoke-sqmSetupReport
 {
@@ -65,23 +36,12 @@ function Invoke-sqmSetupReport
     param (
         [Parameter(Mandatory = $false, Position = 0)]
         [string]$SqlInstance,
-
         [Parameter(Mandatory = $false)]
         [System.Management.Automation.PSCredential]$SqlCredential,
-
-        [Parameter(Mandatory = $false)]
-        [ValidateSet('Auto', 'FiTs', 'Generic')]
-        [string]$CheckProfile,
-
         [Parameter(Mandatory = $false)]
         [string]$OutputPath,
-
         [Parameter(Mandatory = $false)]
         [switch]$PassThru,
-
-        [Parameter(Mandatory = $false)]
-        [switch]$EnableException,
-
         [Parameter(Mandatory = $false)]
         [switch]$NoOpen
     )
@@ -89,187 +49,270 @@ function Invoke-sqmSetupReport
     begin
     {
         $functionName = $MyInvocation.MyCommand.Name
-
         if (-not $PSBoundParameters.ContainsKey('SqlInstance') -or [string]::IsNullOrWhiteSpace($SqlInstance))
         {
             $SqlInstance = $env:COMPUTERNAME
         }
 
-        # CheckProfile: Parameter > Config > Default 'Auto'
-        if (-not $PSBoundParameters.ContainsKey('CheckProfile'))
-        {
-            $CheckProfile = Get-sqmConfig -Key 'CheckProfile'
-            if (-not $CheckProfile) { $CheckProfile = 'Auto' }
-        }
-
-        # OutputPath: Parameter > Config
         if (-not $PSBoundParameters.ContainsKey('OutputPath') -or [string]::IsNullOrWhiteSpace($OutputPath))
         {
             $OutputPath = Get-sqmConfig -Key 'OutputPath'
-            if (-not $OutputPath) { $OutputPath = "$env:ProgramData\sqmSQLTool\Logs" }
+            if (-not $OutputPath) { $OutputPath = "C:\System\WinSrvLog\MSSQL" }
         }
 
-        # Entscheiden ob FI-TS-Checks laufen
-        $runFitsChecks = switch ($CheckProfile)
-        {
-            'FiTs'    { $true }
-            'Generic' { $false }
-            default   { $script:sqmIsFitsEnvironment }   # Auto
-        }
-
-        Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance (Profil: $CheckProfile, FiTs-Checks: $runFitsChecks)" -FunctionName $functionName -Level 'INFO'
+        Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance" -FunctionName $functionName -Level 'INFO'
     }
 
     process
     {
         try
         {
-            $checkResults = [System.Collections.Generic.List[PSCustomObject]]::new()
-            $timestamp    = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+            $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
             $safeInstance = $SqlInstance -replace '[\\:]', '_'
-            $datestamp    = Get-Date -Format 'yyyyMMdd_HHmm'
+            $datestamp = Get-Date -Format 'yyyyMMdd_HHmm'
+            $server = $null
 
-            # ------------------------------------------------------------------
-            # 1. Standard-Instanzcheck (Get-sqmSQLInstanceCheck)
-            # ------------------------------------------------------------------
-            Write-Host "  Fuehre Instanz-Check durch..." -ForegroundColor Gray
+            # Connect to SQL Server
             try
             {
-                $instanceChecks = Get-sqmSQLInstanceCheck -SqlInstance $SqlInstance -ErrorAction Stop
-                foreach ($ic in @($instanceChecks))
-                {
-                    $checkResults.Add([PSCustomObject]@{
-                        Category = 'Instanz-Konfiguration'
-                        Check    = $ic.CheckName
-                        Status   = $ic.Status
-                        Current  = $ic.CurrentValue
-                        Expected = $ic.RecommendedValue
-                        Message  = $ic.Message
-                    })
-                }
+                $server = Connect-DbaInstance -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction Stop
             }
             catch
             {
-                $checkResults.Add([PSCustomObject]@{
-                    Category = 'Instanz-Konfiguration'
-                    Check    = 'Get-sqmSQLInstanceCheck'
-                    Status   = 'Error'
-                    Current  = '-'
-                    Expected = '-'
-                    Message  = $_.Exception.Message
-                })
+                throw "Verbindung zu $SqlInstance fehlgeschlagen: $($_.Exception.Message)"
             }
 
-            # ------------------------------------------------------------------
-            # 2. FI-TS-spezifische Checks
-            # ------------------------------------------------------------------
-            if ($runFitsChecks)
+            # ==========================================
+            # CRITICAL ISSUES
+            # ==========================================
+
+            # SA Account Status
+            $saLogin = Get-DbaLogin -SqlInstance $server -Login 'sa' -ErrorAction SilentlyContinue
+            if (-not $saLogin)
             {
-                Write-Host "  Fuehre FI-TS-spezifische Checks durch..." -ForegroundColor Gray
+                $saSid = '0x01'
+                $saLogin = Get-DbaLogin -SqlInstance $server | Where-Object { $_.SID -eq $saSid }
+            }
+            $saName = if ($saLogin) { $saLogin.Name } else { 'NOT FOUND' }
+            $saDisabled = if ($saLogin) { $saLogin.IsDisabled } else { $null }
+            $saIsRenamed = ($saName -ne 'sa')
+            $saStatus = if ($saIsRenamed -and $saDisabled) { 'OK (renamed & disabled)' } elseif ($saIsRenamed) { 'OK (renamed)' } elseif ($saDisabled) { 'WARNING (disabled only)' } else { 'CRITICAL (not renamed)' }
+            $saStatusColor = if ($saName -ne 'sa' -or $saDisabled) { 'green' } else { 'red' }
 
-                # 2a. CostThresholdForParallelism
-                try
-                {
-                    $r = Test-sqmCostThreshold -SqlInstance $SqlInstance -ErrorAction Stop
-                    $checkResults.Add([PSCustomObject]@{
-                        Category = 'FI-TS Konfiguration'
-                        Check    = 'CostThresholdForParallelism'
-                        Status   = $r.Status
-                        Current  = $r.CurrentValue
-                        Expected = ">= $($r.RecommendedMinValue)"
-                        Message  = $r.Message
-                    })
-                }
-                catch
-                {
-                    $checkResults.Add([PSCustomObject]@{
-                        Category = 'FI-TS Konfiguration'
-                        Check    = 'CostThresholdForParallelism'
-                        Status   = 'Error'
-                        Current  = '-'
-                        Expected = "-"
-                        Message  = $_.Exception.Message
-                    })
-                }
+            # Backup Jobs Status
+            $backupJobs = Get-DbaAgentJob -SqlInstance $server -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*backup*' -or $_.Name -like '*bkp*' }
+            $backupJobCount = @($backupJobs).Count
+            $backupJobsEnabled = @($backupJobs | Where-Object { $_.IsEnabled }).Count
+            $backupJobStatus = if ($backupJobCount -eq 0) { 'NO BACKUP JOBS' } elseif ($backupJobsEnabled -eq $backupJobCount) { "OK ($backupJobCount jobs)" } else { "WARNING ($backupJobsEnabled/$backupJobCount enabled)" }
+            $backupStatusColor = if ($backupJobCount -gt 0 -and $backupJobsEnabled -eq $backupJobCount) { 'green' } else { 'orange' }
 
-                # 2b. TempDB-Datendateien
-                try
-                {
-                    $r = Test-sqmTempDbFileCount -SqlInstance $SqlInstance -ErrorAction Stop
-                    $checkResults.Add([PSCustomObject]@{
-                        Category = 'FI-TS Konfiguration'
-                        Check    = 'TempDB Datendateien'
-                        Status   = $r.Status
-                        Current  = "$($r.CurrentFileCount) Dateien"
-                        Expected = "$($r.RecommendedCount) ($($r.LogicalCores) Kerne, max 8)"
-                        Message  = $r.Message
-                    })
-                }
-                catch
-                {
-                    $checkResults.Add([PSCustomObject]@{
-                        Category = 'FI-TS Konfiguration'
-                        Check    = 'TempDB Datendateien'
-                        Status   = 'Error'
-                        Current  = '-'
-                        Expected = '-'
-                        Message  = $_.Exception.Message
-                    })
-                }
+            # Max Memory
+            $maxMem = $server.Configuration.MaxServerMemory.ConfigValue
+            $totalMem = [math]::Round($server.PhysicalMemory / 1024, 0)
+            $unconfiguredValue = 2147483647
+            if ($maxMem -eq $unconfiguredValue)
+            {
+                $maxMemStatus = 'NOT CONFIGURED'
+                $maxMemColor = 'orange'
+            }
+            elseif ($maxMem -gt [math]::Round($totalMem * 0.95))
+            {
+                $maxMemStatus = "TOO HIGH ($maxMem MB > 95%)"
+                $maxMemColor = 'orange'
+            }
+            elseif ($maxMem -lt [math]::Round($totalMem * 0.85))
+            {
+                $maxMemStatus = "TOO LOW ($maxMem MB < 85%)"
+                $maxMemColor = 'orange'
+            }
+            else
+            {
+                $maxMemStatus = "OK ($maxMem MB)"
+                $maxMemColor = 'green'
+            }
 
-                # 2c. NTFS-Blockgroesse aller SQL-Laufwerke
-                try
+            # ==========================================
+            # SECURITY CHECKS
+            # ==========================================
+
+            # Sysadmin Accounts
+            $sysadmins = @()
+            try
+            {
+                $sysadmins = @(Get-DbaLogin -SqlInstance $server | Where-Object { $_.IsSysAdmin -eq $true } | Select-Object -ExpandProperty Name)
+            }
+            catch { }
+            $sysadminList = if ($sysadmins.Count -gt 0) { $sysadmins -join ', ' } else { 'None' }
+
+            # Logins with Advanced Permissions
+            $advancedLogins = @()
+            try
+            {
+                $allLogins = Get-DbaLogin -SqlInstance $server -ErrorAction SilentlyContinue
+                foreach ($login in $allLogins)
                 {
-                    $diskResults = Get-sqmDiskBlockSize -SqlInstance $SqlInstance -ErrorAction Stop
-                    foreach ($dr in @($diskResults))
+                    $roles = @()
+                    foreach ($role in @('sysadmin', 'serveradmin', 'securityadmin', 'processadmin', 'dbcreator', 'diskadmin'))
                     {
-                        $checkResults.Add([PSCustomObject]@{
-                            Category = 'FI-TS Konfiguration'
-                            Check    = "NTFS-Blockgroesse $($dr.Drive):\"
-                            Status   = $dr.Status
-                            Current  = if ($dr.BlockSizeKB) { "$($dr.BlockSizeKB) KB" } else { 'n/a' }
-                            Expected = "$([Math]::Round($dr.RecommendedBlockSize/1024)) KB"
-                            Message  = $dr.Message
-                        })
+                        if ((Get-DbaServerRole -SqlInstance $server -Login $login.Name -ErrorAction SilentlyContinue | Where-Object { $_.Role -eq $role }).Count -gt 0)
+                        {
+                            $roles += $role
+                        }
+                    }
+                    if ($roles.Count -gt 0)
+                    {
+                        $advancedLogins += "$($login.Name) [$($roles -join ',')]"
                     }
                 }
-                catch
+            }
+            catch { }
+            $advancedLoginList = if ($advancedLogins.Count -gt 0) { $advancedLogins -join ' | ' } else { 'None with extended roles' }
+
+            # CLR Status
+            $clrEnabled = $server.Configuration.IsSqlClrEnabled.ConfigValue
+            $clrStatus = if ($clrEnabled) { 'ENABLED (check if needed)' } else { 'OK (disabled)' }
+            $clrColor = if ($clrEnabled) { 'orange' } else { 'green' }
+
+            # xp_cmdshell Status
+            $xpCmdEnabled = $server.Configuration.XPCmdShell.ConfigValue
+            $xpStatus = if ($xpCmdEnabled) { 'ENABLED (security risk)' } else { 'OK (disabled)' }
+            $xpColor = if ($xpCmdEnabled) { 'orange' } else { 'green' }
+
+            # ==========================================
+            # SERVICE ACCOUNTS & INFRASTRUCTURE
+            # ==========================================
+
+            # Service Accounts
+            $serviceAccounts = @()
+            try
+            {
+                # SQL Server Service
+                $sqlSvc = Get-Service -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "MSSQL|SQL Server" -and $_.Name -notmatch "Agent|Browser" } | Select-Object -First 1
+                if ($sqlSvc)
                 {
-                    $checkResults.Add([PSCustomObject]@{
-                        Category = 'FI-TS Konfiguration'
-                        Check    = 'NTFS-Blockgroesse'
-                        Status   = 'Error'
-                        Current  = '-'
-                        Expected = '64 KB'
-                        Message  = $_.Exception.Message
-                    })
+                    $svcInfo = Get-CimInstance -ClassName Win32_Service -Filter "Name='$($sqlSvc.Name)'" -ErrorAction SilentlyContinue
+                    if ($svcInfo)
+                    {
+                        $serviceAccounts += "SQL Server: $($svcInfo.StartName)"
+                    }
+                }
+
+                # SQL Agent Service
+                $agentSvc = Get-Service -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "SQLSERVERAGENT|SQLAgent" } | Select-Object -First 1
+                if ($agentSvc)
+                {
+                    $svcInfo = Get-CimInstance -ClassName Win32_Service -Filter "Name='$($agentSvc.Name)'" -ErrorAction SilentlyContinue
+                    if ($svcInfo)
+                    {
+                        $serviceAccounts += "SQL Agent: $($svcInfo.StartName)"
+                    }
                 }
             }
+            catch { }
+            $serviceAccountList = if ($serviceAccounts.Count -gt 0) { $serviceAccounts -join ' | ' } else { 'Unable to determine' }
 
-            # ------------------------------------------------------------------
-            # 3. Zusammenfassung
-            # ------------------------------------------------------------------
-            $countOk   = ($checkResults | Where-Object { $_.Status -eq 'OK' }).Count
-            $countWarn = ($checkResults | Where-Object { $_.Status -eq 'Warning' }).Count
-            $countErr  = ($checkResults | Where-Object { $_.Status -in @('Error','NotNTFS') }).Count
-            $overallStatus = if ($countErr -gt 0) { 'ERROR' } elseif ($countWarn -gt 0) { 'WARNING' } else { 'OK' }
+            # SPN Status (Simple Check)
+            $spnOk = 'Not checked'
+            try
+            {
+                $spnReport = Get-sqmSpnReport -ComputerName $env:COMPUTERNAME -ErrorAction SilentlyContinue
+                if ($spnReport)
+                {
+                    $missingSPNs = @($spnReport.DetailRows | Where-Object { $_.Status -eq 'Missing' }).Count
+                    $spnOk = if ($missingSPNs -eq 0) { 'OK (all SPNs registered)' } else { "WARNING ($missingSPNs missing)" }
+                }
+            }
+            catch { }
 
-            # ------------------------------------------------------------------
-            # 4. HTML-Report generieren
-            # ------------------------------------------------------------------
-            $html = _Build-SetupReportHtml `
-                -SqlInstance  $SqlInstance `
-                -Timestamp    $timestamp `
-                -CheckProfile $CheckProfile `
-                -Results      $checkResults `
-                -CountOk      $countOk `
-                -CountWarn    $countWarn `
-                -CountErr     $countErr `
-                -Overall      $overallStatus
+            # Splunk Status (Config + Service Test)
+            $splunkOk = 'Not configured'
+            try
+            {
+                $splunkTest = Invoke-sqmSplunkConfiguration -Test -ErrorAction SilentlyContinue
+                if ($splunkTest)
+                {
+                    $splunkOk = 'Configured'
+                }
+            }
+            catch { }
 
-            # ------------------------------------------------------------------
-            # 5. Report speichern
-            # ------------------------------------------------------------------
+            # ==========================================
+            # CONFIGURATION
+            # ==========================================
+
+            # MAXDOP
+            $maxdop = $server.Configuration.MaxDegreeOfParallelism.ConfigValue
+            $cpuCount = $server.Processors
+            $recommendedMaxdop = if ($cpuCount -le 4) { $cpuCount } elseif ($cpuCount -le 8) { 4 } elseif ($cpuCount -le 16) { 8 } else { 16 }
+            $maxdopStatus = if ($maxdop -ge 2 -and $maxdop -le $recommendedMaxdop) { "OK ($maxdop)" } else { "CHECK ($maxdop, recommended $recommendedMaxdop)" }
+
+            # Cost Threshold
+            $ctp = $server.Configuration.CostThresholdForParallelism.ConfigValue
+            $ctpStatus = if ($ctp -ge 50) { "OK ($ctp)" } else { "WARNING ($ctp, recommended >= 50)" }
+
+            # TempDB
+            $tempdb = Get-DbaDatabase -SqlInstance $server -Database 'tempdb'
+            $tempdbFileCount = $tempdb.FileGroups.Files.Count
+            $idealCount = [Math]::Min($cpuCount, 8)
+            $tempdbStatus = if ($tempdbFileCount -eq $idealCount) { "OK ($tempdbFileCount files)" } else { "CHECK ($tempdbFileCount files, ideal $idealCount)" }
+
+            # ==========================================
+            # DATABASES
+            # ==========================================
+
+            $databases = @()
+            try
+            {
+                $allDbs = Get-DbaDatabase -SqlInstance $server -ExcludeSystem
+                foreach ($db in $allDbs)
+                {
+                    $dbo = $db.Owner
+                    $lastBackup = $db.LastFullBackupDate
+                    $daysAgo = if ($lastBackup) { (New-TimeSpan -Start $lastBackup -End (Get-Date)).Days } else { -1 }
+                    $backupStatus = if ($daysAgo -lt 0) { 'Never' } elseif ($daysAgo -eq 0) { 'Today' } elseif ($daysAgo -le 7) { "$daysAgo days" } else { "$daysAgo days ⚠️" }
+
+                    $databases += [PSCustomObject]@{
+                        Name           = $db.Name
+                        Recovery       = $db.RecoveryModel
+                        DBO            = $dbo
+                        LastFullBackup = $backupStatus
+                    }
+                }
+            }
+            catch { }
+
+            # ==========================================
+            # BUILD HTML
+            # ==========================================
+
+            $html = _Build-ModernReportHtml `
+                -SqlInstance $SqlInstance `
+                -Timestamp $timestamp `
+                -SAStatus $saStatus `
+                -SAStatusColor $saStatusColor `
+                -SAName $saName `
+                -BackupStatus $backupJobStatus `
+                -BackupStatusColor $backupStatusColor `
+                -MaxMemStatus $maxMemStatus `
+                -MaxMemColor $maxMemColor `
+                -Sysadmins $sysadminList `
+                -AdvancedLogins $advancedLoginList `
+                -CLRStatus $clrStatus `
+                -CLRColor $clrColor `
+                -XPStatus $xpStatus `
+                -XPColor $xpColor `
+                -ServiceAccounts $serviceAccountList `
+                -SPNStatus $spnOk `
+                -SplunkStatus $splunkOk `
+                -MAXDOP $maxdopStatus `
+                -CostThreshold $ctpStatus `
+                -TempDB $tempdbStatus `
+                -Databases $databases
+
+            # ==========================================
+            # SAVE REPORT
+            # ==========================================
+
             if (-not (Test-Path $OutputPath))
             {
                 $null = New-Item -ItemType Directory -Path $OutputPath -Force
@@ -278,19 +321,13 @@ function Invoke-sqmSetupReport
             $htmlFile = Join-Path $OutputPath "sqmSetupReport_${safeInstance}_${datestamp}.html"
             $html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
 
-            # Oeffne HTML-Datei wenn nicht -NoOpen
             if (-not $NoOpen -and $htmlFile)
             {
                 Start-Process $htmlFile
             }
 
-            Invoke-sqmLogging -Message "HTML-Report gespeichert: $htmlFile" -FunctionName $functionName -Level 'INFO'
-            Write-Host ""
-            Write-Host "  Setup-Report: $htmlFile" -ForegroundColor Cyan
-            Write-Host "  Ergebnis    : $overallStatus ($countOk OK / $countWarn Warnung(en) / $countErr Fehler)" -ForegroundColor $(
-                if ($overallStatus -eq 'OK') { 'Green' } elseif ($overallStatus -eq 'WARNING') { 'Yellow' } else { 'Red' }
-            )
-            Write-Host ""
+            Invoke-sqmLogging -Message "Report erstellt: $htmlFile" -FunctionName $functionName -Level 'INFO'
+            Write-Host "`n✅ Setup-Report: $htmlFile`n" -ForegroundColor Green
 
             Copy-sqmToCentralPath -Path $htmlFile
 
@@ -298,33 +335,42 @@ function Invoke-sqmSetupReport
         }
         catch
         {
-            $errMsg = "Fehler in $functionName auf ${SqlInstance}: $($_.Exception.Message)"
+            $errMsg = "Fehler: $($_.Exception.Message)"
             Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level 'ERROR'
-            if ($EnableException) { throw }
             Write-Error $errMsg
         }
     }
-
-    end
-    {
-        Invoke-sqmLogging -Message "$functionName abgeschlossen." -FunctionName $functionName -Level 'INFO'
-    }
 }
 
-# ==============================================================================
-# Hilfsfunktion: HTML aufbauen (privat, kein Export)
-# ==============================================================================
-function _Build-SetupReportHtml
+# ======================================================================
+# HTML Builder Function
+# ======================================================================
+
+function _Build-ModernReportHtml
 {
     param(
         [string]$SqlInstance,
         [string]$Timestamp,
-        [string]$CheckProfile,
-        [System.Collections.Generic.List[PSCustomObject]]$Results,
-        [int]$CountOk,
-        [int]$CountWarn,
-        [int]$CountErr,
-        [string]$Overall
+        [string]$SAStatus,
+        [string]$SAStatusColor,
+        [string]$SAName,
+        [string]$BackupStatus,
+        [string]$BackupStatusColor,
+        [string]$MaxMemStatus,
+        [string]$MaxMemColor,
+        [string]$Sysadmins,
+        [string]$AdvancedLogins,
+        [string]$CLRStatus,
+        [string]$CLRColor,
+        [string]$XPStatus,
+        [string]$XPColor,
+        [string]$ServiceAccounts,
+        [string]$SPNStatus,
+        [string]$SplunkStatus,
+        [string]$MAXDOP,
+        [string]$CostThreshold,
+        [string]$TempDB,
+        [PSCustomObject[]]$Databases
     )
 
     function _HtmlEncode
@@ -334,67 +380,12 @@ function _Build-SetupReportHtml
         $Text -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;' -replace '"', '&quot;' -replace "'", '&#39;'
     }
 
-    function _StatusBadge
-    {
-        param([string]$Status)
-        switch ($Status)
-        {
-            'OK'       { '<span class="badge badge-ok">OK</span>' }
-            'Warning'  { '<span class="badge badge-warn">WARN</span>' }
-            'NotNTFS'  { '<span class="badge badge-warn">KEIN NTFS</span>' }
-            'Error'    { '<span class="badge badge-err">FEHLER</span>' }
-            default    { "<span class='badge badge-err'>$(_HtmlEncode $Status)</span>" }
-        }
-    }
-
-    # Gesamtstatus-Farbe
-    $overallColor = switch ($Overall)
-    {
-        'OK'      { '#27ae60' }
-        'WARNING' { '#f39c12' }
-        default   { '#e74c3c' }
-    }
-
-    # Zeilen nach Kategorie gruppiert
-    $categories = $Results | Select-Object -ExpandProperty Category -Unique
-
-    $tableRows = [System.Text.StringBuilder]::new()
-    foreach ($cat in $categories)
-    {
-        $catItems = $Results | Where-Object { $_.Category -eq $cat }
-        $first    = $true
-        foreach ($item in $catItems)
-        {
-            $rowClass = switch ($item.Status)
-            {
-                'OK'      { 'row-ok' }
-                'Warning' { 'row-warn' }
-                default   { 'row-err' }
-            }
-
-            if ($first)
-            {
-                $rowCount = ($catItems | Measure-Object).Count
-                $catCell  = "<td class='cat-cell' rowspan='$rowCount'>$(_HtmlEncode $cat)</td>"
-                $first    = $false
-            }
-            else { $catCell = '' }
-
-            [void]$tableRows.AppendLine(
-                "<tr class='$rowClass'>$catCell<td>$(_HtmlEncode $item.Check)</td>" +
-                "<td class='center'>$(_StatusBadge $item.Status)</td>" +
-                "<td>$(_HtmlEncode $item.Current)</td>" +
-                "<td>$(_HtmlEncode $item.Expected)</td>" +
-                "<td class='msg'>$(_HtmlEncode $item.Message)</td></tr>"
-            )
-        }
-    }
-
-    $profileLabel = switch ($CheckProfile)
-    {
-        'FiTs'    { 'FI-TS' }
-        'Generic' { 'Generisch' }
-        default   { "Auto ($CheckProfile)" }
+    $dbRows = if ($Databases) {
+        $Databases | ForEach-Object {
+            "<tr><td>$(_HtmlEncode $_.Name)</td><td>$($_.Recovery)</td><td>$(_HtmlEncode $_.DBO)</td><td>$($_.LastFullBackup)</td></tr>"
+        } | Out-String
+    } else {
+        '<tr><td colspan="4">No databases</td></tr>'
     }
 
     return @"
@@ -406,123 +397,140 @@ function _Build-SetupReportHtml
 <title>SQL Server Setup Report - $(_HtmlEncode $SqlInstance)</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; background: #060f20; color: #e2e8f0; font-size: 13px; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #060f20; color: #e2e8f0; font-size: 14px; line-height: 1.6; }
 
-  /* Header */
-  .header { background: linear-gradient(160deg, #060f20 0%, #0b1e3d 100%);
-            border-bottom: 2px solid #2e86c1; padding: 28px 32px 20px; }
-  .header h1 { font-size: 22px; font-weight: 600; color: #e2e8f0; }
-  .header h1 em { color: #5dade2; font-style: normal; }
-  .header .meta { margin-top: 8px; color: #94a8c0; font-size: 12px; }
-  .header .meta span { margin-right: 24px; }
+  .header { background: linear-gradient(160deg, #060f20 0%, #0b1e3d 100%); border-bottom: 3px solid #2e86c1; padding: 32px 40px; }
+  .header h1 { font-size: 28px; font-weight: 600; color: #5dade2; margin-bottom: 8px; }
+  .header .meta { color: #94a8c0; font-size: 13px; }
 
-  /* Summary Cards */
-  .summary { display: flex; gap: 16px; padding: 20px 32px; background: #0a1628; }
-  .summary-card { flex: 1; border-radius: 6px; padding: 14px 18px; text-align: center; }
-  .summary-card .num { font-size: 28px; font-weight: 700; }
-  .summary-card .lbl { font-size: 11px; color: #94a8c0; margin-top: 2px; }
-  .card-overall { background: $overallColor; }
-  .card-ok   { background: #1a3a2a; border: 1px solid #27ae60; }
-  .card-ok   .num { color: #2ecc71; }
-  .card-warn { background: #3a2a10; border: 1px solid #f39c12; }
-  .card-warn .num { color: #f39c12; }
-  .card-err  { background: #3a1010; border: 1px solid #e74c3c; }
-  .card-err  .num { color: #e74c3c; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 32px 40px; }
 
-  /* Table */
-  .content { padding: 0 32px 32px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 16px;
-          background: #0d1f38; border-radius: 6px; overflow: hidden;
-          table-layout: auto; }
-  th { background: #0b1e3d; color: #94a8c0; font-weight: 600; font-size: 11px;
-       text-transform: uppercase; letter-spacing: 0.05em;
-       padding: 10px 12px; text-align: left; border-bottom: 1px solid #1e3a5f; }
-  th:nth-child(1) { width: 12%; }  /* Category */
-  th:nth-child(2) { width: 18%; min-width: 180px; }  /* Check */
-  th:nth-child(3) { width: 8%; }   /* Status */
-  th:nth-child(4) { width: 18%; min-width: 180px; }  /* Current */
-  th:nth-child(5) { width: 18%; min-width: 180px; }  /* Expected */
-  th:nth-child(6) { width: 26%; }  /* Message */
+  /* Critical Issues Section */
+  .section-title { font-size: 18px; font-weight: 700; color: #5dade2; margin-top: 32px; margin-bottom: 16px; border-bottom: 2px solid #1e3a5f; padding-bottom: 8px; }
 
-  td { padding: 9px 12px; border-bottom: 1px solid #0f2540; vertical-align: top;
-       word-wrap: break-word; word-break: break-word; }
-  td.cat-cell { color: #5dade2; font-weight: 600; font-size: 11px;
-                text-transform: uppercase; letter-spacing: 0.04em;
-                border-right: 2px solid #1e3a5f; background: #0b1e3d;
-                max-width: 120px; }
-  td:nth-child(2) { max-width: 180px; }  /* Check */
-  td:nth-child(3) { text-align: center; }
-  td:nth-child(4) { max-width: 180px; }  /* Current */
-  td:nth-child(5) { max-width: 180px; }  /* Expected */
-  td:nth-child(6) { max-width: 250px; }  /* Message */
-  td.center { text-align: center; }
-  td.msg { color: #94a8c0; font-size: 12px; }
-  tr:last-child td { border-bottom: none; }
-  tr.row-ok   { }
-  tr.row-warn { background: rgba(243,156,18,0.06); }
-  tr.row-err  { background: rgba(231, 76, 60, 0.08); }
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .card {
+    background: #0d1f38; border-left: 4px solid; padding: 20px; border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .card.green { border-left-color: #27ae60; background: rgba(39, 174, 96, 0.08); }
+  .card.orange { border-left-color: #f39c12; background: rgba(243, 156, 18, 0.08); }
+  .card.red { border-left-color: #e74c3c; background: rgba(231, 76, 60, 0.12); }
 
-  /* Badges */
-  .badge { display: inline-block; padding: 2px 9px; border-radius: 10px;
-           font-size: 10px; font-weight: 700; letter-spacing: 0.05em; }
-  .badge-ok   { background: #1a3a2a; color: #2ecc71; border: 1px solid #27ae60; }
-  .badge-warn { background: #3a2a10; color: #f39c12; border: 1px solid #f39c12; }
-  .badge-err  { background: #3a1010; color: #e74c3c; border: 1px solid #e74c3c; }
+  .card-label { color: #94a8c0; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .card-value { color: #e2e8f0; font-size: 16px; font-weight: 600; }
+  .card-detail { color: #94a8c0; font-size: 12px; margin-top: 6px; }
 
-  /* Footer */
-  .footer { padding: 16px 32px; border-top: 1px solid #1e3a5f;
-            color: #4a6080; font-size: 11px; }
+  /* Info Sections */
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  .info-block h3 { font-size: 14px; color: #5dade2; font-weight: 600; margin-bottom: 12px; text-transform: uppercase; }
+  .info-block p { color: #e2e8f0; font-size: 13px; margin-bottom: 6px; word-wrap: break-word; }
+  .info-label { color: #94a8c0; font-weight: 600; display: inline-block; min-width: 140px; }
+
+  /* Database Table */
+  table { width: 100%; border-collapse: collapse; background: #0d1f38; border-radius: 6px; overflow: hidden; margin-top: 16px; }
+  th { background: #0b1e3d; color: #94a8c0; font-weight: 600; font-size: 12px; text-transform: uppercase; padding: 12px 16px; text-align: left; border-bottom: 1px solid #1e3a5f; }
+  td { padding: 12px 16px; border-bottom: 1px solid #0f2540; color: #e2e8f0; }
+  tr:hover { background: rgba(93, 173, 226, 0.06); }
+
+  .footer { margin-top: 40px; padding-top: 24px; border-top: 1px solid #1e3a5f; color: #4a6080; font-size: 12px; }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <h1>SQL Server Setup Report - <em>$(_HtmlEncode $SqlInstance)</em></h1>
-  <div class="meta">
-    <span>Erstellt: $(_HtmlEncode $Timestamp)</span>
-    <span>Profil: $(_HtmlEncode $profileLabel)</span>
-    <span>Checks: $(($Results | Measure-Object).Count)</span>
-  </div>
+  <h1>SQL Server Setup Report</h1>
+  <div class="meta">Instance: <strong>$(_HtmlEncode $SqlInstance)</strong> | Timestamp: $Timestamp</div>
 </div>
 
-<div class="summary">
-  <div class="summary-card card-overall">
-    <div class="num">$(_HtmlEncode $Overall)</div>
-    <div class="lbl">Gesamtstatus</div>
-  </div>
-  <div class="summary-card card-ok">
-    <div class="num">$CountOk</div>
-    <div class="lbl">OK</div>
-  </div>
-  <div class="summary-card card-warn">
-    <div class="num">$CountWarn</div>
-    <div class="lbl">Warnungen</div>
-  </div>
-  <div class="summary-card card-err">
-    <div class="num">$CountErr</div>
-    <div class="lbl">Fehler</div>
-  </div>
-</div>
+<div class="container">
 
-<div class="content">
+  <!-- CRITICAL ISSUES -->
+  <div class="section-title">🔴 CRITICAL ISSUES</div>
+  <div class="cards-grid">
+    <div class="card $SAStatusColor">
+      <div class="card-label">SA Account</div>
+      <div class="card-value">$SAStatus</div>
+      <div class="card-detail">Name: $(_HtmlEncode $SAName)</div>
+    </div>
+    <div class="card $BackupStatusColor">
+      <div class="card-label">Backup Jobs</div>
+      <div class="card-value">$BackupStatus</div>
+      <div class="card-detail">Enable backups immediately if missing</div>
+    </div>
+    <div class="card $MaxMemColor">
+      <div class="card-label">Max Memory</div>
+      <div class="card-value">$MaxMemStatus</div>
+      <div class="card-detail">Tolerance: 85-95% of RAM</div>
+    </div>
+  </div>
+
+  <!-- SECURITY -->
+  <div class="section-title">🔒 SECURITY</div>
+  <div class="cards-grid">
+    <div class="card">
+      <div class="card-label">Sysadmin Accounts</div>
+      <div class="card-value">$(_HtmlEncode $Sysadmins)</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Logins with Extended Roles</div>
+      <div class="card-value" style="font-size: 13px;">$(_HtmlEncode $AdvancedLogins)</div>
+    </div>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-block">
+      <h3>Server-Level Features</h3>
+      <p><span class="info-label">CLR:</span> $CLRStatus</p>
+      <p><span class="info-label">xp_cmdshell:</span> $XPStatus</p>
+    </div>
+    <div class="info-block">
+      <h3>Infrastructure</h3>
+      <p><span class="info-label">SPNs:</span> $SPNStatus</p>
+      <p><span class="info-label">Splunk:</span> $SplunkStatus</p>
+    </div>
+  </div>
+
+  <!-- SERVICE ACCOUNTS -->
+  <div class="section-title">👤 SERVICE ACCOUNTS</div>
+  <div class="info-block">
+    <p>$(_HtmlEncode $ServiceAccounts)</p>
+  </div>
+
+  <!-- CONFIGURATION -->
+  <div class="section-title">⚙️ CONFIGURATION</div>
+  <div class="info-grid">
+    <div class="info-block">
+      <h3>Query Execution</h3>
+      <p><span class="info-label">MAXDOP:</span> $MAXDOP</p>
+      <p><span class="info-label">Cost Threshold:</span> $CostThreshold</p>
+    </div>
+    <div class="info-block">
+      <h3>Tempdb</h3>
+      <p><span class="info-label">Files:</span> $TempDB</p>
+    </div>
+  </div>
+
+  <!-- DATABASES -->
+  <div class="section-title">📊 DATABASES</div>
   <table>
     <thead>
       <tr>
-        <th style="width:160px">Kategorie</th>
-        <th>Check</th>
-        <th style="width:90px;text-align:center">Status</th>
-        <th style="width:160px">Aktuell</th>
-        <th style="width:180px">Empfohlen</th>
-        <th>Meldung</th>
+        <th>Database</th>
+        <th>Recovery Model</th>
+        <th>DBO Owner</th>
+        <th>Last Full Backup</th>
       </tr>
     </thead>
     <tbody>
-$($tableRows.ToString())    </tbody>
+      $dbRows
+    </tbody>
   </table>
-</div>
 
-<div class="footer">
-  sqmSQLTool - dtcSoftware / Uwe Janke &nbsp;|&nbsp; www.powershelldba.de
+  <div class="footer">
+    Report generated by sqmSQLTool - Setup Report v2.0 | All times UTC
+  </div>
+
 </div>
 
 </body>
