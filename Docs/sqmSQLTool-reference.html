@@ -4563,13 +4563,40 @@ function Invoke-sqmMonitoringKey
 <div class="psdb-st-content">
 <h2 class="psdb-st-section-title">📦 Installation</h2>
 <div class="psdb-st-section" style="margin-top:10px;">
-<div class="psdb-st-qs-step"><div class="psdb-st-qs-num">1</div><div class="psdb-st-qs-body"><div class="psdb-st-qs-title">Voraussetzung: dbatools</div><pre class="psdb-st-code" style="margin-top:6px;">Install-Module dbatools -Scope CurrentUser</pre></div></div>
-<div class="psdb-st-qs-step"><div class="psdb-st-qs-num">2</div><div class="psdb-st-qs-body"><div class="psdb-st-qs-title">Von GitHub herunterladen</div><pre class="psdb-st-code" style="margin-top:6px;"># ZIP herunterladen von:
-# https://github.com/JankeUwe/sqmSQLTool</pre></div></div>
-<div class="psdb-st-qs-step"><div class="psdb-st-qs-num">3</div><div class="psdb-st-qs-body"><div class="psdb-st-qs-title">In PSModulePath entpacken</div><pre class="psdb-st-code" style="margin-top:6px;">C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\</pre></div></div>
-<div class="psdb-st-qs-step"><div class="psdb-st-qs-num">4</div><div class="psdb-st-qs-body"><div class="psdb-st-qs-title">Modul laden und prüfen</div><pre class="psdb-st-code" style="margin-top:6px;">Import-Module sqmSQLTool
-Get-Command -Module sqmSQLTool | Measure-Object</pre></div></div>
-<div class="psdb-st-qs-step"><div class="psdb-st-qs-num">5</div><div class="psdb-st-qs-body"><div class="psdb-st-qs-title">Update prüfen</div><pre class="psdb-st-code" style="margin-top:6px;">Test-sqmModuleUpdate</pre></div></div>
+
+<div class="psdb-st-qs-step"><div class="psdb-st-qs-num">1</div><div class="psdb-st-qs-body"><div class="psdb-st-qs-title">Voraussetzung: dbatools installieren</div>
+<p style="color:#94a8c0;font-size:.85rem;margin:6px 0;">Falls dbatools noch nicht vorhanden — je nach Umgebung:</p>
+<pre class="psdb-st-code" style="margin-top:6px;"># Mit Internetzugang (PSGallery):
+Install-Module dbatools -Scope AllUsers       # systemweit (als Admin)
+Install-Module dbatools -Scope CurrentUser    # nur für aktuellen Benutzer
+
+# Ohne Internetzugang (z.B. Bankenumgebung):
+# dbatools als ZIP auf einen UNC-Share bereitstellen und manuell entpacken nach:
+# C:\Program Files\WindowsPowerShell\Modules\dbatools\</pre>
+</div></div>
+
+<div class="psdb-st-qs-step"><div class="psdb-st-qs-num">2</div><div class="psdb-st-qs-body"><div class="psdb-st-qs-title">sqmSQLTool herunterladen</div>
+<pre class="psdb-st-code" style="margin-top:6px;"># Von GitHub als ZIP:
+# https://github.com/JankeUwe/sqmSQLTool
+# → Code → Download ZIP → entpacken</pre>
+</div></div>
+
+<div class="psdb-st-qs-step"><div class="psdb-st-qs-num">3</div><div class="psdb-st-qs-body"><div class="psdb-st-qs-title">Installation mit Install.cmd (empfohlen)</div>
+<p style="color:#94a8c0;font-size:.85rem;margin:6px 0;">Install.cmd erkennt automatisch ob Admin-Rechte vorhanden sind, behandelt Execution Policy und installiert ins richtige PowerShell-Verzeichnis.</p>
+<pre class="psdb-st-code" style="margin-top:6px;">Install.cmd                  # Auto: AllUsers wenn Admin, sonst CurrentUser
+Install.cmd AllUsers         # Systemweit (UAC-Abfrage wenn nötig)
+Install.cmd CurrentUser      # Nur für aktuellen Benutzer, keine Elevation nötig</pre>
+</div></div>
+
+<div class="psdb-st-qs-step"><div class="psdb-st-qs-num">4</div><div class="psdb-st-qs-body"><div class="psdb-st-qs-title">Modul laden und prüfen</div>
+<pre class="psdb-st-code" style="margin-top:6px;">Import-Module sqmSQLTool
+Get-Command -Module sqmSQLTool | Measure-Object</pre>
+</div></div>
+
+<div class="psdb-st-qs-step"><div class="psdb-st-qs-num">5</div><div class="psdb-st-qs-body"><div class="psdb-st-qs-title">Update prüfen</div>
+<pre class="psdb-st-code" style="margin-top:6px;">Test-sqmModuleUpdate</pre>
+</div></div>
+
 </div>
 </div>
 </div>
