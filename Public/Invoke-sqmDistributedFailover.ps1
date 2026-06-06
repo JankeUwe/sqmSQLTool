@@ -26,6 +26,11 @@
 .PARAMETER Force
     Skip confirmation dialog.
 
+.PARAMETER Rollback
+    Rollback zum urspruenglichen Primary. Ueberspringt den Readiness-Check.
+    Verwenden wenn nach einem Failover Probleme auftreten und das alte System
+    wieder als Primary benoetigt wird.
+
 .PARAMETER WhatIf
     Shows what would be done without actually performing the failover.
 
@@ -40,6 +45,10 @@
 
 .EXAMPLE
     Invoke-sqmDistributedFailover -SqlInstance "SQL01" -AvailabilityGroupName "MyDAG" -WhatIf
+
+.EXAMPLE
+    # Rollback zum alten System nach fehlgeschlagenem Failover:
+    Invoke-sqmDistributedFailover -SqlInstance "SQL01" -AvailabilityGroupName "MyDAG" -Rollback -Force
 
 .NOTES
     Author:       MSSQLTools
@@ -60,6 +69,8 @@ function Invoke-sqmDistributedFailover
 		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
 		[Parameter(Mandatory = $false)]
 		[switch]$Force,
+		[Parameter(Mandatory = $false)]
+		[switch]$Rollback,
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
@@ -82,70 +93,71 @@ function Invoke-sqmDistributedFailover
 
 		try
 		{
-			# Step 1: Validiere Failover-Bereitschaft
-			$readinessTest = Test-sqmDistributedAgReadiness @connParams -EnableException:$true
+			$isRollback = $Rollback.IsPresent
+			$direction = if ($isRollback) { "ROLLBACK" } else { "FAILOVER" }
 
-			if ($readinessTest.ReadinessScore -lt 75)
+			# Step 1: Validiere Failover-Bereitschaft (nur beim normalen Failover, nicht Rollback)
+			if (-not $isRollback)
 			{
-				$errMsg = "Failover NICHT empfohlen. Readiness Score: $($readinessTest.ReadinessScore)/100. Details: $($readinessTest.CheckResults | Out-String)"
-				Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
-				throw $errMsg
+				$readinessTest = Test-sqmDistributedAgReadiness @connParams -EnableException:$true
+
+				if ($readinessTest.ReadinessScore -lt 75)
+				{
+					$errMsg = "Failover NICHT empfohlen. Readiness Score: $($readinessTest.ReadinessScore)/100. Details: $($readinessTest.CheckResults | Out-String)"
+					Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+					throw $errMsg
+				}
+			}
+			else
+			{
+				Invoke-sqmLogging -Message "ROLLBACK-Modus: Readiness-Check wird uebersprungen." -FunctionName $functionName -Level "WARNING"
 			}
 
-			# Step 2: Hole Secondary AG Info
+			# Step 2: Hole Secondary AG Info (SQL 2016 kompatibel - ohne dm_hadr_distributed_ag_replica_member_status)
 			$secondaryQuery = @"
 SELECT TOP 1
-    ag.name AS PrimaryAgName,
-    dag.secondary_availability_group_name AS SecondaryAgName,
-    dag.secondary_replica_server_name AS SecondaryReplicaServer
+    ar.replica_server_name AS SecondaryReplicaServer,
+    ag2.name AS SecondaryAgName
 FROM sys.availability_groups ag
-JOIN sys.dm_hadr_distributed_ag_replica_member_status dag ON 1=1
-WHERE ag.name = @AgName AND ag.is_distributed = 1
+JOIN sys.availability_replicas ar ON ar.group_id = ag.group_id
+JOIN sys.dm_hadr_availability_replica_states ars ON ars.replica_id = ar.replica_id
+JOIN sys.availability_groups ag2 ON ag2.group_id = ar.group_id
+WHERE ag.name = @AgName
+  AND ag.is_distributed = 1
+  AND ars.role_desc = 'SECONDARY'
 "@
 			$secondaryInfo = Invoke-DbaQuery @connParams -Query $secondaryQuery -SqlParameters @{ AgName = $AvailabilityGroupName } -ErrorAction Stop
 
 			if (-not $secondaryInfo)
 			{
-				throw "Distributed AG '$AvailabilityGroupName' nicht gefunden oder nicht korrekt konfiguriert."
+				throw "Distributed AG '$AvailabilityGroupName' nicht gefunden oder kein Secondary erkannt."
 			}
 
 			$secondaryAgName = $secondaryInfo.SecondaryAgName
 			$secondaryServer = $secondaryInfo.SecondaryReplicaServer
 
 			# Step 3: Bestaetigung (wenn nicht -Force)
-			$confirmMsg = @"
-CRITICAL OPERATION: Distributed AG Failover
-
-Primary AG   : $AvailabilityGroupName
-Secondary AG : $secondaryAgName
-Target Server: $secondaryServer
-
-Dieser Vorgang ist nicht rueckkehrbar. Fortfahren?
-"@
+			$actionDesc = if ($isRollback) { "ROLLBACK - Zurueck zum alten System" } else { "Failover zum neuen System" }
 
 			if (-not $Force)
 			{
-				if (-not $PSCmdlet.ShouldProcess($AvailabilityGroupName, "Failover durchfuehren"))
+				if (-not $PSCmdlet.ShouldProcess($AvailabilityGroupName, "$direction durchfuehren"))
 				{
-					Invoke-sqmLogging -Message "Failover abgebrochen durch Benutzer" -FunctionName $functionName -Level "INFO"
+					Invoke-sqmLogging -Message "$direction abgebrochen durch Benutzer" -FunctionName $functionName -Level "INFO"
 					return [PSCustomObject]@{
 						Status = 'CANCELLED'
-						Message = 'Failover abgebrochen'
+						Message = "$direction abgebrochen"
 						Timestamp = Get-Date
 					}
 				}
 			}
 
-			# Step 4: Fuehre Failover durch
+			# Step 4: Fuehre Failover / Rollback durch
 			$timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-			Invoke-sqmLogging -Message "Starte Failover [$AvailabilityGroupName] zu [$secondaryServer]" -FunctionName $functionName -Level "WARNING"
+			Invoke-sqmLogging -Message "Starte $direction [$AvailabilityGroupName] - $actionDesc" -FunctionName $functionName -Level "WARNING"
 
-			# Failover T-SQL
-			$failoverSql = @"
--- Initiate forced failover (als last resort, wenn keine Synchronisierung moeglich)
-ALTER AVAILABILITY GROUP [$AvailabilityGroupName]
-    SET (ROLE = SECONDARY) FORCE_FAILOVER_ALLOW_DATA_LOSS;
-"@
+			# Bug Fix: Korrekte Failover-Syntax (kein FORCE_FAILOVER_ALLOW_DATA_LOSS!)
+			$failoverSql = "ALTER AVAILABILITY GROUP [$AvailabilityGroupName] FAILOVER"
 			Invoke-DbaQuery @connParams -Query $failoverSql -ErrorAction Stop
 
 			# Step 5: Verifikation
@@ -192,6 +204,7 @@ WHERE ag.name = @AgName
 
 			return [PSCustomObject]@{
 				Status = 'SUCCESS'
+				Direction = $direction
 				SqlInstance = $SqlInstance
 				PrimaryAg = $AvailabilityGroupName
 				SecondaryAg = $secondaryAgName
