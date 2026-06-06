@@ -213,10 +213,48 @@ function Get-sqmSpnReport
 			}
 
 			# Echtes Domaenenkonto (DOMAIN\user oder user@domain.local)
+			# UPN-Format (user@domain.net) in SAM-Format (DOMAIN\user) konvertieren fuer setspn.exe
+			$finalSpnAccount = $ServiceAccount
+			if ($ServiceAccount -match '^([^@]+)@(.+)$')
+			{
+				# UPN-Format erkannt: user@domain.net
+				$upnUser = $Matches[1]
+				$upnDomain = $Matches[2]
+
+				try
+				{
+					# .NET Directory Services nutzen um SAM-Namen zu ermitteln
+					$userContext = New-Object System.DirectoryServices.DirectoryEntry
+					$userSearcher = New-Object System.DirectoryServices.DirectorySearcher($userContext)
+					$userSearcher.Filter = "(userPrincipalName=$ServiceAccount)"
+					$result = $userSearcher.FindOne()
+
+					if ($result)
+					{
+						# sAMAccountName auslesen
+						$samName = $result.Properties['samaccountname'][0]
+						# Domaenen-sAMAccountName bestimmen (z.B. DOMAIN\user)
+						$domainName = $upnDomain.Split('.')[0].ToUpper()  # z.B. "domain.net" -> "DOMAIN"
+						$finalSpnAccount = "${domainName}\${samName}"
+
+						Invoke-sqmLogging -Message "UPN '$ServiceAccount' in SAM-Format konvertiert: '$finalSpnAccount'" `
+										  -FunctionName $functionName -Level 'INFO'
+					}
+				}
+				catch
+				{
+					# Fallback: Nutze das erste Segment als Domain-Prefix
+					$domainName = $upnDomain.Split('.')[0].ToUpper()
+					$finalSpnAccount = "${domainName}\${upnUser}"
+					Invoke-sqmLogging -Message "UPN-Konversion via .NET fehlgeschlagen, Fallback-Format: '$finalSpnAccount'. Fehler: $($_.Exception.Message)" `
+									  -FunctionName $functionName -Level 'WARNING'
+				}
+			}
+
 			return [PSCustomObject]@{
 				AccountType = 'Domain'
-				SpnAccount  = $ServiceAccount
-				Note        = "Domaenenkonto '$ServiceAccount' wird direkt fuer SPN-Pruefung verwendet."
+				SpnAccount  = $finalSpnAccount
+				Note        = "Domaenenkonto '$ServiceAccount' wird als '$finalSpnAccount' fuer SPN-Pruefung verwendet."
 			}
 		}
 
