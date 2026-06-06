@@ -42,12 +42,22 @@ Get-ChildItem $publicDir -Filter "*.ps1" | ForEach-Object {
             $params += $_.Groups[1].Value
         }
 
-        # Extract all EXAMPLES
+        # Extract all EXAMPLES - split by .EXAMPLE blocks
         $examples = @()
-        [regex]::Matches($content, '\.EXAMPLE\s*\r?\n((?:[^\r\n]|\r\n(?!\s*\.))*)', [System.Text.RegularExpressions.RegexOptions]::Multiline) | ForEach-Object {
-            $exampleText = $_.Groups[1].Value.Trim()
-            if ($exampleText) {
-                $examples += $exampleText
+        if ($content -match '<#([\s\S]*?)#>') {
+            $helpBlock = $matches[1]
+            # Split on .EXAMPLE
+            $parts = $helpBlock -split '\.EXAMPLE\s*\r?\n'
+            # Skip first part (not an example), process rest
+            for ($i = 1; $i -lt $parts.Count; $i++) {
+                $exampleText = $parts[$i]
+                # Take everything until next .SECTION (like .NOTES, .DESCRIPTION, etc)
+                if ($exampleText -match '^([\s\S]*?)(?=\n\s*\.\w+|$)') {
+                    $exampleText = $matches[1].Trim()
+                    if ($exampleText -and $exampleText.Length -gt 10) {
+                        $examples += $exampleText
+                    }
+                }
             }
         }
 
