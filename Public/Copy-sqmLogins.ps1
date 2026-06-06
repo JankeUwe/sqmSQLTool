@@ -195,7 +195,29 @@ function Copy-sqmLogins
 		$functionName = $MyInvocation.MyCommand.Name
 		
 		# Systemlogin-Muster (standardmaessig ausgeschlossen)
-		$systemLoginPatterns = @('sa', '##MS_*', 'NT SERVICE\*', 'NT AUTHORITY\*', 'BUILTIN\*')
+		# Hinweis: 'sa' wird durch dynamische sysadmin-Erkennung ersetzt um umbenannte sa-Accounts zu handhaben
+		$systemLoginPatterns = @('##MS_*', 'NT SERVICE\*', 'NT AUTHORITY\*', 'BUILTIN\*')
+
+		# Dynamisch alle sysadmin-Accounts ermitteln (handhaben umbenannte 'sa')
+		$sysAdminLogins = @()
+		try
+		{
+			$query = "SELECT name FROM sys.server_principals WHERE is_srvrolemember('sysadmin', name) = 1 AND name NOT LIKE '##%'"
+			$sysAdminLogins = @((Invoke-DbaQuery @srcConnParams -Query $query).name)
+			if ($sysAdminLogins.Count -gt 0)
+			{
+				Invoke-sqmLogging -Message "Gefundene sysadmin-Logins: $($sysAdminLogins -join ', ')" `
+								  -FunctionName $functionName -Level 'INFO'
+				$systemLoginPatterns += $sysAdminLogins
+			}
+		}
+		catch
+		{
+			# Fallback: 'sa' verwenden wenn Abfrage fehlschlägt
+			Invoke-sqmLogging -Message "WARNUNG: Sysadmin-Logins konnten nicht ermittelt werden, verwende 'sa' als Fallback: $($_.Exception.Message)" `
+							  -FunctionName $functionName -Level 'WARNING'
+			$systemLoginPatterns += @('sa')
+		}
 		
 		# Hilfsfunktion: Prueft ob ein Name einem der Muster entspricht
 		function _MatchesAnyPattern

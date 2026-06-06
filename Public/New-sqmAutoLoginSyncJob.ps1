@@ -414,7 +414,7 @@ exit ([int](`$failures.Count -gt 0))
 		catch
 		{
 			$errMsg = $_.Exception.Message
-			Invoke-sqmLogging -Message "Fehler in $functionName: $errMsg" -FunctionName $functionName -Level 'ERROR'
+			Invoke-sqmLogging -Message "Fehler in ${functionName}: $errMsg" -FunctionName $functionName -Level 'ERROR'
 
 			if ($EnableException) { throw }
 

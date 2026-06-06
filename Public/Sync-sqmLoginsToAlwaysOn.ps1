@@ -349,6 +349,25 @@ ORDER BY drs.is_primary_replica DESC
 						# SafeForceMode: Auto-exclude dangerous logins
 						if ($SafeForceMode)
 						{
+							# Get sysadmin logins (handles renamed 'sa')
+							$sysAdminLogins = @()
+							try
+							{
+								$query = "SELECT name FROM sys.server_principals WHERE is_srvrolemember('sysadmin', name) = 1 AND name NOT LIKE '##%'"
+								$sysAdminLogins = @((Invoke-DbaQuery -SqlInstance $secondaryName -SqlCredential $dstCred -Query $query).name)
+								if ($sysAdminLogins.Count -gt 0)
+								{
+									Invoke-sqmLogging -Message "[$secondaryName] SafeForceMode: Found sysadmin logins: $($sysAdminLogins -join ', ')" `
+													  -FunctionName $functionName -Level 'INFO'
+								}
+							}
+							catch
+							{
+								Invoke-sqmLogging -Message "[$secondaryName] WARNUNG: Sysadmin-Logins konnten nicht ermittelt werden, verwende 'sa' als Fallback" `
+												  -FunctionName $functionName -Level 'WARNING'
+								$sysAdminLogins = @('sa')
+							}
+
 							# Get SQL Agent Service Account for this secondary
 							$agentAccount = $null
 							try
@@ -359,12 +378,13 @@ ORDER BY drs.is_primary_replica DESC
 							}
 							catch
 							{
-								Invoke-sqmLogging -Message "[$secondaryName] WARNUNG: Agent Account konnte nicht ermittelt werden, verwende Standard-Exclusions" `
+								Invoke-sqmLogging -Message "[$secondaryName] WARNUNG: Agent Account konnte nicht ermittelt werden" `
 												  -FunctionName $functionName -Level 'WARNING'
 							}
 
-							# Build safe exclusion list
-							$safeExclude = @('sa', 'dbo')
+							# Build safe exclusion list (dynamic sysadmin logins + dbo)
+							$safeExclude = @('dbo')
+							$safeExclude += $sysAdminLogins
 							if ($agentAccount)
 							{
 								$safeExclude += $agentAccount
@@ -420,11 +440,12 @@ ORDER BY drs.is_primary_replica DESC
 							$timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 							$backupFile = Join-Path $BackupPath "LoginBackup_$($secondaryName -replace '\\', '_')_$timestamp.sql"
 
-							# Generate backup script
+							# Generate backup script (excludes sysadmin & dbo accounts)
 							$backupQuery = @"
 -- Login Backup for Secondary: $secondaryName
 -- Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 -- Source: $($primaryReplica.replica_server_name)
+-- Note: Excludes sysadmin accounts, dbo, and system accounts
 
 SELECT 'CREATE LOGIN [' + name + ']' +
        CASE
@@ -434,7 +455,8 @@ SELECT 'CREATE LOGIN [' + name + ']' +
        END + ';'
 FROM sys.server_principals
 WHERE type IN ('S', 'U', 'G')
-  AND name NOT IN ('sa', 'dbo')
+  AND name != 'dbo'
+  AND is_srvrolemember('sysadmin', name) = 0  -- Exclude all sysadmin accounts (handles renamed 'sa')
   AND name NOT LIKE 'NT SERVICE\%'
   AND name NOT LIKE 'NT AUTHORITY\%'
   AND name NOT LIKE 'BUILTIN\%'
@@ -507,7 +529,7 @@ ORDER BY name
 		catch
 		{
 			$errMsg = $_.Exception.Message
-			Invoke-sqmLogging -Message "Fehler in $functionName: $errMsg" -FunctionName $functionName -Level 'ERROR'
+			Invoke-sqmLogging -Message "Fehler in ${functionName}: $errMsg" -FunctionName $functionName -Level 'ERROR'
 
 			if ($EnableException) { throw }
 
