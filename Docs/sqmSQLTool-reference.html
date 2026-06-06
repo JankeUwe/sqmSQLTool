@@ -104,6 +104,11 @@
 	.psdb-st-tabs { padding: 0 8px; }
 	.psdb-st-content { padding: 12px; height: auto; }
 	}
+	/* ── QUICK START STEPS ── */
+	.psdb-st-qs-step { display: flex; gap: 12px; margin-bottom: 16px; align-items: flex-start; }
+	.psdb-st-qs-num { background: var(--psdb-st-blue2); color: #fff; border-radius: 50%; min-width: 28px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+	.psdb-st-qs-body { flex: 1; }
+	.psdb-st-qs-title { font-weight: 700; font-size: .9rem; color: var(--psdb-st-blue); margin-bottom: 6px; }
 </style>
 	</head>
 
@@ -4513,7 +4518,40 @@ function Invoke-sqmMonitoringKey
 </div>
 </div>
 </div>
-<div id="tab-config" class="psdb-st-panel"> <div class="psdb-st-content"> <h2 class="psdb-st-section-title">Konfiguration</h2> <p style="color: #94a8c0;">Konfigurationsdetails folgen...</p> </div> </div>
+<div id="tab-config" class="psdb-st-panel">
+<div class="psdb-st-content">
+<h2 class="psdb-st-section-title">⚙️ Konfiguration</h2>
+<div class="psdb-st-info" style="margin-bottom:20px;">Alle Einstellungen werden mit <code style="background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:3px;">Set-sqmConfig</code> gesetzt und mit <code style="background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:3px;">Get-sqmConfig</code> abgerufen.</div>
+<table class="psdb-st-config-table">
+<thead><tr><th>Parameter</th><th>Beschreibung</th><th>Beispiel</th></tr></thead>
+<tbody>
+<tr><td><code>-LogPath</code></td><td>Pfad für Log-Dateien</td><td><code>C:\System\WinSrvLog\MSSQL</code></td></tr>
+<tr><td><code>-OutputPath</code></td><td>Pfad für Report-Ausgaben</td><td><code>C:\System\WinSrvLog\MSSQL</code></td></tr>
+<tr><td><code>-CentralPath</code></td><td>Zentraler UNC-Pfad für Dateiverteilung</td><td><code>\\server\share\sqmSQLTool</code></td></tr>
+<tr><td><code>-AutoUpdate</code></td><td>Automatisches Update beim Import aktivieren</td><td><code>$true</code></td></tr>
+<tr><td><code>-UpdateRepository</code></td><td>Update-Quelle (GitHub / PSGallery / UNC)</td><td><code>GitHub</code></td></tr>
+<tr><td><code>-Language</code></td><td>Sprache der Ausgaben</td><td><code>de-DE</code> oder <code>en-US</code></td></tr>
+<tr><td><code>-DefaultPolicy</code></td><td>Standard-Policy-Name für Policy-Checks</td><td><code>sqm_Standard</code></td></tr>
+<tr><td><code>-CheckProfile</code></td><td>Prüfprofil für Instance-Check</td><td><code>Auto</code>, <code>FiTs</code>, <code>Generic</code></td></tr>
+<tr><td><code>-CheckCostThresholdMin</code></td><td>Mindestwert für Cost Threshold Prüfung</td><td><code>50</code></td></tr>
+<tr><td><code>-CheckTempDbMaxFiles</code></td><td>Max. TempDB-Dateien für Prüfung</td><td><code>8</code></td></tr>
+<tr><td><code>-CheckDiskBlockSize</code></td><td>Erwartete Block-Größe in Bytes</td><td><code>65536</code></td></tr>
+<tr><td><code>-OlaJobNameFull</code></td><td>Name des Ola Full-Backup Jobs</td><td><code>DatabaseBackup - FULL</code></td></tr>
+<tr><td><code>-OlaJobNameDiff</code></td><td>Name des Ola Diff-Backup Jobs</td><td><code>DatabaseBackup - DIFF</code></td></tr>
+<tr><td><code>-OlaJobNameLog</code></td><td>Name des Ola Log-Backup Jobs</td><td><code>DatabaseBackup - LOG</code></td></tr>
+<tr><td><code>-SsrsInstallerPath</code></td><td>Pfad zum SSRS Installer</td><td><code>\\server\setup\SSRS.exe</code></td></tr>
+<tr><td><code>-TsmManagementClasses</code></td><td>TSM Management Classes (Array)</td><td><code>@('FULL','DIFF','LOG')</code></td></tr>
+</tbody>
+</table>
+<div style="margin-top:20px;">
+<div class="psdb-st-qs-title" style="color:var(--psdb-st-blue);margin-bottom:8px;">Beispiel: Grundkonfiguration</div>
+<pre class="psdb-st-code">Set-sqmConfig -LogPath "C:\System\WinSrvLog\MSSQL" ``
+              -OutputPath "C:\System\WinSrvLog\MSSQL" ``
+              -Language "de-DE" ``
+              -AutoUpdate $false</pre>
+</div>
+</div>
+</div>
 <div id="tab-install" class="psdb-st-panel">
 <div class="psdb-st-content">
 <h2 class="psdb-st-section-title">📦 Installation</h2>
@@ -4731,6 +4769,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre></div></div>
 		}
 	</script>
 	</div>
+
 
 
 
