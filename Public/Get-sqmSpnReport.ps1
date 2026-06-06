@@ -27,6 +27,10 @@
         MSSQLSvc/<Hostname>:<InstanceName>
         MSSQLSvc/<FQDN>:<InstanceName>
 
+    For AlwaysOn Availability Groups, listener SPNs are also checked:
+        MSSQLSvc/<ListenerName>:<Port>
+        MSSQLSvc/<ListenerFQDN>:<Port>
+
     Missing SPNs are prepared as ready-to-use setspn.exe commands
     that can be handed to the AD team.
 
@@ -611,6 +615,115 @@ function Get-sqmSpnReport
 								Note           = "SPN vorhanden, aber nicht in Erwartungsliste (veraltet / Portaenderung?). Ggf. entfernen: setspn -D $existingSpn `"$spnAccount`""
 							})
 						}
+					}
+
+					# --------------------------------------------------------
+					# AlwaysOn Listener SPNs pruefen (falls Instanz in AG)
+					# --------------------------------------------------------
+					try
+					{
+						$listenerQuery = @"
+SELECT
+    ag.name AS AvailabilityGroupName,
+    agl.dns_name AS ListenerDNSName,
+    agl.port AS ListenerPort
+FROM sys.availability_groups ag
+INNER JOIN sys.availability_group_listeners agl ON ag.group_id = agl.group_id
+WHERE ag.group_id IN (
+    SELECT group_id FROM sys.dm_hadr_availability_replica_states
+    WHERE is_local = 1
+)
+"@
+						$listeners = Invoke-DbaQuery @connParams -Query $listenerQuery -ErrorAction SilentlyContinue
+
+						if ($listeners)
+						{
+							foreach ($listener in $listeners)
+							{
+								$listenerName = $listener.ListenerDNSName
+								$listenerPort = $listener.ListenerPort
+								$agName       = $listener.AvailabilityGroupName
+
+								# Listener FQDN ermitteln
+								$listenerFqdn = $listenerName
+								try
+								{
+									$listenerFqdn = [System.Net.Dns]::GetHostEntry($listenerName).HostName
+								}
+								catch
+								{
+									# Fallback: verwende DNS-Namen als-ist
+									Invoke-sqmLogging -Message "[$computer\$instanceName] Listener FQDN-Aufloesung fuer '$listenerName' fehlgeschlagen, verwende DNS-Namen." `
+													  -FunctionName $functionName -Level 'WARNING'
+								}
+
+								# Erwartete Listener-SPNs
+								$listenerSpns = @(
+									"MSSQLSvc/${listenerName}:${listenerPort}",
+									"MSSQLSvc/${listenerFqdn}:${listenerPort}"
+								)
+
+								Invoke-sqmLogging -Message "[$computer\$instanceName] AlwaysOn Listener '$listenerName' (AG: $agName) gefunden. Erwartete SPNs: $($listenerSpns -join ' | ')" `
+												  -FunctionName $functionName -Level 'INFO'
+
+								# Existierende Listener-SPNs pruefen (unter gleicher Service-Account)
+								$existingListenerSpns = _GetExistingSpns -SpnAccount $spnAccount
+
+								foreach ($listenerSpn in $listenerSpns)
+								{
+									$isPresent = $existingListenerSpns | Where-Object { $_ -ieq $listenerSpn }
+									$status    = if ($isPresent) { 'OK' } else { 'Missing' }
+									$setSpnCmd = if (-not $isPresent)
+									{
+										"setspn -S $listenerSpn `"$spnAccount`""
+									}
+									else { $null }
+
+									$detailRows.Add([PSCustomObject]@{
+										ComputerName   = $computer
+										InstanceName   = $instanceName
+										ServiceName    = $svc.Name
+										ServiceAccount = $serviceAccount
+										AccountType    = $accountInfo.AccountType
+										SpnAccount     = $spnAccount
+										Spn            = $listenerSpn
+										Status         = $status
+										SetSpnCommand  = $setSpnCmd
+										Note           = "AlwaysOn Listener SPN (AG: $agName, Listener: $listenerName)"
+									})
+								}
+
+								# Unerwartete Listener-SPNs erkennen
+								foreach ($existingSpn in $existingListenerSpns)
+								{
+									if ($existingSpn -match "^MSSQLSvc/" -and $existingSpn -notmatch ($listenerSpns -join '|'))
+									{
+										$isExpected = $expectedSpns | Where-Object { $_ -ieq $existingSpn }
+										if (-not $isExpected -and $detailRows.Spn -notcontains $existingSpn)
+										{
+											$detailRows.Add([PSCustomObject]@{
+												ComputerName   = $computer
+												InstanceName   = $instanceName
+												ServiceName    = $svc.Name
+												ServiceAccount = $serviceAccount
+												AccountType    = $accountInfo.AccountType
+												SpnAccount     = $spnAccount
+												Spn            = $existingSpn
+												Status         = 'Unexpected'
+												SetSpnCommand  = $null
+												Note           = "AlwaysOn Listener SPN vorhanden, aber nicht erwartet (veraltet?). Ggf. entfernen: setspn -D $existingSpn `"$spnAccount`""
+											})
+										}
+									}
+								}
+							}
+						}
+					}
+					catch
+					{
+						Invoke-sqmLogging -Message "[$computer\$instanceName] AlwaysOn Listener-Pruefung fehlgeschlagen: $($_.Exception.Message)" `
+										  -FunctionName $functionName -Level 'WARNING'
+						# Fehler bei Listener-Pruefung blockiert nicht die Instanz-SPNs
 					}
 
 					$cntOk         = ($detailRows | Where-Object Status -eq 'OK').Count
