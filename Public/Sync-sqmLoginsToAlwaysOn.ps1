@@ -68,6 +68,36 @@
     Comma-separated list of secondary instance names to skip (for maintenance).
     Example: 'SQL02', 'SQL03'
 
+.PARAMETER Force
+    When set, existing logins on secondaries are overwritten (for password updates).
+    Default: $false (only new logins are copied).
+    With SafeForceMode=true (default), system logins (sa, NT SERVICE\*, etc.) are automatically excluded.
+
+.PARAMETER ForceIncludeOnly
+    When Force is set with this parameter, only these logins are updated (whitelist).
+    Overrides other login filters. System logins still excluded per SafeForceMode.
+    Example: 'AppUser_*', 'ServiceAccount'
+
+.PARAMETER ForceExclude
+    Additional logins to exclude from Force operation (blacklist).
+    Combined with SafeForceMode exclusions. Default: none.
+
+.PARAMETER SafeForceMode
+    When Force is set and SafeForceMode is true (default), automatically excludes dangerous logins:
+    - sa (system admin)
+    - SQL Agent Service Account
+    - NT SERVICE\* (virtual accounts)
+    - BUILTIN\* (Windows built-in accounts)
+    Set to false ONLY if you fully understand the risks. Default: $true
+
+.PARAMETER BackupLogins
+    When set, creates a backup of existing logins on each secondary BEFORE applying -Force.
+    Allows rollback if needed. Backup file: BackupPath\LoginBackup_<Secondary>_<Timestamp>.sql
+
+.PARAMETER BackupPath
+    Path where login backups are stored. Default: C:\System\WinSrvLog\MSSQL
+    Path is created if it doesn't exist.
+
 .PARAMETER EnableException
     Throw exceptions immediately instead of returning error status.
 
@@ -82,6 +112,15 @@
 .EXAMPLE
     Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -ExcludeLogin "TempUser_*"
     Skips logins matching the pattern.
+
+.EXAMPLE
+    Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -Force -BackupLogins
+    Updates existing logins (password changes) with backup before applying changes.
+
+.EXAMPLE
+    Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" `
+        -Force -ForceIncludeOnly "AppUser_*", "ServiceDB_Account" -BackupLogins
+    Updates only specific logins with backup enabled (safest -Force operation).
 
 .NOTES
     Requires: dbatools, Invoke-sqmLogging, Copy-sqmLogins, Get-sqmConfig
@@ -128,6 +167,24 @@ function Sync-sqmLoginsToAlwaysOn
 
 		[Parameter(Mandatory = $false)]
 		[string[]]$SkipSecondaryServers,
+
+		[Parameter(Mandatory = $false)]
+		[switch]$Force,
+
+		[Parameter(Mandatory = $false)]
+		[string[]]$ForceIncludeOnly,
+
+		[Parameter(Mandatory = $false)]
+		[string[]]$ForceExclude,
+
+		[Parameter(Mandatory = $false)]
+		[bool]$SafeForceMode = $true,
+
+		[Parameter(Mandatory = $false)]
+		[switch]$BackupLogins,
+
+		[Parameter(Mandatory = $false)]
+		[string]$BackupPath = 'C:\System\WinSrvLog\MSSQL',
 
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
@@ -269,14 +326,14 @@ ORDER BY drs.is_primary_replica DESC
 				{
 					Invoke-sqmLogging -Message "[$secondaryName] Beginne Login-Synchronisierung..." -FunctionName $functionName -Level 'INFO'
 
-					# Copy logins using Copy-sqmLogins
+					# -----------------------------------------------------------
+					# Build Copy-sqmLogins parameters
+					# -----------------------------------------------------------
 					$copyParams = @{
 						Source                  = $primaryReplica.replica_server_name
 						Destination             = $secondaryName
 						SourceCredential        = $srcCred
 						DestinationCredential   = $dstCred
-						Login                   = $Login
-						ExcludeLogin            = $ExcludeLogin
 						IncludeSystemLogins     = $IncludeSystemLogins
 						AdjustAuthMode          = $AdjustAuthMode
 						RestartServiceIfRequired = $RestartServiceIfRequired
@@ -284,6 +341,125 @@ ORDER BY drs.is_primary_replica DESC
 						ErrorAction             = 'Stop'
 					}
 
+					# Handle -Force with SafeForceMode
+					if ($Force)
+					{
+						$copyParams.Force = $true
+
+						# SafeForceMode: Auto-exclude dangerous logins
+						if ($SafeForceMode)
+						{
+							# Get SQL Agent Service Account for this secondary
+							$agentAccount = $null
+							try
+							{
+								$agentAccount = (Get-DbaAgentServiceAccount -SqlInstance $secondaryName -SqlCredential $dstCred).ServiceAccount
+								Invoke-sqmLogging -Message "[$secondaryName] SafeForceMode: Auto-excluding Agent Account: $agentAccount" `
+												  -FunctionName $functionName -Level 'INFO'
+							}
+							catch
+							{
+								Invoke-sqmLogging -Message "[$secondaryName] WARNUNG: Agent Account konnte nicht ermittelt werden, verwende Standard-Exclusions" `
+												  -FunctionName $functionName -Level 'WARNING'
+							}
+
+							# Build safe exclusion list
+							$safeExclude = @('sa', 'dbo')
+							if ($agentAccount)
+							{
+								$safeExclude += $agentAccount
+							}
+							$safeExclude += @('NT SERVICE\*', 'NT AUTHORITY\*', 'BUILTIN\*', '##MS_*')
+
+							# Combine with user-provided ForceExclude
+							if ($ForceExclude)
+							{
+								$safeExclude += $ForceExclude
+							}
+
+							$copyParams.ExcludeLogin = $safeExclude
+							Invoke-sqmLogging -Message "[$secondaryName] SafeForceMode: Excluding: $($safeExclude -join ', ')" `
+											  -FunctionName $functionName -Level 'INFO'
+						}
+
+						# Use ForceIncludeOnly if provided (whitelist)
+						if ($ForceIncludeOnly)
+						{
+							$copyParams.Login = $ForceIncludeOnly
+							Invoke-sqmLogging -Message "[$secondaryName] Force mit Whitelist: $($ForceIncludeOnly -join ', ')" `
+											  -FunctionName $functionName -Level 'INFO'
+						}
+						elseif (-not $SafeForceMode -and $ForceExclude)
+						{
+							# Only use ForceExclude if SafeForceMode is off
+							$copyParams.ExcludeLogin = $ForceExclude
+						}
+					}
+					else
+					{
+						# Normal mode (only new logins)
+						$copyParams.Login = $Login
+						$copyParams.ExcludeLogin = $ExcludeLogin
+					}
+
+					# -----------------------------------------------------------
+					# Backup logins before -Force (if requested)
+					# -----------------------------------------------------------
+					$backupFile = $null
+					if ($BackupLogins -and $Force)
+					{
+						try
+						{
+							if (-not (Test-Path $BackupPath))
+							{
+								New-Item -ItemType Directory -Path $BackupPath -Force | Out-Null
+								Invoke-sqmLogging -Message "[$secondaryName] Backup-Verzeichnis erstellt: $BackupPath" `
+												  -FunctionName $functionName -Level 'VERBOSE'
+							}
+
+							$timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+							$backupFile = Join-Path $BackupPath "LoginBackup_$($secondaryName -replace '\\', '_')_$timestamp.sql"
+
+							# Generate backup script
+							$backupQuery = @"
+-- Login Backup for Secondary: $secondaryName
+-- Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+-- Source: $($primaryReplica.replica_server_name)
+
+SELECT 'CREATE LOGIN [' + name + ']' +
+       CASE
+           WHEN type = 'S' THEN ' WITH PASSWORD = 0x' + CONVERT(VARCHAR(MAX), password_hash, 2) + ' HASHED'
+           WHEN type = 'U' THEN ' FROM WINDOWS'
+           WHEN type = 'G' THEN ' FROM WINDOWS'
+       END + ';'
+FROM sys.server_principals
+WHERE type IN ('S', 'U', 'G')
+  AND name NOT IN ('sa', 'dbo')
+  AND name NOT LIKE 'NT SERVICE\%'
+  AND name NOT LIKE 'NT AUTHORITY\%'
+  AND name NOT LIKE 'BUILTIN\%'
+  AND name NOT LIKE '##MS_%'
+ORDER BY name
+"@
+
+							$backupContent = Invoke-DbaQuery -SqlInstance $secondaryName -SqlCredential $dstCred -Query $backupQuery
+							if ($backupContent)
+							{
+								$backupContent | Out-File -FilePath $backupFile -Encoding UTF8 -Force
+								Invoke-sqmLogging -Message "[$secondaryName] Login-Backup erstellt: $backupFile" `
+												  -FunctionName $functionName -Level 'INFO'
+							}
+						}
+						catch
+						{
+							Invoke-sqmLogging -Message "[$secondaryName] WARNUNG: Backup konnte nicht erstellt werden: $($_.Exception.Message)" `
+											  -FunctionName $functionName -Level 'WARNING'
+						}
+					}
+
+					# -----------------------------------------------------------
+					# Copy logins using Copy-sqmLogins
+					# -----------------------------------------------------------
 					$copyResult = Copy-sqmLogins @copyParams
 
 					# Count logins
@@ -301,6 +477,7 @@ ORDER BY drs.is_primary_replica DESC
 						Status            = 'Success'
 						LoginsCount       = $loginsCount
 						OrphansRepaired   = $orphansRepaired
+						BackupFile        = $backupFile
 						Error             = $null
 						Timestamp         = Get-Date
 					})
@@ -318,6 +495,7 @@ ORDER BY drs.is_primary_replica DESC
 						Status            = 'Failed'
 						LoginsCount       = 0
 						OrphansRepaired   = 0
+						BackupFile        = $backupFile
 						Error             = $errMsg
 						Timestamp         = Get-Date
 					})

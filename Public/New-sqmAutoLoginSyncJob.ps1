@@ -57,6 +57,21 @@
 .PARAMETER SkipSecondaryServers
     Comma-separated list of replica names to skip (maintenance). Default: none
 
+.PARAMETER Force
+    When set, the job will update existing logins (password changes).
+    Default: $false (only new logins are synced).
+    When enabled, SafeForceMode automatically excludes system/agent accounts.
+
+.PARAMETER ForceIncludeOnly
+    When Force is set, only these logins are updated (whitelist).
+    Example: 'AppUser_*', 'ServiceAccount'
+    System logins still excluded per SafeForceMode.
+
+.PARAMETER BackupLogins
+    When set with -Force, creates login backups on each secondary before updating.
+    Backups stored in: C:\System\WinSrvLog\MSSQL\LoginBackup_<Secondary>_<Timestamp>.sql
+    Allows rollback if needed.
+
 .PARAMETER NotificationEmail
     Email address for job failure notifications. Default: none
 
@@ -124,6 +139,15 @@ function New-sqmAutoLoginSyncJob
 
 		[Parameter(Mandatory = $false)]
 		[string[]]$SkipSecondaryServers,
+
+		[Parameter(Mandatory = $false)]
+		[switch]$Force,
+
+		[Parameter(Mandatory = $false)]
+		[string[]]$ForceIncludeOnly,
+
+		[Parameter(Mandatory = $false)]
+		[switch]$BackupLogins,
 
 		[Parameter(Mandatory = $false)]
 		[string]$NotificationEmail,
@@ -223,6 +247,9 @@ ORDER BY creation_date DESC
 			$skipServersArg = if ($SkipSecondaryServers) { "-SkipSecondaryServers $(($SkipSecondaryServers | ForEach-Object { "'$_'" }) -join ',')" } else { "" }
 			$includeSystemArg = if ($IncludeSystemLogins) { "-IncludeSystemLogins" } else { "" }
 			$adjustAuthArg = if ($AdjustAuthMode) { "-AdjustAuthMode -RestartServiceIfRequired" } else { "" }
+			$forceArg = if ($Force) { "-Force" } else { "" }
+			$forceIncludeArg = if ($ForceIncludeOnly) { "-ForceIncludeOnly $(($ForceIncludeOnly | ForEach-Object { "'$_'" }) -join ',')" } else { "" }
+			$backupArg = if ($BackupLogins) { "-BackupLogins -BackupPath 'C:\System\WinSrvLog\MSSQL'" } else { "" }
 
 			$scriptContent = @"
 `$logPath = "C:\System\WinSrvLog\MSSQL"
@@ -237,11 +264,20 @@ Import-Module sqmSQLTool -Force -ErrorAction Stop
     $includeSystemArg
     $adjustAuthArg
     $skipServersArg
+    $forceArg
+    $forceIncludeArg
+    $backupArg
 }
 
 `$result = Sync-sqmLoginsToAlwaysOn @params | ConvertTo-Json
 
 "`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Login Sync Result:`n`$result" | Out-File -FilePath `$logFile -Append -Encoding UTF8
+
+# Log backup files if Force was used
+`$backups = `$result | Where-Object { `$_.BackupFile }
+if (`$backups) {
+    "Backup files created: `$(`$backups | ForEach-Object { `$_.BackupFile } | Join-String -Separator ', ')" | Out-File -FilePath `$logFile -Append -Encoding UTF8
+}
 
 # Return status (0=success, 1=failure)
 `$failures = @(`$result | Where-Object Status -eq 'Failed')
