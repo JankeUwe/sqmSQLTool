@@ -3,12 +3,12 @@
     Zeigt alle Logins mit Default-Datenbank und Spracheinstellung.
 
 .DESCRIPTION
-    Liest sys.server_principals und sys.sql_logins und gibt pro Login aus:
+    Liest sys.server_principals und gibt pro Login aus:
     - Name, Typ (SQL / Windows-User / Windows-Gruppe)
     - Default-Datenbank
     - Default-Sprache
     - Aktiviert / deaktiviert
-    - Password Policy (nur SQL-Logins)
+    - Erstellungs- und Aenderungsdatum
 
     Ausgabe direkt als Objekte. Optional als CSV nach OutputPath.
 
@@ -103,21 +103,17 @@ function Get-sqmLoginSettings
 
 		$query = @"
 SELECT
-    sp.name                    AS LoginName,
-    sp.type_desc               AS LoginType,
-    sp.default_database_name   AS DefaultDatabase,
-    sp.default_language_name   AS DefaultLanguage,
-    sp.is_disabled             AS IsDisabled,
-    sp.create_date             AS CreateDate,
-    sp.modify_date             AS ModifyDate,
-    ISNULL(sl.is_policy_checked, 0)    AS IsPolicyChecked,
-    ISNULL(sl.is_expiration_checked, 0) AS IsExpirationChecked,
-    ISNULL(sl.must_change_password, 0)  AS MustChangePassword
-FROM sys.server_principals sp
-LEFT JOIN sys.sql_logins sl ON sl.principal_id = sp.principal_id
-WHERE sp.type IN ($typeFilter)
-  AND sp.name NOT LIKE '##%##'
-ORDER BY sp.type_desc, sp.name
+    name                    AS LoginName,
+    type_desc               AS LoginType,
+    default_database_name   AS DefaultDatabase,
+    default_language_name   AS DefaultLanguage,
+    is_disabled             AS IsDisabled,
+    create_date             AS CreateDate,
+    modify_date             AS ModifyDate
+FROM sys.server_principals
+WHERE type IN ($typeFilter)
+  AND name NOT LIKE '##%##'
+ORDER BY type_desc, name
 "@
 
 		$sysPatterns = @('NT SERVICE\*', 'NT AUTHORITY\*', '##MS_*##')
@@ -156,17 +152,14 @@ ORDER BY sp.type_desc, sp.name
 					if ($DefaultLanguage -and $row.DefaultLanguage -ne $DefaultLanguage) { continue }
 
 					$allResults.Add([PSCustomObject]@{
-						SqlInstance          = $instance
-						LoginName            = $row.LoginName
-						LoginType            = $row.LoginType
-						DefaultDatabase      = $row.DefaultDatabase
-						DefaultLanguage      = $row.DefaultLanguage
-						IsDisabled           = [bool]$row.IsDisabled
-						IsPolicyChecked      = [bool]$row.IsPolicyChecked
-						IsExpirationChecked  = [bool]$row.IsExpirationChecked
-						MustChangePassword   = [bool]$row.MustChangePassword
-						CreateDate           = $row.CreateDate
-						ModifyDate           = $row.ModifyDate
+						SqlInstance     = $instance
+						LoginName       = $row.LoginName
+						LoginType       = $row.LoginType
+						DefaultDatabase = $row.DefaultDatabase
+						DefaultLanguage = $row.DefaultLanguage
+						IsDisabled      = [bool]$row.IsDisabled
+						CreateDate      = $row.CreateDate
+						ModifyDate      = $row.ModifyDate
 					})
 				}
 
