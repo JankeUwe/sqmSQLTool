@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Prueft ob eine SQL Server-Instanz auf dem lokalen System installiert ist.
 

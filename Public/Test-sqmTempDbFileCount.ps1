@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Prueft ob die Anzahl der TempDB-Datendateien der empfohlenen CPU-Anzahl entspricht.
 

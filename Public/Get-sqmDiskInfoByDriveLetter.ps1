@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Returns disk information for a given drive letter.
 

@@ -1,4 +1,4 @@
-function Uninstall-sqmOdbcDriver {
+﻿function Uninstall-sqmOdbcDriver {
     <#
     .SYNOPSIS
         Deinstalliert den Microsoft ODBC Driver for SQL Server.

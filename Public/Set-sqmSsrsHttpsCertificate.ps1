@@ -1,4 +1,4 @@
-function Set-sqmSsrsHttpsCertificate
+﻿function Set-sqmSsrsHttpsCertificate
 {
 	<#
 	.SYNOPSIS

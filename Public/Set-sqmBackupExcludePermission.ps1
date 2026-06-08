@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Grants SELECT, INSERT, and UPDATE permissions on master.dbo.sqm_BackupExclude to a login.
 

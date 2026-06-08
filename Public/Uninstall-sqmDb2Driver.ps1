@@ -1,4 +1,4 @@
-function Uninstall-sqmDb2Driver {
+﻿function Uninstall-sqmDb2Driver {
     <#
     .SYNOPSIS
         Deinstalliert den IBM DB2 ODBC/CLI-Treiber.

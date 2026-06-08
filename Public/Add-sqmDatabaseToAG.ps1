@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Adds one or more databases to an Always On availability group (AutoSeed).
 

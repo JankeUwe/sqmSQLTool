@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Checks if a newer version of sqmSQLTool is available on GitHub.
 

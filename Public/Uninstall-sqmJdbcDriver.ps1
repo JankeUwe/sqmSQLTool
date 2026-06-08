@@ -1,4 +1,4 @@
-function Uninstall-sqmJdbcDriver {
+﻿function Uninstall-sqmJdbcDriver {
     <#
     .SYNOPSIS
         Deinstalliert den Microsoft JDBC Driver for SQL Server.

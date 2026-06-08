@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Synchronizes logins from the primary replica to all secondary replicas in an AlwaysOn Availability Group.
 

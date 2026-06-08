@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Prueft ob CostThresholdForParallelism auf dem empfohlenen Wert liegt.
 

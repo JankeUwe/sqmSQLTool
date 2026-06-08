@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Installs a certificate file into the Windows certificate store - locally or on
     multiple remote computers.

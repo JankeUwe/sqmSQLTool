@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Restores SQL Server configuration from a previously exported snapshot.
 

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Audits TLS/SSL configuration and certificate status for all SQL Server instances on one or more computers.
 

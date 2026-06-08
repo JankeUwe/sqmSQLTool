@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Prueft ob ein JDBC-, ODBC- oder DB2-Treiber auf dem System installiert ist.
 

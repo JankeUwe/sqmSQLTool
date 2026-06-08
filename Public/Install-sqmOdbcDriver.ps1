@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Installiert den Microsoft ODBC Driver for SQL Server.
 

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Richtet einen Monitoring-Account auf allen SQL Server-Instanzen eines Computers ein.
 

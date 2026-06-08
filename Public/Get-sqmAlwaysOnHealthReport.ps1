@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Creates a detailed health report for all Always On availability groups on an instance.
 

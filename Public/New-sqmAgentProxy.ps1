@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Erstellt einen SQL Server Credential und einen SQL Agent Proxy und verbindet beide.
 

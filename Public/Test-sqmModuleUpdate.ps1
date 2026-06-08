@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Checks all configured update sources for a newer sqmSQLTool version.
 

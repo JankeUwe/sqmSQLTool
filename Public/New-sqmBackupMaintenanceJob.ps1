@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 	Creates a SQL Agent job with two steps that implement the full dynamic backup maintenance workflow.
 

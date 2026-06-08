@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Determines free disk space on all SQL-relevant volumes and estimates
     time to exhaustion based on growth data.

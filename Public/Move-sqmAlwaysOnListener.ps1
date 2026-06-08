@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Migrates an AG Listener from one Availability Group to another.
 

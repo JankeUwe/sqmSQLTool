@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Executes numbered SQL scripts from a directory sequentially against a SQL Server database.
 

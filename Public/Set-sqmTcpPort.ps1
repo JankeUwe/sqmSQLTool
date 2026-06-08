@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Konfiguriert den TCP-Port einer SQL Server-Instanz ueber die Registry.
 

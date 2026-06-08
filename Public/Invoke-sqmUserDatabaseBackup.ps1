@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Backs up user databases on a SQL Server instance.
 

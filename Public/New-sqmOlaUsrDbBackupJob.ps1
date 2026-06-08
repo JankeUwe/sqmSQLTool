@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Creates SQL Agent jobs for FULL, DIFF, and/or LOG backups of user databases
     via Ola Hallengren's DatabaseBackup.

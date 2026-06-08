@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Creates a CSR (Certificate Signing Request) and an order data sheet for a
     CA-signed certificate based on an existing SQL Server certificate.

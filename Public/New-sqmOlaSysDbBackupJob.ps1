@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Creates a SQL Agent job for the daily full backup of SQL Server system databases
     via Ola Hallengren's DatabaseBackup.

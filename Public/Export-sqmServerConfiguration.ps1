@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Exports all SQL Server configuration settings to a JSON snapshot file.
 

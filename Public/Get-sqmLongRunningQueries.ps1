@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Identifies long-running queries on a SQL Server instance.
 

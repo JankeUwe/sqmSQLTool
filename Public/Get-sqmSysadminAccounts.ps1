@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Retrieves all logins with sysadmin rights on a SQL Server instance.
 

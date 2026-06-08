@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Erstellt einen HTML-Hardware-Konfigurationsbericht fuer einen oder mehrere Server.

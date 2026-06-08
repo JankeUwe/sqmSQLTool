@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Adds a database to a Distributed AlwaysOn Availability Group.
 

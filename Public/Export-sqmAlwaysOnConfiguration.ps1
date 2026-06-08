@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 	Exports the complete AlwaysOn AG configuration for one or more SQL Server instances.
 

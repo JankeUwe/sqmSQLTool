@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Lists all members of an Active Directory group.
 

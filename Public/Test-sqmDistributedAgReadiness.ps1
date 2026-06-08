@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Tests Distributed AlwaysOn AG readiness for failover.
 

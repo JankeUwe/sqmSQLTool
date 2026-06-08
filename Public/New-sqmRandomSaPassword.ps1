@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Generiert ein zufaelliges, richtlinienkonformes SA-Passwort.
 

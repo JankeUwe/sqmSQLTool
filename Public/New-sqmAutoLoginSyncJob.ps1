@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Creates a SQL Agent job to automatically synchronize logins in an AlwaysOn Availability Group.
 

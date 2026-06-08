@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Signs all PowerShell script files in a module directory using Set-AuthenticodeSignature.
 

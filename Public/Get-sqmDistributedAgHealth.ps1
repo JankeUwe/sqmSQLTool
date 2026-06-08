@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Creates a detailed health report for Distributed AlwaysOn Availability Groups.
 

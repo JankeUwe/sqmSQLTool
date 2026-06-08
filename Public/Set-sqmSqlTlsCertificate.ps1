@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Binds a Windows certificate from the Machine store to SQL Server as the TLS certificate.
 

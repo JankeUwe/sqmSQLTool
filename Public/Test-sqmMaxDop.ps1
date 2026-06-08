@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Prueft ob MAXDOP (Max Degree of Parallelism) korrekt konfiguriert ist.
 

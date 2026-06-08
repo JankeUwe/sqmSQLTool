@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Installiert den Microsoft JDBC Driver for SQL Server.
 

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Prueft ob SQL Server Max Server Memory korrekt konfiguriert ist.
 

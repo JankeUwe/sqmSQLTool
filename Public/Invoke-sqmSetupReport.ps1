@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Professional SQL Server Setup Report with critical issues, security, and database overview.
 

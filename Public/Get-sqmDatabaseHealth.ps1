@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Aggregated health report for all databases on an instance.
 

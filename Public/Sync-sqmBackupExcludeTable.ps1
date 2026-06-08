@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Creates and synchronises the backup exclude table in the master database.
 

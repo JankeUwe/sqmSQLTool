@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Validates SSIS package compatibility for SQL Server upgrades (2016 - 2025).
 

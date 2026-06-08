@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Reads and analyzes deadlock events from the System Health Extended Event session.
 

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Initiates failover of a Distributed AlwaysOn AG.
 

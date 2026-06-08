@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Updates the sqmSQLTool module from GitHub, PSGallery or a UNC share.
 

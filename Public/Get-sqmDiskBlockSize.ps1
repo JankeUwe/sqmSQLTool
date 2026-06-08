@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Prueft die NTFS-Blockgroesse (Cluster-Groesse) von Laufwerken auf 64KB.
 

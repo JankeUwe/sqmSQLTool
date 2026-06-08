@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Installiert den IBM DB2 ODBC/CLI-Treiber.
 

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Creates three SQL Agent jobs for Ola Hallengren's Maintenance Solution:
     IndexOptimize (user DBs) and IntegrityCheck (user and system DBs).

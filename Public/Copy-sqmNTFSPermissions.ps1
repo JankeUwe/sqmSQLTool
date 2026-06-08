@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Copies NTFS permissions (ACLs) from a source path to a destination path.
 
