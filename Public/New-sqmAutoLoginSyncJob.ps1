@@ -168,7 +168,7 @@ function New-sqmAutoLoginSyncJob
 		# -------------------------------------------------------------------
 		$agQuery = @"
 SELECT name FROM sys.availability_groups
-ORDER BY creation_date DESC
+ORDER BY name ASC
 "@
 
 		try
