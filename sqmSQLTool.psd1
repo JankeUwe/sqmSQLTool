@@ -104,6 +104,7 @@
 		'Get-sqmHpuAllowGroup',
 		'Get-sqmIndexFragmentation',
 		'Get-sqmLinkedServerUsage',
+		'Get-sqmLoginSettings',
 		'Get-sqmLongRunningQueries',
 		'Get-sqmMissingIndexes',
 		'Get-sqmOperationStatus',
