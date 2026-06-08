@@ -79,6 +79,7 @@
 		'Copy-sqmLogins',
 		'Copy-sqmNTFSPermissions',
 		'Copy-sqmToCentralPath',
+		'Enable-sqmMonitoringAccess',
 		'Export-sqmAlwaysOnConfiguration',
 		'Export-sqmDatabaseDocumentation',
 		'Export-sqmServerConfiguration',

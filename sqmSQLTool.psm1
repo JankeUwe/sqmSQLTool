@@ -37,9 +37,12 @@ $script:sqmModuleConfig = @{
 	# Check-Profil: 'Auto' = FI-TS wenn erkannt, 'FiTs' = immer, 'Generic' = nie FI-TS-Checks
 	CheckProfile          = 'Auto'
 	# Grenzwerte fuer Setup-Checks (neutrale Defaults, FI-TS-Block setzt gleiche Werte)
-	CheckCostThresholdMin = 50
-	CheckTempDbMaxFiles   = 8
-	CheckDiskBlockSize    = 65536
+	CheckCostThresholdMin    = 50
+	CheckTempDbMaxFiles      = 8
+	CheckDiskBlockSize       = 65536
+	# Monitoring-Zugang (Enable-sqmMonitoringAccess)
+	DefaultPolicy            = $null   # Policy die vor Setup deaktiviert wird, $null = kein Policy-Handling
+	DefaultMonitoringUser    = $null   # Windows-Login des Monitoring-Accounts, $null = Pflicht per Parameter
 }
 
 # Aktuelle Version aus der Manifestdatei lesen
@@ -88,6 +91,7 @@ if ($script:sqmIsFitsEnvironment)
 	$script:sqmModuleConfig['UpdateRepository']       = 'W:\75084-Datenbanken\MSSQL\CPM\sqmSQLTool'
 	$script:sqmModuleConfig['TsmManagementClasses']   = @('MC_B_NL.NL_35.35.NA')
 	$script:sqmModuleConfig['DefaultPolicy']          = 'New Login_Enforce Passwort Policy'
+	$script:sqmModuleConfig['DefaultMonitoringUser']  = "$env:USERDOMAIN\izt0504"
 	$script:sqmModuleConfig['SsrsInstallerPath']      = 'W:\75084-Datenbanken\MSSQL\SQLSources\Reporting'
 	$script:sqmModuleConfig['OlaJobNameFull']         = 'FITS-UserDatabases-FULL'
 	$script:sqmModuleConfig['OlaJobNameDiff']         = 'FITS-UserDatabases-DIFF'
