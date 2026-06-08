@@ -87,6 +87,7 @@
 		'Get-sqmADAccountStatus',
 		'Get-sqmADGroupMembers',
 		'Get-sqmAgentJobHistory',
+		'Get-sqmAlwaysOnFailoverHistory',
 		'Get-sqmAlwaysOnHealthReport',
 		'Get-sqmAutoGrowthReport',
 		'Get-sqmBlockingReport',
