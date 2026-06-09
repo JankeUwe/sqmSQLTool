@@ -72,8 +72,9 @@
     Backups stored in: C:\System\WinSrvLog\MSSQL\LoginBackup_<Secondary>_<Timestamp>.sql
     Allows rollback if needed.
 
-.PARAMETER NotificationEmail
-    Email address for job failure notifications. Default: none
+.PARAMETER NotificationOperator
+    Name of an existing SQL Agent operator for OnFailure notifications. The operator must
+    exist on the instance (SQL Agent notifies operators, not raw email addresses). Default: none
 
 .PARAMETER Overwrite
     If the job already exists, drop and recreate it. Default: $false
@@ -150,7 +151,7 @@ function New-sqmAutoLoginSyncJob
 		[switch]$BackupLogins,
 
 		[Parameter(Mandatory = $false)]
-		[string]$NotificationEmail,
+		[string]$NotificationOperator,
 
 		[Parameter(Mandatory = $false)]
 		[switch]$Overwrite,
@@ -208,10 +209,17 @@ ORDER BY name ASC
 			}
 		}
 
-		# Set JobName if not provided
+		# JobName aufloesen - in FI-TS-Umgebung muss er mit 'FITS' beginnen (wie Ola-Jobs).
+		$isFitsEnv = ((Get-sqmConfig -Key 'CheckProfile') -eq 'FiTs')
 		if ([string]::IsNullOrWhiteSpace($JobName))
 		{
-			$JobName = "sqmLoginSync_$AvailabilityGroupName"
+			$JobName = if ($isFitsEnv) { "FITS-LoginSync_$AvailabilityGroupName" } else { "sqmLoginSync_$AvailabilityGroupName" }
+		}
+		elseif ($isFitsEnv -and $JobName -notlike 'FITS*')
+		{
+			$enforced = "FITS-$JobName"
+			Invoke-sqmLogging -Message "FI-TS-Umgebung: JobName muss mit 'FITS' beginnen. '$JobName' -> '$enforced'" -FunctionName $functionName -Level 'WARNING'
+			$JobName = $enforced
 		}
 
 		Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance für AG '$AvailabilityGroupName' (Job: '$JobName')" `
@@ -296,6 +304,14 @@ if (`$backups) {
 
 # Return status (0=success, 1=failure)
 `$failures = @(`$result | Where-Object Status -eq 'Failed')
+if (`$failures.Count -gt 0) {
+    # Windows Event Log (fuer Splunk) - Berechtigungs-/Source-Fehler bewusst ignorieren
+    try {
+        `$evtSrc = 'sqmSQLTool'
+        if (-not [System.Diagnostics.EventLog]::SourceExists(`$evtSrc)) { New-EventLog -LogName Application -Source `$evtSrc -ErrorAction Stop }
+        Write-EventLog -LogName Application -Source `$evtSrc -EntryType Error -EventId 9002 -Message "sqmSQLTool: Login-Sync fehlgeschlagen AG '$AvailabilityGroupName' - Failed=`$(`$failures.Count)"
+    } catch { }
+}
 exit ([int](`$failures.Count -gt 0))
 "@
 
@@ -390,23 +406,32 @@ exit ([int](`$failures.Count -gt 0))
 			Invoke-sqmLogging -Message "Zeitplan hinzugefügt: $schedDesc" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
-			# 7. Add notification if email provided
+			# 7. OnFailure-Benachrichtigung an Operator
+			#    SQL Agent benachrichtigt einen Operator (mit hinterlegter Mailadresse),
+			#    nicht eine rohe E-Mail. Operator muss auf der Instanz existieren.
 			# -------------------------------------------------------------------
-			if ($NotificationEmail)
+			if ($NotificationOperator)
 			{
-				try
+				$op = Get-DbaAgentOperator -SqlInstance $SqlInstance -Operator $NotificationOperator -ErrorAction SilentlyContinue
+				if (-not $op)
 				{
-					Set-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName `
-						-NotificationLevel OnFailure `
-						-NotificationEmail $NotificationEmail `
-						-ErrorAction Stop
-
-					Invoke-sqmLogging -Message "Benachrichtigung hinzugefügt: $NotificationEmail" -FunctionName $functionName -Level 'INFO'
+					Invoke-sqmLogging -Message "Operator '$NotificationOperator' existiert nicht auf $SqlInstance - Benachrichtigung wird NICHT gesetzt. Operator anlegen (New-DbaAgentOperator) oder Namen pruefen." -FunctionName $functionName -Level 'WARNING'
 				}
-				catch
+				else
 				{
-					Invoke-sqmLogging -Message "Warnung: Benachrichtigung konnte nicht hinzugefügt werden: $($_.Exception.Message)" `
-									  -FunctionName $functionName -Level 'WARNING'
+					try
+					{
+						Set-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName `
+							-EmailLevel OnFailure `
+							-EmailOperator $NotificationOperator `
+							-ErrorAction Stop
+						Invoke-sqmLogging -Message "Benachrichtigung (OnFailure) an Operator '$NotificationOperator' gesetzt." -FunctionName $functionName -Level 'INFO'
+					}
+					catch
+					{
+						Invoke-sqmLogging -Message "Warnung: Benachrichtigung konnte nicht gesetzt werden: $($_.Exception.Message)" `
+										  -FunctionName $functionName -Level 'WARNING'
+					}
 				}
 			}
 

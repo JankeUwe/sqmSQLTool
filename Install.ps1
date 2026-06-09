@@ -181,6 +181,25 @@ try {
 }
 
 # ---------------------------------------------------------------------------
+# 6b. Windows Event Log Source registrieren (fuer Splunk-Integration)
+#     Die Agent-Jobs (Sync/Compare) schreiben bei Fehler/Drift in das Application
+#     Log unter der Source 'sqmSQLTool'. Das Anlegen der Source erfordert Adminrechte
+#     und ist nur einmalig noetig. Schlaegt es fehl (CurrentUser-Install ohne Admin),
+#     wird es ignoriert - die Jobs registrieren die Source sonst beim ersten Lauf.
+# ---------------------------------------------------------------------------
+Write-Host "Registriere Event Log Source 'sqmSQLTool'..." -ForegroundColor Cyan
+try {
+    if (-not [System.Diagnostics.EventLog]::SourceExists('sqmSQLTool')) {
+        New-EventLog -LogName Application -Source 'sqmSQLTool' -ErrorAction Stop
+        Write-Host "  Event Log Source 'sqmSQLTool' registriert." -ForegroundColor Green
+    } else {
+        Write-Host "  Event Log Source 'sqmSQLTool' bereits vorhanden." -ForegroundColor Gray
+    }
+} catch {
+    Write-Host "  Hinweis: Event Log Source konnte nicht registriert werden (keine Adminrechte?) - wird beim ersten Job-Lauf nachgeholt." -ForegroundColor Yellow
+}
+
+# ---------------------------------------------------------------------------
 # 7. FI-TS-Konfiguration automatisch setzen
 #    Kriterium: Installation wurde von W:\ oder \\tsclient\W\ gestartet.
 #    Setzt alle FI-TS-Standardwerte via Set-sqmConfig (persistiert in config.json).

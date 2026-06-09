@@ -6,7 +6,7 @@
     Sets up a recurring SQL Agent job that calls Compare-sqmAlwaysOnLogins on a schedule
     (default: weekly). The job step runs the comparison, writes a TXT/HTML report to the
     output path and exits with a non-zero code when any login drift is found
-    (Status Warning or Critical). Combined with -NotificationEmail (OnFailure), the job
+    (Status Warning or Critical). Combined with -NotificationOperator (OnFailure), the job
     automatically alerts when logins are no longer consistent across the replicas.
 
     This is the monitoring counterpart to New-sqmAutoLoginSyncJob: the sync job keeps
@@ -62,9 +62,11 @@
     Only report logins with drift (Warning/Critical) in the output files. Default: $false.
     The alert (exit code) is always based on drift, regardless of this switch.
 
-.PARAMETER NotificationEmail
-    Email address for the OnFailure notification. Because the step fails on detected
-    drift, this effectively becomes a "logins out of sync" alert. Default: none.
+.PARAMETER NotificationOperator
+    Name of an existing SQL Agent operator that receives the OnFailure notification.
+    Because the step fails on detected drift, this effectively becomes a "logins out of
+    sync" alert. The operator must exist on the instance (SQL Agent notifies operators,
+    not raw email addresses). Default: none.
 
 .PARAMETER Overwrite
     If the job already exists, drop and recreate it. Default: $false.
@@ -79,7 +81,7 @@
 .EXAMPLE
     New-sqmAutoLoginCompareJob -SqlInstance "PRIMARY01" -AvailabilityGroupName "AG_Prod" `
         -Schedule Weekly -DayOfWeek Sunday -TimeOfDay "03:00" `
-        -NotificationEmail "dba@kunde.de" -OnlyDifferences -Overwrite
+        -NotificationOperator "DBA-Team" -OnlyDifferences -Overwrite
     Weekly check with email alert on drift, report contains only differing logins.
 
 .NOTES
@@ -129,7 +131,7 @@ function New-sqmAutoLoginCompareJob
 		[switch]$OnlyDifferences,
 
 		[Parameter(Mandatory = $false)]
-		[string]$NotificationEmail,
+		[string]$NotificationOperator,
 
 		[Parameter(Mandatory = $false)]
 		[switch]$Overwrite,
@@ -178,9 +180,17 @@ function New-sqmAutoLoginCompareJob
 			}
 		}
 
+		# JobName aufloesen - in FI-TS-Umgebung muss er mit 'FITS' beginnen (wie Ola-Jobs).
+		$isFitsEnv = ((Get-sqmConfig -Key 'CheckProfile') -eq 'FiTs')
 		if ([string]::IsNullOrWhiteSpace($JobName))
 		{
-			$JobName = "sqmLoginCompare_$AvailabilityGroupName"
+			$JobName = if ($isFitsEnv) { "FITS-LoginCompare_$AvailabilityGroupName" } else { "sqmLoginCompare_$AvailabilityGroupName" }
+		}
+		elseif ($isFitsEnv -and $JobName -notlike 'FITS*')
+		{
+			$enforced = "FITS-$JobName"
+			Invoke-sqmLogging -Message "FI-TS-Umgebung: JobName muss mit 'FITS' beginnen. '$JobName' -> '$enforced'" -FunctionName $functionName -Level 'WARNING'
+			$JobName = $enforced
 		}
 
 		Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance fuer AG '$AvailabilityGroupName' (Job: '$JobName')" `
@@ -246,6 +256,14 @@ if (`$drift -gt 0) {
     `$result | Where-Object { `$_.OverallStatus -ne 'OK' } |
         ForEach-Object { "  [`$(`$_.OverallStatus)] `$(`$_.LoginName)  Present=`$(`$_.Present)  MissingOn=`$(`$_.MissingOn)" } |
         Out-File -FilePath `$logFile -Append -Encoding UTF8
+
+    # Windows Event Log (fuer Splunk) - Berechtigungs-/Source-Fehler bewusst ignorieren
+    try {
+        `$evtSrc = 'sqmSQLTool'
+        if (-not [System.Diagnostics.EventLog]::SourceExists(`$evtSrc)) { New-EventLog -LogName Application -Source `$evtSrc -ErrorAction Stop }
+        `$evtType = if (`$crit.Count -gt 0) { 'Error' } else { 'Warning' }
+        Write-EventLog -LogName Application -Source `$evtSrc -EntryType `$evtType -EventId 9001 -Message "sqmSQLTool: AlwaysOn Login-Drift AG '$AvailabilityGroupName' - Warning=`$(`$warn.Count) Critical=`$(`$crit.Count)"
+    } catch { }
 }
 
 # Exit 1 bei Drift -> loest OnFailure-Benachrichtigung aus
@@ -340,22 +358,32 @@ exit ([int](`$drift -gt 0))
 			Invoke-sqmLogging -Message "Zeitplan hinzugefuegt: $schedDesc" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
-			# 7. OnFailure-Benachrichtigung (= Alarm bei Drift)
+			# 7. OnFailure-Benachrichtigung an Operator (= Alarm bei Drift)
+			#    SQL Agent benachrichtigt einen Operator (mit hinterlegter Mailadresse),
+			#    nicht eine rohe E-Mail. Operator muss auf der Instanz existieren.
 			# -------------------------------------------------------------------
-			if ($NotificationEmail)
+			if ($NotificationOperator)
 			{
-				try
+				$op = Get-DbaAgentOperator -SqlInstance $SqlInstance -Operator $NotificationOperator -ErrorAction SilentlyContinue
+				if (-not $op)
 				{
-					Set-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName `
-						-NotificationLevel OnFailure `
-						-NotificationEmail $NotificationEmail `
-						-ErrorAction Stop
-					Invoke-sqmLogging -Message "Benachrichtigung (OnFailure/Drift) hinzugefuegt: $NotificationEmail" -FunctionName $functionName -Level 'INFO'
+					Invoke-sqmLogging -Message "Operator '$NotificationOperator' existiert nicht auf $SqlInstance - Benachrichtigung wird NICHT gesetzt. Operator anlegen (New-DbaAgentOperator) oder Namen pruefen." -FunctionName $functionName -Level 'WARNING'
 				}
-				catch
+				else
 				{
-					Invoke-sqmLogging -Message "Warnung: Benachrichtigung konnte nicht hinzugefuegt werden: $($_.Exception.Message)" `
-									  -FunctionName $functionName -Level 'WARNING'
+					try
+					{
+						Set-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName `
+							-EmailLevel OnFailure `
+							-EmailOperator $NotificationOperator `
+							-ErrorAction Stop
+						Invoke-sqmLogging -Message "Benachrichtigung (OnFailure/Drift) an Operator '$NotificationOperator' gesetzt." -FunctionName $functionName -Level 'INFO'
+					}
+					catch
+					{
+						Invoke-sqmLogging -Message "Warnung: Benachrichtigung konnte nicht gesetzt werden: $($_.Exception.Message)" `
+										  -FunctionName $functionName -Level 'WARNING'
+					}
 				}
 			}
 
