@@ -305,7 +305,8 @@ END
 					
 					$lines = [System.Collections.Generic.List[string]]::new()
 					$lines.Add("# ================================================================")
-					$lines.Add("# MSSQLTools - Datenbank Health Report")
+					$lines.Add("# sqmSQLTool - Datenbank Health Report")
+					$lines.Add("# $(Get-sqmReportReference)")
 					$lines.Add("# Instanz   : $instance")
 					$lines.Add("# Erstellt  : $timestamp")
 					$lines.Add("# CheckDB max: ${MaxCheckDbAgeDays} Tage | VLF max: $MaxVlfCount | AutoGrowth: letzte $HistoryDays Tage")
@@ -329,11 +330,7 @@ END
 					# CSV-Datei
 					$detailRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 
-					# Oeffne TXT-Datei wenn nicht -NoOpen
-					if (-not $NoOpen -and $txtFile)
-					{
-						Start-Process $txtFile
-					}
+					Invoke-sqmOpenReport -TxtFile $txtFile -NoOpen:$NoOpen
 
 					Invoke-sqmLogging -Message "[$instance] Database-Health-Bericht erstellt: $txtFile" -FunctionName $functionName -Level "INFO"
 				}

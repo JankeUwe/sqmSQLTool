@@ -465,6 +465,7 @@ function Get-sqmTlsStatus
 		{
 			$lines = [System.Collections.Generic.List[string]]::new()
 			$lines.Add("TLS / SSL Status Report")
+			$lines.Add("$(Get-sqmReportReference)")
 			$lines.Add("Generated : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')")
 			$lines.Add("Computers : $($ComputerName -join ', ')")
 			$lines.Add(('-' * 80))
@@ -498,11 +499,7 @@ function Get-sqmTlsStatus
 
 			$lines | Out-File -FilePath $txtPath -Encoding UTF8
 
-			# Oeffne TXT-Datei wenn nicht -NoOpen
-			if (-not $NoOpen -and $txtPath)
-			{
-				Start-Process $txtPath
-			}
+			Invoke-sqmOpenReport -TxtFile $txtPath -NoOpen:$NoOpen
 
 			Invoke-sqmLogging -Message "TXT report saved: $txtPath" -FunctionName $functionName -Level "INFO"
 		}

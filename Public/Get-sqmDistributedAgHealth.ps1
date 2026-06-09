@@ -146,6 +146,7 @@ ORDER BY ag.name, ars.role_desc DESC, ar.replica_server_name, DB_NAME(adbrs.data
 				$reportContent = @(
 					"================================================================"
 					"sqmSQLTool - Distributed AlwaysOn Health Report"
+					"$(Get-sqmReportReference)"
 					"================================================================"
 					"Instanz       : $instance"
 					"Erstellt      : $timestamp"
@@ -212,10 +213,7 @@ ORDER BY ag.name, ars.role_desc DESC, ar.replica_server_name, DB_NAME(adbrs.data
 
 				$allInstanceResults.Add($result)
 
-				if (-not $NoOpen)
-				{
-					try { Invoke-Item $reportFile } catch { }
-				}
+				Invoke-sqmOpenReport -TxtFile $reportFile -NoOpen:$NoOpen
 			}
 			catch
 			{

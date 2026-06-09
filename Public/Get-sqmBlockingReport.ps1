@@ -250,11 +250,8 @@ ORDER BY r.wait_time DESC
 				$csvFile = Join-Path $OutputPath "Blocking_$(($SqlInstance -replace '\\', '_'))_$(Get-Date -Format 'yyyyMMdd_HHmsqm').csv"
 				$blockedSessions | Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
 
-				# Oeffne CSV-Datei wenn nicht -NoOpen
-				if (-not $NoOpen -and $csvFile)
-				{
-					Start-Process $csvFile
-				}
+				# CSV wird NICHT automatisch geoeffnet (wuerde Excel starten).
+				# TXT/HTML-Ausgabe mit Auto-Open folgt in einem spaeteren Schritt.
 
 				Invoke-sqmLogging -Message "Blocking-Snapshot gespeichert: $csvFile" -FunctionName $functionName -Level "INFO"
 			}
