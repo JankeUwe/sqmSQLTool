@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Installs the sqmSQLTool module into the PowerShell module path.
 
@@ -36,8 +36,9 @@
     Installs system-wide — requires Admin rights.
 
 .NOTES
-    Uses robocopy /COPY:DAT to avoid copying Zone.Identifier ADS from network shares.
-    Runs Unblock-File on all destination files afterwards.
+    Uses robocopy /COPY:DAT to copy the module data. Note: /COPY:DAT does NOT strip
+    the Zone.Identifier ADS (Mark-of-the-Web) - the subsequent Unblock-File pass on all
+    destination files is what removes it.
 #>
 param(
     [ValidateSet('CurrentUser', 'AllUsers')]
@@ -140,7 +141,8 @@ if ($Scope -eq 'AllUsers') {
 
 # ---------------------------------------------------------------------------
 # 4. Modul kopieren
-#    /COPY:DAT  -> no Alternate Data Streams (no Zone.Identifier)
+#    /COPY:DAT  -> Data, Attributes, Timestamps (KEIN Zone.Identifier-Strip!
+#                  das erledigt der Unblock-File-Schritt 5)
 #    /XD .git   -> exclude git directory
 #    /XF        -> exclude meta files
 # ---------------------------------------------------------------------------
