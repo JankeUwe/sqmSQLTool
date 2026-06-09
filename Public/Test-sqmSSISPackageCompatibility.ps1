@@ -97,7 +97,10 @@ function Test-sqmSSISPackageCompatibility
         [string]$OutputPath,
 
         [Parameter(Mandatory = $false)]
-        [switch]$EnableException
+        [switch]$EnableException,
+
+        [Parameter(Mandatory = $false)]
+        [switch]$NoOpen
     )
 
     begin
@@ -530,6 +533,8 @@ ORDER BY f.name, p.name, pk.name;
 
             $htmlContent | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
             Invoke-sqmLogging -Message "HTML report saved: $htmlFile" -FunctionName $functionName -Level 'INFO'
+
+            Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
 
             Write-Host "SSIS Compatibility Report: $htmlFile" -ForegroundColor Cyan
 

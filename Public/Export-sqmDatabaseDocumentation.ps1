@@ -99,7 +99,9 @@ function Export-sqmDatabaseDocumentation
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 	
 	begin
@@ -218,7 +220,7 @@ table tr:hover td{background:#f8fafc}
 		{
 			param ([string]$Timestamp)
 			return @"
-<div class="footer">Erstellt durch sqmSQLTool ? Export-sqmDatabaseDocumentation ? $Timestamp</div>
+<div class="footer">Erstellt durch sqmSQLTool - Export-sqmDatabaseDocumentation - $Timestamp<br>Quelle: <a href="https://www.powershelldba.de">www.powershelldba.de</a></div>
 </body></html>
 "@
 		}
@@ -616,9 +618,11 @@ ORDER BY dp.name;
 					
 					$htmlSb.ToString() | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
 					$csvRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
-					
+
 					Copy-sqmToCentralPath -Path $htmlFile, $csvFile
-					
+
+					Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
+
 					Invoke-sqmLogging -Message "[$instance] Dokumentation erstellt: $htmlFile | $csvFile" -FunctionName $functionName -Level "INFO"
 				}
 				else
