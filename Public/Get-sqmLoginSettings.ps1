@@ -86,7 +86,10 @@ function Get-sqmLoginSettings
 		[switch]$ContinueOnError,
 
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 
 	begin
@@ -189,6 +192,12 @@ ORDER BY type_desc, name
 				$csvFile = Join-Path $OutputPath "LoginSettings_$(Get-Date -Format 'yyyy-MM-dd').csv"
 				$allResults | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 				Invoke-sqmLogging -Message "CSV geschrieben: $csvFile" -FunctionName $functionName -Level 'INFO'
+
+				$htmlFile = Join-Path $OutputPath "LoginSettings_$(Get-Date -Format 'yyyy-MM-dd').html"
+				$bodyHtml = ($allResults | ConvertTo-Html -Fragment -As Table | Out-String)
+				$html = ConvertTo-sqmHtmlReport -Title "Login Settings" -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -BodyHtml $bodyHtml
+				$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+				Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
 			}
 			catch
 			{

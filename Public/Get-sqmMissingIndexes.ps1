@@ -89,7 +89,9 @@ function Get-sqmMissingIndexes
 		[Parameter(Mandatory = $false)]
 		[string]$OutputPath,
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 	
 	begin
@@ -221,6 +223,15 @@ ORDER BY ImpactScore DESC
 				
 				Copy-sqmToCentralPath -Path @($csvFile)
 				Invoke-sqmLogging -Message ("CSV gespeichert: " + $csvFile) -FunctionName $functionName -Level "INFO"
+
+				$htmlFile = Join-Path $OutputPath ("MissingIndexes_" + $safeInst + "_" + $stamp + ".html")
+				$bodyHtml = ($results | Select-Object SqlInstance, DatabaseName, SchemaName, TableName,
+											 ImpactScore, UserSeeks, UserScans, LastUserSeek,
+											 EqualityColumns, InequalityColumns, IncludedColumns |
+							 ConvertTo-Html -Fragment -As Table | Out-String)
+				$html = ConvertTo-sqmHtmlReport -Title "Missing Indexes - $SqlInstance" -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -BodyHtml $bodyHtml
+				$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+				Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
 			}
 			
 			$msg = $results.Count.ToString() + " fehlende Index-Empfehlung(en) gefunden (MinImpact=" + $MinImpactScore + ", MinSeeks=" + $MinSeeks + ")."

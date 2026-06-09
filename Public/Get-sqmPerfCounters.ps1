@@ -54,7 +54,9 @@ function Get-sqmPerfCounters
 		[Parameter(Mandatory = $false)]
 		[string]$OutputPath,
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 
 	begin
@@ -198,6 +200,12 @@ ORDER BY object_name, counter_name
 				$csvFile  = Join-Path $OutputPath "PerfCounters_${safeInst}_${ts}.csv"
 				$results | Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
 				Invoke-sqmLogging -Message (_s 'PerfCounters_Saved' $csvFile) -FunctionName $functionName -Level "INFO"
+
+				$htmlFile = Join-Path $OutputPath "PerfCounters_${safeInst}_${ts}.html"
+				$bodyHtml = ($results | ConvertTo-Html -Fragment -As Table | Out-String)
+				$html = ConvertTo-sqmHtmlReport -Title "Performance Counters - $SqlInstance" -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -BodyHtml $bodyHtml
+				$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+				Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
 			}
 
 			return [PSCustomObject]@{

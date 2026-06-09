@@ -62,7 +62,9 @@ function Get-sqmConnectionStats
 		[Parameter(Mandatory = $false)]
 		[string]$OutputPath,
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 
 	begin
@@ -206,6 +208,12 @@ WHERE name = 'max connections'
 				$csvFile  = Join-Path $OutputPath "ConnectionStats_${safeInst}_${ts}.csv"
 				$grouped  | Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
 				Invoke-sqmLogging -Message (_s 'ConnStats_Saved' $csvFile) -FunctionName $functionName -Level "INFO"
+
+				$htmlFile = Join-Path $OutputPath "ConnectionStats_${safeInst}_${ts}.html"
+				$bodyHtml = ($grouped | ConvertTo-Html -Fragment -As Table | Out-String)
+				$html = ConvertTo-sqmHtmlReport -Title "Connection Statistics - $SqlInstance" -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -BodyHtml $bodyHtml
+				$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+				Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
 			}
 
 			return [PSCustomObject]@{

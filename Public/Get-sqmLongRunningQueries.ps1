@@ -96,7 +96,9 @@ function Get-sqmLongRunningQueries
 		[Parameter(Mandatory = $false)]
 		[string]$OutputPath,
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 	
 	begin
@@ -272,6 +274,13 @@ ORDER BY DurationSeconds DESC
 				$results | Select-Object * -ExcludeProperty QueryPlanXml, FullBatch |
 				Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
 				Invoke-sqmLogging -Message "LongRunning-Snapshot gespeichert: $csvFile" -FunctionName $functionName -Level "INFO"
+
+				$htmlFile = Join-Path $OutputPath "LongRunning_$(($SqlInstance -replace '\\', '_'))_$(Get-Date -Format 'yyyyMMdd_HHmsqm').html"
+				$bodyHtml = ($results | Select-Object * -ExcludeProperty QueryPlanXml, FullBatch |
+							 ConvertTo-Html -Fragment -As Table | Out-String)
+				$html = ConvertTo-sqmHtmlReport -Title "Long Running Queries - $SqlInstance" -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -BodyHtml $bodyHtml
+				$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+				Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
 			}
 			
 			$msg = "$($results.Count) lang laufende Query/Queries gefunden (>= ${MinDurationSeconds}s)"

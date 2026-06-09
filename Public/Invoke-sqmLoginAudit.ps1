@@ -82,9 +82,11 @@ function Invoke-sqmLoginAudit
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
-	
+
 	begin
 	{
 		$functionName = $MyInvocation.MyCommand.Name
@@ -337,7 +339,8 @@ WHERE sp.type IN ('S','U','G')
 					# TXT-Bericht
 					$lines = [System.Collections.Generic.List[string]]::new()
 					$lines.Add("# ================================================================")
-					$lines.Add("# MSSQLTools - Login Audit")
+					$lines.Add("# sqmSQLTool - Login Audit")
+					$lines.Add("# $(Get-sqmReportReference)")
 					$lines.Add("# Instanz      : $instance")
 					$lines.Add("# Erstellt     : $timestamp")
 					$lines.Add("# Inaktiv ab   : $InactivityThresholdDays Tage | PW-Alter max: $MaxPasswordAgeDays Tage")
@@ -357,7 +360,7 @@ WHERE sp.type IN ('S','U','G')
 						$catItems = $detailRows | Where-Object { $_.Category -eq $catKey }
 						if (-not $catItems) { continue }
 						$lines.Add("")
-						$lines.Add("# ?? $($categories[$catKey]) ($(@($catItems).Count)) ??")
+						$lines.Add("# === $($categories[$catKey]) ($(@($catItems).Count)) ===")
 						foreach ($e in ($catItems | Sort-Object LoginName))
 						{
 							$loginShort = if ($e.LoginName.Length -gt 40) { $e.LoginName.Substring(0, 37) + '...' }
@@ -370,7 +373,7 @@ WHERE sp.type IN ('S','U','G')
 					if ($okLogins)
 					{
 						$lines.Add("")
-						$lines.Add("# ?? OHNE BEFUND ($(@($okLogins).Count)) ??")
+						$lines.Add("# === OHNE BEFUND ($(@($okLogins).Count)) ===")
 						$lines.Add("  " + (($okLogins | Sort-Object LoginName | Select-Object -ExpandProperty LoginName) -join ', '))
 					}
 					
@@ -383,6 +386,9 @@ WHERE sp.type IN ('S','U','G')
 					Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 					
 					Copy-sqmToCentralPath -Path $txtFile, $csvFile
+
+					Invoke-sqmOpenReport -TxtFile $txtFile -NoOpen:$NoOpen
+
 					Invoke-sqmLogging -Message "[$instance] Login-Audit-Bericht erstellt: $txtFile" -FunctionName $functionName -Level "INFO"
 				}
 				else

@@ -64,7 +64,9 @@ function Get-sqmWaitStatistics
 		[Parameter(Mandatory = $false)]
 		[string]$OutputPath,
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 
 	begin
@@ -228,6 +230,12 @@ ORDER BY wait_time_ms DESC
 				$csvFile  = Join-Path $OutputPath "WaitStats_${safeInst}_${ts}.csv"
 				$results | Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
 				Invoke-sqmLogging -Message (_s 'WaitStats_Saved' $csvFile) -FunctionName $functionName -Level "INFO"
+
+				$htmlFile = Join-Path $OutputPath "WaitStats_${safeInst}_${ts}.html"
+				$bodyHtml = ($results | ConvertTo-Html -Fragment -As Table | Out-String)
+				$html = ConvertTo-sqmHtmlReport -Title "Wait Statistics - $SqlInstance" -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -BodyHtml $bodyHtml
+				$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+				Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
 			}
 
 			Invoke-sqmLogging -Message (_s 'WaitStats_Completed' $functionName, $results.Count, ([math]::Round($totalWaitMs/1000,1))) -FunctionName $functionName -Level "INFO"
