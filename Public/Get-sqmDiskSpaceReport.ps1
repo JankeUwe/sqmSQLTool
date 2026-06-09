@@ -125,15 +125,47 @@ FROM sys.master_files mf
 CROSS APPLY sys.dm_os_volume_stats(mf.database_id, mf.file_id) vs
 ORDER BY vs.volume_mount_point;
 "@
-				$volRows = Invoke-DbaQuery @connParams -Query $volumeQuery -EnableException:$EnableException
-				
+				# Verbindungs-/Auth-Fehler explizit fangen (EnableException erzwingen),
+				# damit der echte Fehler nicht als "keine Daten" maskiert wird.
+				$volRows = $null
+				try
+				{
+					$volRows = Invoke-DbaQuery @connParams -Query $volumeQuery -EnableException:$true
+				}
+				catch
+				{
+					$origMsg = $_.Exception.Message
+
+					# Kerberos / SPN / SSPI-Hinweis ergaenzen
+					$hint = ''
+					if ($origMsg -match 'target principal name|Kerberos|SSPI|cannot generate sspi')
+					{
+						$hint = ' | Kerberos/SPN-Problem: FQDN statt Alias verwenden, SPN pruefen (setspn -L <Dienstkonto>), oder -SqlCredential nutzen.'
+					}
+
+					$errMsg = "Verbindung/Abfrage fehlgeschlagen: $origMsg$hint"
+					Invoke-sqmLogging -Message "[$instance] $errMsg" -FunctionName $functionName -Level "ERROR"
+					$allInstanceResults.Add([PSCustomObject]@{
+							SqlInstance = $instance
+							Status	    = 'Error'
+							Message	    = $errMsg
+							DetailRows  = @()
+							TxtFile	    = $null
+							CsvFile	    = $null
+						})
+					if ($EnableException) { throw }
+					continue
+				}
+
+				# Verbunden, aber keine Zeilen (auf einer echten Instanz praktisch nie der Fall,
+				# da sys.master_files immer Systemdatenbanken enthaelt).
 				if (-not $volRows)
 				{
-					Invoke-sqmLogging -Message "[$instance] Keine Volumedaten gefunden (keine Datenbankdateien?)." -FunctionName $functionName -Level "WARNING"
+					Invoke-sqmLogging -Message "[$instance] Verbindung ok, aber keine Volumedaten zurueckgegeben." -FunctionName $functionName -Level "WARNING"
 					$allInstanceResults.Add([PSCustomObject]@{
 							SqlInstance = $instance
 							Status	    = 'Warning'
-							Message	    = 'Keine Volumedaten (keine Datenbankdateien oder keine Berechtigung fuer dm_os_volume_stats)'
+							Message	    = 'Keine Volumedaten zurueckgegeben (Verbindung war erfolgreich).'
 							DetailRows  = @()
 							TxtFile	    = $null
 							CsvFile	    = $null
