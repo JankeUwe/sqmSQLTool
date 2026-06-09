@@ -155,6 +155,7 @@
 		'Invoke-sqmUserDatabaseBackup',
 		'Move-sqmAlwaysOnListener',
 		'New-sqmAgentProxy',
+		'New-sqmAutoLoginCompareJob',
 		'New-sqmAlwaysOnRepairJob',
 		'New-sqmBackupMaintenanceJob',
 		'New-sqmCertificateRequest',

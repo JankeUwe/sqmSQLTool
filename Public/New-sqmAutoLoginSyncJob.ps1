@@ -244,39 +244,54 @@ ORDER BY name ASC
 			# -------------------------------------------------------------------
 			# 2. Build PowerShell script for job step
 			# -------------------------------------------------------------------
-			$skipServersArg = if ($SkipSecondaryServers) { "-SkipSecondaryServers $(($SkipSecondaryServers | ForEach-Object { "'$_'" }) -join ',')" } else { "" }
-			$includeSystemArg = if ($IncludeSystemLogins) { "-IncludeSystemLogins" } else { "" }
-			$adjustAuthArg = if ($AdjustAuthMode) { "-AdjustAuthMode -RestartServiceIfRequired" } else { "" }
-			$forceArg = if ($Force) { "-Force" } else { "" }
-			$forceIncludeArg = if ($ForceIncludeOnly) { "-ForceIncludeOnly $(($ForceIncludeOnly | ForEach-Object { "'$_'" }) -join ',')" } else { "" }
-			$backupArg = if ($BackupLogins) { "-BackupLogins -BackupPath 'C:\System\WinSrvLog\MSSQL'" } else { "" }
+			# Schalter/Parameter werden per Indexer NACH dem Hashtable gesetzt.
+			# Ein bloszes "-Switch" innerhalb von @{} waere ungueltiges PowerShell.
+			$extraLines = [System.Collections.Generic.List[string]]::new()
+			if ($IncludeSystemLogins) { $extraLines.Add("`$params['IncludeSystemLogins'] = `$true") }
+			if ($AdjustAuthMode)
+			{
+				$extraLines.Add("`$params['AdjustAuthMode'] = `$true")
+				$extraLines.Add("`$params['RestartServiceIfRequired'] = `$true")
+			}
+			if ($SkipSecondaryServers)
+			{
+				$skipArr = ($SkipSecondaryServers | ForEach-Object { "'$_'" }) -join ','
+				$extraLines.Add("`$params['SkipSecondaryServers'] = @($skipArr)")
+			}
+			if ($Force) { $extraLines.Add("`$params['Force'] = `$true") }
+			if ($ForceIncludeOnly)
+			{
+				$fioArr = ($ForceIncludeOnly | ForEach-Object { "'$_'" }) -join ','
+				$extraLines.Add("`$params['ForceIncludeOnly'] = @($fioArr)")
+			}
+			if ($BackupLogins)
+			{
+				$extraLines.Add("`$params['BackupLogins'] = `$true")
+				$extraLines.Add("`$params['BackupPath'] = 'C:\System\WinSrvLog\MSSQL'")
+			}
+			$extraParamLines = $extraLines -join "`r`n"
 
 			$scriptContent = @"
 `$logPath = "C:\System\WinSrvLog\MSSQL"
-`$logFile = Join-Path `$logPath ("LoginSync_$AvailabilityGroupName_`$(Get-Date -Format 'yyyyMMdd_HHmmss').log")
 if (-not (Test-Path `$logPath)) { New-Item -ItemType Directory -Path `$logPath -Force | Out-Null }
+`$logFile = Join-Path `$logPath ("LoginSync_$AvailabilityGroupName" + "_" + (Get-Date -Format 'yyyyMMdd_HHmmss') + ".log")
 
 Import-Module sqmSQLTool -Force -ErrorAction Stop
 
 `$params = @{
-    SqlInstance = "$SqlInstance"
+    SqlInstance           = "$SqlInstance"
     AvailabilityGroupName = "$AvailabilityGroupName"
-    $includeSystemArg
-    $adjustAuthArg
-    $skipServersArg
-    $forceArg
-    $forceIncludeArg
-    $backupArg
 }
+$extraParamLines
 
-`$result = Sync-sqmLoginsToAlwaysOn @params | ConvertTo-Json
+`$result = Sync-sqmLoginsToAlwaysOn @params
 
-"`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Login Sync Result:`n`$result" | Out-File -FilePath `$logFile -Append -Encoding UTF8
+"`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Login Sync Result:`n`$(`$result | ConvertTo-Json -Depth 4)" | Out-File -FilePath `$logFile -Append -Encoding UTF8
 
 # Log backup files if Force was used
 `$backups = `$result | Where-Object { `$_.BackupFile }
 if (`$backups) {
-    "Backup files created: `$(`$backups | ForEach-Object { `$_.BackupFile } | Join-String -Separator ', ')" | Out-File -FilePath `$logFile -Append -Encoding UTF8
+    "Backup files created: `$((`$backups | ForEach-Object { `$_.BackupFile }) -join ', ')" | Out-File -FilePath `$logFile -Append -Encoding UTF8
 }
 
 # Return status (0=success, 1=failure)
