@@ -7,7 +7,7 @@
     then copies logins from the primary to each secondary.
 
     Process:
-    1. Detect primary replica in the AG (is_primary_replica = 1)
+    1. Detect primary replica in the AG (role_desc = 'PRIMARY')
     2. Enumerate all secondary replicas
     3. For each secondary:
        - Connect and validate
@@ -253,7 +253,6 @@ ORDER BY creation_date DESC
 SELECT
     ar.replica_server_name,
     ar.availability_mode_desc,
-    drs.is_primary_replica,
     drs.role_desc
 FROM sys.availability_replicas ar
 INNER JOIN sys.dm_hadr_availability_replica_states drs
@@ -262,7 +261,7 @@ WHERE ar.group_id IN (
     SELECT group_id FROM sys.availability_groups
     WHERE name = N'$AvailabilityGroupName'
 )
-ORDER BY drs.is_primary_replica DESC
+ORDER BY drs.role ASC
 "@
 
 			$replicas = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $srcCred -Query $query -ErrorAction Stop
@@ -272,8 +271,8 @@ ORDER BY drs.is_primary_replica DESC
 				throw "Keine Availability Group oder Replicas gefunden auf $SqlInstance für AG '$AvailabilityGroupName'"
 			}
 
-			$primaryReplica = $replicas | Where-Object { $_.is_primary_replica -eq 1 }
-			$secondaryReplicas = $replicas | Where-Object { $_.is_primary_replica -eq 0 }
+			$primaryReplica = $replicas | Where-Object { $_.role_desc -eq 'PRIMARY' }
+			$secondaryReplicas = $replicas | Where-Object { $_.role_desc -eq 'SECONDARY' }
 
 			if (-not $primaryReplica)
 			{

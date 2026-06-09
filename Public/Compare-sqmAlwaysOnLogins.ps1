@@ -194,14 +194,14 @@ function Compare-sqmAlwaysOnLogins
 			$replicaQuery = @"
 SELECT
     ar.replica_server_name AS ReplicaName,
-    drs.is_primary_replica AS IsPrimary
+    drs.role_desc          AS Role
 FROM sys.availability_replicas ar
 INNER JOIN sys.dm_hadr_availability_replica_states drs
     ON ar.replica_id = drs.replica_id
 WHERE ar.group_id IN (
     SELECT group_id FROM sys.availability_groups WHERE name = N'$AvailabilityGroupName'
 )
-ORDER BY drs.is_primary_replica DESC, ar.replica_server_name
+ORDER BY drs.role ASC, ar.replica_server_name
 "@
 			$replicaRows = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Query $replicaQuery -ErrorAction Stop
 			$replicaNames = @($replicaRows | ForEach-Object { $_.ReplicaName })
