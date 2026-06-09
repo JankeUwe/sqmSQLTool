@@ -57,15 +57,54 @@ echo.
 echo  sqmSQLTool - Installation
 echo  ============================================================
 
-if "%DESTINATION%"=="" (
-    if "%SCOPE%"=="" (
-        powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%Install.ps1"
-    ) else (
-        powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%Install.ps1" -Scope "%SCOPE%"
-    )
-) else (
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%Install.ps1" -Scope "%SCOPE%" -Destination "%DESTINATION%"
+:: Erster Versuch: direkt vom (ggf. Remote-) Skriptverzeichnis
+call :RUN_INSTALL "%SCRIPT_DIR%Install.ps1"
+
+:: ---------------------------------------------------------------
+:: Fallback: schlaegt die Ausfuehrung vom Remote-Laufwerk fehl
+:: (GPO RemoteSigned ignoriert -ExecutionPolicy Bypass, Mark-of-the-Web
+:: blockiert das unsignierte .ps1), dann Bootstrap lokal stagen und
+:: von dort starten. "type > datei" erzeugt eine frische Datei NUR aus dem
+:: Hauptstream - der Zone.Identifier-ADS (MOTW) wird dabei nicht uebernommen.
+:: ---------------------------------------------------------------
+if not "%ERRORLEVEL%"=="0" (
+    echo.
+    echo  Ausfuehrung vom Quellverzeichnis fehlgeschlagen (Execution Policy / Signatur).
+    echo  Fallback: stage Bootstrap lokal und starte erneut ...
+
+    set "BOOT_DIR=%TEMP%\sqmSQLTool_boot"
+    if not exist "!BOOT_DIR!" md "!BOOT_DIR!"
+    type "%SCRIPT_DIR%Install.ps1" > "!BOOT_DIR!\Install.ps1"
+
+    :: Trailing-Backslash aus SCRIPT_DIR entfernen (sonst Quoting-Bug bei -Source)
+    set "SRC_DIR=%SCRIPT_DIR%"
+    if "!SRC_DIR:~-1!"=="\" set "SRC_DIR=!SRC_DIR:~0,-1!"
+
+    call :RUN_INSTALL "!BOOT_DIR!\Install.ps1" -Source "!SRC_DIR!"
+
+    rmdir /s /q "!BOOT_DIR!" >nul 2>&1
 )
 
 endlocal
 pause
+goto :EOF
+
+:: ===============================================================
+:: Subroutine: Install.ps1 mit den passenden Argumenten starten.
+::   %~1 = Pfad zu Install.ps1
+::   %~2 %~3 = optionale Zusatzargumente (z.B. -Source "<pfad>")
+:: ===============================================================
+:RUN_INSTALL
+set "PS1=%~1"
+:: %2 %3 OHNE Tilde, damit die Quotes um den -Source-Pfad erhalten bleiben
+set "EXTRA=%2 %3"
+if "%DESTINATION%"=="" (
+    if "%SCOPE%"=="" (
+        powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PS1%" %EXTRA%
+    ) else (
+        powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PS1%" -Scope "%SCOPE%" %EXTRA%
+    )
+) else (
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PS1%" -Scope "%SCOPE%" -Destination "%DESTINATION%" %EXTRA%
+)
+goto :EOF
