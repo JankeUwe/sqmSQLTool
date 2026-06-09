@@ -74,6 +74,7 @@
 	FunctionsToExport	   = @(
 		'Add-sqmDatabaseToAG',
 		'Add-sqmDatabaseToDistributedAg',
+		'Compare-sqmAlwaysOnLogins',
 		'Compare-sqmServerConfiguration',
 		'Complete-sqmListenerMigration',
 		'Copy-sqmLogins',
