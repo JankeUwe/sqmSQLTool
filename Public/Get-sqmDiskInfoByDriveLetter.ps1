@@ -39,6 +39,8 @@
     - FreeGB        : Free disk space in gigabytes
     - FreePercent   : Percentage of free disk space
     - SerialNumber  : Serial number of the physical disk (LUN serial number)
+    - IsVM          : True if the machine is a virtual machine
+    - MachineType   : Hyper-V, VMware, VirtualBox, KVM/QEMU or Physisch
 
 .NOTES
     Author:       sqmSQLTool
@@ -96,6 +98,9 @@ function Get-sqmDiskInfoByDriveLetter
 				$disk.SerialNumber.Trim()
 			}
 
+			# VM- oder Hardware-Erkennung (zentral via Get-sqmMachineType)
+			$machine = Get-sqmMachineType
+
 			$result = [PSCustomObject]@{
 				DriveLetter  = "${Letter}:"
 				DiskNumber   = $diskNumber
@@ -103,9 +108,11 @@ function Get-sqmDiskInfoByDriveLetter
 				FreeGB       = $freeGB
 				FreePercent  = $freePercent
 				SerialNumber = $serialNumber
+				IsVM         = $machine.IsVM
+				MachineType  = $machine.MachineType
 			}
 
-			Invoke-sqmLogging -Message "[$Letter`:] DiskNr=$diskNumber  Total=${totalGB} GB  Free=${freeGB} GB (${freePercent}%)  SN=$serialNumber" -FunctionName $functionName -Level "INFO"
+			Invoke-sqmLogging -Message "[$Letter`:] DiskNr=$diskNumber  Total=${totalGB} GB  Free=${freeGB} GB (${freePercent}%)  SN=$serialNumber  Typ=$($machine.MachineType)" -FunctionName $functionName -Level "INFO"
 
 			$results.Add($result)
 			$result

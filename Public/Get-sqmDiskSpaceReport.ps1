@@ -264,7 +264,11 @@ END
 				$safeInst = $instance -replace '[\\/:*?"<>|]', '_'
 				$txtFile = Join-Path $OutputPath "DiskSpaceReport_${safeInst}_${datestamp}.txt"
 				$csvFile = Join-Path $OutputPath "DiskSpaceReport_${safeInst}_${datestamp}.csv"
-				
+				$htmlFile = Join-Path $OutputPath "DiskSpaceReport_${safeInst}_${datestamp}.html"
+
+				$cntCrit = ($detailRows | Where-Object Status -eq 'Critical').Count
+				$cntWarn = ($detailRows | Where-Object Status -eq 'Warning').Count
+
 				if ($PSCmdlet.ShouldProcess($instance, "Erstelle Disk-Space-Bericht in $OutputPath"))
 				{
 					# Verzeichnis anlegen
@@ -273,13 +277,13 @@ END
 						New-Item -ItemType Directory -Path $OutputPath -Force -ErrorAction Stop | Out-Null
 						Invoke-sqmLogging -Message "Verzeichnis $OutputPath wurde erstellt." -FunctionName $functionName -Level "INFO"
 					}
-					
+
 					# TXT-Bericht
-					$cntCrit = ($detailRows | Where-Object Status -eq 'Critical').Count
-					$cntWarn = ($detailRows | Where-Object Status -eq 'Warning').Count
+					$reference = Get-sqmReportReference
 					$lines = [System.Collections.Generic.List[string]]::new()
 					$lines.Add("# ================================================================")
-					$lines.Add("# MSSQLTools - Disk Space Report")
+					$lines.Add("# sqmSQLTool - Disk Space Report")
+					$lines.Add("# $reference")
 					$lines.Add("# Instanz   : $instance")
 					$lines.Add("# Erstellt  : $timestamp")
 					$lines.Add("# Warn: <${WarnThresholdPct}% | Critical: <${CriticalThresholdPct}% | Wachstum: letzte $HistoryDays Tage")
@@ -304,21 +308,41 @@ END
 					# CSV-Datei
 					$detailRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 
-					# Oeffne TXT-Datei wenn nicht -NoOpen
-					if (-not $NoOpen -and $txtFile)
+					# HTML-Bericht (farbcodiert nach Status)
+					$rowsHtml = ''
+					foreach ($e in ($detailRows | Sort-Object Status, MountPoint))
 					{
-						Start-Process $txtFile
+						$cls = switch ($e.Status) { 'Critical' { 'crit' } 'Warning' { 'warn' } default { 'ok' } }
+						$growthDisplay = if ($e.GrowthLastPeriodGB) { $e.GrowthLastPeriodGB } else { 'n/a' }
+						$daysDisplay   = if ($e.DaysUntilFull) { $e.DaysUntilFull } else { '?' }
+						$mp = [string]$e.MountPoint -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;'
+						$rowsHtml += "<tr><td class='$cls'>$($e.Status)</td><td>$mp</td><td>$($e.TotalGB)</td><td>$($e.UsedGB)</td><td>$($e.FreeGB)</td><td>$($e.FreePct)%</td><td>$growthDisplay</td><td>$daysDisplay</td></tr>`n"
 					}
+					$bodyHtml = @"
+<table>
+<thead><tr><th>Status</th><th>Laufwerk</th><th>Total GB</th><th>Used GB</th><th>Free GB</th><th>Free %</th><th>Growth GB</th><th>Days Full</th></tr></thead>
+<tbody>
+$rowsHtml
+</tbody>
+</table>
+<p style="color:#94a8c0;font-size:12px;">Warn: &lt;${WarnThresholdPct}% &nbsp;|&nbsp; Critical: &lt;${CriticalThresholdPct}% &nbsp;|&nbsp; Wachstum: letzte $HistoryDays Tage &nbsp;|&nbsp; Critical: $cntCrit, Warning: $cntWarn</p>
+"@
+					$html = ConvertTo-sqmHtmlReport -Title "Disk Space Report - $instance" -Subtitle "Erstellt: $timestamp" -BodyHtml $bodyHtml
+					$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
 
-					Invoke-sqmLogging -Message "[$instance] Disk-Space-Bericht erstellt: $txtFile" -FunctionName $functionName -Level "INFO"
+					# Oeffnen: HTML vor TXT, CSV nie. -NoOpen unterdrueckt.
+					Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
+
+					Invoke-sqmLogging -Message "[$instance] Disk-Space-Bericht erstellt: $htmlFile" -FunctionName $functionName -Level "INFO"
 				}
 				else
 				{
 					Invoke-sqmLogging -Message "[$instance] WhatIf: Berichtsdateien wuerden erstellt werden." -FunctionName $functionName -Level "VERBOSE"
 					$txtFile = $null
 					$csvFile = $null
+					$htmlFile = $null
 				}
-				
+
 				# Ergebnisobjekt fuer diese Instanz
 				$result = [PSCustomObject]@{
 					SqlInstance					     = $instance
@@ -326,6 +350,7 @@ END
 					DetailRows					     = $detailRows
 					TxtFile						     = $txtFile
 					CsvFile						     = $csvFile
+					HtmlFile					     = $htmlFile
 					Status						     = if ($cntCrit -gt 0) { 'Critical' } elseif ($cntWarn -gt 0) { 'Warning' } else { 'OK' }
 				}
 				$allInstanceResults.Add($result)
