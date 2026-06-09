@@ -109,7 +109,10 @@ function Get-sqmAlwaysOnFailoverHistory
 		[switch]$ContinueOnError,
 
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 
 	begin
@@ -384,6 +387,7 @@ WHERE ars.is_local = 1
 					$lines = [System.Collections.Generic.List[string]]::new()
 					$lines.Add('# ================================================================')
 					$lines.Add('# sqmSQLTool - AlwaysOn Failover-Historie')
+					$lines.Add("# $(Get-sqmReportReference)")
 					$lines.Add("# Computer  : $computer")
 					$lines.Add("# Erstellt  : $timestamp")
 					$lines.Add("# Zeitraum  : ab $($Since.ToString('yyyy-MM-dd HH:mm'))")
@@ -413,6 +417,8 @@ WHERE ars.is_local = 1
 
 					$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
 					$sorted | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
+
+					Invoke-sqmOpenReport -TxtFile $txtFile -NoOpen:$NoOpen
 
 					Invoke-sqmLogging -Message "[$computer] Bericht erstellt: $txtFile" `
 						-FunctionName $functionName -Level 'INFO'

@@ -262,7 +262,8 @@ ORDER BY sp.type_desc, sp.name;
 					# ... (der Code fuer die TXT-Erstellung bleibt unveraendert)
 					$lines = [System.Collections.Generic.List[string]]::new()
 					$lines.Add("# ================================================================")
-					$lines.Add("# MSSQLTools - Sysadmin-Konten Bericht")
+					$lines.Add("# sqmSQLTool - Sysadmin-Konten Bericht")
+					$lines.Add("# $(Get-sqmReportReference)")
 					$lines.Add("# Instanz   : $instance")
 					$lines.Add("# Erstellt  : $timestamp")
 					$lines.Add("# Gesamt    : $($detailRows.Count) Logins")
@@ -352,11 +353,7 @@ ORDER BY sp.type_desc, sp.name;
 					$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
 					$detailRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 
-					# Oeffne TXT-Datei wenn nicht -NoOpen
-					if (-not $NoOpen -and $txtFile)
-					{
-						Start-Process $txtFile
-					}
+					Invoke-sqmOpenReport -TxtFile $txtFile -NoOpen:$NoOpen
 
 					Invoke-sqmLogging -Message "[$instance] Bericht erstellt: $txtFile" -FunctionName $functionName -Level "INFO"
 				}

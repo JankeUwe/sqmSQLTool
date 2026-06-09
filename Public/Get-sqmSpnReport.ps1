@@ -109,7 +109,10 @@ function Get-sqmSpnReport
 		[switch]$ContinueOnError,
 
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 
 	begin
@@ -775,6 +778,7 @@ WHERE ag.group_id IN (
 
 						$lines.Add($sep)
 						$lines.Add("# sqmSQLTool - SPN-Pruefbericht")
+						$lines.Add("# $(Get-sqmReportReference)")
 						$lines.Add("# Computer       : $computer")
 						$lines.Add("# Hostname        : $hostName")
 						$lines.Add("# FQDN            : $fqdn")
@@ -873,6 +877,8 @@ WHERE ag.group_id IN (
 
 						$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
 						$detailRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
+
+						Invoke-sqmOpenReport -TxtFile $txtFile -NoOpen:$NoOpen
 
 						Invoke-sqmLogging -Message "[$computer\$instanceName] Bericht erstellt: $txtFile" `
 										  -FunctionName $functionName -Level 'INFO'

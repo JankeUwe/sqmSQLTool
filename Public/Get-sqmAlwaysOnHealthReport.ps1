@@ -310,7 +310,8 @@ ORDER BY has.start_time;
 					$cntWarn = ($healthRows | Where-Object OverallStatus -eq 'Warning').Count
 					$lines = [System.Collections.Generic.List[string]]::new()
 					$lines.Add("# ================================================================")
-					$lines.Add("# MSSQLTools - Always On Health Report")
+					$lines.Add("# sqmSQLTool - Always On Health Report")
+					$lines.Add("# $(Get-sqmReportReference)")
 					$lines.Add("# Instanz   : $instance")
 					$lines.Add("# Erstellt  : $timestamp")
 					$lines.Add("# RedoQueue max: ${MaxRedoQueueMB} MB | SendQueue max: ${MaxSendQueueMB} MB")
@@ -339,11 +340,7 @@ ORDER BY has.start_time;
 					# CSV-Datei erstellen
 					$healthRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 
-					# Oeffne TXT-Datei wenn nicht -NoOpen
-					if (-not $NoOpen -and $txtFile)
-					{
-						Start-Process $txtFile
-					}
+					Invoke-sqmOpenReport -TxtFile $txtFile -NoOpen:$NoOpen
 
 					Invoke-sqmLogging -Message "[$instance] Health-Bericht erstellt: $txtFile" -FunctionName $functionName -Level "INFO"
 				}
