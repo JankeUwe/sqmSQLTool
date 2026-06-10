@@ -58,9 +58,14 @@
     Comma-separated list of replica names to skip (maintenance). Default: none
 
 .PARAMETER Force
-    When set, the job will update existing logins (password changes).
-    Default: $false (only new logins are synced).
-    When enabled, SafeForceMode automatically excludes system/agent accounts.
+    Controls whether the job updates EXISTING logins (password / language / default-db changes),
+    not only adds new ones. Default: $true - a recurring sync job should keep the secondaries
+    fully in sync; without it, a password change on the primary would silently drift and break
+    application logins after a failover.
+    SafeForceMode (in Sync-sqmLoginsToAlwaysOn) automatically excludes all sysadmin logins, the
+    SQL Agent service account and every system account, so the job cannot lock itself or any
+    admin out.
+    Opt out with -Force:$false (then only new logins are created, password drift is NOT corrected).
 
 .PARAMETER ForceIncludeOnly
     When Force is set, only these logins are updated (whitelist).
@@ -68,9 +73,10 @@
     System logins still excluded per SafeForceMode.
 
 .PARAMETER BackupLogins
-    When set with -Force, creates login backups on each secondary before updating.
+    Creates a login backup on each secondary BEFORE -Force updates them (rollback safety).
+    Default: $true (paired with the Force default).
     Backups stored in: C:\System\WinSrvLog\MSSQL\LoginBackup_<Secondary>_<Timestamp>.sql
-    Allows rollback if needed.
+    Opt out with -BackupLogins:$false.
 
 .PARAMETER NotificationOperator
     Name of an existing SQL Agent operator for OnFailure notifications. The operator must
@@ -92,7 +98,11 @@
 
 .EXAMPLE
     New-sqmAutoLoginSyncJob -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -Schedule Custom -CustomScheduleFrequency Hourly -CustomScheduleInterval 4
-    Creates a job that runs every 4 hours.
+    Creates a job that runs every 4 hours (Force and BackupLogins are on by default).
+
+.EXAMPLE
+    New-sqmAutoLoginSyncJob -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -Force:$false
+    Creates a job that only adds NEW logins - password/language drift is NOT corrected (legacy behaviour).
 
 .NOTES
     Requires: dbatools, Invoke-sqmLogging
@@ -142,13 +152,13 @@ function New-sqmAutoLoginSyncJob
 		[string[]]$SkipSecondaryServers,
 
 		[Parameter(Mandatory = $false)]
-		[switch]$Force,
+		[switch]$Force = $true,
 
 		[Parameter(Mandatory = $false)]
 		[string[]]$ForceIncludeOnly,
 
 		[Parameter(Mandatory = $false)]
-		[switch]$BackupLogins,
+		[switch]$BackupLogins = $true,
 
 		[Parameter(Mandatory = $false)]
 		[string]$NotificationOperator,
@@ -224,6 +234,17 @@ ORDER BY name ASC
 
 		Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance für AG '$AvailabilityGroupName' (Job: '$JobName')" `
 						  -FunctionName $functionName -Level 'INFO'
+
+		# Effektiver Job-Modus protokollieren. Force/BackupLogins sind standardmaessig an,
+		# damit ein laufender Sync-Job auch Passwort-/Sprachaenderungen uebertraegt.
+		# SafeForceMode in Sync-sqmLoginsToAlwaysOn schuetzt sysadmin/Agent/System-Konten.
+		Invoke-sqmLogging -Message ("Job-Modus: Force={0}, BackupLogins={1} (SafeForceMode schuetzt sysadmin/Agent/System-Konten vor Self-Lockout)." -f [bool]$Force, [bool]$BackupLogins) `
+						  -FunctionName $functionName -Level 'INFO'
+		if (-not $Force)
+		{
+			Invoke-sqmLogging -Message "Hinweis: -Force:`$false - der Job legt nur NEUE Logins an. Passwort-/Sprach-Drift wird NICHT korrigiert." `
+							  -FunctionName $functionName -Level 'WARNING'
+		}
 	}
 
 	process
