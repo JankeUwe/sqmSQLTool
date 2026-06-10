@@ -363,14 +363,18 @@ if (`$failures.Count -gt 0) {
 				Force = $true
 			}
 
+			# New-DbaAgentSchedule nutzt -StartTime im Format 'HHMMSS' (nicht
+			# ActiveStartTimeOfDay - das ist eine SMO-Property, KEIN dbatools-Parameter).
+			$hour = [int]($TimeOfDay.Split(':')[0])
+			$minute = [int]($TimeOfDay.Split(':')[1])
+			$startTime = '{0:00}{1:00}00' -f $hour, $minute
+
 			if ($Schedule -eq 'Daily')
 			{
-				$hour = [int]($TimeOfDay.Split(':')[0])
-				$minute = [int]($TimeOfDay.Split(':')[1])
 				$scheduleParams += @{
-					FrequencyType = 'Daily'
+					FrequencyType     = 'Daily'
 					FrequencyInterval = 1
-					ActiveStartTimeOfDay = ($hour * 10000) + ($minute * 100)
+					StartTime         = $startTime
 				}
 			}
 			elseif ($Schedule -eq 'Weekly')
@@ -379,22 +383,53 @@ if (`$failures.Count -gt 0) {
 					'Monday' = 2; 'Tuesday' = 4; 'Wednesday' = 8; 'Thursday' = 16
 					'Friday' = 32; 'Saturday' = 64; 'Sunday' = 1
 				}
-				$hour = [int]($TimeOfDay.Split(':')[0])
-				$minute = [int]($TimeOfDay.Split(':')[1])
 				$scheduleParams += @{
-					FrequencyType = 'Weekly'
-					FrequencyInterval = $dayMap[$DayOfWeek]
-					ActiveStartTimeOfDay = ($hour * 10000) + ($minute * 100)
+					FrequencyType             = 'Weekly'
+					FrequencyInterval         = $dayMap[$DayOfWeek]
+					FrequencyRecurrenceFactor = 1
+					StartTime                 = $startTime
 				}
 			}
 			else # Custom
 			{
-				$freqMap = @{
-					'Hourly' = 4; 'Daily' = 1; 'Weekly' = 2; 'Monthly' = 3
-				}
-				$scheduleParams += @{
-					FrequencyType = $freqMap[$CustomScheduleFrequency]
-					FrequencyInterval = $CustomScheduleInterval
+				switch ($CustomScheduleFrequency)
+				{
+					'Hourly'
+					{
+						$scheduleParams += @{
+							FrequencyType           = 'Daily'
+							FrequencyInterval       = 1
+							FrequencySubdayType     = 'Hours'
+							FrequencySubdayInterval = $CustomScheduleInterval
+							StartTime               = '000000'
+						}
+					}
+					'Daily'
+					{
+						$scheduleParams += @{
+							FrequencyType     = 'Daily'
+							FrequencyInterval = $CustomScheduleInterval
+							StartTime         = $startTime
+						}
+					}
+					'Weekly'
+					{
+						$scheduleParams += @{
+							FrequencyType             = 'Weekly'
+							FrequencyInterval         = 1
+							FrequencyRecurrenceFactor = $CustomScheduleInterval
+							StartTime                 = $startTime
+						}
+					}
+					'Monthly'
+					{
+						$scheduleParams += @{
+							FrequencyType             = 'Monthly'
+							FrequencyInterval         = 1
+							FrequencyRecurrenceFactor = $CustomScheduleInterval
+							StartTime                 = $startTime
+						}
+					}
 				}
 			}
 

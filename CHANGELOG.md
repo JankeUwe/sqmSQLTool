@@ -1,5 +1,15 @@
 # sqmSQLTool — Changelog
 
+## [1.4.11.0] — 2026-06-10
+
+### 🔧 Fixes
+
+- **New-sqmAutoLoginSyncJob**: Job-Erstellung schlug fehl mit „A parameter cannot be found that
+  matches parameter name 'ActiveStartTimeOfDay'". `ActiveStartTimeOfDay` ist eine SMO-Property,
+  kein `New-DbaAgentSchedule`-Parameter. Zeitplan nutzt jetzt korrekt `-StartTime` (Format
+  `HHMMSS`), für Weekly/Monthly `-FrequencyRecurrenceFactor`, für stündlich
+  `-FrequencySubdayType Hours` / `-FrequencySubdayInterval`.
+
 ## [1.4.10.0] — 2026-06-10
 
 ### 🔧 Fixes
