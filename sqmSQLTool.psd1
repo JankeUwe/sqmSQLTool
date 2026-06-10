@@ -167,6 +167,7 @@
 		'New-sqmRandomSaPassword',
 		'New-sqmSqlCertificate',
 		'Invoke-sqmListenerMigrationPrep',
+		'Remove-sqmAdOrphanLogin',
 		'Remove-sqmDatabaseFromAG',
 		'Repair-sqmAlwaysOnDatabases',
 		'Set-sqmBackupExcludePermission',
