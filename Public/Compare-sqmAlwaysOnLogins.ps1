@@ -34,7 +34,13 @@
 
 .PARAMETER IncludeSystemLogins
     Wenn gesetzt, werden auch Systemlogins (sa, ##MS_*, NT SERVICE\*, NT AUTHORITY\*,
-    BUILTIN\*) verglichen. Standard: ausgeblendet.
+    BUILTIN\*) sowie sysadmin-Logins verglichen. Standard: ausgeblendet.
+
+    Hinweis: sysadmin-Logins werden standardmaessig ausgeschlossen, weil jede Instanz
+    ein eigenes Zufallspasswort verwendet (vom Sync per SafeForceMode bewusst nicht
+    synchronisiert). Ihr Passwort-Hash weicht daher erwartungsgemaess ab und wuerde
+    sonst -FailOnDrift im Job ausloesen. Mit -IncludeSystemLogins werden sie dennoch
+    angezeigt (gilt dann wieder als Drift).
 
 .PARAMETER Login
     Nur diese Logins vergleichen (Wildcards erlaubt).
@@ -159,6 +165,27 @@ function Compare-sqmAlwaysOnLogins
 		}
 
 		function _h { param($x) [string]$x -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;' }
+
+		# Sysadmin-Logins dynamisch ermitteln (analog SafeForceMode in Sync-sqmLoginsToAlwaysOn).
+		# Jede Installation hat ein eigenes Zufallspasswort fuer sysadmin-Logins (z.B. 'sa' / SID 0x01).
+		# Der Sync synchronisiert diese bewusst NICHT - daher hier ebenfalls standardmaessig
+		# ausblenden, damit der Report und -FailOnDrift im Job nicht wegen erwarteter
+		# Passwort-Hash-Differenzen fehlschlagen. Mit -IncludeSystemLogins werden sie wieder gezeigt.
+		$sysAdminLogins = @()
+		try
+		{
+			$saQuery = "SELECT name FROM sys.server_principals WHERE (is_srvrolemember('sysadmin', name) = 1 OR sid = 0x01) AND name NOT LIKE '##%'"
+			$sysAdminLogins = @((Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Query $saQuery -ErrorAction Stop).name)
+			if ($sysAdminLogins.Count -gt 0)
+			{
+				Invoke-sqmLogging -Message "Sysadmin-Logins werden ausgeschlossen (eigenes Zufallspasswort je Instanz): $($sysAdminLogins -join ', ')" -FunctionName $functionName -Level "INFO"
+			}
+		}
+		catch
+		{
+			Invoke-sqmLogging -Message "Sysadmin-Logins konnten nicht ermittelt werden, Fallback 'sa': $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
+			$sysAdminLogins = @('sa')
+		}
 
 		Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance" -FunctionName $functionName -Level "INFO"
 	}
@@ -295,7 +322,7 @@ WHERE sp.type IN ('S','U','G')
 				$display = $allLogins[$key]
 
 				# Filter
-				if (-not $IncludeSystemLogins -and (_IsSystemLogin $display)) { continue }
+				if (-not $IncludeSystemLogins -and ((_IsSystemLogin $display) -or ($sysAdminLogins -contains $display))) { continue }
 				if ($Login.Count -gt 0 -and -not (_MatchesAny $display $Login)) { continue }
 				if ($ExcludeLogin.Count -gt 0 -and (_MatchesAny $display $ExcludeLogin)) { continue }
 
