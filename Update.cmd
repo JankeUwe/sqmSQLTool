@@ -13,30 +13,30 @@ set "SCRIPT_DIR=%~dp0"
 set "REPOSITORY=%~1"
 set "FORCE=%~2"
 
-:: Erster Versuch: direkt vom (ggf. Remote-) Skriptverzeichnis
-call :RUN_UPDATE "%SCRIPT_DIR%Update.ps1"
-
 :: ---------------------------------------------------------------
-:: Fallback: schlaegt die Ausfuehrung vom Remote-Laufwerk fehl
-:: (GPO RemoteSigned ignoriert -ExecutionPolicy Bypass, Mark-of-the-Web
-:: blockiert das unsignierte .ps1), dann Bootstrap lokal stagen und
-:: von dort starten. "type > datei" erzeugt eine frische Datei NUR aus dem
-:: Hauptstream - der Zone.Identifier-ADS (MOTW) wird dabei nicht uebernommen.
-:: Update.ps1 liest das Modul ohnehin aus -RepositoryPath, daher kein -Source noetig.
+:: Bootstrap IMMER lokal stagen und von dort starten (kein Remote-Versuch).
+:: Grund: Eine per GPO gesetzte MachinePolicy (z.B. RemoteSigned) ueberstimmt
+:: -ExecutionPolicy Bypass (Process-Scope). Ein .ps1 von einem Remote-/UNC-Pfad
+:: (\\tsclient\..., Netz-Share) wird dann als unsigniertes Remote-Skript
+:: blockiert - der Remote-Versuch scheitert in dieser Umgebung IMMER.
+:: "type > datei" erzeugt eine frische LOKALE Datei ohne Zone.Identifier (MOTW),
+:: damit laeuft das unsignierte Skript unter RemoteSigned.
+:: Update.ps1 liest das Modul aus -RepositoryPath; wenn REPOSITORY leer ist,
+:: setzen wir es auf den tatsaechlichen Startpfad (sonst greift der hardcoded
+:: Default W:\... und nicht der Share, von dem Update.cmd gestartet wurde).
 :: ---------------------------------------------------------------
-if not "%ERRORLEVEL%"=="0" (
-    echo.
-    echo  Ausfuehrung vom Quellverzeichnis fehlgeschlagen (Execution Policy / Signatur).
-    echo  Fallback: stage Bootstrap lokal und starte erneut ...
+:: Trailing-Backslash aus SCRIPT_DIR entfernen
+set "SRC_DIR=%SCRIPT_DIR%"
+if "!SRC_DIR:~-1!"=="\" set "SRC_DIR=!SRC_DIR:~0,-1!"
+if "%REPOSITORY%"=="" set "REPOSITORY=!SRC_DIR!"
 
-    set "BOOT_DIR=%TEMP%\sqmSQLTool_boot"
-    if not exist "!BOOT_DIR!" md "!BOOT_DIR!"
-    type "%SCRIPT_DIR%Update.ps1" > "!BOOT_DIR!\Update.ps1"
+set "BOOT_DIR=%TEMP%\sqmSQLTool_boot"
+if not exist "!BOOT_DIR!" md "!BOOT_DIR!"
+type "%SCRIPT_DIR%Update.ps1" > "!BOOT_DIR!\Update.ps1"
 
-    call :RUN_UPDATE "!BOOT_DIR!\Update.ps1"
+call :RUN_UPDATE "!BOOT_DIR!\Update.ps1"
 
-    rmdir /s /q "!BOOT_DIR!" >nul 2>&1
-)
+rmdir /s /q "!BOOT_DIR!" >nul 2>&1
 
 endlocal
 pause

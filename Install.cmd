@@ -1,6 +1,8 @@
 @echo off
 :: sqmSQLTool Installer
-:: Runs Install.ps1 with ExecutionPolicy Bypass (recommended for cross-domain shares).
+:: Stages Install.ps1 locally (strips Mark-of-the-Web) and runs it from there,
+:: so it works even when a GPO MachinePolicy (e.g. RemoteSigned) blocks scripts
+:: launched directly from a remote/UNC share (\\tsclient\..., cross-domain share).
 :: Automatically re-launches elevated (UAC) when AllUsers scope is requested.
 ::
 :: Usage:
@@ -57,33 +59,29 @@ echo.
 echo  sqmSQLTool - Installation
 echo  ============================================================
 
-:: Erster Versuch: direkt vom (ggf. Remote-) Skriptverzeichnis
-call :RUN_INSTALL "%SCRIPT_DIR%Install.ps1"
-
 :: ---------------------------------------------------------------
-:: Fallback: schlaegt die Ausfuehrung vom Remote-Laufwerk fehl
-:: (GPO RemoteSigned ignoriert -ExecutionPolicy Bypass, Mark-of-the-Web
-:: blockiert das unsignierte .ps1), dann Bootstrap lokal stagen und
-:: von dort starten. "type > datei" erzeugt eine frische Datei NUR aus dem
-:: Hauptstream - der Zone.Identifier-ADS (MOTW) wird dabei nicht uebernommen.
+:: Bootstrap IMMER lokal stagen und von dort starten (kein Remote-Versuch).
+:: Grund: Eine per GPO gesetzte MachinePolicy (z.B. RemoteSigned) ueberstimmt
+:: -ExecutionPolicy Bypass (Process-Scope). Ein .ps1 von einem Remote-/UNC-Pfad
+:: (\\tsclient\..., Netz-Share) wird dann als unsigniertes Remote-Skript
+:: blockiert - der Remote-Versuch scheitert in dieser Umgebung IMMER.
+:: "type > datei" erzeugt eine frische LOKALE Datei nur aus dem Hauptstream:
+:: der Zone.Identifier-ADS (Mark-of-the-Web) wird NICHT uebernommen, damit
+:: laeuft das lokale unsignierte Skript unter RemoteSigned.
+:: Install.ps1 liest das Modul per robocopy aus -Source (Datei-Lesen ist nicht
+:: policy-beschraenkt) und entblockt die Zieldateien anschliessend selbst.
 :: ---------------------------------------------------------------
-if not "%ERRORLEVEL%"=="0" (
-    echo.
-    echo  Ausfuehrung vom Quellverzeichnis fehlgeschlagen (Execution Policy / Signatur).
-    echo  Fallback: stage Bootstrap lokal und starte erneut ...
+set "BOOT_DIR=%TEMP%\sqmSQLTool_boot"
+if not exist "!BOOT_DIR!" md "!BOOT_DIR!"
+type "%SCRIPT_DIR%Install.ps1" > "!BOOT_DIR!\Install.ps1"
 
-    set "BOOT_DIR=%TEMP%\sqmSQLTool_boot"
-    if not exist "!BOOT_DIR!" md "!BOOT_DIR!"
-    type "%SCRIPT_DIR%Install.ps1" > "!BOOT_DIR!\Install.ps1"
+:: Trailing-Backslash aus SCRIPT_DIR entfernen (sonst Quoting-Bug bei -Source)
+set "SRC_DIR=%SCRIPT_DIR%"
+if "!SRC_DIR:~-1!"=="\" set "SRC_DIR=!SRC_DIR:~0,-1!"
 
-    :: Trailing-Backslash aus SCRIPT_DIR entfernen (sonst Quoting-Bug bei -Source)
-    set "SRC_DIR=%SCRIPT_DIR%"
-    if "!SRC_DIR:~-1!"=="\" set "SRC_DIR=!SRC_DIR:~0,-1!"
+call :RUN_INSTALL "!BOOT_DIR!\Install.ps1" -Source "!SRC_DIR!"
 
-    call :RUN_INSTALL "!BOOT_DIR!\Install.ps1" -Source "!SRC_DIR!"
-
-    rmdir /s /q "!BOOT_DIR!" >nul 2>&1
-)
+rmdir /s /q "!BOOT_DIR!" >nul 2>&1
 
 endlocal
 pause
