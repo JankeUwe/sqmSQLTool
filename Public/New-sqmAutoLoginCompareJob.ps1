@@ -122,7 +122,7 @@ function New-sqmAutoLoginCompareJob
 		[string]$DayOfWeek = 'Sunday',
 
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = 'C:\System\WinSrvLog\MSSQL',
+		[string]$OutputPath = (Get-sqmDefaultOutputPath),
 
 		[Parameter(Mandatory = $false)]
 		[switch]$IncludeSystemLogins,
@@ -222,92 +222,56 @@ function New-sqmAutoLoginCompareJob
 			# -------------------------------------------------------------------
 			# 2. PowerShell-Script fuer den Job-Step bauen
 			# -------------------------------------------------------------------
-			# Schalter werden per Indexer NACH dem Hashtable gesetzt - ein bloszes
-			# "-Switch" innerhalb von @{} waere ungueltiges PowerShell.
-			$includeSystemLine = if ($IncludeSystemLogins) { "`$params['IncludeSystemLogins'] = `$true" } else { "" }
-			$onlyDiffLine      = if ($OnlyDifferences)      { "`$params['OnlyDifferences'] = `$true" }      else { "" }
-
+			# Bewusst minimal: Modul laden, dann EIN Aufruf. -FailOnDrift schreibt bei
+			# Login-Drift Windows Event 9001 (Splunk) und wirft -> SQL Agent markiert den
+			# Job als fehlgeschlagen (= Drift-Alarm via OnFailure-Operator). SqlInstance
+			# (= Computername), AG (= erste gefundene) und OutputPath sind Defaults von
+			# Compare-sqmAlwaysOnLogins.
 			$scriptContent = @"
-`$logPath = "C:\System\WinSrvLog\MSSQL"
-if (-not (Test-Path `$logPath)) { New-Item -ItemType Directory -Path `$logPath -Force | Out-Null }
-`$logFile = Join-Path `$logPath ("LoginCompare_$AvailabilityGroupName" + "_" + (Get-Date -Format 'yyyyMMdd_HHmmss') + ".log")
-
 Import-Module sqmSQLTool -Force -ErrorAction Stop
-
-`$params = @{
-    SqlInstance           = "$SqlInstance"
-    AvailabilityGroupName = "$AvailabilityGroupName"
-    OutputPath            = "$OutputPath"
-    NoOpen                = `$true
-}
-$includeSystemLine
-$onlyDiffLine
-
-`$result   = Compare-sqmAlwaysOnLogins @params
-`$crit     = @(`$result | Where-Object { `$_.OverallStatus -eq 'Critical' })
-`$warn     = @(`$result | Where-Object { `$_.OverallStatus -eq 'Warning' })
-`$ok       = @(`$result | Where-Object { `$_.OverallStatus -eq 'OK' })
-`$drift    = `$crit.Count + `$warn.Count
-
-`$summary = "`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Compare AG '$AvailabilityGroupName': OK=`$(`$ok.Count) Warning=`$(`$warn.Count) Critical=`$(`$crit.Count)"
-`$summary | Out-File -FilePath `$logFile -Append -Encoding UTF8
-if (`$drift -gt 0) {
-    "Drift erkannt - betroffene Logins:" | Out-File -FilePath `$logFile -Append -Encoding UTF8
-    `$result | Where-Object { `$_.OverallStatus -ne 'OK' } |
-        ForEach-Object { "  [`$(`$_.OverallStatus)] `$(`$_.LoginName)  Present=`$(`$_.Present)  MissingOn=`$(`$_.MissingOn)" } |
-        Out-File -FilePath `$logFile -Append -Encoding UTF8
-
-    # Windows Event Log (fuer Splunk) - Berechtigungs-/Source-Fehler bewusst ignorieren
-    try {
-        `$evtSrc = 'sqmSQLTool'
-        if (-not [System.Diagnostics.EventLog]::SourceExists(`$evtSrc)) { New-EventLog -LogName Application -Source `$evtSrc -ErrorAction Stop }
-        `$evtType = if (`$crit.Count -gt 0) { 'Error' } else { 'Warning' }
-        Write-EventLog -LogName Application -Source `$evtSrc -EntryType `$evtType -EventId 9001 -Message "sqmSQLTool: AlwaysOn Login-Drift AG '$AvailabilityGroupName' - Warning=`$(`$warn.Count) Critical=`$(`$crit.Count)"
-    } catch { }
-}
-
-# Exit 1 bei Drift -> loest OnFailure-Benachrichtigung aus
-exit ([int](`$drift -gt 0))
+Compare-sqmAlwaysOnLogins -FailOnDrift
 "@
 
 			# -------------------------------------------------------------------
-			# 3. Schedule-Parameter
+			# 3. Schedule-Werte fuer native msdb-Prozeduren (sp_add_schedule).
+			#    Bewusst NICHT ueber New-DbaAgentSchedule - dessen Parameter (-Force,
+			#    -StartTime, -Schedule-Validierung) variieren je dbatools-Version.
 			# -------------------------------------------------------------------
-			$scheduleParams = @{
-				SqlInstance = $SqlInstance
-				Force       = $true
+			$hour = [int]($TimeOfDay.Split(':')[0])
+			$minute = [int]($TimeOfDay.Split(':')[1])
+			$activeStartTime = [int]('{0:00}{1:00}00' -f $hour, $minute)
+
+			$freqType = 4              # 4 = taeglich, 8 = woechentlich, 16 = monatlich
+			$freqInterval = 1
+			$freqRecurrence = 0
+			$freqSubdayType = 1        # 1 = einmal zur angegebenen Zeit
+			$freqSubdayInterval = 0
+
+			$dayMap = @{
+				'Monday' = 2; 'Tuesday' = 4; 'Wednesday' = 8; 'Thursday' = 16
+				'Friday' = 32; 'Saturday' = 64; 'Sunday' = 1
 			}
 
-			if ($Schedule -eq 'Daily')
+			if ($Schedule -eq 'Weekly')
 			{
-				$hour = [int]($TimeOfDay.Split(':')[0])
-				$minute = [int]($TimeOfDay.Split(':')[1])
-				$scheduleParams += @{
-					FrequencyType        = 'Daily'
-					FrequencyInterval    = 1
-					ActiveStartTimeOfDay = ($hour * 10000) + ($minute * 100)
-				}
+				$freqType = 8
+				$freqInterval = $dayMap[$DayOfWeek]
+				$freqRecurrence = 1
 			}
-			elseif ($Schedule -eq 'Weekly')
+			elseif ($Schedule -eq 'Custom')
 			{
-				$dayMap = @{
-					'Monday' = 2; 'Tuesday' = 4; 'Wednesday' = 8; 'Thursday' = 16
-					'Friday' = 32; 'Saturday' = 64; 'Sunday' = 1
-				}
-				$hour = [int]($TimeOfDay.Split(':')[0])
-				$minute = [int]($TimeOfDay.Split(':')[1])
-				$scheduleParams += @{
-					FrequencyType        = 'Weekly'
-					FrequencyInterval    = $dayMap[$DayOfWeek]
-					ActiveStartTimeOfDay = ($hour * 10000) + ($minute * 100)
-				}
-			}
-			else # Custom
-			{
-				$freqMap = @{ 'Hourly' = 4; 'Daily' = 1; 'Weekly' = 2; 'Monthly' = 3 }
-				$scheduleParams += @{
-					FrequencyType     = $freqMap[$CustomScheduleFrequency]
-					FrequencyInterval = $CustomScheduleInterval
+				switch ($CustomScheduleFrequency)
+				{
+					'Hourly'
+					{
+						$freqType = 4; $freqInterval = 1
+						$freqSubdayType = 8          # 8 = Stunden
+						$freqSubdayInterval = $CustomScheduleInterval
+						$activeStartTime = 0
+					}
+					'Daily'   { $freqType = 4;  $freqInterval = $CustomScheduleInterval }
+					'Weekly'  { $freqType = 8;  $freqInterval = 1; $freqRecurrence = $CustomScheduleInterval }
+					'Monthly' { $freqType = 16; $freqInterval = 1; $freqRecurrence = $CustomScheduleInterval }
 				}
 			}
 
@@ -348,8 +312,27 @@ exit ([int](`$drift -gt 0))
 			# 6. Zeitplan
 			# -------------------------------------------------------------------
 			$schedName = "sch_$JobName"
-			$schedule = New-DbaAgentSchedule -SqlInstance $SqlInstance -Schedule $schedName @scheduleParams -ErrorAction Stop
-			$jobSchedule = Add-DbaAgentJobSchedule -SqlInstance $SqlInstance -Job $JobName -Schedule $schedName -ErrorAction Stop
+			$schedSql = @"
+-- Alle (auch mehrfach vorhandenen) Schedules dieses Namens per ID entfernen,
+-- damit sp_attach_schedule den Namen wieder eindeutig aufloesen kann.
+DECLARE @sid INT;
+WHILE EXISTS (SELECT 1 FROM msdb.dbo.sysschedules WHERE name = N'$schedName')
+BEGIN
+    SELECT TOP (1) @sid = schedule_id FROM msdb.dbo.sysschedules WHERE name = N'$schedName';
+    EXEC msdb.dbo.sp_delete_schedule @schedule_id = @sid, @force_delete = 1;
+END
+EXEC msdb.dbo.sp_add_schedule
+    @schedule_name          = N'$schedName',
+    @enabled                = 1,
+    @freq_type              = $freqType,
+    @freq_interval          = $freqInterval,
+    @freq_subday_type       = $freqSubdayType,
+    @freq_subday_interval   = $freqSubdayInterval,
+    @freq_recurrence_factor = $freqRecurrence,
+    @active_start_time      = $activeStartTime;
+EXEC msdb.dbo.sp_attach_schedule @job_name = N'$JobName', @schedule_name = N'$schedName';
+"@
+			$null = Invoke-DbaQuery -SqlInstance $SqlInstance -Database msdb -Query $schedSql -EnableException -ErrorAction Stop
 
 			$schedDesc = if ($Schedule -eq 'Daily') { "Daily at $TimeOfDay" }
 			elseif ($Schedule -eq 'Weekly') { "Weekly on $DayOfWeek at $TimeOfDay" }
@@ -399,7 +382,7 @@ exit ([int](`$drift -gt 0))
 				Schedule          = $schedDesc
 				Status            = 'Success'
 				Message           = "Job created and scheduled: $schedDesc"
-				LogPath           = 'C:\System\WinSrvLog\MSSQL\LoginCompare_*.log'
+				LogPath           = (Get-sqmDefaultOutputPath)
 				ReportPath        = "$OutputPath\AlwaysOnLoginCompare_*.html"
 				Timestamp         = Get-Date
 			}

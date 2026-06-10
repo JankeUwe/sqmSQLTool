@@ -51,6 +51,13 @@
 .PARAMETER NoOpen
     Unterdrueckt das automatische Oeffnen des Reports.
 
+.PARAMETER FailOnDrift
+    Wenn gesetzt: bei Login-Drift (Status Warning oder Critical) wird ein Windows Event
+    (Source 'sqmSQLTool', EventId 9001) geschrieben und anschliessend eine Ausnahme geworfen.
+    Damit schlaegt ein SQL-Agent-Job-Step, der nur 'Compare-sqmAlwaysOnLogins -FailOnDrift'
+    aufruft, bei Drift fehl (-> OnFailure-Operator-Alarm). Impliziert -NoOpen. Der Report wird
+    vorher trotzdem geschrieben.
+
 .PARAMETER ContinueOnError
     Bei Fehler fortfahren.
 
@@ -103,6 +110,9 @@ function Compare-sqmAlwaysOnLogins
 		[switch]$NoOpen,
 
 		[Parameter(Mandatory = $false)]
+		[switch]$FailOnDrift,
+
+		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 
 		[Parameter(Mandatory = $false)]
@@ -113,6 +123,9 @@ function Compare-sqmAlwaysOnLogins
 	{
 		$functionName = $MyInvocation.MyCommand.Name
 		$results      = [System.Collections.Generic.List[PSCustomObject]]::new()
+
+		# -FailOnDrift ist fuer den unbeaufsichtigten Job-Betrieb: Report nicht oeffnen.
+		if ($FailOnDrift) { $NoOpen = $true }
 
 		if (-not (Get-Module -ListAvailable -Name dbatools))
 		{
@@ -473,6 +486,30 @@ $rowsHtml
 	end
 	{
 		Invoke-sqmLogging -Message "$functionName abgeschlossen. $($results.Count) Login(s) verglichen." -FunctionName $functionName -Level "INFO"
+
+		# -------------------------------------------------------------------
+		# -FailOnDrift: bei Warning/Critical Event 9001 (Splunk) + Ausnahme,
+		# damit ein SQL-Agent-Job rot wird (Drift-Alarm). Report ist bereits geschrieben.
+		# -------------------------------------------------------------------
+		if ($FailOnDrift)
+		{
+			$crit = @($results | Where-Object OverallStatus -eq 'Critical').Count
+			$warn = @($results | Where-Object OverallStatus -eq 'Warning').Count
+			if (($crit + $warn) -gt 0)
+			{
+				try
+				{
+					$evtSrc = 'sqmSQLTool'
+					if (-not [System.Diagnostics.EventLog]::SourceExists($evtSrc)) { New-EventLog -LogName Application -Source $evtSrc -ErrorAction Stop }
+					$evtType = if ($crit -gt 0) { 'Error' } else { 'Warning' }
+					Write-EventLog -LogName Application -Source $evtSrc -EntryType $evtType -EventId 9001 `
+						-Message "sqmSQLTool: AlwaysOn Login-Drift AG '$AvailabilityGroupName' - Warning=$warn Critical=$crit"
+				}
+				catch { }
+				throw "AlwaysOn Login-Drift in AG '$AvailabilityGroupName': Warning=$warn Critical=$crit. Details im Report/Log."
+			}
+		}
+
 		return $results
 	}
 }

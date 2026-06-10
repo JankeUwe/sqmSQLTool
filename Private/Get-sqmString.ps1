@@ -37,7 +37,7 @@ function Get-sqmString
     {
         $lang = $null
         if ($script:sqmModuleConfig) { $lang = $script:sqmModuleConfig['Language'] }
-        if (-not $lang) { $lang = 'de-DE' }
+        if (-not $lang) { $lang = 'en-US' }
 
         $strFile = Join-Path $PSScriptRoot "Strings\$lang.psd1"
         if (-not (Test-Path $strFile))

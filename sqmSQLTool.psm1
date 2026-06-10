@@ -33,7 +33,7 @@ $script:sqmModuleConfig = @{
 	AutoUpdate            = $false
 	UpdateRepository      = ''
 	ModuleVersion         = '1.0.0'
-	Language              = 'de-DE'
+	Language              = 'en-US'
 	# Check-Profil: 'Auto' = FI-TS wenn erkannt, 'FiTs' = immer, 'Generic' = nie FI-TS-Checks
 	CheckProfile          = 'Auto'
 	# Grenzwerte fuer Setup-Checks (neutrale Defaults, FI-TS-Block setzt gleiche Werte)
