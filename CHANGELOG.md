@@ -1,5 +1,11 @@
 # sqmSQLTool — Changelog
 
+## [1.5.1.0] — 2026-06-10
+
+Versionssprung über das (fehlbenannte) Tag v1.5.0, damit die gesammelten Fixes 1.4.8 - 1.4.15
+auf GitHub eindeutig die neueste Version sind und vom Update-Mechanismus gezogen werden.
+Inhaltlich identisch mit 1.4.15.0 (siehe Einträge darunter); kein neuer Funktionscode.
+
 ## [1.4.15.0] — 2026-06-10
 
 ### 🔧 Fixes
