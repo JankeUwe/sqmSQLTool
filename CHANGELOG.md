@@ -1,5 +1,25 @@
 # sqmSQLTool — Changelog
 
+## [1.4.9.0] — 2026-06-10
+
+### 🔧 Fixes
+
+- **Get-sqmBlockingReport**: `most_recent_sql_handle` korrekt aus `sys.dm_exec_connections`
+  statt `sys.dm_exec_sessions` (Fehler „Invalid column name 'most_recent_sql_handle'").
+- **New-sqmAutoLoginSyncJob**: `SqlInstance` wurde beim Anlegen des Zeitplans doppelt gebunden
+  (Fehler „parameter 'SqlInstance' is specified more than once") - jetzt nur noch explizit.
+
+### ♻️ Refactoring
+
+- **New-sqmAutoLoginSyncJob**: Job-Step radikal vereinfacht. Statt ~60 Zeilen eingebackener
+  Orchestrierung jetzt ein schlanker Direkt-Aufruf von `Sync-sqmLoginsToAlwaysOn`; bei Fehlern
+  `throw` → SQL Agent markiert den Job als fehlgeschlagen (Operator-Benachrichtigung).
+  Keine hartkodierten Pfade mehr im Step.
+- **Sync-sqmLoginsToAlwaysOn**: übernimmt jetzt Retention (`-BackupRetentionDays`) und den
+  AD-Orphan-Audit (`-AuditAdOrphans`, Detection-only, Event Log 9003). `-BackupPath` nimmt den
+  konfigurierten Ausgabepfad (`Get-sqmDefaultOutputPath`) statt eines festen Literals - alle
+  Pfade kommen aus den Settings.
+
 ## [1.4.8.0] — 2026-06-10
 
 ### ✨ Neue Features

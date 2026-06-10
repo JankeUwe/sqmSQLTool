@@ -156,7 +156,15 @@ LEFT JOIN sys.dm_exec_requests r_blocker
     ON r.blocking_session_id = r_blocker.session_id
 OUTER APPLY sys.dm_exec_sql_text(r_blocker.sql_handle) st_blocker
 -- Blocker: letzter Batch (falls kein aktiver Request)
-OUTER APPLY sys.dm_exec_sql_text(s_blocker.most_recent_sql_handle) st_blocker_conn
+-- most_recent_sql_handle gehoert zu sys.dm_exec_connections, NICHT zu dm_exec_sessions.
+-- Eine Session kann mehrere Connections haben -> TOP 1 nach letztem Read.
+OUTER APPLY (
+    SELECT TOP 1 c.most_recent_sql_handle
+    FROM sys.dm_exec_connections c
+    WHERE c.session_id = s_blocker.session_id
+    ORDER BY c.last_read DESC
+) c_blocker
+OUTER APPLY sys.dm_exec_sql_text(c_blocker.most_recent_sql_handle) st_blocker_conn
 WHERE r.blocking_session_id > 0
   AND r.wait_time / 1000.0 >= $MinWaitSeconds
 ORDER BY r.wait_time DESC

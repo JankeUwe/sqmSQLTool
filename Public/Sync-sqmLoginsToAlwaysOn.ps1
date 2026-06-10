@@ -95,8 +95,21 @@
     Allows rollback if needed. Backup file: BackupPath\LoginBackup_<Secondary>_<Timestamp>.sql
 
 .PARAMETER BackupPath
-    Path where login backups are stored. Default: C:\System\WinSrvLog\MSSQL
+    Path where login backups are stored. Default: configured output path (Get-sqmDefaultOutputPath),
+    i.e. C:\System\WinSrvLog\MSSQL unless overridden in the module config.
     Path is created if it doesn't exist.
+
+.PARAMETER BackupRetentionDays
+    When greater than 0, login backups (LoginBackup_*.sql) in BackupPath older than this many
+    days are deleted after the sync. With -AuditAdOrphans, the LoginAudit_<instance>_* reports
+    are cleaned up too. Default: 0 (no cleanup). The login sync job sets this to 7.
+
+.PARAMETER AuditAdOrphans
+    When set, runs an AD-orphan check (Invoke-sqmLoginAudit -CheckAdOrphans) on the primary AFTER
+    the sync and reports Windows logins whose AD account no longer exists. Findings go to the log
+    and a Windows Event Log warning (Source 'sqmSQLTool', EventId 9003) for Splunk.
+    DETECTION ONLY - logins are NEVER deleted automatically. Requires the RSAT ActiveDirectory
+    module and AD read rights. Default: $false.
 
 .PARAMETER EnableException
     Throw exceptions immediately instead of returning error status.
@@ -184,7 +197,13 @@ function Sync-sqmLoginsToAlwaysOn
 		[switch]$BackupLogins,
 
 		[Parameter(Mandatory = $false)]
-		[string]$BackupPath = 'C:\System\WinSrvLog\MSSQL',
+		[string]$BackupPath = (Get-sqmDefaultOutputPath),
+
+		[Parameter(Mandatory = $false)]
+		[int]$BackupRetentionDays = 0,
+
+		[Parameter(Mandatory = $false)]
+		[switch]$AuditAdOrphans,
 
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
@@ -556,6 +575,69 @@ ORDER BY sp.name
 
 		Invoke-sqmLogging -Message "$functionName abgeschlossen. Success: $successCount | Failed: $failedCount | Skipped: $skippedCount | Logins: $totalLogins | Orphans: $totalOrphans" `
 						  -FunctionName $functionName -Level 'INFO'
+
+		# -------------------------------------------------------------------
+		# Optional: AD-Orphan-Audit auf dem Primary (nur Meldung, KEIN Auto-Delete)
+		# -------------------------------------------------------------------
+		if ($AuditAdOrphans)
+		{
+			try
+			{
+				$audit = Invoke-sqmLoginAudit -SqlInstance $SqlInstance -SqlCredential $srcCred -CheckAdOrphans -NoOpen -ErrorAction Stop
+				$adOrphans = @($audit | ForEach-Object { $_.DetailRows } | Where-Object { $_.FindingType -eq 'AdOrphan' })
+				if ($adOrphans.Count -gt 0)
+				{
+					$orphanNames = (($adOrphans | ForEach-Object { $_.LoginName }) -join ', ')
+					Invoke-sqmLogging -Message "AD-Orphans erkannt (manuelle Pruefung noetig, KEIN Auto-Delete): $orphanNames" `
+									  -FunctionName $functionName -Level 'WARNING'
+					try
+					{
+						$evtSrc = 'sqmSQLTool'
+						if (-not [System.Diagnostics.EventLog]::SourceExists($evtSrc)) { New-EventLog -LogName Application -Source $evtSrc -ErrorAction Stop }
+						Write-EventLog -LogName Application -Source $evtSrc -EntryType Warning -EventId 9003 `
+							-Message "sqmSQLTool: AD-verwaiste Logins auf '$SqlInstance' AG '$AvailabilityGroupName' - Count=$($adOrphans.Count): $orphanNames"
+					}
+					catch { }
+				}
+				else
+				{
+					Invoke-sqmLogging -Message "AD-Orphan-Pruefung: keine verwaisten Windows-Logins gefunden." -FunctionName $functionName -Level 'INFO'
+				}
+			}
+			catch
+			{
+				Invoke-sqmLogging -Message "AD-Orphan-Pruefung uebersprungen/fehlgeschlagen: $($_.Exception.Message)" `
+								  -FunctionName $functionName -Level 'WARNING'
+			}
+		}
+
+		# -------------------------------------------------------------------
+		# Optional: Retention - alte Login-Backups (und Audit-Reports) aufraeumen
+		# -------------------------------------------------------------------
+		if ($BackupRetentionDays -gt 0 -and (Test-Path $BackupPath))
+		{
+			try
+			{
+				$cutoff = (Get-Date).AddDays(-$BackupRetentionDays)
+				$old = @(Get-ChildItem -Path $BackupPath -Filter 'LoginBackup_*.sql' -File -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -lt $cutoff })
+				if ($AuditAdOrphans)
+				{
+					$safeInst = $SqlInstance -replace '[\\/:*?"<>|]', '_'
+					$old += @(Get-ChildItem -Path $BackupPath -Filter "LoginAudit_${safeInst}_*" -File -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -lt $cutoff })
+				}
+				if ($old.Count -gt 0)
+				{
+					$old | Remove-Item -Force -ErrorAction SilentlyContinue
+					Invoke-sqmLogging -Message "Retention: $($old.Count) Datei(en) aelter als $BackupRetentionDays Tage entfernt ($BackupPath)." `
+									  -FunctionName $functionName -Level 'INFO'
+				}
+			}
+			catch
+			{
+				Invoke-sqmLogging -Message "Retention-Cleanup fehlgeschlagen: $($_.Exception.Message)" `
+								  -FunctionName $functionName -Level 'WARNING'
+			}
+		}
 
 		return $results
 	}

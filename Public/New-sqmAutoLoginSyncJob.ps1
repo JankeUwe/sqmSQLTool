@@ -11,8 +11,11 @@
     3. Schedule (daily, weekly, custom)
     4. Notifications (job failure handling)
 
-    The job runs under the SQL Agent service account context. It outputs results to a log file
-    at C:\System\WinSrvLog\MSSQL\LoginSync_<AG>_<Date>.log
+    The job runs under the SQL Agent service account context. The step is intentionally thin:
+    it imports the module and calls Sync-sqmLoginsToAlwaysOn directly. Logging, retention and the
+    optional AD-orphan audit live inside that function; paths come from the module settings
+    (Get-sqmDefaultOutputPath, default C:\System\WinSrvLog\MSSQL). On failure the step throws, so
+    SQL Agent marks the job failed and notifies the configured operator.
 
     Prerequisites:
     - sqmSQLTool module available on the SQL Server (or in shared UNC path)
@@ -79,11 +82,11 @@
     Opt out with -BackupLogins:$false.
 
 .PARAMETER BackupRetentionDays
-    Retention in days for login backups (LoginBackup_*.sql) and sync logs
-    (LoginSync_<AG>_*.log) in C:\System\WinSrvLog\MSSQL. On each run the job deletes
-    matching files older than this value, so the share does not grow unbounded.
-    When -AuditAdOrphans is active, the LoginAudit_<instance>_* reports it produces are
-    cleaned up by the same retention.
+    Retention in days for login backups (LoginBackup_*.sql) in the configured output path
+    (Get-sqmDefaultOutputPath, default C:\System\WinSrvLog\MSSQL). On each run
+    Sync-sqmLoginsToAlwaysOn deletes matching files older than this value, so the share does
+    not grow unbounded. When -AuditAdOrphans is active, the LoginAudit_<instance>_* reports are
+    cleaned up by the same retention. Passed through to Sync-sqmLoginsToAlwaysOn.
     Default: 7. Set to 0 to disable cleanup (keep all files).
 
 .PARAMETER AuditAdOrphans
@@ -129,8 +132,9 @@
 .NOTES
     Requires: dbatools, Invoke-sqmLogging
     Needs: sysadmin on the SQL Server instance
-    The job step uses PowerShell to call Sync-sqmLoginsToAlwaysOn
-    Results logged to: C:\System\WinSrvLog\MSSQL\LoginSync_<AGName>_<Date>.log
+    The job step uses PowerShell to call Sync-sqmLoginsToAlwaysOn directly.
+    Results are written to the sqmSQLTool central log; backups and audit reports go to the
+    configured output path (Get-sqmDefaultOutputPath, default C:\System\WinSrvLog\MSSQL).
 #>
 function New-sqmAutoLoginSyncJob
 {
@@ -306,120 +310,57 @@ ORDER BY name ASC
 			# -------------------------------------------------------------------
 			# 2. Build PowerShell script for job step
 			# -------------------------------------------------------------------
-			# Schalter/Parameter werden per Indexer NACH dem Hashtable gesetzt.
-			# Ein bloszes "-Switch" innerhalb von @{} waere ungueltiges PowerShell.
+			# Schlanker Step: Modul laden, Sync-sqmLoginsToAlwaysOn direkt aufrufen, bei
+			# Fehlern throw -> SQL Agent markiert den Step als fehlgeschlagen (-> Operator).
+			# Retention, AD-Orphan-Audit und Logging liegen IN der Funktion. Pfade kommen
+			# aus den Settings (Get-sqmDefaultOutputPath) - hier wird KEIN Pfad eingebacken.
 			$extraLines = [System.Collections.Generic.List[string]]::new()
-			if ($IncludeSystemLogins) { $extraLines.Add("`$params['IncludeSystemLogins'] = `$true") }
+			if ($Force) { $extraLines.Add("    Force                 = `$true") }
+			if ($BackupLogins) { $extraLines.Add("    BackupLogins          = `$true") }
+			if ($BackupRetentionDays -gt 0) { $extraLines.Add("    BackupRetentionDays   = $BackupRetentionDays") }
+			if ($AuditAdOrphans) { $extraLines.Add("    AuditAdOrphans        = `$true") }
+			if ($IncludeSystemLogins) { $extraLines.Add("    IncludeSystemLogins   = `$true") }
 			if ($AdjustAuthMode)
 			{
-				$extraLines.Add("`$params['AdjustAuthMode'] = `$true")
-				$extraLines.Add("`$params['RestartServiceIfRequired'] = `$true")
+				$extraLines.Add("    AdjustAuthMode           = `$true")
+				$extraLines.Add("    RestartServiceIfRequired = `$true")
 			}
 			if ($SkipSecondaryServers)
 			{
 				$skipArr = ($SkipSecondaryServers | ForEach-Object { "'$_'" }) -join ','
-				$extraLines.Add("`$params['SkipSecondaryServers'] = @($skipArr)")
+				$extraLines.Add("    SkipSecondaryServers  = @($skipArr)")
 			}
-			if ($Force) { $extraLines.Add("`$params['Force'] = `$true") }
 			if ($ForceIncludeOnly)
 			{
 				$fioArr = ($ForceIncludeOnly | ForEach-Object { "'$_'" }) -join ','
-				$extraLines.Add("`$params['ForceIncludeOnly'] = @($fioArr)")
-			}
-			if ($BackupLogins)
-			{
-				$extraLines.Add("`$params['BackupLogins'] = `$true")
-				$extraLines.Add("`$params['BackupPath'] = 'C:\System\WinSrvLog\MSSQL'")
+				$extraLines.Add("    ForceIncludeOnly      = @($fioArr)")
 			}
 			$extraParamLines = $extraLines -join "`r`n"
 
-			# Optionaler AD-Orphan-Audit-Block (Erkennung + Meldung, KEIN Auto-Delete).
-			# $auditBlock laeuft nach der Sync; $auditCleanupLine raeumt die LoginAudit-Reports
-			# nach derselben Retention auf wie Backups/Logs.
-			$auditBlock = ''
-			$auditCleanupLine = ''
-			if ($AuditAdOrphans)
-			{
-				$auditBlock = @"
-# AD-Orphan-Erkennung auf dem Primary (nur Meldung, KEIN automatisches Loeschen)
-try {
-    `$audit = Invoke-sqmLoginAudit -SqlInstance "$SqlInstance" -CheckAdOrphans -NoOpen -ErrorAction Stop
-    `$adOrphans = @(`$audit | ForEach-Object { `$_.DetailRows } | Where-Object { `$_.FindingType -eq 'AdOrphan' })
-    if (`$adOrphans.Count -gt 0) {
-        `$orphanNames = ((`$adOrphans | ForEach-Object { `$_.LoginName }) -join ', ')
-        "AD-Orphans erkannt (manuelle Pruefung noetig, KEIN Auto-Delete): `$orphanNames" | Out-File -FilePath `$logFile -Append -Encoding UTF8
-        try {
-            `$evtSrc = 'sqmSQLTool'
-            if (-not [System.Diagnostics.EventLog]::SourceExists(`$evtSrc)) { New-EventLog -LogName Application -Source `$evtSrc -ErrorAction Stop }
-            Write-EventLog -LogName Application -Source `$evtSrc -EntryType Warning -EventId 9003 -Message "sqmSQLTool: AD-verwaiste Logins auf '$SqlInstance' AG '$AvailabilityGroupName' - Count=`$(`$adOrphans.Count): `$orphanNames"
-        } catch { }
-    } else {
-        "AD-Orphan-Pruefung: keine verwaisten Windows-Logins gefunden." | Out-File -FilePath `$logFile -Append -Encoding UTF8
-    }
-} catch {
-    "AD-Orphan-Pruefung uebersprungen/fehlgeschlagen: `$(`$_.Exception.Message)" | Out-File -FilePath `$logFile -Append -Encoding UTF8
-}
-"@
-				$safeInst = $SqlInstance -replace '[\\/:*?"<>|]', '_'
-				$auditCleanupLine = "    `$removed += @(Get-ChildItem -Path `$logPath -Filter 'LoginAudit_${safeInst}_*' -File -ErrorAction SilentlyContinue | Where-Object { `$_.LastWriteTime -lt `$cutoff })"
-			}
-
 			$scriptContent = @"
-`$logPath = "C:\System\WinSrvLog\MSSQL"
-if (-not (Test-Path `$logPath)) { New-Item -ItemType Directory -Path `$logPath -Force | Out-Null }
-`$logFile = Join-Path `$logPath ("LoginSync_$AvailabilityGroupName" + "_" + (Get-Date -Format 'yyyyMMdd_HHmmss') + ".log")
-
 Import-Module sqmSQLTool -Force -ErrorAction Stop
 
 `$params = @{
     SqlInstance           = "$SqlInstance"
     AvailabilityGroupName = "$AvailabilityGroupName"
-}
 $extraParamLines
+}
 
 `$result = Sync-sqmLoginsToAlwaysOn @params
 
-"`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Login Sync Result:`n`$(`$result | ConvertTo-Json -Depth 4)" | Out-File -FilePath `$logFile -Append -Encoding UTF8
-
-# Log backup files if Force was used
-`$backups = `$result | Where-Object { `$_.BackupFile }
-if (`$backups) {
-    "Backup files created: `$((`$backups | ForEach-Object { `$_.BackupFile }) -join ', ')" | Out-File -FilePath `$logFile -Append -Encoding UTF8
-}
-
-# Alte Login-Backups und Sync-Logs aufraeumen (Retention in Tagen, 0 = aus)
-`$retentionDays = $BackupRetentionDays
-if (`$retentionDays -gt 0) {
-    `$cutoff = (Get-Date).AddDays(-`$retentionDays)
-    `$removed = @()
-    `$removed += @(Get-ChildItem -Path `$logPath -Filter 'LoginBackup_*.sql' -File -ErrorAction SilentlyContinue | Where-Object { `$_.LastWriteTime -lt `$cutoff })
-    `$removed += @(Get-ChildItem -Path `$logPath -Filter 'LoginSync_$($AvailabilityGroupName)_*.log' -File -ErrorAction SilentlyContinue | Where-Object { `$_.LastWriteTime -lt `$cutoff })
-$auditCleanupLine
-    `$removed | Remove-Item -Force -ErrorAction SilentlyContinue
-    "Cleanup: `$(`$removed.Count) Datei(en) aelter als `$retentionDays Tage entfernt." | Out-File -FilePath `$logFile -Append -Encoding UTF8
-}
-
-$auditBlock
-
-# Return status (0=success, 1=failure)
 `$failures = @(`$result | Where-Object Status -eq 'Failed')
 if (`$failures.Count -gt 0) {
-    # Windows Event Log (fuer Splunk) - Berechtigungs-/Source-Fehler bewusst ignorieren
-    try {
-        `$evtSrc = 'sqmSQLTool'
-        if (-not [System.Diagnostics.EventLog]::SourceExists(`$evtSrc)) { New-EventLog -LogName Application -Source `$evtSrc -ErrorAction Stop }
-        Write-EventLog -LogName Application -Source `$evtSrc -EntryType Error -EventId 9002 -Message "sqmSQLTool: Login-Sync fehlgeschlagen AG '$AvailabilityGroupName' - Failed=`$(`$failures.Count)"
-    } catch { }
+    throw "Login-Sync fehlgeschlagen fuer AG '$AvailabilityGroupName': `$(`$failures.Count) Replica(s). Details im sqmSQLTool-Log."
 }
-exit ([int](`$failures.Count -gt 0))
 "@
 
 			# -------------------------------------------------------------------
 			# 3. Parse schedule settings
 			# -------------------------------------------------------------------
+			# SqlInstance wird beim Aufruf explizit uebergeben (-SqlInstance) - NICHT zusaetzlich
+			# ins Hashtable, sonst "parameter 'SqlInstance' is specified more than once".
 			$scheduleParams = @{
-				SqlInstance = $SqlInstance
-				Force       = $true
+				Force = $true
 			}
 
 			if ($Schedule -eq 'Daily')
@@ -546,7 +487,7 @@ exit ([int](`$failures.Count -gt 0))
 				Schedule = $schedDesc
 				Status = 'Success'
 				Message = "Job created and scheduled: $schedDesc"
-				LogPath = 'C:\System\WinSrvLog\MSSQL\LoginSync_*.log'
+				LogPath = (Get-sqmDefaultOutputPath)
 				Timestamp = Get-Date
 			}
 		}
