@@ -1,5 +1,16 @@
 # sqmSQLTool — Changelog
 
+## [1.4.12.0] — 2026-06-10
+
+### 🔧 Fixes
+
+- **New-sqmAutoLoginSyncJob**: Zeitplan-Erstellung scheiterte versionsabhängig an
+  `New-DbaAgentSchedule` („A parameter cannot be found that matches parameter name 'Force'",
+  „… 'sch_…' is not a valid value for the Schedule variable"). Die Parameter dieses Cmdlets
+  variieren je dbatools-Version. Der Zeitplan wird jetzt über native msdb-Prozeduren
+  (`sp_add_schedule` / `sp_attach_schedule`) per `Invoke-DbaQuery` erstellt - identisch stabil
+  auf jeder SQL-Server- und dbatools-Version, kein API-Raten mehr.
+
 ## [1.4.11.0] — 2026-06-10
 
 ### 🔧 Fixes

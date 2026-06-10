@@ -357,79 +357,46 @@ if (`$failures.Count -gt 0) {
 			# -------------------------------------------------------------------
 			# 3. Parse schedule settings
 			# -------------------------------------------------------------------
-			# SqlInstance wird beim Aufruf explizit uebergeben (-SqlInstance) - NICHT zusaetzlich
-			# ins Hashtable, sonst "parameter 'SqlInstance' is specified more than once".
-			$scheduleParams = @{
-				Force = $true
-			}
-
-			# New-DbaAgentSchedule nutzt -StartTime im Format 'HHMMSS' (nicht
-			# ActiveStartTimeOfDay - das ist eine SMO-Property, KEIN dbatools-Parameter).
+			# Schedule-Werte fuer die nativen msdb-Prozeduren (sp_add_schedule).
+			# Bewusst NICHT ueber New-DbaAgentSchedule: dessen Parameter (-Force, -StartTime,
+			# -Schedule-Validierung) unterscheiden sich je dbatools-Version und brachen die
+			# Job-Erstellung. sp_add_schedule ist auf jeder SQL-Version identisch stabil.
 			$hour = [int]($TimeOfDay.Split(':')[0])
 			$minute = [int]($TimeOfDay.Split(':')[1])
-			$startTime = '{0:00}{1:00}00' -f $hour, $minute
+			$activeStartTime = [int]('{0:00}{1:00}00' -f $hour, $minute)
 
-			if ($Schedule -eq 'Daily')
-			{
-				$scheduleParams += @{
-					FrequencyType     = 'Daily'
-					FrequencyInterval = 1
-					StartTime         = $startTime
-				}
+			# Defaults: taeglich zur angegebenen Uhrzeit
+			$freqType = 4              # 4 = taeglich, 8 = woechentlich, 16 = monatlich
+			$freqInterval = 1
+			$freqRecurrence = 0
+			$freqSubdayType = 1        # 1 = einmal zur angegebenen Zeit
+			$freqSubdayInterval = 0
+
+			$dayMap = @{
+				'Monday' = 2; 'Tuesday' = 4; 'Wednesday' = 8; 'Thursday' = 16
+				'Friday' = 32; 'Saturday' = 64; 'Sunday' = 1
 			}
-			elseif ($Schedule -eq 'Weekly')
+
+			if ($Schedule -eq 'Weekly')
 			{
-				$dayMap = @{
-					'Monday' = 2; 'Tuesday' = 4; 'Wednesday' = 8; 'Thursday' = 16
-					'Friday' = 32; 'Saturday' = 64; 'Sunday' = 1
-				}
-				$scheduleParams += @{
-					FrequencyType             = 'Weekly'
-					FrequencyInterval         = $dayMap[$DayOfWeek]
-					FrequencyRecurrenceFactor = 1
-					StartTime                 = $startTime
-				}
+				$freqType = 8
+				$freqInterval = $dayMap[$DayOfWeek]
+				$freqRecurrence = 1
 			}
-			else # Custom
+			elseif ($Schedule -eq 'Custom')
 			{
 				switch ($CustomScheduleFrequency)
 				{
 					'Hourly'
 					{
-						$scheduleParams += @{
-							FrequencyType           = 'Daily'
-							FrequencyInterval       = 1
-							FrequencySubdayType     = 'Hours'
-							FrequencySubdayInterval = $CustomScheduleInterval
-							StartTime               = '000000'
-						}
+						$freqType = 4; $freqInterval = 1
+						$freqSubdayType = 8          # 8 = Stunden
+						$freqSubdayInterval = $CustomScheduleInterval
+						$activeStartTime = 0
 					}
-					'Daily'
-					{
-						$scheduleParams += @{
-							FrequencyType     = 'Daily'
-							FrequencyInterval = $CustomScheduleInterval
-							StartTime         = $startTime
-						}
-					}
-					'Weekly'
-					{
-						$scheduleParams += @{
-							FrequencyType             = 'Weekly'
-							FrequencyInterval         = 1
-							FrequencyRecurrenceFactor = $CustomScheduleInterval
-							StartTime                 = $startTime
-						}
-					}
-					'Monthly'
-					{
-						$scheduleParams += @{
-							FrequencyType             = 'Monthly'
-							FrequencyInterval         = 1
-							FrequencyRecurrenceFactor = $CustomScheduleInterval
-							StartTime                 = $startTime
-						}
-					}
+					'Daily'   { $freqType = 4;  $freqInterval = $CustomScheduleInterval }
+					'Weekly'  { $freqType = 8;  $freqInterval = 1; $freqRecurrence = $CustomScheduleInterval }
+					'Monthly' { $freqType = 16; $freqInterval = 1; $freqRecurrence = $CustomScheduleInterval }
 				}
 			}
 
@@ -468,11 +435,24 @@ if (`$failures.Count -gt 0) {
 			Invoke-sqmLogging -Message "Job-Schritt hinzugefügt: SyncLogins_Step1" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
-			# 6. Add schedule
+			# 6. Add schedule (native msdb-Prozeduren - version-stabil)
 			# -------------------------------------------------------------------
 			$schedName = "sch_$JobName"
-			$schedule = New-DbaAgentSchedule -SqlInstance $SqlInstance -Schedule $schedName @scheduleParams -ErrorAction Stop
-			$jobSchedule = Add-DbaAgentJobSchedule -SqlInstance $SqlInstance -Job $JobName -Schedule $schedName -ErrorAction Stop
+			$schedSql = @"
+IF EXISTS (SELECT 1 FROM msdb.dbo.sysschedules WHERE name = N'$schedName')
+    EXEC msdb.dbo.sp_delete_schedule @schedule_name = N'$schedName', @force_delete = 1;
+EXEC msdb.dbo.sp_add_schedule
+    @schedule_name          = N'$schedName',
+    @enabled                = 1,
+    @freq_type              = $freqType,
+    @freq_interval          = $freqInterval,
+    @freq_subday_type       = $freqSubdayType,
+    @freq_subday_interval   = $freqSubdayInterval,
+    @freq_recurrence_factor = $freqRecurrence,
+    @active_start_time      = $activeStartTime;
+EXEC msdb.dbo.sp_attach_schedule @job_name = N'$JobName', @schedule_name = N'$schedName';
+"@
+			$null = Invoke-DbaQuery -SqlInstance $SqlInstance -Database msdb -Query $schedSql -EnableException -ErrorAction Stop
 
 			$schedDesc = if ($Schedule -eq 'Daily') { "Daily at $TimeOfDay" } `
 						 elseif ($Schedule -eq 'Weekly') { "Weekly on $DayOfWeek at $TimeOfDay" } `
