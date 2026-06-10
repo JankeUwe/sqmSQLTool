@@ -371,7 +371,7 @@ ORDER BY drs.role ASC
 							$sysAdminLogins = @()
 							try
 							{
-								$query = "SELECT name FROM sys.server_principals WHERE is_srvrolemember('sysadmin', name) = 1 AND name NOT LIKE '##%'"
+								$query = "SELECT name FROM sys.server_principals WHERE (is_srvrolemember('sysadmin', name) = 1 OR sid = 0x01) AND name NOT LIKE '##%'"
 								$sysAdminLogins = @((Invoke-DbaQuery -SqlInstance $secondaryName -SqlCredential $dstCred -Query $query).name)
 								if ($sysAdminLogins.Count -gt 0)
 								{

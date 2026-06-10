@@ -1,5 +1,18 @@
 # sqmSQLTool — Changelog
 
+## [1.4.10.0] — 2026-06-10
+
+### 🔧 Fixes
+
+- **Copy-sqmLogins / AlwaysOn-Login-Sync**: umbenannte `sa` wurde nicht erkannt. Ursache war
+  ein Reihenfolge-Bug - die dynamische sysadmin-Erkennung lief, bevor `$srcConnParams`
+  definiert war, scheiterte still und fiel auf das Literal `'sa'` zurück. Dadurch konnte eine
+  auf einem Node umbenannte `sa` in den Kopier-Batch gelangen (SID-Kollision 0x01 auf dem Ziel).
+  - ConnParams/Credentials werden jetzt VOR der Erkennung aufgebaut.
+  - `sa` wird zusätzlich über die well-known SID `0x01` identifiziert (namensunabhängig) und
+    grundsätzlich nie kopiert - auch nicht mit `-IncludeSystemLogins`.
+  - sysadmin-Abfrage in Copy-sqmLogins und Sync-sqmLoginsToAlwaysOn ergänzt um `OR sid = 0x01`.
+
 ## [1.4.9.0] — 2026-06-10
 
 ### 🔧 Fixes

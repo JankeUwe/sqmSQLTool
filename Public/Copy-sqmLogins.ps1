@@ -194,15 +194,45 @@ function Copy-sqmLogins
 	{
 		$functionName = $MyInvocation.MyCommand.Name
 		
+		# Credential-Aufloesung + Connection-Parameter ZUERST aufbauen - die sa-/sysadmin-
+		# Erkennung weiter unten braucht $srcConnParams bereits. (Frueher standen diese Zeilen
+		# weiter unten, wodurch die Abfrage immer mit leerem Splat fehlschlug und auf das Literal
+		# 'sa' zurueckfiel - eine auf einem Node umbenannte sa wurde dadurch NICHT erkannt.)
+		$srcCred = if ($SourceCredential) { $SourceCredential }
+		elseif ($SqlCredential) { $SqlCredential }
+		else { $null }
+		$dstCred = if ($DestinationCredential) { $DestinationCredential }
+		elseif ($SqlCredential) { $SqlCredential }
+		else { $null }
+		$srcConnParams = @{ SqlInstance = $Source; ErrorAction = 'Stop' }
+		$dstConnParams = @{ SqlInstance = $Destination; ErrorAction = 'Stop' }
+		if ($srcCred) { $srcConnParams['SqlCredential'] = $srcCred }
+		if ($dstCred) { $dstConnParams['SqlCredential'] = $dstCred }
+
 		# Systemlogin-Muster (standardmaessig ausgeschlossen)
-		# Hinweis: 'sa' wird durch dynamische sysadmin-Erkennung ersetzt um umbenannte sa-Accounts zu handhaben
+		# Hinweis: 'sa' wird ueber die well-known SID 0x01 erkannt (namensunabhaengig) und
+		# zusaetzlich ueber die dynamische sysadmin-Erkennung - umbenannte sa-Accounts inklusive.
 		$systemLoginPatterns = @('##MS_*', 'NT SERVICE\*', 'NT AUTHORITY\*', 'BUILTIN\*')
 
-		# Dynamisch alle sysadmin-Accounts ermitteln (handhaben umbenannte 'sa')
+		# 'sa' per well-known SID 0x01 ermitteln (Name kann auf einem Node umbenannt sein)
+		$saLoginName = $null
+		try
+		{
+			$saLoginName = (Invoke-DbaQuery @srcConnParams -Query "SELECT SUSER_SNAME(0x01) AS n" -ErrorAction Stop).n
+			if (-not [string]::IsNullOrWhiteSpace($saLoginName))
+			{
+				$systemLoginPatterns += $saLoginName
+				Invoke-sqmLogging -Message "Quelle: 'sa' (SID 0x01) heisst '$saLoginName' - wird von der Synchronisierung ausgeschlossen." `
+								  -FunctionName $functionName -Level 'INFO'
+			}
+		}
+		catch { }
+
+		# Dynamisch alle sysadmin-Accounts ermitteln (handhaben umbenannte 'sa' / weitere sysadmins)
 		$sysAdminLogins = @()
 		try
 		{
-			$query = "SELECT name FROM sys.server_principals WHERE is_srvrolemember('sysadmin', name) = 1 AND name NOT LIKE '##%'"
+			$query = "SELECT name FROM sys.server_principals WHERE (is_srvrolemember('sysadmin', name) = 1 OR sid = 0x01) AND name NOT LIKE '##%'"
 			$sysAdminLogins = @((Invoke-DbaQuery @srcConnParams -Query $query).name)
 			if ($sysAdminLogins.Count -gt 0)
 			{
@@ -245,20 +275,8 @@ function Copy-sqmLogins
 			}
 		}
 		
-		# Credential-Aufloesung: spezifische Credentials haben Vorrang vor dem gemeinsamen
-		$srcCred = if ($SourceCredential) { $SourceCredential }
-		elseif ($SqlCredential) { $SqlCredential }
-		else { $null }
-		
-		$dstCred = if ($DestinationCredential) { $DestinationCredential }
-		elseif ($SqlCredential) { $SqlCredential }
-		else { $null }
-		
-		$srcConnParams = @{ SqlInstance = $Source; ErrorAction = 'Stop' }
-		$dstConnParams = @{ SqlInstance = $Destination; ErrorAction = 'Stop' }
-		if ($srcCred) { $srcConnParams['SqlCredential'] = $srcCred }
-		if ($dstCred) { $dstConnParams['SqlCredential'] = $dstCred }
-		
+		# (Credential-Aufloesung + $srcConnParams/$dstConnParams werden bereits oben im
+		#  begin-Block aufgebaut, damit die sa-/sysadmin-Erkennung sie nutzen kann.)
 		$results = [System.Collections.Generic.List[PSCustomObject]]::new()
 		
 		# Hilfsfunktion: Ergebnis-Eintrag hinzufuegen
@@ -558,6 +576,13 @@ function Copy-sqmLogins
 			{
 				$sourceLogins = Get-DbaLogin @srcConnParams
 				
+				# 'sa' (well-known SID 0x01) NIE kopieren - die SID-Kollision auf dem Ziel ist
+				# garantiert, auch wenn sa auf einem Node umbenannt wurde. Unabhaengig von
+				# -IncludeSystemLogins.
+				$sourceLogins = $sourceLogins | Where-Object {
+					-not ($_.Sid -and $_.Sid.Length -eq 1 -and [int]$_.Sid[0] -eq 1)
+				}
+
 				if (-not $IncludeSystemLogins)
 				{
 					$sourceLogins = $sourceLogins | Where-Object {
