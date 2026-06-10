@@ -1,5 +1,35 @@
 # sqmSQLTool — Changelog
 
+## [1.4.8.0] — 2026-06-10
+
+### ✨ Neue Features
+
+#### Remove-sqmAdOrphanLogin
+Manuelles, sicheres Entfernen von Windows-Logins, deren AD-Konto nicht mehr existiert
+(„tote" AD-Logins). Bewusst nur manuell, nicht für den unbeaufsichtigten Betrieb.
+- ActiveDirectory-Modul Pflicht (Default `-AdModuleAction Abort`); ohne AD keine Löschung
+- System- und alle sysadmin-Logins immer ausgeschlossen, DB-Owner-Logins übersprungen
+- Orphan nur bei positivem AD-„nicht vorhanden"; AD-Abfragefehler → überspringen
+- Rollback-Skript (CREATE LOGIN FROM WINDOWS + Server-Rollen) vor dem Drop
+- `ConfirmImpact = High`: `-WhatIf` / `-Confirm` greifen
+
+#### New-sqmAutoLoginSyncJob — neue Optionen
+- `-Force` und `-BackupLogins` standardmäßig aktiv: der laufende Job hält die Secondaries
+  vollständig synchron (Passwort-/Sprach-/Default-DB-Drift), mit Rollback-Backup.
+  Opt-out via `-Force:$false` / `-BackupLogins:$false`
+- `-BackupRetentionDays` (Default 7): räumt Backups, Sync-Logs und Audit-Reports auf
+- `-AuditAdOrphans`: meldet nach jedem Lauf verwaiste Windows-Logins (Sync-Log + Event Log
+  EventId 9003 für Splunk) — nur Erkennung, kein Auto-Delete
+
+### 🔧 Fixes
+
+- **Login-Backup-Query**: `password_hash` aus `sys.sql_logins` statt `sys.server_principals`
+  (Fehler „Invalid column name 'password_hash'" bei `-BackupLogins`)
+- **Sync-sqmLoginsToAlwaysOn**: AG-Ermittlung sortiert nach `name` statt nicht existierender
+  Spalte `creation_date`
+- **Install.cmd / Update.cmd**: unter GPO `RemoteSigned` immer lokal stagen (Mark-of-the-Web
+  entfernen), damit die Ausführung vom UNC-/`\\tsclient\`-Pfad nicht blockiert wird
+
 ## [1.4.0.0] — 2026-05-31
 
 ### ✨ Neue Features
