@@ -310,48 +310,13 @@ ORDER BY name ASC
 			# -------------------------------------------------------------------
 			# 2. Build PowerShell script for job step
 			# -------------------------------------------------------------------
-			# Schlanker Step: Modul laden, Sync-sqmLoginsToAlwaysOn direkt aufrufen, bei
-			# Fehlern throw -> SQL Agent markiert den Step als fehlgeschlagen (-> Operator).
-			# Retention, AD-Orphan-Audit und Logging liegen IN der Funktion. Pfade kommen
-			# aus den Settings (Get-sqmDefaultOutputPath) - hier wird KEIN Pfad eingebacken.
-			$extraLines = [System.Collections.Generic.List[string]]::new()
-			if ($Force) { $extraLines.Add("    Force                 = `$true") }
-			if ($BackupLogins) { $extraLines.Add("    BackupLogins          = `$true") }
-			if ($BackupRetentionDays -gt 0) { $extraLines.Add("    BackupRetentionDays   = $BackupRetentionDays") }
-			if ($AuditAdOrphans) { $extraLines.Add("    AuditAdOrphans        = `$true") }
-			if ($IncludeSystemLogins) { $extraLines.Add("    IncludeSystemLogins   = `$true") }
-			if ($AdjustAuthMode)
-			{
-				$extraLines.Add("    AdjustAuthMode           = `$true")
-				$extraLines.Add("    RestartServiceIfRequired = `$true")
-			}
-			if ($SkipSecondaryServers)
-			{
-				$skipArr = ($SkipSecondaryServers | ForEach-Object { "'$_'" }) -join ','
-				$extraLines.Add("    SkipSecondaryServers  = @($skipArr)")
-			}
-			if ($ForceIncludeOnly)
-			{
-				$fioArr = ($ForceIncludeOnly | ForEach-Object { "'$_'" }) -join ','
-				$extraLines.Add("    ForceIncludeOnly      = @($fioArr)")
-			}
-			$extraParamLines = $extraLines -join "`r`n"
-
+			# Bewusst minimal: Modul laden, dann EIN Aufruf ohne Parameter. SqlInstance
+			# (= Computername), AG (= erste gefundene), Force/Backup/Retention sowie Pfade
+			# sind Defaults von Sync-sqmLoginsToAlwaysOn. Fehler werden von der Funktion
+			# protokolliert und als Windows Event 9002 (Splunk) gemeldet.
 			$scriptContent = @"
 Import-Module sqmSQLTool -Force -ErrorAction Stop
-
-`$params = @{
-    SqlInstance           = "$SqlInstance"
-    AvailabilityGroupName = "$AvailabilityGroupName"
-$extraParamLines
-}
-
-`$result = Sync-sqmLoginsToAlwaysOn @params
-
-`$failures = @(`$result | Where-Object Status -eq 'Failed')
-if (`$failures.Count -gt 0) {
-    throw "Login-Sync fehlgeschlagen fuer AG '$AvailabilityGroupName': `$(`$failures.Count) Replica(s). Details im sqmSQLTool-Log."
-}
+Sync-sqmLoginsToAlwaysOn
 "@
 
 			# -------------------------------------------------------------------
@@ -439,8 +404,14 @@ if (`$failures.Count -gt 0) {
 			# -------------------------------------------------------------------
 			$schedName = "sch_$JobName"
 			$schedSql = @"
-IF EXISTS (SELECT 1 FROM msdb.dbo.sysschedules WHERE name = N'$schedName')
-    EXEC msdb.dbo.sp_delete_schedule @schedule_name = N'$schedName', @force_delete = 1;
+-- Alle (auch mehrfach vorhandenen) Schedules dieses Namens per ID entfernen,
+-- damit sp_attach_schedule den Namen wieder eindeutig aufloesen kann.
+DECLARE @sid INT;
+WHILE EXISTS (SELECT 1 FROM msdb.dbo.sysschedules WHERE name = N'$schedName')
+BEGIN
+    SELECT TOP (1) @sid = schedule_id FROM msdb.dbo.sysschedules WHERE name = N'$schedName';
+    EXEC msdb.dbo.sp_delete_schedule @schedule_id = @sid, @force_delete = 1;
+END
 EXEC msdb.dbo.sp_add_schedule
     @schedule_name          = N'$schedName',
     @enabled                = 1,

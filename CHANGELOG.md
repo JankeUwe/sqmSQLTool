@@ -1,5 +1,25 @@
 # sqmSQLTool — Changelog
 
+## [1.4.13.0] — 2026-06-10
+
+### ♻️ Vereinfachung
+
+- **Sync-sqmLoginsToAlwaysOn** läuft jetzt sinnvoll ohne jede Angabe: `Force`, `BackupLogins`
+  (je $true) und `BackupRetentionDays` (7) sind Defaults. Ein bloßes `Sync-sqmLoginsToAlwaysOn`
+  hält die Secondaries komplett synchron (SqlInstance = Computername, AG = erste gefundene,
+  Pfade aus den Settings). Opt-out via `-Force:$false` / `-BackupLogins:$false`.
+- **New-sqmAutoLoginSyncJob**: Job-Step ist jetzt nur noch zwei Zeilen - `Import-Module` plus
+  der parameterlose Aufruf `Sync-sqmLoginsToAlwaysOn`. Keine Hashtable, keine Pfade, kein
+  Servername, keine AG im Step.
+
+### 🔧 Fixes
+
+- **New-sqmAutoLoginSyncJob**: „There are two or more schedules named …" - mehrfach vorhandene
+  Schedules gleichen Namens (aus früheren Fehlversuchen) werden jetzt vor dem Anlegen per
+  `schedule_id` in einer Schleife entfernt, statt per mehrdeutigem `@schedule_name`.
+- **Sync-sqmLoginsToAlwaysOn**: meldet Fehlschläge per Windows Event Log (Source 'sqmSQLTool',
+  EventId 9002) für Splunk - der schlanke Job-Step braucht dafür keinen eigenen throw mehr.
+
 ## [1.4.12.0] — 2026-06-10
 
 ### 🔧 Fixes

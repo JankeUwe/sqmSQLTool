@@ -69,9 +69,11 @@
     Example: 'SQL02', 'SQL03'
 
 .PARAMETER Force
-    When set, existing logins on secondaries are overwritten (for password updates).
-    Default: $false (only new logins are copied).
-    With SafeForceMode=true (default), system logins (sa, NT SERVICE\*, etc.) are automatically excluded.
+    Existing logins on secondaries are overwritten (password / language / default-db drift),
+    not only new ones added. Default: $true - so a bare 'Sync-sqmLoginsToAlwaysOn' keeps the
+    secondaries fully in sync. Opt out with -Force:$false (then only new logins are created).
+    With SafeForceMode=true (default), all sysadmin logins, the SQL Agent account and system
+    logins (sa via SID, NT SERVICE\*, etc.) are automatically excluded - no self-lockout.
 
 .PARAMETER ForceIncludeOnly
     When Force is set with this parameter, only these logins are updated (whitelist).
@@ -91,8 +93,9 @@
     Set to false ONLY if you fully understand the risks. Default: $true
 
 .PARAMETER BackupLogins
-    When set, creates a backup of existing logins on each secondary BEFORE applying -Force.
-    Allows rollback if needed. Backup file: BackupPath\LoginBackup_<Secondary>_<Timestamp>.sql
+    Creates a backup of existing logins on each secondary BEFORE applying -Force (rollback safety).
+    Default: $true (paired with the Force default). Opt out with -BackupLogins:$false.
+    Backup file: BackupPath\LoginBackup_<Secondary>_<Timestamp>.sql
 
 .PARAMETER BackupPath
     Path where login backups are stored. Default: configured output path (Get-sqmDefaultOutputPath),
@@ -102,7 +105,7 @@
 .PARAMETER BackupRetentionDays
     When greater than 0, login backups (LoginBackup_*.sql) in BackupPath older than this many
     days are deleted after the sync. With -AuditAdOrphans, the LoginAudit_<instance>_* reports
-    are cleaned up too. Default: 0 (no cleanup). The login sync job sets this to 7.
+    are cleaned up too. Default: 7. Set to 0 to disable cleanup (keep all files).
 
 .PARAMETER AuditAdOrphans
     When set, runs an AD-orphan check (Invoke-sqmLoginAudit -CheckAdOrphans) on the primary AFTER
@@ -182,7 +185,7 @@ function Sync-sqmLoginsToAlwaysOn
 		[string[]]$SkipSecondaryServers,
 
 		[Parameter(Mandatory = $false)]
-		[switch]$Force,
+		[switch]$Force = $true,
 
 		[Parameter(Mandatory = $false)]
 		[string[]]$ForceIncludeOnly,
@@ -194,13 +197,13 @@ function Sync-sqmLoginsToAlwaysOn
 		[bool]$SafeForceMode = $true,
 
 		[Parameter(Mandatory = $false)]
-		[switch]$BackupLogins,
+		[switch]$BackupLogins = $true,
 
 		[Parameter(Mandatory = $false)]
 		[string]$BackupPath = (Get-sqmDefaultOutputPath),
 
 		[Parameter(Mandatory = $false)]
-		[int]$BackupRetentionDays = 0,
+		[int]$BackupRetentionDays = 7,
 
 		[Parameter(Mandatory = $false)]
 		[switch]$AuditAdOrphans,
@@ -575,6 +578,23 @@ ORDER BY sp.name
 
 		Invoke-sqmLogging -Message "$functionName abgeschlossen. Success: $successCount | Failed: $failedCount | Skipped: $skippedCount | Logins: $totalLogins | Orphans: $totalOrphans" `
 						  -FunctionName $functionName -Level 'INFO'
+
+		# -------------------------------------------------------------------
+		# Bei Fehlern: Windows Event Log (Splunk). Der SQL-Agent-Job-Step ruft nur
+		# 'Sync-sqmLoginsToAlwaysOn' auf (ohne throw) - die Fehlermeldung laeuft daher
+		# ueber Event 9002 und das zentrale sqmSQLTool-Log, nicht ueber den Step.
+		# -------------------------------------------------------------------
+		if ($failedCount -gt 0)
+		{
+			try
+			{
+				$evtSrc = 'sqmSQLTool'
+				if (-not [System.Diagnostics.EventLog]::SourceExists($evtSrc)) { New-EventLog -LogName Application -Source $evtSrc -ErrorAction Stop }
+				Write-EventLog -LogName Application -Source $evtSrc -EntryType Error -EventId 9002 `
+					-Message "sqmSQLTool: Login-Sync fehlgeschlagen AG '$AvailabilityGroupName' auf '$SqlInstance' - Failed=$failedCount"
+			}
+			catch { }
+		}
 
 		# -------------------------------------------------------------------
 		# Optional: AD-Orphan-Audit auf dem Primary (nur Meldung, KEIN Auto-Delete)
