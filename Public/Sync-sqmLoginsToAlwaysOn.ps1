@@ -446,21 +446,21 @@ ORDER BY drs.role ASC
 -- Source: $($primaryReplica.replica_server_name)
 -- Note: Excludes sysadmin accounts, dbo, and system accounts
 
-SELECT 'CREATE LOGIN [' + name + ']' +
+SELECT 'CREATE LOGIN [' + sp.name + ']' +
        CASE
-           WHEN type = 'S' THEN ' WITH PASSWORD = 0x' + CONVERT(VARCHAR(MAX), password_hash, 2) + ' HASHED'
-           WHEN type = 'U' THEN ' FROM WINDOWS'
-           WHEN type = 'G' THEN ' FROM WINDOWS'
+           WHEN sp.type = 'S' THEN ' WITH PASSWORD = 0x' + CONVERT(VARCHAR(MAX), sl.password_hash, 2) + ' HASHED'
+           WHEN sp.type IN ('U', 'G') THEN ' FROM WINDOWS'
        END + ';'
-FROM sys.server_principals
-WHERE type IN ('S', 'U', 'G')
-  AND name != 'dbo'
-  AND is_srvrolemember('sysadmin', name) = 0  -- Exclude all sysadmin accounts (handles renamed 'sa')
-  AND name NOT LIKE 'NT SERVICE\%'
-  AND name NOT LIKE 'NT AUTHORITY\%'
-  AND name NOT LIKE 'BUILTIN\%'
-  AND name NOT LIKE '##MS_%'
-ORDER BY name
+FROM sys.server_principals sp
+LEFT JOIN sys.sql_logins sl ON sl.principal_id = sp.principal_id
+WHERE sp.type IN ('S', 'U', 'G')
+  AND sp.name != 'dbo'
+  AND is_srvrolemember('sysadmin', sp.name) = 0  -- Exclude all sysadmin accounts (handles renamed 'sa')
+  AND sp.name NOT LIKE 'NT SERVICE\%'
+  AND sp.name NOT LIKE 'NT AUTHORITY\%'
+  AND sp.name NOT LIKE 'BUILTIN\%'
+  AND sp.name NOT LIKE '##MS_%'
+ORDER BY sp.name
 "@
 
 							$backupContent = Invoke-DbaQuery -SqlInstance $secondaryName -SqlCredential $dstCred -Query $backupQuery
