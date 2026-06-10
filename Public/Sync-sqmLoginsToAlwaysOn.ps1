@@ -211,7 +211,7 @@ function Sync-sqmLoginsToAlwaysOn
 			# -------------------------------------------------------------------
 			$agQuery = @"
 SELECT name FROM sys.availability_groups
-ORDER BY creation_date DESC
+ORDER BY name ASC
 "@
 
 			$allAgs = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $srcCred -Query $agQuery -ErrorAction Stop
