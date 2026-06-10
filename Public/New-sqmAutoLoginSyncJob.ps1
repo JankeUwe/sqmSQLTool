@@ -78,6 +78,12 @@
     Backups stored in: C:\System\WinSrvLog\MSSQL\LoginBackup_<Secondary>_<Timestamp>.sql
     Opt out with -BackupLogins:$false.
 
+.PARAMETER BackupRetentionDays
+    Retention in days for login backups (LoginBackup_*.sql) and sync logs
+    (LoginSync_<AG>_*.log) in C:\System\WinSrvLog\MSSQL. On each run the job deletes
+    matching files older than this value, so the share does not grow unbounded.
+    Default: 7. Set to 0 to disable cleanup (keep all files).
+
 .PARAMETER NotificationOperator
     Name of an existing SQL Agent operator for OnFailure notifications. The operator must
     exist on the instance (SQL Agent notifies operators, not raw email addresses). Default: none
@@ -159,6 +165,9 @@ function New-sqmAutoLoginSyncJob
 
 		[Parameter(Mandatory = $false)]
 		[switch]$BackupLogins = $true,
+
+		[Parameter(Mandatory = $false)]
+		[int]$BackupRetentionDays = 7,
 
 		[Parameter(Mandatory = $false)]
 		[string]$NotificationOperator,
@@ -321,6 +330,17 @@ $extraParamLines
 `$backups = `$result | Where-Object { `$_.BackupFile }
 if (`$backups) {
     "Backup files created: `$((`$backups | ForEach-Object { `$_.BackupFile }) -join ', ')" | Out-File -FilePath `$logFile -Append -Encoding UTF8
+}
+
+# Alte Login-Backups und Sync-Logs aufraeumen (Retention in Tagen, 0 = aus)
+`$retentionDays = $BackupRetentionDays
+if (`$retentionDays -gt 0) {
+    `$cutoff = (Get-Date).AddDays(-`$retentionDays)
+    `$removed = @()
+    `$removed += @(Get-ChildItem -Path `$logPath -Filter 'LoginBackup_*.sql' -File -ErrorAction SilentlyContinue | Where-Object { `$_.LastWriteTime -lt `$cutoff })
+    `$removed += @(Get-ChildItem -Path `$logPath -Filter 'LoginSync_$($AvailabilityGroupName)_*.log' -File -ErrorAction SilentlyContinue | Where-Object { `$_.LastWriteTime -lt `$cutoff })
+    `$removed | Remove-Item -Force -ErrorAction SilentlyContinue
+    "Cleanup: `$(`$removed.Count) Datei(en) aelter als `$retentionDays Tage entfernt." | Out-File -FilePath `$logFile -Append -Encoding UTF8
 }
 
 # Return status (0=success, 1=failure)
