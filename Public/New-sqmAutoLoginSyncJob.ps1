@@ -302,7 +302,7 @@ ORDER BY name ASC
 			{
 				if ($PSCmdlet.ShouldProcess($JobName, "Lösche existierenden Job"))
 				{
-					Remove-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -Force -ErrorAction Stop
+					Remove-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -Confirm:$false -ErrorAction Stop
 					Invoke-sqmLogging -Message "Existierender Job '$JobName' gelöscht" -FunctionName $functionName -Level 'INFO'
 				}
 			}

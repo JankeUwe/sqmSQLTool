@@ -1,5 +1,14 @@
 # sqmSQLTool — Changelog
 
+## [1.4.15.0] — 2026-06-10
+
+### 🔧 Fixes
+
+- **New-sqmAutoLoginSyncJob / New-sqmAutoLoginCompareJob**: `-Overwrite` schlug fehl mit
+  „A parameter cannot be found that matches parameter name 'Force'". `Remove-DbaAgentJob -Force`
+  existiert nicht in jeder dbatools-Version; jetzt `-Confirm:$false` (versionsstabil, wie in
+  allen anderen Job-Funktionen).
+
 ## [1.4.14.0] — 2026-06-10
 
 ### 🔧 Fixes

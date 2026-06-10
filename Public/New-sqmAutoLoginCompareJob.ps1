@@ -214,7 +214,7 @@ function New-sqmAutoLoginCompareJob
 			{
 				if ($PSCmdlet.ShouldProcess($JobName, "Loesche existierenden Job"))
 				{
-					Remove-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -Force -ErrorAction Stop
+					Remove-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -Confirm:$false -ErrorAction Stop
 					Invoke-sqmLogging -Message "Existierender Job '$JobName' geloescht" -FunctionName $functionName -Level 'INFO'
 				}
 			}
