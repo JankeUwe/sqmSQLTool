@@ -82,7 +82,19 @@
     Retention in days for login backups (LoginBackup_*.sql) and sync logs
     (LoginSync_<AG>_*.log) in C:\System\WinSrvLog\MSSQL. On each run the job deletes
     matching files older than this value, so the share does not grow unbounded.
+    When -AuditAdOrphans is active, the LoginAudit_<instance>_* reports it produces are
+    cleaned up by the same retention.
     Default: 7. Set to 0 to disable cleanup (keep all files).
+
+.PARAMETER AuditAdOrphans
+    When set, the job runs an AD-orphan check (Invoke-sqmLoginAudit -CheckAdOrphans) on the
+    primary AFTER the sync and reports Windows logins whose AD account no longer exists.
+    Findings are written to the sync log and raised as a Windows Event Log warning
+    (Source 'sqmSQLTool', EventId 9003) for Splunk.
+    DETECTION ONLY - logins are NEVER deleted automatically. A missing AD account can be a
+    transient DC/trust issue, so removal stays a deliberate manual action.
+    Requires the RSAT ActiveDirectory module and AD read rights for the SQL Agent service
+    account. Default: $false.
 
 .PARAMETER NotificationOperator
     Name of an existing SQL Agent operator for OnFailure notifications. The operator must
@@ -109,6 +121,10 @@
 .EXAMPLE
     New-sqmAutoLoginSyncJob -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -Force:$false
     Creates a job that only adds NEW logins - password/language drift is NOT corrected (legacy behaviour).
+
+.EXAMPLE
+    New-sqmAutoLoginSyncJob -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -AuditAdOrphans
+    Daily sync that additionally reports AD-orphaned Windows logins after each run (no auto-delete).
 
 .NOTES
     Requires: dbatools, Invoke-sqmLogging
@@ -168,6 +184,9 @@ function New-sqmAutoLoginSyncJob
 
 		[Parameter(Mandatory = $false)]
 		[int]$BackupRetentionDays = 7,
+
+		[Parameter(Mandatory = $false)]
+		[switch]$AuditAdOrphans,
 
 		[Parameter(Mandatory = $false)]
 		[string]$NotificationOperator,
@@ -254,6 +273,11 @@ ORDER BY name ASC
 			Invoke-sqmLogging -Message "Hinweis: -Force:`$false - der Job legt nur NEUE Logins an. Passwort-/Sprach-Drift wird NICHT korrigiert." `
 							  -FunctionName $functionName -Level 'WARNING'
 		}
+		if ($AuditAdOrphans)
+		{
+			Invoke-sqmLogging -Message "AD-Orphan-Audit aktiv: Job meldet verwaiste Windows-Logins nach jedem Lauf (nur Detection, KEIN Auto-Delete). Benoetigt RSAT-AD + AD-Leserechte des Agent-Kontos." `
+							  -FunctionName $functionName -Level 'INFO'
+		}
 	}
 
 	process
@@ -309,6 +333,37 @@ ORDER BY name ASC
 			}
 			$extraParamLines = $extraLines -join "`r`n"
 
+			# Optionaler AD-Orphan-Audit-Block (Erkennung + Meldung, KEIN Auto-Delete).
+			# $auditBlock laeuft nach der Sync; $auditCleanupLine raeumt die LoginAudit-Reports
+			# nach derselben Retention auf wie Backups/Logs.
+			$auditBlock = ''
+			$auditCleanupLine = ''
+			if ($AuditAdOrphans)
+			{
+				$auditBlock = @"
+# AD-Orphan-Erkennung auf dem Primary (nur Meldung, KEIN automatisches Loeschen)
+try {
+    `$audit = Invoke-sqmLoginAudit -SqlInstance "$SqlInstance" -CheckAdOrphans -NoOpen -ErrorAction Stop
+    `$adOrphans = @(`$audit | ForEach-Object { `$_.DetailRows } | Where-Object { `$_.FindingType -eq 'AdOrphan' })
+    if (`$adOrphans.Count -gt 0) {
+        `$orphanNames = ((`$adOrphans | ForEach-Object { `$_.LoginName }) -join ', ')
+        "AD-Orphans erkannt (manuelle Pruefung noetig, KEIN Auto-Delete): `$orphanNames" | Out-File -FilePath `$logFile -Append -Encoding UTF8
+        try {
+            `$evtSrc = 'sqmSQLTool'
+            if (-not [System.Diagnostics.EventLog]::SourceExists(`$evtSrc)) { New-EventLog -LogName Application -Source `$evtSrc -ErrorAction Stop }
+            Write-EventLog -LogName Application -Source `$evtSrc -EntryType Warning -EventId 9003 -Message "sqmSQLTool: AD-verwaiste Logins auf '$SqlInstance' AG '$AvailabilityGroupName' - Count=`$(`$adOrphans.Count): `$orphanNames"
+        } catch { }
+    } else {
+        "AD-Orphan-Pruefung: keine verwaisten Windows-Logins gefunden." | Out-File -FilePath `$logFile -Append -Encoding UTF8
+    }
+} catch {
+    "AD-Orphan-Pruefung uebersprungen/fehlgeschlagen: `$(`$_.Exception.Message)" | Out-File -FilePath `$logFile -Append -Encoding UTF8
+}
+"@
+				$safeInst = $SqlInstance -replace '[\\/:*?"<>|]', '_'
+				$auditCleanupLine = "    `$removed += @(Get-ChildItem -Path `$logPath -Filter 'LoginAudit_${safeInst}_*' -File -ErrorAction SilentlyContinue | Where-Object { `$_.LastWriteTime -lt `$cutoff })"
+			}
+
 			$scriptContent = @"
 `$logPath = "C:\System\WinSrvLog\MSSQL"
 if (-not (Test-Path `$logPath)) { New-Item -ItemType Directory -Path `$logPath -Force | Out-Null }
@@ -339,9 +394,12 @@ if (`$retentionDays -gt 0) {
     `$removed = @()
     `$removed += @(Get-ChildItem -Path `$logPath -Filter 'LoginBackup_*.sql' -File -ErrorAction SilentlyContinue | Where-Object { `$_.LastWriteTime -lt `$cutoff })
     `$removed += @(Get-ChildItem -Path `$logPath -Filter 'LoginSync_$($AvailabilityGroupName)_*.log' -File -ErrorAction SilentlyContinue | Where-Object { `$_.LastWriteTime -lt `$cutoff })
+$auditCleanupLine
     `$removed | Remove-Item -Force -ErrorAction SilentlyContinue
     "Cleanup: `$(`$removed.Count) Datei(en) aelter als `$retentionDays Tage entfernt." | Out-File -FilePath `$logFile -Append -Encoding UTF8
 }
+
+$auditBlock
 
 # Return status (0=success, 1=failure)
 `$failures = @(`$result | Where-Object Status -eq 'Failed')
