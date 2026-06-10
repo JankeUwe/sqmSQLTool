@@ -18,10 +18,10 @@
 
 name: Publish to PowerShell Gallery
 
+# Bewusst NICHT automatisch bei Tag-Push - die PSGallery wird derzeit nicht aktuell
+# gehalten (Distribution laeuft ueber GitHub Releases). Nur manuell ausloesbar.
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  workflow_dispatch:
 
 permissions:
   contents: read
