@@ -220,20 +220,7 @@ function New-sqmAutoLoginCompareJob
 			}
 
 			# -------------------------------------------------------------------
-			# 2. PowerShell-Script fuer den Job-Step bauen
-			# -------------------------------------------------------------------
-			# Bewusst minimal: Modul laden, dann EIN Aufruf. -FailOnDrift schreibt bei
-			# Login-Drift Windows Event 9001 (Splunk) und wirft -> SQL Agent markiert den
-			# Job als fehlgeschlagen (= Drift-Alarm via OnFailure-Operator). SqlInstance
-			# (= Computername), AG (= erste gefundene) und OutputPath sind Defaults von
-			# Compare-sqmAlwaysOnLogins.
-			$scriptContent = @"
-Import-Module sqmSQLTool -Force -ErrorAction Stop
-Compare-sqmAlwaysOnLogins -FailOnDrift
-"@
-
-			# -------------------------------------------------------------------
-			# 3. Schedule-Werte fuer native msdb-Prozeduren (sp_add_schedule).
+			# 2. Schedule-Werte fuer native msdb-Prozeduren (sp_add_schedule).
 			#    Bewusst NICHT ueber New-DbaAgentSchedule - dessen Parameter (-Force,
 			#    -StartTime, -Schedule-Validierung) variieren je dbatools-Version.
 			# -------------------------------------------------------------------
@@ -289,27 +276,37 @@ Compare-sqmAlwaysOnLogins -FailOnDrift
 			}
 
 			# -------------------------------------------------------------------
-			# 4. Job anlegen
+			# 3. Job anlegen
 			# -------------------------------------------------------------------
 			$job = New-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -ErrorAction Stop
 			Invoke-sqmLogging -Message "Job '$JobName' erstellt" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
-			# 5. Job-Step
+			# 4. Job-Step (CmdExec - kein PowerShell Proxy noetig!)
 			# -------------------------------------------------------------------
 			$stepParams = @{
-				SqlInstance = $SqlInstance
-				Job         = $JobName
-				StepName    = "CompareLogins_Step1"
-				Subsystem   = 'PowerShell'
-				Command     = $scriptContent
-				ErrorAction = 'Stop'
+				SqlInstance    = $SqlInstance
+				JobName        = $JobName
+				StepName       = "CompareLogins_Step1"
+				FunctionName   = 'Compare-sqmAlwaysOnLogins'
+				Parameters     = @{
+					FailOnDrift = $true
+					OutputPath  = $OutputPath
+					IncludeSystemLogins = $IncludeSystemLogins
+					OnlyDifferences     = $OnlyDifferences
+				}
+				Description    = "Compare logins across AlwaysOn replicas (AG: $AvailabilityGroupName)"
+				ErrorAction    = 'Stop'
 			}
-			$jobStep = New-DbaAgentJobStep @stepParams
-			Invoke-sqmLogging -Message "Job-Schritt hinzugefuegt: CompareLogins_Step1" -FunctionName $functionName -Level 'INFO'
+			if (-not [string]::IsNullOrWhiteSpace($AvailabilityGroupName)) {
+				$stepParams.Parameters['AvailabilityGroupName'] = $AvailabilityGroupName
+			}
+			$jobStepResult = _CreateCmdExecJobStep @stepParams
+			$jobStep = $jobStepResult.JobStep
+			Invoke-sqmLogging -Message "Job-Schritt (CmdExec) hinzugefuegt: CompareLogins_Step1" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
-			# 6. Zeitplan
+			# 5. Zeitplan
 			# -------------------------------------------------------------------
 			$schedName = "sch_$JobName"
 			$schedSql = @"
@@ -341,7 +338,7 @@ EXEC msdb.dbo.sp_attach_schedule @job_name = N'$JobName', @schedule_name = N'$sc
 			Invoke-sqmLogging -Message "Zeitplan hinzugefuegt: $schedDesc" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
-			# 7. OnFailure-Benachrichtigung an Operator (= Alarm bei Drift)
+			# 6. OnFailure-Benachrichtigung an Operator (= Alarm bei Drift)
 			#    SQL Agent benachrichtigt einen Operator (mit hinterlegter Mailadresse),
 			#    nicht eine rohe E-Mail. Operator muss auf der Instanz existieren.
 			# -------------------------------------------------------------------

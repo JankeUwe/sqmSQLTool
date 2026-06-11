@@ -308,16 +308,24 @@ ORDER BY name ASC
 			}
 
 			# -------------------------------------------------------------------
-			# 2. Build PowerShell script for job step
+			# 2. Build parameters for wrapper script
 			# -------------------------------------------------------------------
-			# Bewusst minimal: Modul laden, dann EIN Aufruf ohne Parameter. SqlInstance
-			# (= Computername), AG (= erste gefundene), Force/Backup/Retention sowie Pfade
-			# sind Defaults von Sync-sqmLoginsToAlwaysOn. Fehler werden von der Funktion
-			# protokolliert und als Windows Event 9002 (Splunk) gemeldet.
-			$scriptContent = @"
-Import-Module sqmSQLTool -Force -ErrorAction Stop
-Sync-sqmLoginsToAlwaysOn
-"@
+			# CmdExec step passes parameters to the wrapper, which calls Sync-sqmLoginsToAlwaysOn
+			$wrapperParams = @{
+				AvailabilityGroupName = $AvailabilityGroupName
+				IncludeSystemLogins   = $IncludeSystemLogins
+				AdjustAuthMode        = $AdjustAuthMode
+				Force                 = $Force
+				BackupLogins          = $BackupLogins
+				BackupRetentionDays   = $BackupRetentionDays
+				AuditAdOrphans        = $AuditAdOrphans
+			}
+			if ($SkipSecondaryServers -and $SkipSecondaryServers.Count -gt 0) {
+				$wrapperParams['SkipSecondaryServers'] = $SkipSecondaryServers
+			}
+			if ($ForceIncludeOnly -and $ForceIncludeOnly.Count -gt 0) {
+				$wrapperParams['ForceIncludeOnly'] = $ForceIncludeOnly
+			}
 
 			# -------------------------------------------------------------------
 			# 3. Parse schedule settings
@@ -385,19 +393,20 @@ Sync-sqmLoginsToAlwaysOn
 			Invoke-sqmLogging -Message "Job '$JobName' erstellt" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
-			# 5. Add job step
+			# 5. Add job step (CmdExec - kein PowerShell Proxy noetig!)
 			# -------------------------------------------------------------------
 			$stepParams = @{
-				SqlInstance = $SqlInstance
-				Job = $JobName
-				StepName = "SyncLogins_Step1"
-				Subsystem = 'PowerShell'
-				Command = $scriptContent
-				ErrorAction = 'Stop'
+				SqlInstance    = $SqlInstance
+				JobName        = $JobName
+				StepName       = "SyncLogins_Step1"
+				FunctionName   = 'Sync-sqmLoginsToAlwaysOn'
+				Parameters     = $wrapperParams
+				Description    = "Synchronize logins across AlwaysOn replicas (AG: $AvailabilityGroupName)"
+				ErrorAction    = 'Stop'
 			}
-
-			$jobStep = New-DbaAgentJobStep @stepParams
-			Invoke-sqmLogging -Message "Job-Schritt hinzugefügt: SyncLogins_Step1" -FunctionName $functionName -Level 'INFO'
+			$jobStepResult = _CreateCmdExecJobStep @stepParams
+			$jobStep = $jobStepResult.JobStep
+			Invoke-sqmLogging -Message "Job-Schritt (CmdExec) hinzugefügt: SyncLogins_Step1" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
 			# 6. Add schedule (native msdb-Prozeduren - version-stabil)

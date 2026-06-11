@@ -35,11 +35,11 @@ Shows what would happen without making any changes.
 
 .EXAMPLE
 # Remove a single database from its AG
-Remove-sqmDatabaseFromAvailabilityGroup -Database "SalesDB"
+Remove-sqmDatabaseFromAG -Database "SalesDB"
 
 .EXAMPLE
 # Remove all AG databases
-Remove-sqmDatabaseFromAvailabilityGroup -All
+Remove-sqmDatabaseFromAG -All
 
 .NOTES
 Requires dbatools and Invoke-sqmLogging.

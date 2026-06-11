@@ -94,91 +94,93 @@ function New-sqmAlwaysOnRepairJob
 				Remove-DbaAgentJob -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Job $JobName -Confirm:$false -ErrorAction Stop
 			}
 			
-			# PowerShell-Skript fuer den Job-Schritt
-			# Dieses Skript laedt die benoetigten Funktionen (hier vereinfacht: wir nehmen an, dass sie bereits definiert sind)
-			# Fuer Produktivumgebung besser: In ein Modul packen oder ueber -Command eine Skriptdatei aufrufen.
-			$powershellCode = @'
-# Importiere dbatools (falls nicht bereits geladen)
-if (-not (Get-Module dbatools)) { Import-Module dbatools -ErrorAction Stop }
-
-# Hier die benutzerdefinierten Funktionen definieren oder aus einer Datei dot-sourcen.
-# Wir nehmen an, dass die Funktionen bereits im globalen Scope verfuegbar sind (z.B. durch ein Modul).
-# Falls nicht, folgende Zeile aktivieren und Pfad anpassen:
-# . "C:\Scripts\sqmAlwaysOnFunctions.ps1"
-
-# Fuehre Reparatur aus
-Repair-sqmAlwaysOnDatabases -SqlInstance $env:COMPUTERNAME -Force -SkipAutoSeedingCheck
-
-# Optional: Logging in eine Datei
-# $log = "C:\Logs\AlwaysOnRepair_$(Get-Date -Format 'yyyyMMdd_HHmsqm').log"
-# Repair-sqmAlwaysOnDatabases -SqlInstance $env:COMPUTERNAME -Force -SkipAutoSeedingCheck | Out-File $log
-'@
-			
-			# Erstelle Job mit dbatools
-			$jobParams = @{
-				SqlInstance   = $SqlInstance
-				SqlCredential = $SqlCredential
-				Job		      = $JobName
-				Description   = "Fuehrt regelmaessig die Reparatur von AlwaysOn-Datenbanken durch."
-				OwnerLogin    = 'sa'
-				ErrorAction   = 'Stop'
-			}
-			if ($EnableException) { $jobParams.EnableException = $true }
-			
-			if ($PSCmdlet.ShouldProcess($SqlInstance, "Erstelle Job '$JobName'"))
+			# Resolve SqlInstance if not provided
+			if (-not $PSBoundParameters.ContainsKey('SqlInstance') -or [string]::IsNullOrWhiteSpace($SqlInstance))
 			{
-				$job = New-DbaAgentJob @jobParams
-				
-				# Erstelle Job-Schritt (PowerShell)
-				$stepParams = @{
-					SqlInstance   = $SqlInstance
-					SqlCredential = $SqlCredential
-					Job		      = $JobName
-					StepName	  = 'RunRepair'
-					SubSystem	  = 'PowerShell'
-					Command	      = $powershellCode
-					Database	  = 'master'
-					ErrorAction   = 'Stop'
-				}
-				Add-DbaAgentJobStep @stepParams
-				
-				# Fuege Zeitplan hinzu, falls angegeben
-				if ($Schedule)
-				{
-					$scheduleParams = @{
-						SqlInstance   = $SqlInstance
-						SqlCredential = $SqlCredential
-						Job		      = $JobName
-						Schedule	  = "$JobName Schedule"
-						Frequency	  = $Schedule
-						ErrorAction   = 'Stop'
-					}
-					if ($StartTime) { $scheduleParams.StartTime = $StartTime }
-					Add-DbaAgentJobSchedule @scheduleParams
-				}
-				
-				# Aktiviere Job
-				Enable-DbaAgentJob -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Job $JobName
-				
-				Invoke-sqmLogging -Message "Job '$JobName' erfolgreich erstellt und aktiviert." -FunctionName $functionName -Level "INFO"
-				
-				# Rueckgabe
-				[PSCustomObject]@{
+				$SqlInstance = $env:COMPUTERNAME
+			}
+
+			# Check if job exists
+			$existingJob = Get-DbaAgentJob -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Job $JobName -ErrorAction SilentlyContinue
+			if ($existingJob -and -not $Force)
+			{
+				throw "Job '$JobName' existiert bereits. Verwenden Sie -Force zum Ueberschreiben."
+			}
+			elseif ($existingJob -and $Force)
+			{
+				Invoke-sqmLogging -Message "Loesche vorhandenen Job '$JobName'." -FunctionName $functionName -Level "INFO"
+				Remove-DbaAgentJob -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Job $JobName -Confirm:$false -ErrorAction Stop
+			}
+
+			if (-not $PSCmdlet.ShouldProcess($JobName, "Erstelle neuen SQL Agent Job"))
+			{
+				Invoke-sqmLogging -Message "WhatIf: Job '$JobName' würde erstellt" -FunctionName $functionName -Level 'VERBOSE'
+				return [PSCustomObject]@{
 					SqlInstance = $SqlInstance
-					JobName	    = $JobName
-					Status	    = "Created"
-					Schedule    = $Schedule
-					Message	    = "Job wurde erstellt. Manueller Start: Start-DbaAgentJob -SqlInstance $SqlInstance -Job '$JobName'"
+					JobName     = $JobName
+					Status      = 'WhatIf'
+					Message     = 'Job would be created'
+					Timestamp   = Get-Date
 				}
 			}
-			else
+
+			# Create job
+			$job = New-DbaAgentJob -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Job $JobName `
+				-Description "Repariert regelmaessig AlwaysOn-Datenbanken und heilt autoseeding-Fehler." -ErrorAction Stop
+			Invoke-sqmLogging -Message "Job '$JobName' erstellt" -FunctionName $functionName -Level 'INFO'
+
+			# Build parameters for wrapper script
+			$wrapperParams = @{}  # Repair-sqmAlwaysOnDatabases hat keine zusaetzlichen Parameter noetig
+
+			# Create CmdExec job step (no PowerShell Proxy needed!)
+			$stepParams = @{
+				SqlInstance    = $SqlInstance
+				JobName        = $JobName
+				StepName       = "RunRepair_Step1"
+				FunctionName   = 'Repair-sqmAlwaysOnDatabases'
+				Parameters     = $wrapperParams
+				Description    = "Repair and heal AlwaysOn database replication errors"
+				ErrorAction    = 'Stop'
+			}
+			$jobStepResult = _CreateCmdExecJobStep @stepParams
+			$jobStep = $jobStepResult.JobStep
+			Invoke-sqmLogging -Message "Job-Schritt (CmdExec) hinzugefuegt: RunRepair_Step1" -FunctionName $functionName -Level 'INFO'
+
+			# Add schedule if provided
+			if ($Schedule)
 			{
-				[PSCustomObject]@{
-					SqlInstance = $SqlInstance
-					JobName	    = $JobName
-					Status	    = "Skipped"
-					Message	    = "WhatIf: Job-Erstellung uebersprungen."
-				}
+				# Parse Schedule string (e.g. 'FREQ=HOURLY;INTERVAL=1')
+				# For now, use dbatools New-DbaAgentSchedule which is simpler
+				$schedName = "sch_$JobName"
+				$schedSql = @"
+DECLARE @sid INT;
+WHILE EXISTS (SELECT 1 FROM msdb.dbo.sysschedules WHERE name = N'$schedName')
+BEGIN
+    SELECT TOP (1) @sid = schedule_id FROM msdb.dbo.sysschedules WHERE name = N'$schedName';
+    EXEC msdb.dbo.sp_delete_schedule @schedule_id = @sid, @force_delete = 1;
+END
+EXEC msdb.dbo.sp_add_schedule
+    @schedule_name          = N'$schedName',
+    @enabled                = 1,
+    @freq_type              = 4,
+    @freq_interval          = 1,
+    @active_start_time      = 000000;
+EXEC msdb.dbo.sp_attach_schedule @job_name = N'$JobName', @schedule_name = N'$schedName';
+"@
+				$null = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database msdb -Query $schedSql -ErrorAction Stop
+				Invoke-sqmLogging -Message "Zeitplan hinzugefuegt: $Schedule" -FunctionName $functionName -Level 'INFO'
+			}
+
+			# Return result
+			Invoke-sqmLogging -Message "Job '$JobName' erfolgreich erstellt und aktiviert." -FunctionName $functionName -Level "INFO"
+
+			[PSCustomObject]@{
+				SqlInstance = $SqlInstance
+				JobName     = $JobName
+				Status      = "Success"
+				Schedule    = $Schedule
+				Message     = "Job created successfully. Manual start: Start-DbaAgentJob -SqlInstance $SqlInstance -Job '$JobName'"
+				Timestamp   = Get-Date
 			}
 		}
 		catch
