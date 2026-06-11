@@ -75,7 +75,8 @@ function _CreateCmdExecJobStep
 
         # Handle different types
         if ($value -is [bool]) {
-            $paramStrings += "-$key `$$value"
+            # Use PowerShell switch syntax: -param:$true or -param:$false
+            $paramStrings += '-' + $key + ':$' + $value
         } elseif ($value -is [int] -or $value -is [double]) {
             $paramStrings += "-$key $value"
         } elseif ($value -is [array]) {
