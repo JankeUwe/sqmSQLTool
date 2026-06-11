@@ -1,36 +1,30 @@
 <#
 .SYNOPSIS
-    Helper: Creates a SQL Agent CmdExec job step with PowerShell wrapper script.
+    Helper: Creates a SQL Agent CmdExec job step with PowerShell wrapper.
 .DESCRIPTION
-    Generates a wrapper PowerShell script and creates a CmdExec (not PowerShell)
-    job step that calls it. This avoids the need for PowerShell Proxy + Credential.
+    Generates a PowerShell wrapper script and creates a CmdExec job step.
 
-    The wrapper script is generated in:
-    C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs\<FunctionName>-<JobName>.ps1
+    DESIGN: Inline command with NO parameter passing.
+    All function parameters are hardcoded in the generated script.
+    This avoids serialization issues with hashtables and complex types.
 
-    The job step simply calls:
-    C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<wrapper-path>" <params>
+    Wrapper is generated at: C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs\<FunctionName>-<JobName>.ps1
+    Job step simply calls: powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<wrapper-path>"
+
 .PARAMETER SqlInstance
     SQL Server instance.
 .PARAMETER JobName
-    Name of the job (for step naming).
+    Name of the job.
 .PARAMETER StepName
-    Name of the job step. Default: "{FunctionName}_Step1"
+    Name of the job step. Default: "AutoStep_1"
 .PARAMETER FunctionName
-    The sqmSQLTool function to call in the wrapper (e.g. Compare-sqmAlwaysOnLogins).
+    The sqmSQLTool function to call (e.g. Compare-sqmAlwaysOnLogins).
 .PARAMETER Parameters
-    Hash of parameters to pass to the function. Converted to script arguments.
-.PARAMETER Description
-    Optional description for the job step.
+    Hashtable of parameters to pass to the function.
 .EXAMPLE
-    $params = @{
-        SqlInstance = 'SQL01'
-        AvailabilityGroupName = 'AG_Prod'
-        NoOpen = $true
-        OutputPath = 'C:\System\WinSrvLog\MSSQL'
-    }
-    _CreateCmdExecJobStep -SqlInstance 'SQL01' -JobName 'sqmLoginCompare' `
-        -FunctionName 'Compare-sqmAlwaysOnLogins' -Parameters $params
+    _CreateCmdExecJobStep -SqlInstance 'SQL01' -JobName 'TestJob' `
+        -FunctionName 'Compare-sqmAlwaysOnLogins' `
+        -Parameters @{ AvailabilityGroupName='AG1'; OutputPath='C:\...' }
 #>
 function _CreateCmdExecJobStep
 {
@@ -52,9 +46,9 @@ function _CreateCmdExecJobStep
         [hashtable]$Parameters = @{}
     )
 
-    # -----------------------------------------------------------------------
-    # 1. Wrapper-Script Path
-    # -----------------------------------------------------------------------
+    # =========================================================================
+    # 1. Ensure jobs directory exists
+    # =========================================================================
     $modulePath = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool'
     $jobsDir = Join-Path $modulePath 'jobs'
 
@@ -62,41 +56,43 @@ function _CreateCmdExecJobStep
         New-Item -ItemType Directory -Path $jobsDir -Force | Out-Null
     }
 
-    $wrapperName = "$FunctionName-$JobName.ps1"
-    $wrapperPath = Join-Path $jobsDir $wrapperName
-
-    # -----------------------------------------------------------------------
-    # 2. Build wrapper script content
-    # -----------------------------------------------------------------------
-    # Convert hashtable parameters to script arguments
+    # =========================================================================
+    # 2. Build parameter strings for inline command
+    # =========================================================================
     $paramStrings = @()
+
     foreach ($key in $Parameters.Keys) {
         $value = $Parameters[$key]
 
-        # Handle different types
         if ($value -is [bool]) {
-            # Use PowerShell switch syntax: -param:$true or -param:$false
-            $paramStrings += '-' + $key + ':$' + $value
-        } elseif ($value -is [int] -or $value -is [double]) {
-            $paramStrings += "-$key $value"
-        } elseif ($value -is [array]) {
-            $arrayStr = ($value | ForEach-Object { "`"$_`"" }) -join ','
-            $paramStrings += "-$key @($arrayStr)"
-        } else {
-            $paramStrings += "-$key `"$value`""
+            # Boolean: -ParamName:$true or -ParamName:$false
+            $paramStrings += "-${key}:`$$value"
+        }
+        elseif ($value -is [int] -or $value -is [double]) {
+            # Number: unquoted
+            $paramStrings += "-${key} $value"
+        }
+        elseif ($value -is [array]) {
+            # Array: @('item1','item2',...)
+            $itemsQuoted = @($value | ForEach-Object { "`"$_`"" }) -join ','
+            $paramStrings += "-${key} @($itemsQuoted)"
+        }
+        else {
+            # String: quoted
+            $paramStrings += "-${key} `"$value`""
         }
     }
 
-    # Join parameters as single line (no newlines needed in command string)
+    # Join all parameters
     $paramLine = if ($paramStrings) { " " + ($paramStrings -join " ") } else { "" }
 
-    $wrapperContent = @"
-<#
-    Wrapper script for SQL Agent job: $JobName
-    Generated by: _CreateCmdExecJobStep
-    Function: $FunctionName
-    Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-#>
+    # =========================================================================
+    # 3. Generate wrapper script with INLINE COMMAND
+    # =========================================================================
+    $wrapperScript = @"
+# Auto-generated wrapper for SQL Agent job: $JobName
+# Function: $FunctionName
+# Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 
 `$ErrorActionPreference = 'Stop'
 `$VerbosePreference = 'Continue'
@@ -105,60 +101,53 @@ Write-Output "`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Starting $FunctionNam
 
 try {
     Import-Module sqmSQLTool -Force -ErrorAction Stop
-    Write-Output "Module loaded."
 
-    # Build and execute the function call dynamically
-    `$cmd = "$FunctionName$paramLine -Verbose -ContinueOnError"
-    Write-Output "Executing: `$cmd"
-    Invoke-Expression `$cmd
+    # Inline command execution (no parameter passing to script)
+    $FunctionName$paramLine -Verbose -ContinueOnError
 
-    Write-Output "`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Completed successfully"
+    Write-Output "`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Completed"
     exit 0
-} catch {
+}
+catch {
     Write-Output "ERROR: `$_"
     exit 1
 }
 "@
 
-    # -----------------------------------------------------------------------
-    # 3. Write wrapper script to disk
-    # -----------------------------------------------------------------------
-    Set-Content -Path $wrapperPath -Value $wrapperContent -Encoding UTF8 -Force
-    Write-Verbose "Wrapper script created: $wrapperPath"
+    # =========================================================================
+    # 4. Write wrapper script to disk
+    # =========================================================================
+    $wrapperPath = Join-Path $jobsDir "$FunctionName-$JobName.ps1"
+    Set-Content -Path $wrapperPath -Value $wrapperScript -Encoding UTF8 -Force
 
-    # -----------------------------------------------------------------------
-    # 4. Create CmdExec job step
-    # -----------------------------------------------------------------------
+    # =========================================================================
+    # 5. Create CmdExec job step
+    # =========================================================================
     $psExePath = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
-    $cmdExecCommand = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$wrapperPath`""
+    $command = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$wrapperPath`""
 
     $stepParams = @{
         SqlInstance = $SqlInstance
         Job         = $JobName
         StepName    = $StepName
         Subsystem   = 'CmdExec'
-        Command     = $cmdExecCommand
+        Command     = $command
         ErrorAction = 'Stop'
     }
 
-    # Note: dbatools New-DbaAgentJobStep does not support StepDescription parameter.
-    # Description is implicit in StepName and visible in SQL Agent UI.
-
     $jobStep = New-DbaAgentJobStep @stepParams
 
-    Write-Verbose "CmdExec job step created: $StepName"
-
-    # -----------------------------------------------------------------------
-    # 5. Return result
-    # -----------------------------------------------------------------------
+    # =========================================================================
+    # 6. Return result
+    # =========================================================================
     [PSCustomObject]@{
-        SqlInstance    = $SqlInstance
-        JobName        = $JobName
-        StepName       = $StepName
-        FunctionName   = $FunctionName
-        WrapperScript  = $wrapperPath
-        JobStep        = $jobStep
-        Status         = 'Success'
-        Timestamp      = Get-Date
+        SqlInstance   = $SqlInstance
+        JobName       = $JobName
+        StepName      = $StepName
+        FunctionName  = $FunctionName
+        WrapperPath   = $wrapperPath
+        JobStep       = $jobStep
+        Status        = 'Success'
+        Timestamp     = Get-Date
     }
 }
