@@ -22,7 +22,10 @@
     Logins without login since this value are considered inactive. Default: 90.
 
 .PARAMETER MaxPasswordAgeDays
-    SQL logins with password older than this value are reported. Default: 180. 0 = disabled.
+    SQL logins with password older than this value are reported (non-sysadmins). Default: 180. 0 = disabled.
+
+.PARAMETER MaxPasswordAgeDaysSysadmin
+    SQL logins with password older than this value are reported (sysadmins). Default: 365. 0 = disabled.
 
 .PARAMETER ExcludeLogin
     Logins to exclude (wildcards). E.g. 'NT SERVICE\*', 'sqmsa'.
@@ -30,8 +33,23 @@
 .PARAMETER IncludeSystemLogins
     When set, NT SERVICE\*, NT AUTHORITY\* are also included.
 
+.PARAMETER CheckPolicyNonSysadmin
+    Check password policy violations for non-sysadmin logins. Default: $true.
+
+.PARAMETER CheckPolicySysadmin
+    Check password policy violations for sysadmin logins. Default: $true.
+
+.PARAMETER ReportBuiltInAdmins
+    When BUILTIN\Administrators is found in logins, report as warning. Default: $true.
+
 .PARAMETER CheckAdOrphans
     When set, AD orphan check is performed for Windows logins (requires AD module).
+
+.PARAMETER GenerateHtmlReport
+    Generate HTML report in addition to TXT/CSV. Default: $true.
+
+.PARAMETER HtmlReportTemplate
+    HTML template style: 'Standard', 'Compact', 'Detailed'. Default: 'Standard'.
 
 .PARAMETER OutputPath
     Output directory. Default: from module configuration (Get-sqmDefaultOutputPath).
@@ -72,11 +90,24 @@ function Invoke-sqmLoginAudit
 		[Parameter(Mandatory = $false)]
 		[int]$MaxPasswordAgeDays = 180,
 		[Parameter(Mandatory = $false)]
+		[int]$MaxPasswordAgeDaysSysadmin = 365,
+		[Parameter(Mandatory = $false)]
 		[string[]]$ExcludeLogin = @(),
 		[Parameter(Mandatory = $false)]
 		[switch]$IncludeSystemLogins,
 		[Parameter(Mandatory = $false)]
+		[switch]$CheckPolicyNonSysadmin = $true,
+		[Parameter(Mandatory = $false)]
+		[switch]$CheckPolicySysadmin = $true,
+		[Parameter(Mandatory = $false)]
+		[switch]$ReportBuiltInAdmins = $true,
+		[Parameter(Mandatory = $false)]
 		[switch]$CheckAdOrphans,
+		[Parameter(Mandatory = $false)]
+		[switch]$GenerateHtmlReport = $true,
+		[Parameter(Mandatory = $false)]
+		[ValidateSet('Standard', 'Compact', 'Detailed')]
+		[string]$HtmlReportTemplate = 'Standard',
 		[Parameter(Mandatory = $false)]
 		[string]$OutputPath = (Get-sqmDefaultOutputPath),
 		[Parameter(Mandatory = $false)]
@@ -153,12 +184,14 @@ function Invoke-sqmLoginAudit
 					$IsEnabled,
 					$Category,
 					$Detail,
-					$Status)
+					$Status,
+					$IsSysadmin = $false)
 				$detailRows.Add([PSCustomObject]@{
 						SqlInstance = $instance
 						LoginName   = $LoginName
 						LoginType   = $LoginType
 						IsEnabled   = $IsEnabled
+						IsSysadmin  = $IsSysadmin
 						Category    = $Category
 						FindingType = $FindingType
 						Detail	    = $Detail
@@ -183,7 +216,8 @@ SELECT
     sl.is_expiration_checked                AS ExpirationChecked,
     CAST(LOGINPROPERTY(sp.name, 'IsMustChange') AS BIT) AS MustChange,
     CAST(LOGINPROPERTY(sp.name, 'PasswordLastSetTime') AS DATETIME) AS PwLastSet,
-    sp.sid                                  AS Sid
+    sp.sid                                  AS Sid,
+    CASE WHEN IS_SRVROLEMEMBER('sysadmin', sp.name) = 1 THEN 1 ELSE 0 END AS IsSysadmin
 FROM sys.server_principals sp
 LEFT JOIN sys.sql_logins   sl ON sl.principal_id = sp.principal_id
 WHERE sp.type IN ('S','U','G')
@@ -217,37 +251,60 @@ WHERE sp.type IN ('S','U','G')
 				
 				Invoke-sqmLogging -Message "[$instance] $(@($filtered).Count) Logins zu pruefen." -FunctionName $functionName -Level "INFO"
 				
-				# 1. Policy-Verstoesse (SQL-Logins)
+				# 0. BUILTIN\Admins-Pruefung
+				if ($ReportBuiltInAdmins)
+				{
+					$builtinAdmins = $filtered | Where-Object { $_.LoginName -like 'BUILTIN\*Administrators*' }
+					foreach ($row in $builtinAdmins)
+					{
+						$enabled = -not [bool]$row.IsDisabled
+						_AddFinding $row.LoginName 'BuiltinAdmins' $row.LoginType $enabled 'BuiltinAdmins' "BUILTIN\Administrators nicht empfohlen. Verwende Domain-Gruppen oder spezifische Service-Accounts statt." 'Warning' $row.IsSysadmin
+					}
+				}
+
+				# 1. Policy-Verstoesse (SQL-Logins, differenziert nach Sysadmin)
 				foreach ($row in ($filtered | Where-Object { $_.LoginType -eq 'SQL_LOGIN' }))
 				{
 					$enabled = -not [bool]$row.IsDisabled
-					if (-not $row.PolicyChecked)
+					$isSysadmin = [bool]$row.IsSysadmin
+
+					# Entscheidung: Policy-Check durchfuehren?
+					$checkPolicy = if ($isSysadmin) { $CheckPolicySysadmin } else { $CheckPolicyNonSysadmin }
+
+					if ($checkPolicy)
 					{
-						_AddFinding $row.LoginName 'PolicyOff' $row.LoginType $enabled 'Policy' "CHECK_POLICY = OFF - Kennwortrichtlinie deaktiviert." 'Warning'
-					}
-					if (-not $row.ExpirationChecked)
-					{
-						_AddFinding $row.LoginName 'ExpirationOff' $row.LoginType $enabled 'Policy' "CHECK_EXPIRATION = OFF - Kennwortablauf deaktiviert." 'Warning'
-					}
-					if ($row.MustChange)
-					{
-						_AddFinding $row.LoginName 'MustChange' $row.LoginType $enabled 'Policy' "MUST_CHANGE = ON - Kennwort muss bei naechstem Login geaendert werden." 'Warning'
+						if (-not $row.PolicyChecked)
+						{
+							_AddFinding $row.LoginName 'PolicyOff' $row.LoginType $enabled 'Policy' "CHECK_POLICY = OFF - Kennwortrichtlinie deaktiviert." 'Warning' $row.IsSysadmin
+						}
+						if (-not $row.ExpirationChecked)
+						{
+							_AddFinding $row.LoginName 'ExpirationOff' $row.LoginType $enabled 'Policy' "CHECK_EXPIRATION = OFF - Kennwortablauf deaktiviert." 'Warning' $row.IsSysadmin
+						}
+						if ($row.MustChange)
+						{
+							_AddFinding $row.LoginName 'MustChange' $row.LoginType $enabled 'Policy' "MUST_CHANGE = ON - Kennwort muss bei naechstem Login geaendert werden." 'Warning' $row.IsSysadmin
+						}
 					}
 				}
-				
-				# 2. Kennwortalter
-				if ($MaxPasswordAgeDays -gt 0)
+
+				# 2. Kennwortalter (differenziert nach Sysadmin)
+				foreach ($row in ($filtered | Where-Object { $_.LoginType -eq 'SQL_LOGIN' -and $_.PwLastSet }))
 				{
-					foreach ($row in ($filtered | Where-Object { $_.LoginType -eq 'SQL_LOGIN' -and $_.PwLastSet }))
+					$isSysadmin = [bool]$row.IsSysadmin
+					$maxPwAge = if ($isSysadmin) { $MaxPasswordAgeDaysSysadmin } else { $MaxPasswordAgeDays }
+
+					if ($maxPwAge -gt 0)
 					{
 						$pwAgeDays = ($now - $row.PwLastSet).TotalDays
-						if ($pwAgeDays -gt $MaxPasswordAgeDays)
+						if ($pwAgeDays -gt $maxPwAge)
 						{
-							_AddFinding $row.LoginName 'OldPassword' $row.LoginType (-not [bool]$row.IsDisabled) 'Password' ("Kennwort seit $([math]::Round($pwAgeDays, 0)) Tagen nicht geaendert (Max: $MaxPasswordAgeDays Tage). Letzte aenderung: " + $row.PwLastSet.ToString('yyyy-MM-dd')) 'Warning'
+							$label = if ($isSysadmin) { "(Sysadmin: Max $MaxPasswordAgeDaysSysadmin Tage)" } else { "(Max: $MaxPasswordAgeDays Tage)" }
+							_AddFinding $row.LoginName 'OldPassword' $row.LoginType (-not [bool]$row.IsDisabled) 'Password' ("Kennwort seit $([math]::Round($pwAgeDays, 0)) Tagen nicht geaendert $label. Letzte aenderung: " + $row.PwLastSet.ToString('yyyy-MM-dd')) 'Warning' $row.IsSysadmin
 						}
 						if ($row.CreateDate -and [math]::Abs(($row.PwLastSet - $row.CreateDate).TotalMinutes) -lt 1)
 						{
-							_AddFinding $row.LoginName 'NeverChangedPassword' $row.LoginType (-not [bool]$row.IsDisabled) 'Password' "Kennwort seit Kontoerstellung nie geaendert (erstellt: $($row.CreateDate.ToString('yyyy-MM-dd')))." 'Warning'
+							_AddFinding $row.LoginName 'NeverChangedPassword' $row.LoginType (-not [bool]$row.IsDisabled) 'Password' "Kennwort seit Kontoerstellung nie geaendert (erstellt: $($row.CreateDate.ToString('yyyy-MM-dd')))." 'Warning' $row.IsSysadmin
 						}
 					}
 				}
@@ -261,7 +318,7 @@ WHERE sp.type IN ('S','U','G')
 						$inactiveDays = ($now - $row.LastLogin).TotalDays
 						if ($inactiveDays -gt $InactivityThresholdDays)
 						{
-							_AddFinding $row.LoginName 'Inactive' $row.LoginType $enabled 'Inactivity' ("Letzter Login vor $([math]::Round($inactiveDays, 0)) Tagen ($($row.LastLogin.ToString('yyyy-MM-dd'))). Schwelle: $InactivityThresholdDays Tage.") 'Warning'
+							_AddFinding $row.LoginName 'Inactive' $row.LoginType $enabled 'Inactivity' ("Letzter Login vor $([math]::Round($inactiveDays, 0)) Tagen ($($row.LastLogin.ToString('yyyy-MM-dd'))). Schwelle: $InactivityThresholdDays Tage.") 'Warning' $row.IsSysadmin
 						}
 					}
 					elseif (-not $row.IsDisabled -and $row.LoginType -eq 'SQL_LOGIN')
@@ -269,7 +326,7 @@ WHERE sp.type IN ('S','U','G')
 						$createDays = ($now - $row.CreateDate).TotalDays
 						if ($createDays -gt $InactivityThresholdDays)
 						{
-							_AddFinding $row.LoginName 'NeverUsed' $row.LoginType $true 'Inactivity' "Login seit $([math]::Round($createDays, 0)) Tagen nie verwendet (erstellt: $($row.CreateDate.ToString('yyyy-MM-dd')))." 'Warning'
+							_AddFinding $row.LoginName 'NeverUsed' $row.LoginType $true 'Inactivity' "Login seit $([math]::Round($createDays, 0)) Tagen nie verwendet (erstellt: $($row.CreateDate.ToString('yyyy-MM-dd')))." 'Warning' $row.IsSysadmin
 						}
 					}
 				}
@@ -281,7 +338,7 @@ WHERE sp.type IN ('S','U','G')
 					$names = ($grp.Group | Select-Object -ExpandProperty LoginName) -join ', '
 					foreach ($row in $grp.Group)
 					{
-						_AddFinding $row.LoginName 'DuplicateSid' $row.LoginType (-not [bool]$row.IsDisabled) 'Integrity' "Doppelte SID mit: $names - deutet auf fehlerhafte Migration hin." 'Warning'
+						_AddFinding $row.LoginName 'DuplicateSid' $row.LoginType (-not [bool]$row.IsDisabled) 'Integrity' "Doppelte SID mit: $names - deutet auf fehlerhafte Migration hin." 'Warning' $row.IsSysadmin
 					}
 				}
 				
@@ -297,7 +354,7 @@ WHERE sp.type IN ('S','U','G')
 							$adObj = Get-ADObject -Filter { SamAccountName -eq $samName } -ErrorAction Stop | Select-Object -First 1
 							if (-not $adObj)
 							{
-								_AddFinding $row.LoginName 'AdOrphan' $row.LoginType (-not [bool]$row.IsDisabled) 'Orphan' "Windows-Login '$($row.LoginName)' im AD nicht gefunden - verwaist." 'Warning'
+								_AddFinding $row.LoginName 'AdOrphan' $row.LoginType (-not [bool]$row.IsDisabled) 'Orphan' "Windows-Login '$($row.LoginName)' im AD nicht gefunden - verwaist." 'Warning' $row.IsSysadmin
 							}
 						}
 						catch
@@ -313,7 +370,7 @@ WHERE sp.type IN ('S','U','G')
 				{
 					if ($row.LoginName -notin $loginNamesWithFindings)
 					{
-						_AddFinding $row.LoginName 'Clean' $row.LoginType (-not [bool]$row.IsDisabled) 'Info' "Kein Befund." 'OK'
+						_AddFinding $row.LoginName 'Clean' $row.LoginType (-not [bool]$row.IsDisabled) 'Info' "Kein Befund." 'OK' $row.IsSysadmin
 					}
 				}
 				
@@ -381,11 +438,138 @@ WHERE sp.type IN ('S','U','G')
 					
 					# CSV (nur Befunde)
 					$detailRows | Where-Object { $_.FindingType -ne 'Clean' } |
-					Select-Object SqlInstance, LoginName, LoginType, IsEnabled,
+					Select-Object SqlInstance, LoginName, LoginType, IsEnabled, IsSysadmin,
 								  Category, FindingType, Status, Detail |
 					Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
-					
-					Copy-sqmToCentralPath -Path $txtFile, $csvFile
+
+					# HTML-Report (optional)
+					$htmlFile = $null
+					if ($GenerateHtmlReport)
+					{
+						$htmlFile = Join-Path $OutputPath "LoginAudit_${safeInst}_${datestamp}.html"
+
+						# HTML Header + Styling
+						$htmlLines = [System.Collections.Generic.List[string]]::new()
+						$htmlLines.Add('<!DOCTYPE html>')
+						$htmlLines.Add('<html>')
+						$htmlLines.Add('<head>')
+						$htmlLines.Add('	<meta charset="UTF-8">')
+						$htmlLines.Add('	<title>sqmSQLTool - Login Audit Report</title>')
+						$htmlLines.Add('	<style>')
+						$htmlLines.Add('		body { background: #060f20; color: #e2e8f0; font-family: Segoe UI, Arial; margin: 0; padding: 20px; }')
+						$htmlLines.Add('		.header { background: linear-gradient(160deg, #060f20 0%, #0b1e3d 100%); padding: 20px; border-radius: 8px; margin-bottom: 20px; }')
+						$htmlLines.Add('		.header h1 { margin: 0; color: #5dade2; }')
+						$htmlLines.Add('		.header p { margin: 5px 0; color: #94a8c0; }')
+						$htmlLines.Add('		.section { background: #0b1e3d; padding: 15px; margin-bottom: 20px; border-radius: 4px; border-left: 4px solid #2e86c1; }')
+						$htmlLines.Add('		.section.warning { border-left-color: #c91a1a; }')
+						$htmlLines.Add('		.section.ok { border-left-color: #16a34a; }')
+						$htmlLines.Add('		h2 { color: #5dade2; margin-top: 0; }')
+						$htmlLines.Add('		table { width: 100%; border-collapse: collapse; }')
+						$htmlLines.Add('		th { background: #051329; color: #5dade2; text-align: left; padding: 8px; border-bottom: 2px solid #2e86c1; }')
+						$htmlLines.Add('		td { padding: 8px; border-bottom: 1px solid #051329; }')
+						$htmlLines.Add('		tr:hover { background: #0b1e3d; }')
+						$htmlLines.Add('		.warning-text { color: #f87171; }')
+						$htmlLines.Add('		.ok-text { color: #86efac; }')
+						$htmlLines.Add('		.badge { padding: 2px 8px; border-radius: 3px; font-size: 0.85em; font-weight: bold; }')
+						$htmlLines.Add('		.badge-warning { background: #7c2d12; color: #fdba74; }')
+						$htmlLines.Add('		.badge-ok { background: #14532d; color: #86efac; }')
+						$htmlLines.Add('		.badge-sysadmin { background: #1e1b4b; color: #c4b5fd; }')
+						$htmlLines.Add('		.footer { text-align: center; margin-top: 40px; color: #94a8c0; font-size: 0.9em; border-top: 1px solid #2e86c1; padding-top: 20px; }')
+						$htmlLines.Add('	</style>')
+						$htmlLines.Add('</head>')
+						$htmlLines.Add('<body>')
+
+						# Header
+						$htmlLines.Add('	<div class="header">')
+						$htmlLines.Add("		<h1>SQL Server Login Audit Report</h1>")
+						$htmlLines.Add("		<p><strong>Instance:</strong> $instance | <strong>Generated:</strong> $timestamp</p>")
+						$htmlLines.Add("		<p><strong>Inactivity Threshold:</strong> $InactivityThresholdDays days | <strong>Password Age (Non-Sysadmin):</strong> $MaxPasswordAgeDays days | <strong>Password Age (Sysadmin):</strong> $MaxPasswordAgeDaysSysadmin days</p>")
+						$htmlLines.Add('	</div>')
+
+						# Summary
+						$sysadminCount = ($detailRows | Where-Object { $_.IsSysadmin } | Select-Object -ExpandProperty LoginName -Unique).Count
+						$htmlLines.Add('	<div class="section">')
+						$htmlLines.Add('		<h2>Summary</h2>')
+						$htmlLines.Add('		<table>')
+						$htmlLines.Add("			<tr><td><strong>Total Logins:</strong></td><td>$(@($filtered).Count)</td></tr>")
+						$htmlLines.Add("			<tr><td><strong>Findings:</strong></td><td><span class='warning-text'>$cntWarn</span></td></tr>")
+						$htmlLines.Add("			<tr><td><strong>Clean Logins:</strong></td><td><span class='ok-text'>$cntOk</span></td></tr>")
+						$htmlLines.Add("			<tr><td><strong>Sysadmin Logins:</strong></td><td><span class='badge badge-sysadmin'>$sysadminCount</span></td></tr>")
+						$htmlLines.Add('		</table>')
+						$htmlLines.Add('	</div>')
+
+						# Findings by Category
+						$categories = @('BuiltinAdmins', 'Policy', 'Password', 'Inactivity', 'Integrity', 'Orphan')
+						foreach ($catKey in $categories)
+						{
+							$catItems = $detailRows | Where-Object { $_.Category -eq $catKey }
+							if (-not $catItems) { continue }
+
+							$catTitle = @{
+								'BuiltinAdmins' = '⚠️ Built-in Admins'
+								'Policy' = '⚠️ Policy Violations'
+								'Password' = '⚠️ Password Issues'
+								'Inactivity' = '⚠️ Inactive Logins'
+								'Integrity' = '⚠️ Integrity Problems'
+								'Orphan' = '⚠️ AD-Orphaned Logins'
+							}[$catKey]
+
+							$htmlLines.Add('	<div class="section warning">')
+							$htmlLines.Add("		<h2>$catTitle ($(@($catItems).Count))</h2>")
+							$htmlLines.Add('		<table>')
+							$htmlLines.Add('			<tr><th>Login</th><th>Type</th><th>Enabled</th><th>Sysadmin</th><th>Finding</th><th>Detail</th></tr>')
+
+							foreach ($e in ($catItems | Sort-Object LoginName))
+							{
+								$badgeClass = if ($e.Status -eq 'Warning') { 'badge-warning' } else { 'badge-ok' }
+								$sysAdminBadge = if ($e.IsSysadmin) { '<span class="badge badge-sysadmin">SA</span>' } else { '-' }
+								$htmlLines.Add("			<tr>")
+								$htmlLines.Add("				<td>$($e.LoginName)</td>")
+								$htmlLines.Add("				<td>$($e.LoginType)</td>")
+								$htmlLines.Add("				<td>$(if ($e.IsEnabled) { '<span class="ok-text">Yes</span>' } else { '<span class="warning-text">No</span>' })</td>")
+								$htmlLines.Add("				<td>$sysAdminBadge</td>")
+								$htmlLines.Add("				<td><span class='badge $badgeClass'>$($e.FindingType)</span></td>")
+								$htmlLines.Add("				<td>$($e.Detail)</td>")
+								$htmlLines.Add("			</tr>")
+							}
+
+							$htmlLines.Add('		</table>')
+							$htmlLines.Add('	</div>')
+						}
+
+						# Clean Logins (if any)
+						if ($cntOk -gt 0)
+						{
+							$htmlLines.Add('	<div class="section ok">')
+							$htmlLines.Add("		<h2>✅ Clean Logins ($cntOk)</h2>")
+							$htmlLines.Add('		<p>These logins have no findings:</p>')
+							$htmlLines.Add('		<table>')
+							$htmlLines.Add('			<tr><th>Login</th><th>Type</th><th>Sysadmin</th></tr>')
+
+							$cleanLogins = $detailRows | Where-Object { $_.FindingType -eq 'Clean' } | Sort-Object LoginName
+							foreach ($login in $cleanLogins)
+							{
+								$sysAdminBadge = if ($login.IsSysadmin) { '<span class="badge badge-sysadmin">SA</span>' } else { '-' }
+								$htmlLines.Add("			<tr><td>$($login.LoginName)</td><td>$($login.LoginType)</td><td>$sysAdminBadge</td></tr>")
+							}
+
+							$htmlLines.Add('		</table>')
+							$htmlLines.Add('	</div>')
+						}
+
+						# Footer
+						$htmlLines.Add('	<div class="footer">')
+						$htmlLines.Add("		<p>sqmSQLTool | $(Get-sqmReportReference) | Generated: $timestamp</p>")
+						$htmlLines.Add('	</div>')
+
+						$htmlLines.Add('</body>')
+						$htmlLines.Add('</html>')
+
+						$htmlLines | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+						Invoke-sqmLogging -Message "[$instance] HTML-Report erstellt: $htmlFile" -FunctionName $functionName -Level "INFO"
+					}
+
+					Copy-sqmToCentralPath -Path $txtFile, $csvFile, $htmlFile
 
 					Invoke-sqmOpenReport -TxtFile $txtFile -NoOpen:$NoOpen
 
@@ -409,6 +593,7 @@ WHERE sp.type IN ('S','U','G')
 						DetailRows  = $detailRows
 						TxtFile	    = $txtFile
 						CsvFile	    = $csvFile
+						HtmlFile    = $htmlFile
 						Status	    = if ($cntWarn -gt 0) { 'Warning' } else { 'OK' }
 					})
 			}
@@ -423,6 +608,7 @@ WHERE sp.type IN ('S','U','G')
 						DetailRows  = $null
 						TxtFile	    = $null
 						CsvFile	    = $null
+						HtmlFile    = $null
 					})
 				if ($EnableException) { throw }
 				if (-not $ContinueOnError) { throw $_ }
