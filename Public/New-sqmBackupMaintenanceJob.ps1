@@ -192,8 +192,6 @@ function New-sqmBackupMaintenanceJob
 			SqlInstance    = $SqlInstance
 			JobName        = $JobName
 			BackupType     = $BackupType
-			Step1Command   = $null
-			Step2Command   = $null
 			ScheduleName   = $null
 			ScheduleDays   = ($ScheduleDays -join ', ')
 			ScheduleTime   = $ScheduleTime
@@ -235,51 +233,46 @@ function New-sqmBackupMaintenanceJob
 				}
 			}
 
-			# 4. Step 1 Command aufbauen: Sync-sqmBackupExcludeTable
-			$step1Lines = [System.Collections.Generic.List[string]]::new()
-			$step1Lines.Add("Import-Module sqmSQLTool -Force")
-			$step1Lines.Add("`$params = @{ SqlInstance = '$SqlInstance' }")
+			# 4. Build parameters for Step 1: Sync-sqmBackupExcludeTable
+			$step1Params = @{
+				SqlInstance = $SqlInstance
+			}
 			if ($IncludeSystemDatabases)
 			{
-				$step1Lines.Add("`$params['IncludeSystemDatabases'] = `$true")
+				$step1Params['IncludeSystemDatabases'] = $IncludeSystemDatabases
 			}
-			$step1Lines.Add("Sync-sqmBackupExcludeTable @params")
-			$step1Command = $step1Lines -join "`r`n"
-			$result.Step1Command = $step1Command
 
-			Invoke-sqmLogging -Message "Step 1 Command aufgebaut (Sync-sqmBackupExcludeTable)." -FunctionName $functionName -Level "INFO"
+			Invoke-sqmLogging -Message "Step 1 Parameters aufgebaut (Sync-sqmBackupExcludeTable)." -FunctionName $functionName -Level "INFO"
 
-			# 5. Step 2 Command aufbauen: Invoke-sqmUserDatabaseBackup
-			# DIFF und LOG Unterstuetzung geplant — aktuell wird Type = 'Full' verwendet
-			$step2Lines = [System.Collections.Generic.List[string]]::new()
-			$step2Lines.Add("Import-Module sqmSQLTool -Force")
-			$step2Lines.Add("`$params = @{ SqlInstance = '$SqlInstance'; All = `$true; BackupType = 'FULL' }")
+			# 5. Build parameters for Step 2: Invoke-sqmUserDatabaseBackup
+			$step2Params = @{
+				SqlInstance = $SqlInstance
+				All = $true
+				BackupType = 'FULL'
+				MailProfile = $MailProfile
+			}
 			if ($UseExcludeTable)
 			{
-				$step2Lines.Add("`$params['UseExcludeTable'] = `$true")
+				$step2Params['UseExcludeTable'] = $UseExcludeTable
 			}
 			if ($CheckPreferredReplica)
 			{
-				$step2Lines.Add("`$params['CheckPreferredReplica'] = `$true")
+				$step2Params['CheckPreferredReplica'] = $CheckPreferredReplica
 			}
 			if ($BackupPath)
 			{
-				$step2Lines.Add("`$params['BackupPath'] = '$BackupPath'")
+				$step2Params['BackupPath'] = $BackupPath
 			}
 			if ($MailTo)
 			{
-				$step2Lines.Add("`$params['MailTo'] = '$MailTo'")
+				$step2Params['MailTo'] = $MailTo
 			}
-			$step2Lines.Add("`$params['MailProfile'] = '$MailProfile'")
 			if ($MailOnSuccess)
 			{
-				$step2Lines.Add("`$params['MailOnSuccess'] = `$true")
+				$step2Params['MailOnSuccess'] = $MailOnSuccess
 			}
-			$step2Lines.Add("Invoke-sqmUserDatabaseBackup @params")
-			$step2Command = $step2Lines -join "`r`n"
-			$result.Step2Command = $step2Command
 
-			Invoke-sqmLogging -Message "Step 2 Command aufgebaut (Invoke-sqmUserDatabaseBackup)." -FunctionName $functionName -Level "INFO"
+			Invoke-sqmLogging -Message "Step 2 Parameters aufgebaut (Invoke-sqmUserDatabaseBackup)." -FunctionName $functionName -Level "INFO"
 
 			# 6. WhatIf-Pruefung
 			if (-not $PSCmdlet.ShouldProcess($SqlInstance, "Erstelle Job '$JobName' [$BackupType]"))
@@ -298,31 +291,36 @@ function New-sqmBackupMaintenanceJob
 
 			Invoke-sqmLogging -Message "Job '$JobName' angelegt." -FunctionName $functionName -Level "INFO"
 
-			# 8. Step 1 anlegen: Sync-BackupExcludeTable
-			New-DbaAgentJobStep @connParams `
-				-Job $JobName `
-				-StepId 1 `
-				-StepName 'Sync-BackupExcludeTable' `
-				-Subsystem PowerShell `
-				-Command $step1Command `
-				-OnSuccessAction GoToNextStep `
-				-OnFailAction QuitWithFailure `
-				-EnableException -ErrorAction Stop | Out-Null
+			# 8. Step 1 anlegen: Sync-BackupExcludeTable (CmdExec - kein PowerShell Proxy noetig!)
+			$step1StepParams = @{
+				SqlInstance    = $SqlInstance
+				JobName        = $JobName
+				StepName       = 'Sync-BackupExcludeTable'
+				FunctionName   = 'Sync-sqmBackupExcludeTable'
+				Parameters     = $step1Params
+				Description    = "Synchronize backup exclude table for $BackupType backups"
+				ErrorAction    = 'Stop'
+			}
+			$step1Result = _CreateCmdExecJobStep @step1StepParams
+			# Note: _CreateCmdExecJobStep creates step with StepId 1 automatically (first step)
+			# But since we need 2 steps with specific IDs, we need to handle this manually.
+			# For now, accept that dbatools auto-increments step IDs.
 
-			Invoke-sqmLogging -Message "Step 1 'Sync-BackupExcludeTable' angelegt." -FunctionName $functionName -Level "INFO"
+			Invoke-sqmLogging -Message "Step 1 (CmdExec) 'Sync-BackupExcludeTable' angelegt." -FunctionName $functionName -Level "INFO"
 
-			# 9. Step 2 anlegen: Backup-UserDatabases-<BackupType>
-			New-DbaAgentJobStep @connParams `
-				-Job $JobName `
-				-StepId 2 `
-				-StepName "Backup-UserDatabases-$BackupType" `
-				-Subsystem PowerShell `
-				-Command $step2Command `
-				-OnSuccessAction QuitWithSuccess `
-				-OnFailAction QuitWithFailure `
-				-EnableException -ErrorAction Stop | Out-Null
+			# 9. Step 2 anlegen: Backup-UserDatabases-<BackupType> (CmdExec)
+			$step2StepParams = @{
+				SqlInstance    = $SqlInstance
+				JobName        = $JobName
+				StepName       = "Backup-UserDatabases-$BackupType"
+				FunctionName   = 'Invoke-sqmUserDatabaseBackup'
+				Parameters     = $step2Params
+				Description    = "Backup user databases with type $BackupType"
+				ErrorAction    = 'Stop'
+			}
+			$step2Result = _CreateCmdExecJobStep @step2StepParams
 
-			Invoke-sqmLogging -Message "Step 2 'Backup-UserDatabases-$BackupType' angelegt." -FunctionName $functionName -Level "INFO"
+			Invoke-sqmLogging -Message "Step 2 (CmdExec) 'Backup-UserDatabases-$BackupType' angelegt." -FunctionName $functionName -Level "INFO"
 
 			# 10. Hilfsfunktion: Wochentage aufloesen
 			function ConvertTo-WeekdayInterval
