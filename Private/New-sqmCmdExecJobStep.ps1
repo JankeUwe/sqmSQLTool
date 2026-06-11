@@ -86,7 +86,8 @@ function _CreateCmdExecJobStep
         }
     }
 
-    $paramLine = if ($paramStrings) { " `\`n    " + ($paramStrings -join " `\`n    ") } else { "" }
+    # Join parameters as single line (no newlines needed in command string)
+    $paramLine = if ($paramStrings) { " " + ($paramStrings -join " ") } else { "" }
 
     $wrapperContent = @"
 <#
@@ -105,9 +106,10 @@ try {
     Import-Module sqmSQLTool -Force -ErrorAction Stop
     Write-Output "Module loaded."
 
-    $FunctionName$paramLine `
-        -Verbose `
-        -ContinueOnError
+    # Build and execute the function call dynamically
+    `$cmd = "$FunctionName$paramLine -Verbose -ContinueOnError"
+    Write-Output "Executing: `$cmd"
+    Invoke-Expression `$cmd
 
     Write-Output "`$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Completed successfully"
     exit 0
