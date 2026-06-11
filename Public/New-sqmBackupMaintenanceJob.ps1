@@ -298,7 +298,6 @@ function New-sqmBackupMaintenanceJob
 				StepName       = 'Sync-BackupExcludeTable'
 				FunctionName   = 'Sync-sqmBackupExcludeTable'
 				Parameters     = $step1Params
-				Description    = "Synchronize backup exclude table for $BackupType backups"
 				ErrorAction    = 'Stop'
 			}
 			$step1Result = _CreateCmdExecJobStep @step1StepParams
@@ -315,7 +314,6 @@ function New-sqmBackupMaintenanceJob
 				StepName       = "Backup-UserDatabases-$BackupType"
 				FunctionName   = 'Invoke-sqmUserDatabaseBackup'
 				Parameters     = $step2Params
-				Description    = "Backup user databases with type $BackupType"
 				ErrorAction    = 'Stop'
 			}
 			$step2Result = _CreateCmdExecJobStep @step2StepParams

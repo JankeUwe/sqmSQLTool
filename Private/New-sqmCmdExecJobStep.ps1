@@ -49,10 +49,7 @@ function _CreateCmdExecJobStep
         [string]$FunctionName,
 
         [Parameter(Mandatory = $false)]
-        [hashtable]$Parameters = @{},
-
-        [Parameter(Mandatory = $false)]
-        [string]$Description
+        [hashtable]$Parameters = @{}
     )
 
     # -----------------------------------------------------------------------
@@ -141,9 +138,8 @@ try {
         ErrorAction = 'Stop'
     }
 
-    if ($Description) {
-        $stepParams['StepDescription'] = $Description
-    }
+    # Note: dbatools New-DbaAgentJobStep does not support StepDescription parameter.
+    # Description is implicit in StepName and visible in SQL Agent UI.
 
     $jobStep = New-DbaAgentJobStep @stepParams
 

@@ -401,7 +401,6 @@ ORDER BY name ASC
 				StepName       = "SyncLogins_Step1"
 				FunctionName   = 'Sync-sqmLoginsToAlwaysOn'
 				Parameters     = $wrapperParams
-				Description    = "Synchronize logins across AlwaysOn replicas (AG: $AvailabilityGroupName)"
 				ErrorAction    = 'Stop'
 			}
 			$jobStepResult = _CreateCmdExecJobStep @stepParams

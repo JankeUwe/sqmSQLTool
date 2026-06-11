@@ -139,7 +139,6 @@ function New-sqmAlwaysOnRepairJob
 				StepName       = "RunRepair_Step1"
 				FunctionName   = 'Repair-sqmAlwaysOnDatabases'
 				Parameters     = $wrapperParams
-				Description    = "Repair and heal AlwaysOn database replication errors"
 				ErrorAction    = 'Stop'
 			}
 			$jobStepResult = _CreateCmdExecJobStep @stepParams

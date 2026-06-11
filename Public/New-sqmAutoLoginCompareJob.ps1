@@ -295,7 +295,6 @@ function New-sqmAutoLoginCompareJob
 					IncludeSystemLogins = $IncludeSystemLogins
 					OnlyDifferences     = $OnlyDifferences
 				}
-				Description    = "Compare logins across AlwaysOn replicas (AG: $AvailabilityGroupName)"
 				ErrorAction    = 'Stop'
 			}
 			if (-not [string]::IsNullOrWhiteSpace($AvailabilityGroupName)) {
