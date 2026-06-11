@@ -284,17 +284,24 @@ function New-sqmAutoLoginCompareJob
 			# -------------------------------------------------------------------
 			# 4. Job-Step (CmdExec - kein PowerShell Proxy noetig!)
 			# -------------------------------------------------------------------
+			# Build parameters - only include switches that are $true
+			$wrapperParams = @{
+				FailOnDrift = $true
+				OutputPath  = $OutputPath
+			}
+			if ($IncludeSystemLogins) {
+				$wrapperParams['IncludeSystemLogins'] = $IncludeSystemLogins
+			}
+			if ($OnlyDifferences) {
+				$wrapperParams['OnlyDifferences'] = $OnlyDifferences
+			}
+
 			$stepParams = @{
 				SqlInstance    = $SqlInstance
 				JobName        = $JobName
 				StepName       = "CompareLogins_Step1"
 				FunctionName   = 'Compare-sqmAlwaysOnLogins'
-				Parameters     = @{
-					FailOnDrift = $true
-					OutputPath  = $OutputPath
-					IncludeSystemLogins = $IncludeSystemLogins
-					OnlyDifferences     = $OnlyDifferences
-				}
+				Parameters     = $wrapperParams
 				ErrorAction    = 'Stop'
 			}
 			if (-not [string]::IsNullOrWhiteSpace($AvailabilityGroupName)) {

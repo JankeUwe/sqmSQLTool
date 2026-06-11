@@ -311,14 +311,21 @@ ORDER BY name ASC
 			# 2. Build parameters for wrapper script
 			# -------------------------------------------------------------------
 			# CmdExec step passes parameters to the wrapper, which calls Sync-sqmLoginsToAlwaysOn
+			# Only include switches that are $true (PowerShell best practice)
 			$wrapperParams = @{
 				AvailabilityGroupName = $AvailabilityGroupName
-				IncludeSystemLogins   = $IncludeSystemLogins
-				AdjustAuthMode        = $AdjustAuthMode
 				Force                 = $Force
 				BackupLogins          = $BackupLogins
 				BackupRetentionDays   = $BackupRetentionDays
-				AuditAdOrphans        = $AuditAdOrphans
+			}
+			if ($IncludeSystemLogins) {
+				$wrapperParams['IncludeSystemLogins'] = $IncludeSystemLogins
+			}
+			if ($AdjustAuthMode) {
+				$wrapperParams['AdjustAuthMode'] = $AdjustAuthMode
+			}
+			if ($AuditAdOrphans) {
+				$wrapperParams['AuditAdOrphans'] = $AuditAdOrphans
 			}
 			if ($SkipSecondaryServers -and $SkipSecondaryServers.Count -gt 0) {
 				$wrapperParams['SkipSecondaryServers'] = $SkipSecondaryServers
