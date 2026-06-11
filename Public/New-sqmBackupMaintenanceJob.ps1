@@ -291,34 +291,55 @@ function New-sqmBackupMaintenanceJob
 
 			Invoke-sqmLogging -Message "Job '$JobName' angelegt." -FunctionName $functionName -Level "INFO"
 
-			# 8. Step 1 anlegen: Sync-BackupExcludeTable (CmdExec - kein PowerShell Proxy noetig!)
-			$step1StepParams = @{
-				SqlInstance    = $SqlInstance
-				JobName        = $JobName
-				StepName       = 'Sync-BackupExcludeTable'
-				FunctionName   = 'Sync-sqmBackupExcludeTable'
-				Parameters     = $step1Params
-				ErrorAction    = 'Stop'
-			}
-			$step1Result = _CreateCmdExecJobStep @step1StepParams
-			# Note: _CreateCmdExecJobStep creates step with StepId 1 automatically (first step)
-			# But since we need 2 steps with specific IDs, we need to handle this manually.
-			# For now, accept that dbatools auto-increments step IDs.
+			# 8. Create wrapper scripts and job steps (einfache Wrapper-Scripts)
+			$jobsDir = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs'
+			if (-not (Test-Path $jobsDir)) { New-Item -ItemType Directory -Path $jobsDir -Force | Out-Null }
 
-			Invoke-sqmLogging -Message "Step 1 (CmdExec) 'Sync-BackupExcludeTable' angelegt." -FunctionName $functionName -Level "INFO"
+			# Step 1: Sync-sqmBackupExcludeTable
+			$switchParams1 = @()
+			if ($IncludeSystemDatabases) { $switchParams1 += "-IncludeSystemDatabases" }
+			$switchLine1 = if ($switchParams1) { " " + ($switchParams1 -join " ") } else { "" }
 
-			# 9. Step 2 anlegen: Backup-UserDatabases-<BackupType> (CmdExec)
-			$step2StepParams = @{
-				SqlInstance    = $SqlInstance
-				JobName        = $JobName
-				StepName       = "Backup-UserDatabases-$BackupType"
-				FunctionName   = 'Invoke-sqmUserDatabaseBackup'
-				Parameters     = $step2Params
-				ErrorAction    = 'Stop'
-			}
-			$step2Result = _CreateCmdExecJobStep @step2StepParams
+			$wrapper1Script = @"
+`$ErrorActionPreference = 'Stop'
+Import-Module sqmSQLTool -Force
+Sync-sqmBackupExcludeTable$switchLine1 -Confirm:`$false
+"@
+			$wrapper1Path = Join-Path $jobsDir "Sync-sqmBackupExcludeTable-$JobName.ps1"
+			[System.IO.File]::WriteAllText($wrapper1Path, $wrapper1Script, [System.Text.Encoding]::UTF8)
 
-			Invoke-sqmLogging -Message "Step 2 (CmdExec) 'Backup-UserDatabases-$BackupType' angelegt." -FunctionName $functionName -Level "INFO"
+			$psExePath = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
+			$command1 = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$wrapper1Path`""
+
+			New-DbaAgentJobStep -SqlInstance $SqlInstance -Job $JobName `
+				-StepName 'Sync-BackupExcludeTable' -Subsystem 'CmdExec' -Command $command1 -ErrorAction Stop | Out-Null
+
+			Invoke-sqmLogging -Message "Step 1 (CmdExec) 'Sync-BackupExcludeTable' angelegt, Wrapper: $wrapper1Path" -FunctionName $functionName -Level "INFO"
+
+			# Step 2: Invoke-sqmUserDatabaseBackup
+			$switchParams2 = @()
+			if ($UseExcludeTable) { $switchParams2 += "-UseExcludeTable" }
+			if ($CheckPreferredReplica) { $switchParams2 += "-CheckPreferredReplica" }
+			if ($MailOnSuccess) { $switchParams2 += "-MailOnSuccess" }
+			$switchLine2 = if ($switchParams2) { " " + ($switchParams2 -join " ") } else { "" }
+
+			$backupPathLine = if ($BackupPath) { " -BackupPath `"$BackupPath`"" } else { "" }
+			$mailToLine = if ($MailTo) { " -MailTo `"$MailTo`"" } else { "" }
+
+			$wrapper2Script = @"
+`$ErrorActionPreference = 'Stop'
+Import-Module sqmSQLTool -Force
+Invoke-sqmUserDatabaseBackup -All -BackupType '$BackupType' -MailProfile '$MailProfile'$switchLine2$backupPathLine$mailToLine -Confirm:`$false
+"@
+			$wrapper2Path = Join-Path $jobsDir "Invoke-sqmUserDatabaseBackup-$BackupType-$JobName.ps1"
+			[System.IO.File]::WriteAllText($wrapper2Path, $wrapper2Script, [System.Text.Encoding]::UTF8)
+
+			$command2 = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$wrapper2Path`""
+
+			New-DbaAgentJobStep -SqlInstance $SqlInstance -Job $JobName `
+				-StepName "Backup-UserDatabases-$BackupType" -Subsystem 'CmdExec' -Command $command2 -ErrorAction Stop | Out-Null
+
+			Invoke-sqmLogging -Message "Step 2 (CmdExec) 'Backup-UserDatabases-$BackupType' angelegt, Wrapper: $wrapper2Path" -FunctionName $functionName -Level "INFO"
 
 			# 10. Hilfsfunktion: Wochentage aufloesen
 			function ConvertTo-WeekdayInterval

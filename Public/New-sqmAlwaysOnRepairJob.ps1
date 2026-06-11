@@ -129,21 +129,25 @@ function New-sqmAlwaysOnRepairJob
 				-Description "Repariert regelmaessig AlwaysOn-Datenbanken und heilt autoseeding-Fehler." -ErrorAction Stop
 			Invoke-sqmLogging -Message "Job '$JobName' erstellt" -FunctionName $functionName -Level 'INFO'
 
-			# Build parameters for wrapper script
-			$wrapperParams = @{}  # Repair-sqmAlwaysOnDatabases hat keine zusaetzlichen Parameter noetig
+			# Create CmdExec job step (einfaches Wrapper-Script)
+			$jobsDir = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs'
+			if (-not (Test-Path $jobsDir)) { New-Item -ItemType Directory -Path $jobsDir -Force | Out-Null }
 
-			# Create CmdExec job step (no PowerShell Proxy needed!)
-			$stepParams = @{
-				SqlInstance    = $SqlInstance
-				JobName        = $JobName
-				StepName       = "RunRepair_Step1"
-				FunctionName   = 'Repair-sqmAlwaysOnDatabases'
-				Parameters     = $wrapperParams
-				ErrorAction    = 'Stop'
-			}
-			$jobStepResult = _CreateCmdExecJobStep @stepParams
-			$jobStep = $jobStepResult.JobStep
-			Invoke-sqmLogging -Message "Job-Schritt (CmdExec) hinzugefuegt: RunRepair_Step1" -FunctionName $functionName -Level 'INFO'
+			$wrapperScript = @"
+`$ErrorActionPreference = 'Stop'
+Import-Module sqmSQLTool -Force
+Repair-sqmAlwaysOnDatabases -Confirm:`$false
+"@
+			$wrapperPath = Join-Path $jobsDir "Repair-sqmAlwaysOnDatabases-$JobName.ps1"
+			[System.IO.File]::WriteAllText($wrapperPath, $wrapperScript, [System.Text.Encoding]::UTF8)
+
+			# Create CmdExec job step
+			$psExePath = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
+			$command = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$wrapperPath`""
+
+			$jobStep = New-DbaAgentJobStep -SqlInstance $SqlInstance -Job $JobName `
+				-StepName "RunRepair_Step1" -Subsystem 'CmdExec' -Command $command -ErrorAction Stop
+			Invoke-sqmLogging -Message "Job-Schritt (CmdExec) hinzugefuegt: RunRepair_Step1, Wrapper: $wrapperPath" -FunctionName $functionName -Level 'INFO'
 
 			# Add schedule if provided
 			if ($Schedule)

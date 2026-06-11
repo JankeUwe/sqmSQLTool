@@ -400,19 +400,45 @@ ORDER BY name ASC
 			Invoke-sqmLogging -Message "Job '$JobName' erstellt" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
-			# 5. Add job step (CmdExec - kein PowerShell Proxy noetig!)
+			# 5. Add job step (CmdExec - einfaches Wrapper-Script)
 			# -------------------------------------------------------------------
-			$stepParams = @{
-				SqlInstance    = $SqlInstance
-				JobName        = $JobName
-				StepName       = "SyncLogins_Step1"
-				FunctionName   = 'Sync-sqmLoginsToAlwaysOn'
-				Parameters     = $wrapperParams
-				ErrorAction    = 'Stop'
+			$jobsDir = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs'
+			if (-not (Test-Path $jobsDir)) { New-Item -ItemType Directory -Path $jobsDir -Force | Out-Null }
+
+			# Build wrapper script with all parameters
+			$switchParams = @()
+			if ($IncludeSystemLogins) { $switchParams += "-IncludeSystemLogins" }
+			if ($AdjustAuthMode) { $switchParams += "-AdjustAuthMode" }
+			if ($AuditAdOrphans) { $switchParams += "-AuditAdOrphans" }
+			$switchLine = if ($switchParams) { " " + ($switchParams -join " ") } else { "" }
+
+			$skipServerLine = ""
+			if ($SkipSecondaryServers -and $SkipSecondaryServers.Count -gt 0) {
+				$skipServerStr = ($SkipSecondaryServers | ForEach-Object { "`"$_`"" }) -join ','
+				$skipServerLine = " -SkipSecondaryServers @($skipServerStr)"
 			}
-			$jobStepResult = _CreateCmdExecJobStep @stepParams
-			$jobStep = $jobStepResult.JobStep
-			Invoke-sqmLogging -Message "Job-Schritt (CmdExec) hinzugefügt: SyncLogins_Step1" -FunctionName $functionName -Level 'INFO'
+
+			$forceIncludeLine = ""
+			if ($ForceIncludeOnly -and $ForceIncludeOnly.Count -gt 0) {
+				$forceIncludeStr = ($ForceIncludeOnly | ForEach-Object { "`"$_`"" }) -join ','
+				$forceIncludeLine = " -ForceIncludeOnly @($forceIncludeStr)"
+			}
+
+			$wrapperScript = @"
+`$ErrorActionPreference = 'Stop'
+Import-Module sqmSQLTool -Force
+Sync-sqmLoginsToAlwaysOn -AvailabilityGroupName '$AvailabilityGroupName' -Force:`$$Force -BackupLogins:`$$BackupLogins -BackupRetentionDays $BackupRetentionDays$switchLine$skipServerLine$forceIncludeLine -Confirm:`$false
+"@
+			$wrapperPath = Join-Path $jobsDir "Sync-sqmLoginsToAlwaysOn-$JobName.ps1"
+			[System.IO.File]::WriteAllText($wrapperPath, $wrapperScript, [System.Text.Encoding]::UTF8)
+
+			# Create CmdExec job step
+			$psExePath = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
+			$command = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$wrapperPath`""
+
+			$jobStep = New-DbaAgentJobStep -SqlInstance $SqlInstance -Job $JobName `
+				-StepName "SyncLogins_Step1" -Subsystem 'CmdExec' -Command $command -ErrorAction Stop
+			Invoke-sqmLogging -Message "Job-Schritt (CmdExec) hinzugefügt: SyncLogins_Step1, Wrapper: $wrapperPath" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
 			# 6. Add schedule (native msdb-Prozeduren - version-stabil)

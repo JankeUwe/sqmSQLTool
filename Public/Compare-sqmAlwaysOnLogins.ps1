@@ -460,7 +460,7 @@ WHERE sp.type IN ('S','U','G')
 					$loginShort = if ($e.LoginName.Length -gt 35) { $e.LoginName.Substring(0, 32) + '...' } else { $e.LoginName }
 					$lines.Add(("{0,-10} {1,-35} {2,-14} {3,-9} {4}" -f $e.OverallStatus, $loginShort, $e.LoginType, $e.Present, ($befund -join '; ')))
 				}
-				$lines -join "`n" | Set-Content -Path $txtFile -Encoding UTF8 -Force
+				[System.IO.File]::WriteAllText($txtFile, ($lines -join "`n"), [System.Text.Encoding]::UTF8)
 
 				# HTML
 				$rowsHtml = ''
@@ -495,7 +495,7 @@ $rowsHtml
 <p style="color:#94a8c0;font-size:12px;">Replicas: $($reachable -join ', ')$(if ($unreach) { " &nbsp;|&nbsp; Nicht erreichbar: $($unreach -join ', ')" }) &nbsp;|&nbsp; OK: $cntOk, Warning: $cntWarn, Critical: $cntCrit</p>
 "@
 				$html = ConvertTo-sqmHtmlReport -Title "AlwaysOn Login-Vergleich - $AvailabilityGroupName" -Subtitle "Erstellt: $timestamp" -BodyHtml $bodyHtml
-				$html | Set-Content -Path $htmlFile -Encoding UTF8 -Force
+				[System.IO.File]::WriteAllText($htmlFile, $html, [System.Text.Encoding]::UTF8)
 
 				Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
 				Invoke-sqmLogging -Message "Bericht erstellt: $htmlFile" -FunctionName $functionName -Level "INFO"

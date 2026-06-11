@@ -282,34 +282,32 @@ function New-sqmAutoLoginCompareJob
 			Invoke-sqmLogging -Message "Job '$JobName' erstellt" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
-			# 4. Job-Step (CmdExec - kein PowerShell Proxy noetig!)
+			# 4. Job-Step (CmdExec - einfaches Wrapper-Script)
 			# -------------------------------------------------------------------
-			# Build parameters - only include switches that are $true
-			$wrapperParams = @{
-				FailOnDrift = $true
-				OutputPath  = $OutputPath
-			}
-			if ($IncludeSystemLogins) {
-				$wrapperParams['IncludeSystemLogins'] = $IncludeSystemLogins
-			}
-			if ($OnlyDifferences) {
-				$wrapperParams['OnlyDifferences'] = $OnlyDifferences
-			}
+			$jobsDir = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs'
+			if (-not (Test-Path $jobsDir)) { New-Item -ItemType Directory -Path $jobsDir -Force | Out-Null }
 
-			$stepParams = @{
-				SqlInstance    = $SqlInstance
-				JobName        = $JobName
-				StepName       = "CompareLogins_Step1"
-				FunctionName   = 'Compare-sqmAlwaysOnLogins'
-				Parameters     = $wrapperParams
-				ErrorAction    = 'Stop'
-			}
-			if (-not [string]::IsNullOrWhiteSpace($AvailabilityGroupName)) {
-				$stepParams.Parameters['AvailabilityGroupName'] = $AvailabilityGroupName
-			}
-			$jobStepResult = _CreateCmdExecJobStep @stepParams
-			$jobStep = $jobStepResult.JobStep
-			Invoke-sqmLogging -Message "Job-Schritt (CmdExec) hinzugefuegt: CompareLogins_Step1" -FunctionName $functionName -Level 'INFO'
+			# Build wrapper script with all parameters
+			$switchParams = @()
+			if ($IncludeSystemLogins) { $switchParams += "-IncludeSystemLogins" }
+			if ($OnlyDifferences) { $switchParams += "-OnlyDifferences" }
+			$switchLine = if ($switchParams) { " " + ($switchParams -join " ") } else { "" }
+
+			$wrapperScript = @"
+`$ErrorActionPreference = 'Stop'
+Import-Module sqmSQLTool -Force
+Compare-sqmAlwaysOnLogins -AvailabilityGroupName '$AvailabilityGroupName' -OutputPath '$OutputPath' -FailOnDrift -NoOpen -Confirm:`$false$switchLine
+"@
+			$wrapperPath = Join-Path $jobsDir "Compare-sqmAlwaysOnLogins-$JobName.ps1"
+			[System.IO.File]::WriteAllText($wrapperPath, $wrapperScript, [System.Text.Encoding]::UTF8)
+
+			# Create CmdExec job step
+			$psExePath = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
+			$command = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$wrapperPath`""
+
+			$jobStep = New-DbaAgentJobStep -SqlInstance $SqlInstance -Job $JobName `
+				-StepName "CompareLogins_Step1" -Subsystem 'CmdExec' -Command $command -ErrorAction Stop
+			Invoke-sqmLogging -Message "Job-Schritt (CmdExec) hinzugefuegt: CompareLogins_Step1, Wrapper: $wrapperPath" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
 			# 5. Zeitplan
