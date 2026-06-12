@@ -22,6 +22,14 @@ function Repair-sqmAlwaysOnDatabases
 			throw "dbatools-Modul nicht gefunden."
 		}
 
+		# SQL 2022+ requires TrustServerCertificate
+		$version = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
+			-Query "SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS INT)" -ErrorAction Stop | Select-Object -ExpandProperty Column1
+		if ($version -ge 16)
+		{
+			Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Scope Session -Force
+		}
+
 		# Eventlog-Quelle sicherstellen
 		$logSource = "sqmAlwaysOn"
 		if (-not [System.Diagnostics.EventLog]::SourceExists($logSource))

@@ -11,6 +11,14 @@ function Sync-sqmLoginsToAlwaysOn
 
 	$results = [System.Collections.Generic.List[PSCustomObject]]::new()
 
+	# SQL 2022+ requires TrustServerCertificate
+	$version = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
+		-Query "SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS INT)" -ErrorAction Stop | Select-Object -ExpandProperty Column1
+	if ($version -ge 16)
+	{
+		Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Scope Session -Force
+	}
+
 	try
 	{
 		# Resolve AG
