@@ -448,9 +448,9 @@ try {
 } catch {
     `$errMsg = `$_.ToString()
     `$errLine = `$_.InvocationInfo.ScriptLineNumber
-    Write-Verbose "ERROR on line `$errLine: `$errMsg"
+    Write-Verbose "ERROR on line `${errLine}: `${errMsg}"
     Write-EventLog -LogName Application -Source 'sqmSQLTool' -EventId 5001 -EntryType Error `
-        -Message "Job FEHLER: Sync-sqmLoginsToAlwaysOn Line:`$errLine Msg:`$errMsg" -ErrorAction SilentlyContinue
+        -Message "Job FEHLER: Sync-sqmLoginsToAlwaysOn Line:`${errLine} Msg:`${errMsg}" -ErrorAction SilentlyContinue
     exit 1
 }
 "@
