@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Creates a SQL Agent job that runs Sync-Job.ps1 (AutoSync).
 
