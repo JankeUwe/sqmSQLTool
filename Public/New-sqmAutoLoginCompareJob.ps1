@@ -308,7 +308,7 @@ function New-sqmAutoLoginCompareJob
 Import-Module sqmSQLTool -Force
 try {
     Write-Verbose "Starting Compare-sqmAlwaysOnLogins..."
-    `$result = Compare-sqmAlwaysOnLogins -AvailabilityGroupName '$AvailabilityGroupName' -OutputPath '$OutputPath' -FailOnDrift -NoOpen -NoReport -Confirm:`$false -ErrorAction Stop$switchLine
+    `$result = Compare-sqmAlwaysOnLogins -AvailabilityGroupName '$AvailabilityGroupName' -OutputPath '$OutputPath' -NoOpen -NoReport -Confirm:`$false -ErrorAction Stop$switchLine
     Write-Verbose "Compare completed successfully"
     Write-EventLog -LogName Application -Source 'sqmSQLTool' -EventId 5000 -EntryType Information `
         -Message "Job SUCCESS: Compare-sqmAlwaysOnLogins AG='$AvailabilityGroupName'" -ErrorAction SilentlyContinue
