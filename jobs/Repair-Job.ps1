@@ -83,7 +83,19 @@ function Repair-sqmAlwaysOnDatabases
 			Write-Output "Pruefe/aktiviere Automatic Seeding auf allen AlwaysOn-Replikaten."
 
 			# --- 2. Alle AGs und deren Datenbanken abrufen ---
-			$allAGs = Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction Stop
+			$allAGs = $null
+			try {
+				$allAGs = Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction Stop
+			}
+			catch {
+				# If certificate error, set config and retry
+				if ($_ -match "certificate|trust") {
+					Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Scope Session -Force -ErrorAction SilentlyContinue
+					$allAGs = Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction Stop
+				} else {
+					throw
+				}
+			}
 			if (-not $allAGs)
 			{
 				Write-Output "Keine Verfuegbarkeitsgruppen gefunden."
