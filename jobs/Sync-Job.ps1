@@ -52,9 +52,22 @@ function Sync-sqmLoginsToAlwaysOn
 
 	try
 	{
-		# Resolve AG
-		$allAgs = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
-			-Query "SELECT name FROM sys.availability_groups ORDER BY name ASC" -ErrorAction Stop
+		# Resolve AG - try, if fails set TrustServerCertificate and retry
+		$allAgs = $null
+		try {
+			$allAgs = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
+				-Query "SELECT name FROM sys.availability_groups ORDER BY name ASC" -ErrorAction Stop
+		}
+		catch {
+			# If certificate error, set config and retry
+			if ($_ -match "certificate|trust") {
+				Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Scope Session -Force -ErrorAction SilentlyContinue
+				$allAgs = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
+					-Query "SELECT name FROM sys.availability_groups ORDER BY name ASC" -ErrorAction Stop
+			} else {
+				throw
+			}
+		}
 
 		if (-not $allAgs)
 		{
