@@ -203,6 +203,13 @@ function New-sqmOlaMaintenanceJobs
 			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 			throw $errMsg
 		}
+
+		# Load SqlVersionDetection helper for TrustServerCertificate handling
+		$detectionScriptPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'jobs\SqlVersionDetection.ps1'
+		if (Test-Path $detectionScriptPath) { . $detectionScriptPath }
+
+		# Initialize TrustServerCertificate for SQL 2022+
+		$null = Initialize-SqlTrustServerCertificate -SqlInstance $SqlInstance
 		
 		$cfg = Get-sqmConfig
 		$effJobIndexOpt = if ($JobNameIndexOpt) { $JobNameIndexOpt }

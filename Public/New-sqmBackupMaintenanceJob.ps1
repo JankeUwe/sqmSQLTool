@@ -171,6 +171,13 @@ function New-sqmBackupMaintenanceJob
 			throw $errMsg
 		}
 
+		# Load SqlVersionDetection helper for TrustServerCertificate handling
+		$detectionScriptPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'jobs\SqlVersionDetection.ps1'
+		if (Test-Path $detectionScriptPath) { . $detectionScriptPath }
+
+		# Initialize TrustServerCertificate for SQL 2022+
+		$null = Initialize-SqlTrustServerCertificate -SqlInstance $SqlInstance
+
 		# Default-ScheduleDays je BackupType setzen wenn nicht explizit angegeben
 		if (-not $PSBoundParameters.ContainsKey('ScheduleDays'))
 		{
