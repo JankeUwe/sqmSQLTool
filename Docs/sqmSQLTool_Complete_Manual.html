@@ -1,0 +1,3062 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>sqmSQLTool Complete User Manual</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: white;
+            padding: 40px;
+        }
+        
+        .cover {
+            page-break-after: always;
+            text-align: center;
+            padding: 120px 0;
+        }
+        
+        .cover h1 {
+            font-size: 48px;
+            color: #1e3a5f;
+            margin-bottom: 30px;
+            font-weight: 700;
+        }
+        
+        .cover p {
+            font-size: 18px;
+            color: #666;
+            margin: 10px 0;
+        }
+        
+        .toc {
+            page-break-after: always;
+            margin: 40px 0;
+        }
+        
+        .toc h2 {
+            font-size: 28px;
+            color: #1e3a5f;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #1e3a5f;
+            padding-bottom: 10px;
+        }
+        
+        .toc-list {
+            list-style: none;
+            column-count: 2;
+            column-gap: 30px;
+        }
+        
+        .toc-list li {
+            margin: 8px 0;
+            page-break-inside: avoid;
+        }
+        
+        .toc-list a {
+            text-decoration: none;
+            color: #1e3a5f;
+            font-size: 13px;
+        }
+        
+        h2 {
+            font-size: 24px;
+            color: #1e3a5f;
+            margin: 40px 0 20px 0;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 10px;
+            page-break-after: avoid;
+        }
+        
+        h3 {
+            font-size: 16px;
+            color: #2c5aa0;
+            margin: 30px 0 10px 0;
+            page-break-after: avoid;
+            font-weight: 600;
+        }
+        
+        .synopsis {
+            background: #f0f4f8;
+            border-left: 4px solid #2c5aa0;
+            padding: 12px 15px;
+            margin: 10px 0 15px 0;
+            page-break-inside: avoid;
+        }
+        
+        .params-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 12px;
+        }
+        
+        .params-table thead {
+            background: #1e3a5f;
+            color: white;
+        }
+        
+        .params-table th {
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+            border: 1px solid #ddd;
+        }
+        
+        .params-table td {
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+        }
+        
+        .params-table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        
+        .params-table .param-name {
+            font-family: 'Courier New', monospace;
+            color: #2c5aa0;
+            font-weight: 600;
+        }
+        
+        .code-example {
+            background: #051329;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 12px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.4;
+            page-break-inside: avoid;
+        }
+        
+        .example-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            margin: 12px 0 6px 0;
+        }
+        
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 11px;
+            color: #666;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<!-- COVER PAGE -->
+<div class="cover">
+    <h1>sqmSQLTool</h1>
+    <h2 style="color: #666; font-weight: normal;">Complete User Manual</h2>
+    <p>SQL Server Administration & Automation</p>
+    <p style="margin-top: 40px; font-size: 14px;">
+        <strong>Functions:</strong> 129<br>
+        <strong>Categories:</strong> 22<br>
+        <strong>Examples:</strong> 345+
+    </p>
+    <p style="margin-top: 60px; font-size: 12px; color: #999;">
+        Version 2.0 | Generated 2026-06-12
+    </p>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc">
+    <h2>Table of Contents</h2>
+    <ul class="toc-list">        <li><a href='#cat-14-Active-Directory-Integration'>14. Active Directory Integration</a> (4)</li>
+        <li><a href='#cat-10-Reporting-&-Analysis'>10. Reporting & Analysis</a> (5)</li>
+        <li><a href='#cat-3-Backup-&-Recovery'>3. Backup & Recovery</a> (10)</li>
+        <li><a href='#cat-7-Configuration-Management'>7. Configuration Management</a> (7)</li>
+        <li><a href='#cat-17-SSRS-Configuration'>17. SSRS Configuration</a> (3)</li>
+        <li><a href='#cat-5-Login-&-User-Security'>5. Login & User Security</a> (8)</li>
+        <li><a href='#cat-12-Server-Configuration-Testing'>12. Server Configuration Testing</a> (5)</li>
+        <li><a href='#cat-4-Monitoring-&-Health-Checks'>4. Monitoring & Health Checks</a> (8)</li>
+        <li><a href='#cat-8-Storage-&-Disk-Management'>8. Storage & Disk Management</a> (6)</li>
+        <li><a href='#cat-11-Module-&-Update-Management'>11. Module & Update Management</a> (6)</li>
+        <li><a href='#cat-16-SQL-Drivers-&-Tools-Installation'>16. SQL Drivers & Tools Installation</a> (6)</li>
+        <li><a href='#cat-19-External-Systems-Integration'>19. External Systems Integration</a> (3)</li>
+        <li><a href='#cat-13-SQL-Agent-&-Proxy-Jobs'>13. SQL Agent & Proxy Jobs</a> (4)</li>
+        <li><a href='#cat-1-Always-On-&-Availability-Groups'>1. Always On & Availability Groups</a> (18)</li>
+        <li><a href='#cat-18-SSIS-Configuration'>18. SSIS Configuration</a> (2)</li>
+        <li><a href='#cat-21-Analysis-Services-(SSAS)'>21. Analysis Services (SSAS)</a> (1)</li>
+        <li><a href='#cat-2-Performance-Analysis-&-Optimization'>2. Performance Analysis & Optimization</a> (10)</li>
+        <li><a href='#cat-6-Certificates-&-TLS-Security'>6. Certificates & TLS Security</a> (8)</li>
+        <li><a href='#cat-15-Extended-Events-&-Diagnostics'>15. Extended Events & Diagnostics</a> (3)</li>
+        <li><a href='#cat-9-Database-Maintenance'>9. Database Maintenance</a> (5)</li>
+        <li><a href='#cat-22-Monitoring-&-Registry'>22. Monitoring & Registry</a> (3)</li>
+        <li><a href='#cat-20-Script-Execution-&-Deployment'>20. Script Execution & Deployment</a> (3)</li>
+    </ul>
+</div>
+
+<!-- CONTENT -->
+<h2 id='cat-14-Active-Directory-Integration'>14. Active Directory Integration</h2>
+
+<h3>Get-sqmADAccountStatus</h3>
+<div class='synopsis'>Checks the status of an Active Directory user account.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SamAccountName</td><td>The SamAccountName of the AD account to check.</td></tr>
+<tr><td class='param-name'>-DomainController</td><td>Optional target DC. Only used via the RSAT path.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmADAccountStatus -SamAccountName 'jdoe'</div>
+
+<h3>Get-sqmADGroupMembers</h3>
+<div class='synopsis'>Lists all members of an Active Directory group.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-GroupName</td><td>Name of the AD group. Pipeline-capable. Format: "GroupName" or "DOMAIN\GroupName"</td></tr>
+<tr><td class='param-name'>-Domain</td><td>Optional: AD domain (e.g., "FITS.LOCAL", "corp.de") If not specified, auto-detects current domain.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmADGroupMembers -GroupName "DL_SQL_Admins"</div>
+
+<h3>Get-sqmHpuAllowGroup</h3>
+<div class='synopsis'>Searches for the HPU allow group in Active Directory based on configurable domain/group mappings.</div>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmHpuAllowGroup</div>
+
+<h3>Remove-sqmAdOrphanLogin</h3>
+<div class='synopsis'>Removes Windows logins whose Active Directory account no longer exists (AD orphans).</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>Target SQL Server instance. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for the instance.</td></tr>
+<tr><td class='param-name'>-ExcludeLogin</td><td>Additional logins to exclude from removal (wildcards allowed). Combined with the always-on safety exclusions (system and sysadmin logins).</td></tr>
+<tr><td class='param-name'>-AdModuleAction</td><td>Behavior when the ActiveDirectory module is not present: 'Abort' (default) - stop with an error; nothing is verified or deleted. 'Install' - try In...</td></tr>
+<tr><td class='param-name'>-BackupPath</td><td>Directory for the rollback script. Default: C:\System\WinSrvLog\MSSQL (created if missing).</td></tr>
+<tr><td class='param-name'>-SkipBackup</td><td>Skip writing the rollback script. Not recommended.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately instead of returning error status.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Remove-sqmAdOrphanLogin -SqlInstance "SQL01" -WhatIf
+    Lists exactly which AD-orphaned logins would be removed, without changing anything.</div>
+
+<h2 id='cat-10-Reporting-&-Analysis'>10. Reporting & Analysis</h2>
+
+<h3>Export-sqmDatabaseDocumentation</h3>
+<div class='synopsis'>Creates structured HTML and CSV documentation for all databases on a SQL Server instance.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance(s). Pipeline-capable. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for the SQL connection.</td></tr>
+<tr><td class='param-name'>-Database</td><td>Document specific databases only. Wildcards allowed (e.g. 'Sales*'). Default: all user databases.</td></tr>
+<tr><td class='param-name'>-IncludeSystemDatabases</td><td>Include system databases (master, model, msdb, tempdb). Default: $false.</td></tr>
+<tr><td class='param-name'>-IncludeFileDetails</td><td>Include filegroup and file details in the report. Default: $true.</td></tr>
+<tr><td class='param-name'>-IncludeUsers</td><td>Include database users in the report. Default: $true.</td></tr>
+<tr><td class='param-name'>-IncludeObjectSummary</td><td>Include object summary (tables, SPs, views, etc.) in the report. Default: $true.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory. Default: value from module configuration (Get-sqmDefaultOutputPath).</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue on error for an instance or database instead of aborting.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions directly (overrides ContinueOnError).</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Request confirmation before writing output files.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Simulation: shows which files would be created without writing them.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Export-sqmDatabaseDocumentation</div>
+
+<h3>Get-sqmAutoGrowthReport</h3>
+<div class='synopsis'>Creates an AutoGrowth configuration report for all database files on a SQL Server instance.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance (default: current computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-Database</td><td>Restrict to specific databases (array of names).</td></tr>
+<tr><td class='param-name'>-IncludeSystem</td><td>Include system databases. Default: $false.</td></tr>
+<tr><td class='param-name'>-Detailed</td><td>When set, additional file properties (physical path) are included in the output.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmAutoGrowthReport -SqlInstance "SQL01"</div>
+
+<h3>Get-sqmServerHardwareReport</h3>
+<div class='synopsis'>Erstellt einen HTML-Hardware-Konfigurationsbericht fuer einen oder mehrere Server.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-ComputerName</td><td>Zielserver (ein oder mehrere). Standard: lokaler Computer. Aliase: SqlInstance, ServerName</td></tr>
+<tr><td class='param-name'>-ReportPath</td><td>Ausgabepfad fuer die HTML-Report-Datei(en). Standard: %ProgramData%\sqmSQLTool\HardwareReports</td></tr>
+<tr><td class='param-name'>-OutputFormat</td><td>Ausgabeformat: HTML (Standard), CSV, TXT oder All (alle Formate gleichzeitig). - HTML: Interaktiver Dark-Theme Report (Standard) - CSV : Flache CSV...</td></tr>
+<tr><td class='param-name'>-NoOpen</td><td>HTML-Datei nach dem Erstellen NICHT automatisch im Browser oeffnen.</td></tr>
+<tr><td class='param-name'>-PassThru</td><td>Gibt den vollstaendigen Pfad der erstellten Datei(en) als String zurueck.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Ausnahmen sofort ausloesen statt Write-Error.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Lokalen Server analysieren - Report wird automatisch im Browser geoeffnet
+    Get-sqmServerHardwareReport</div>
+
+<h3>Invoke-sqmInstanceInventory</h3>
+<div class='synopsis'>Creates a complete inventory of a SQL Server instance as a structured report (TXT + CSV).</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance(s). Pipeline-capable. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory for report files. Default: value from module configuration (Get-sqmDefaultOutputPath).</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue on error for an instance (otherwise abort).</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Allow exceptions to pass through (for advanced error handling).</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Request confirmation before creation.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Test only, do not write files.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Invoke-sqmInstanceInventory</div>
+
+<h3>Invoke-sqmSetupReport</h3>
+<div class='synopsis'>Professional SQL Server Setup Report with critical issues, security, and database overview.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance. Default: local computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Credentials for SQL connection.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output path for HTML report.</td></tr>
+<tr><td class='param-name'>-PassThru</td><td>Return the file path.</td></tr>
+<tr><td class='param-name'>-NoOpen</td><td>Don't open the report in browser.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Invoke-sqmSetupReport -SqlInstance "SQL01"
+
+#&gt;
+function Invoke-sqmSetupReport
+{
+    [CmdletBinding()]
+    [OutputType([string])]
+    param (
+        [Parameter(Mandatory = $false, Position = 0)]
+        [string]$SqlInstance,
+        [Parameter(Mandatory = $false)]
+        [System.Management.Automation.PSCredential]$SqlCredential,
+        [Parameter(Mandatory = $false)]
+        [string]$OutputPath,
+        [Parameter(Mandatory = $false)]
+        [switch]$PassThru,
+        [Parameter(Mandatory = $false)]
+        [switch]$NoOpen
+    )
+
+    begin
+    {
+        $functionName = $MyInvocation.MyCommand.Name
+        if (-not $PSBoundParameters.ContainsKey('SqlInstance') -or [string]::IsNullOrWhiteSpace($SqlInstance))
+        {
+            $SqlInstance = $env:COMPUTERNAME
+        }
+
+        if (-not $PSBoundParameters.ContainsKey('OutputPath') -or [string]::IsNullOrWhiteSpace($OutputPath))
+        {
+            $OutputPath = Get-sqmConfig -Key 'OutputPath'
+            if (-not $OutputPath) { $OutputPath = "C:\System\WinSrvLog\MSSQL" }
+        }
+
+        Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance" -FunctionName $functionName -Level 'INFO'
+    }
+
+    process
+    {
+        try
+        {
+            $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+            $safeInstance = $SqlInstance -replace '[\\:]', '_'
+            $datestamp = Get-Date -Format 'yyyyMMdd_HHmm'
+            $server = $null
+
+            # Connect to SQL Server
+            try
+            {
+                $server = Connect-DbaInstance -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction Stop
+            }
+            catch
+            {
+                throw "Verbindung zu $SqlInstance fehlgeschlagen: $($_.Exception.Message)"
+            }
+
+            # ==========================================
+            # CRITICAL ISSUES
+            # ==========================================
+
+            # SA Account Status
+            $saLogin = Get-DbaLogin -SqlInstance $server -Login 'sa' -ErrorAction SilentlyContinue
+            if (-not $saLogin)
+            {
+                $saSid = '0x01'
+                $saLogin = Get-DbaLogin -SqlInstance $server | Where-Object { $_.SID -eq $saSid }
+            }
+            $saName = if ($saLogin) { $saLogin.Name } else { 'NOT FOUND' }
+            $saDisabled = if ($saLogin) { $saLogin.IsDisabled } else { $null }
+            $saIsRenamed = ($saName -ne 'sa')
+            $saStatus = if ($saIsRenamed -and $saDisabled) { 'OK (renamed & disabled)' } elseif ($saIsRenamed) { 'OK (renamed)' } elseif ($saDisabled) { 'WARNING (disabled only)' } else { 'CRITICAL (not renamed)' }
+            $saStatusColor = if ($saName -ne 'sa' -or $saDisabled) { 'green' } else { 'red' }
+
+            # Backup Jobs Status
+            $backupJobs = Get-DbaAgentJob -SqlInstance $server -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*backup*' -or $_.Name -like '*bkp*' }
+            $backupJobCount = @($backupJobs).Count
+            $backupJobsEnabled = @($backupJobs | Where-Object { $_.IsEnabled }).Count
+            $backupJobStatus = if ($backupJobCount -eq 0) { 'NO BACKUP JOBS' } elseif ($backupJobsEnabled -eq $backupJobCount) { "OK ($backupJobCount jobs)" } else { "WARNING ($backupJobsEnabled/$backupJobCount enabled)" }
+            $backupStatusColor = if ($backupJobCount -gt 0 -and $backupJobsEnabled -eq $backupJobCount) { 'green' } else { 'orange' }
+
+            # Max Memory (synchronized with Test-sqmMaxMemory logic)
+            $maxMem = $server.Configuration.MaxServerMemory.ConfigValue
+            $totalMem = [math]::Round($server.PhysicalMemory / 1024, 0)
+            $unconfiguredValue = 2147483647
+            $lowerBound = [math]::Round($totalMem * 0.85)
+            $upperBound = [math]::Round($totalMem * 0.95)
+
+            if ($maxMem -eq $unconfiguredValue)
+            {
+                $maxMemStatus = "NOT CONFIGURED (default)"
+                $maxMemColor = 'orange'
+            }
+            elseif ($maxMem -gt $upperBound)
+            {
+                $maxMemStatus = "TOO HIGH ($maxMem MB &gt; $upperBound MB)"
+                $maxMemColor = 'orange'
+            }
+            elseif ($maxMem -lt $lowerBound)
+            {
+                $maxMemStatus = "TOO LOW ($maxMem MB &lt; $lowerBound MB)"
+                $maxMemColor = 'orange'
+            }
+            else
+            {
+                $maxMemStatus = "OK ($maxMem MB)"
+                $maxMemColor = 'green'
+            }
+
+            # ==========================================
+            # SECURITY CHECKS
+            # ==========================================
+
+            # Sysadmin Accounts
+            $sysadmins = @()
+            try
+            {
+                $sysadmins = @(Get-DbaLogin -SqlInstance $server | Where-Object { $_.IsSysAdmin -eq $true } | Select-Object -ExpandProperty Name)
+            }
+            catch { }
+            $sysadminList = if ($sysadmins.Count -gt 0) { $sysadmins -join ', ' } else { 'None' }
+
+            # Logins with Server Roles (only server-level roles)
+            $advancedLogins = @()
+            try
+            {
+                $serverRoles = @('sysadmin', 'serveradmin', 'securityadmin', 'processadmin', 'dbcreator', 'diskadmin')
+                $allLogins = Get-DbaLogin -SqlInstance $server -ErrorAction SilentlyContinue
+                foreach ($login in $allLogins)
+                {
+                    $roles = @()
+                    foreach ($role in $serverRoles)
+                    {
+                        try
+                        {
+                            $query = "SELECT IS_SRVROLEMEMBER('$role', '$($login.Name)') AS IsMember"
+                            $result = Invoke-DbaQuery -SqlInstance $server -Query $query -ErrorAction SilentlyContinue
+                            if ($result -and $result.IsMember -eq 1)
+                            {
+                                $roles += $role
+                            }
+                        }
+                        catch { }
+                    }
+                    if ($roles.Count -gt 0)
+                    {
+                        $advancedLogins += "$($login.Name) [$($roles -join ', ')]"
+                    }
+                }
+            }
+            catch { }
+            $advancedLoginList = if ($advancedLogins.Count -gt 0) { $advancedLogins -join ' | ' } else { 'None with server roles' }
+
+            # CLR Status
+            $clrEnabled = $server.Configuration.IsSqlClrEnabled.ConfigValue
+            $clrStatus = if ($clrEnabled) { 'ENABLED (check if needed)' } else { 'OK (disabled)' }
+            $clrColor = if ($clrEnabled) { 'orange' } else { 'green' }
+
+            # xp_cmdshell Status
+            $xpCmdEnabled = $server.Configuration.XPCmdShell.ConfigValue
+            $xpStatus = if ($xpCmdEnabled) { 'ENABLED (security risk)' } else { 'OK (disabled)' }
+            $xpColor = if ($xpCmdEnabled) { 'orange' } else { 'green' }
+
+            # ==========================================
+            # SERVICE ACCOUNTS & INFRASTRUCTURE
+            # ==========================================
+
+            # Service Accounts
+            $serviceAccounts = @()
+            try
+            {
+                # SQL Server Service
+                $sqlSvc = Get-Service -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "MSSQL|SQL Server" -and $_.Name -notmatch "Agent|Browser" } | Select-Object -First 1
+                if ($sqlSvc)
+                {
+                    $svcInfo = Get-CimInstance -ClassName Win32_Service -Filter "Name='$($sqlSvc.Name)'" -ErrorAction SilentlyContinue
+                    if ($svcInfo)
+                    {
+                        $serviceAccounts += "SQL Server: $($svcInfo.StartName)"
+                    }
+                }
+
+                # SQL Agent Service
+                $agentSvc = Get-Service -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "SQLSERVERAGENT|SQLAgent" } | Select-Object -First 1
+                if ($agentSvc)
+                {
+                    $svcInfo = Get-CimInstance -ClassName Win32_Service -Filter "Name='$($agentSvc.Name)'" -ErrorAction SilentlyContinue
+                    if ($svcInfo)
+                    {
+                        $serviceAccounts += "SQL Agent: $($svcInfo.StartName)"
+                    }
+                }
+            }
+            catch { }
+            $serviceAccountList = if ($serviceAccounts.Count -gt 0) { $serviceAccounts -join ' | ' } else { 'Unable to determine' }
+
+            # SPN Status (List all SPNs)
+            $spnList = 'Not checked'
+            $spnDetails = @()
+            try
+            {
+                $spnReport = Get-sqmSpnReport -ComputerName $env:COMPUTERNAME -ErrorAction SilentlyContinue
+                if ($spnReport -and $spnReport.DetailRows)
+                {
+                    foreach ($row in $spnReport.DetailRows)
+                    {
+                        $spnDetails += "$($row.SPN) [$($row.Status)]"
+                    }
+                    $spnList = if ($spnDetails.Count -gt 0) { $spnDetails -join ' | ' } else { 'No SPNs found' }
+                }
+            }
+            catch
+            {
+                $spnList = 'Error retrieving SPNs'
+            }
+
+            # Splunk Status (via Invoke-sqmSplunkConfiguration -Test)
+            $splunkStatus = 'Not configured'
+            try
+            {
+                $splunkResult = Invoke-sqmSplunkConfiguration -Mode Test -ErrorAction SilentlyContinue
+                if ($splunkResult)
+                {
+                    if ($splunkResult.IsConfigured)
+                    {
+                        $splunkStatus = "Configured (service: $($splunkResult.ServiceStatus))"
+                    }
+                    else
+                    {
+                        $splunkStatus = 'Not configured'
+                    }
+                }
+            }
+            catch
+            {
+                $splunkStatus = 'Error checking Splunk'
+            }
+
+            # ==========================================
+            # CONFIGURATION
+            # ==========================================
+
+            # MAXDOP
+            $maxdop = $server.Configuration.MaxDegreeOfParallelism.ConfigValue
+            $cpuCount = $server.Processors
+            $recommendedMaxdop = if ($cpuCount -le 4) { $cpuCount } elseif ($cpuCount -le 8) { 4 } elseif ($cpuCount -le 16) { 8 } else { 16 }
+            $maxdopStatus = if ($maxdop -ge 2 -and $maxdop -le $recommendedMaxdop) { "OK ($maxdop)" } else { "CHECK ($maxdop, recommended $recommendedMaxdop)" }
+
+            # Cost Threshold
+            $ctp = $server.Configuration.CostThresholdForParallelism.ConfigValue
+            $ctpStatus = if ($ctp -ge 50) { "OK ($ctp)" } else { "WARNING ($ctp, recommended &gt;= 50)" }
+
+            # TempDB
+            $tempdb = Get-DbaDatabase -SqlInstance $server -Database 'tempdb'
+            $tempdbFileCount = $tempdb.FileGroups.Files.Count
+            $idealCount = [Math]::Min($cpuCount, 8)
+            $tempdbStatus = if ($tempdbFileCount -eq $idealCount) { "OK ($tempdbFileCount files)" } else { "CHECK ($tempdbFileCount files, ideal $idealCount)" }
+
+            # ==========================================
+            # DATABASES
+            # ==========================================
+
+            $databases = @()
+            try
+            {
+                $allDbs = Get-DbaDatabase -SqlInstance $server -ExcludeSystem
+                foreach ($db in $allDbs)
+                {
+                    $dbo = $db.Owner
+                    $lastBackup = $db.LastFullBackupDate
+                    $daysAgo = if ($lastBackup) { (New-TimeSpan -Start $lastBackup -End (Get-Date)).Days } else { -1 }
+                    $backupStatus = if ($daysAgo -lt 0) { 'Never' } elseif ($daysAgo -eq 0) { 'Today' } elseif ($daysAgo -le 7) { "$daysAgo days" } else { "$daysAgo days ⚠️" }
+
+                    $databases += [PSCustomObject]@{
+                        Name           = $db.Name
+                        Recovery       = $db.RecoveryModel
+                        DBO            = $dbo
+                        LastFullBackup = $backupStatus
+                    }
+                }
+            }
+            catch { }
+
+            # ==========================================
+            # BUILD HTML
+            # ==========================================
+
+            $html = _Build-ModernReportHtml `
+                -SqlInstance $SqlInstance `
+                -Timestamp $timestamp `
+                -SAStatus $saStatus `
+                -SAStatusColor $saStatusColor `
+                -SAName $saName `
+                -BackupStatus $backupJobStatus `
+                -BackupStatusColor $backupStatusColor `
+                -MaxMemStatus $maxMemStatus `
+                -MaxMemColor $maxMemColor `
+                -Sysadmins $sysadminList `
+                -AdvancedLogins $advancedLoginList `
+                -CLRStatus $clrStatus `
+                -CLRColor $clrColor `
+                -XPStatus $xpStatus `
+                -XPColor $xpColor `
+                -ServiceAccounts $serviceAccountList `
+                -SPNList $spnList `
+                -SplunkStatus $splunkStatus `
+                -MAXDOP $maxdopStatus `
+                -CostThreshold $ctpStatus `
+                -TempDB $tempdbStatus `
+                -Databases $databases
+
+            # ==========================================
+            # SAVE REPORT
+            # ==========================================
+
+            if (-not (Test-Path $OutputPath))
+            {
+                $null = New-Item -ItemType Directory -Path $OutputPath -Force
+            }
+
+            $htmlFile = Join-Path $OutputPath "sqmSetupReport_${safeInstance}_${datestamp}.html"
+            $html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+
+            Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
+
+            Invoke-sqmLogging -Message "Report erstellt: $htmlFile" -FunctionName $functionName -Level 'INFO'
+            Write-Host "`n✅ Setup-Report: $htmlFile`n" -ForegroundColor Green
+
+            Copy-sqmToCentralPath -Path $htmlFile
+
+            if ($PassThru) { return $htmlFile }
+        }
+        catch
+        {
+            $errMsg = "Fehler: $($_.Exception.Message)"
+            Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level 'ERROR'
+            Write-Error $errMsg
+        }
+    }
+}
+
+# ======================================================================
+# HTML Builder Function
+# ======================================================================
+
+function _Build-ModernReportHtml
+{
+    param(
+        [string]$SqlInstance,
+        [string]$Timestamp,
+        [string]$SAStatus,
+        [string]$SAStatusColor,
+        [string]$SAName,
+        [string]$BackupStatus,
+        [string]$BackupStatusColor,
+        [string]$MaxMemStatus,
+        [string]$MaxMemColor,
+        [string]$Sysadmins,
+        [string]$AdvancedLogins,
+        [string]$CLRStatus,
+        [string]$CLRColor,
+        [string]$XPStatus,
+        [string]$XPColor,
+        [string]$ServiceAccounts,
+        [string]$SPNList,
+        [string]$SplunkStatus,
+        [string]$MAXDOP,
+        [string]$CostThreshold,
+        [string]$TempDB,
+        [PSCustomObject[]]$Databases
+    )
+
+    function _HtmlEncode
+    {
+        param([string]$Text)
+        if (-not $Text) { return '' }
+        $Text -replace '&', '&amp;' -replace '&lt;', '&lt;' -replace '&gt;', '&gt;' -replace '"', '&quot;' -replace "'", '&#39;'
+    }
+
+    $dbRows = if ($Databases) {
+        $Databases | ForEach-Object {
+            "&lt;tr&gt;&lt;td&gt;$(_HtmlEncode $_.Name)&lt;/td&gt;&lt;td&gt;$($_.Recovery)&lt;/td&gt;&lt;td&gt;$(_HtmlEncode $_.DBO)&lt;/td&gt;&lt;td&gt;$($_.LastFullBackup)&lt;/td&gt;&lt;/tr&gt;"
+        } | Out-String
+    } else {
+        '&lt;tr&gt;&lt;td colspan="4"&gt;No databases&lt;/td&gt;&lt;/tr&gt;'
+    }
+
+    return @"
+&lt;!DOCTYPE html&gt;
+&lt;html lang="de"&gt;
+&lt;head&gt;
+&lt;meta charset="UTF-8"&gt;
+&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+&lt;title&gt;SQL Server Setup Report - $(_HtmlEncode $SqlInstance)&lt;/title&gt;
+&lt;style&gt;
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #060f20; color: #e2e8f0; font-size: 14px; line-height: 1.6; }</div>
+
+<h2 id='cat-3-Backup-&-Recovery'>3. Backup & Recovery</h2>
+
+<h3>Get-sqmOperationStatus</h3>
+<div class='synopsis'>Displays progress and estimated remaining time for active backup, restore and AutoSeed operations.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>The target SQL Server instance (default: current computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Alternative credentials.</td></tr>
+<tr><td class='param-name'>-OperationType</td><td>Filters by operation type. Valid values: 'Backup', 'Restore', 'AutoSeed'. By default all active operations are shown.</td></tr>
+<tr><td class='param-name'>-Continuous</td><td>When set, output is continuously refreshed (similar to 'watch'). Stop with Ctrl+C.</td></tr>
+<tr><td class='param-name'>-RefreshSeconds</td><td>Refresh interval in seconds for continuous mode (default: 5). Only used with -Continuous.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Switch to allow exceptions to pass through (by default errors are logged as warnings).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Show all active operations on the local instance
+Get-sqmOperationStatus</div>
+
+<h3>Invoke-sqmRestoreDatabase</h3>
+<div class='synopsis'>Restores a database from a backup file, with support for single-server and AlwaysOn environments.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>Target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE"). Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Alternative credentials for the target instance.</td></tr>
+<tr><td class='param-name'>-BackupFile</td><td>Path to the full backup file (.bak). Can also be an array for striped backups. For sequential restore (Full + Diff + Logs) use `-BackupFiles`.</td></tr>
+<tr><td class='param-name'>-BackupFiles</td><td>Array of backup files in order: Full, then Diff (optional), then Logs (optional). Example: @("C:\Backup\Full.bak", "C:\Backup\Diff.bak", "C:\Backu...</td></tr>
+<tr><td class='param-name'>-DatabaseName</td><td>Name of the database to restore (as it appears in the backup file). Required to determine file names.</td></tr>
+<tr><td class='param-name'>-NewDatabaseName</td><td>Optional: New name for the database after the restore. If specified, logical file names are adjusted accordingly (physical files use the new name ...</td></tr>
+<tr><td class='param-name'>-NewDatabaseFilePath</td><td>Optional: Target directory for database files (.mdf, .ndf). If not specified, the default directory of the target instance is used (BackupDirector...</td></tr>
+<tr><td class='param-name'>-NewLogFilePath</td><td>Optional: Target directory for the log file (.ldf). If not specified, the default directory of the target instance is used.</td></tr>
+<tr><td class='param-name'>-BackupBeforeRestore</td><td>Optional: Creates a full backup of the existing database before the restore (if present). The backup is stored in the default backup directory nam...</td></tr>
+<tr><td class='param-name'>-NoUserExport</td><td>Optional: Skips export of database users (users are always exported by default). The export file is stored temporarily in the %TEMP% directory.</td></tr>
+<tr><td class='param-name'>-KeepAlwaysOn</td><td>Optional: If the database is part of an AG, it is not removed from the AG. Note: Restoring an AG database is only possible after removing it from ...</td></tr>
+<tr><td class='param-name'>-WithNoRecovery</td><td>Optional: Performs the restore with NORECOVERY so the database remains in restoring state (for additional log backups). By default RECOVERY is use...</td></tr>
+<tr><td class='param-name'>-ContinueWithNoRecovery</td><td>Optional: When set, the last restore is also performed with NORECOVERY (e.g. when additional backups are to be applied manually).</td></tr>
+<tr><td class='param-name'>-ForceSingleUser</td><td>Forces the database into single-user mode before the restore (even if no active connections are detected). By default only switches when there are...</td></tr>
+<tr><td class='param-name'>-RejoinAvailabilityGroup</td><td>When set and the database was part of an AG, it is automatically re-added to the AG after the restore (Add-DbaAgDatabase with SeedingMode Automati...</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Switch to allow exceptions to pass through (by default errors are logged and returned as objects).</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Request confirmation before critical actions (removing from AG, restore).</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows what would happen without making changes.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Simple restore of a full backup file
+Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\AdventureWorks.bak" -DatabaseName "AdventureWorks"</div>
+
+<h3>Invoke-sqmUserDatabaseBackup</h3>
+<div class='synopsis'>Backs up user databases on a SQL Server instance.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>The target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE"). If not specified, the current computer name is used.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Alternative credentials (PSCredential). If not specified, Windows authentication is used.</td></tr>
+<tr><td class='param-name'>-Database</td><td>Name or array of user databases to back up. Ignored when -All is set.</td></tr>
+<tr><td class='param-name'>-All</td><td>When set, all user databases on the instance are backed up.</td></tr>
+<tr><td class='param-name'>-BackupPath</td><td>Optional direct backup path (overrides the value from server properties). The path must end with "User-Db".</td></tr>
+<tr><td class='param-name'>-UseExcludeTable</td><td>When set, reads master.dbo.sqm_BackupExclude and skips databases where IsActive=1 and IsOrphaned=0.</td></tr>
+<tr><td class='param-name'>-CheckPreferredReplica</td><td>When set, checks sys.fn_hadr_backup_is_preferred_replica() for all AG databases on this instance before starting any backups. If this instance is n...</td></tr>
+<tr><td class='param-name'>-MailTo</td><td>Recipient email address for the backup report. When specified, a mail is sent via SQL Server Database Mail after the backup run. By default the mai...</td></tr>
+<tr><td class='param-name'>-MailProfile</td><td>SQL Server Database Mail profile name to use for sending the report mail. Default: 'Default'.</td></tr>
+<tr><td class='param-name'>-MailOnSuccess</td><td>When set together with -MailTo, a report mail is also sent when all backups succeeded (not only on errors or abort).</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Switch to propagate exceptions immediately (by default errors are logged as warnings).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Back up all user databases on the current computer
+Invoke-sqmUserDatabaseBackup -All</div>
+
+<h3>New-sqmBackupMaintenanceJob</h3>
+<div class='synopsis'>Creates a SQL Agent job with two steps that implement the full dynamic backup maintenance workflow.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance. Default: current computer name ($env:COMPUTERNAME).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the SQL connection.</td></tr>
+<tr><td class='param-name'>-JobName</td><td>Name of the SQL Agent job to create. Default: 'sqm-BackupMaintenance-FULL'.</td></tr>
+<tr><td class='param-name'>-BackupType</td><td>Backup type: 'FULL', 'DIFF', or 'LOG'. Default: 'FULL'.</td></tr>
+<tr><td class='param-name'>-BackupPath</td><td>Optional backup path. When specified, overrides the server default and is passed as 	-BackupPath to Invoke-sqmUserDatabaseBackup in Step 2.</td></tr>
+<tr><td class='param-name'>-ScheduleTime</td><td>Start time of the schedule in format 'HH:mm'. Default: '20:00'.</td></tr>
+<tr><td class='param-name'>-ScheduleDays</td><td>Days of the week for the schedule. Valid values: 'Monday'..'Sunday', 'Weekdays', 'Weekend', 	'EveryDay'. When not specified, defaults depend on Bac...</td></tr>
+<tr><td class='param-name'>-ScheduleIntervalMinutes</td><td>Repeat interval within a day in minutes (e.g. 15 = every 15 minutes). 0 = run once at 	ScheduleTime. Default: 0.</td></tr>
+<tr><td class='param-name'>-JobCategory</td><td>SQL Agent job category. Default: 'Database Maintenance'.</td></tr>
+<tr><td class='param-name'>-UseExcludeTable</td><td>When set, passes -UseExcludeTable to Invoke-sqmUserDatabaseBackup in Step 2.</td></tr>
+<tr><td class='param-name'>-CheckPreferredReplica</td><td>When set, passes -CheckPreferredReplica to Invoke-sqmUserDatabaseBackup in Step 2.</td></tr>
+<tr><td class='param-name'>-IncludeSystemDatabases</td><td>When set, passes -IncludeSystemDatabases to Sync-sqmBackupExcludeTable in Step 1. 	Note: system databases are not backed up by Invoke-sqmUserDataba...</td></tr>
+<tr><td class='param-name'>-MailTo</td><td>Recipient email address. Passed as -MailTo to Invoke-sqmUserDatabaseBackup in Step 2.</td></tr>
+<tr><td class='param-name'>-MailProfile</td><td>SQL Server Database Mail profile name. Passed as -MailProfile to Invoke-sqmUserDatabaseBackup. 	Default: 'Default'.</td></tr>
+<tr><td class='param-name'>-MailOnSuccess</td><td>When set, passes -MailOnSuccess to Invoke-sqmUserDatabaseBackup in Step 2 so that a report 	mail is also sent on full success.</td></tr>
+<tr><td class='param-name'>-OperatorName</td><td>SQL Agent operator name for failure email notification on the job level.</td></tr>
+<tr><td class='param-name'>-Update</td><td>When set, replaces an existing job with the same name.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately instead of returning error objects.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows what would happen without making changes.</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Request confirmation before creating the job.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Weekly FULL backup Sunday 20:00 with all features
+	New-sqmBackupMaintenanceJob -SqlInstance "SQL01" -BackupType FULL `
+	    -UseExcludeTable -CheckPreferredReplica `
+	    -MailTo "dba@company.com" -MailProfile "DBA-Mail"</div>
+
+<h3>Set-sqmBackupExcludePermission</h3>
+<div class='synopsis'>Grants SELECT, INSERT, and UPDATE permissions on master.dbo.sqm_BackupExclude to a login.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>The target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE"). If not specified, the current computer name is used.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Alternative credentials (PSCredential). If not specified, Windows authentication is used.</td></tr>
+<tr><td class='param-name'>-LoginName</td><td>The Windows group (e.g. "DOMAIN\DBA-Team") or SQL login to grant permissions to. This parameter is mandatory.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Switch to propagate exceptions immediately (by default errors are logged as warnings).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Grant permissions to a Windows group on the local instance
+Set-sqmBackupExcludePermission -LoginName "CONTOSO\DBA-Team"</div>
+
+<h3>Sync-sqmBackupExcludeTable</h3>
+<div class='synopsis'>Creates and synchronises the backup exclude table in the master database.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>The target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE"). If not specified, the current computer name is used.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Alternative credentials (PSCredential). If not specified, Windows authentication is used.</td></tr>
+<tr><td class='param-name'>-IncludeSystemDatabases</td><td>When set, the system databases master, model, and msdb are also inserted into the exclude table. tempdb is always excluded regardless of this switch.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Switch to propagate exceptions immediately (by default errors are logged as warnings).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Synchronise on the local instance – user databases only
+Sync-sqmBackupExcludeTable</div>
+
+<h3>Test-sqmBackupIntegrity</h3>
+<div class='synopsis'>Verifies one or more backup files using RESTORE VERIFYONLY.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance on which the verification runs (default: current computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-BackupPath</td><td>Path to the backup file (.bak) on the server (local path, not UNC). Can be an array. If not specified, the directory from the module configuration...</td></tr>
+<tr><td class='param-name'>-FileListOnly</td><td>When $true, only lists the files contained in the backup (without VerifyOnly).</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Test-sqmBackupIntegrity -SqlInstance "SQL01" -BackupPath "D:\Backup\AdventureWorks.bak"</div>
+
+<h2 id='cat-7-Configuration-Management'>7. Configuration Management</h2>
+
+<h3>Compare-sqmServerConfiguration</h3>
+<div class='synopsis'>Compares important configuration settings between two SQL Server instances.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SourceInstance</td><td>Source instance (reference).</td></tr>
+<tr><td class='param-name'>-TargetInstance</td><td>Target instance (server to compare). Mandatory.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for both instances (if identical). For different credentials, separate parameters are required (simplified).</td></tr>
+<tr><td class='param-name'>-CompareDatabases</td><td>When set, databases (Name, Owner, RecoveryModel, Collation) are compared.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Compare-sqmServerConfiguration -SourceInstance "SQL01" -TargetInstance "SQL02"</div>
+
+<h3>Export-sqmServerConfiguration</h3>
+<div class='synopsis'>Exports all SQL Server configuration settings to a JSON snapshot file.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>Target SQL Server instance (default: $env:COMPUTERNAME).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional alternative credentials (PSCredential object).</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Path where JSON snapshot will be saved. Default: $env:ProgramData\sqmSQLTool\Snapshots</td></tr>
+<tr><td class='param-name'>-Label</td><td>Optional descriptive label for this snapshot (e.g., "before MaxMemory change"). Included in the JSON metadata.</td></tr>
+<tr><td class='param-name'>-IncludeDatabases</td><td>When set, includes database-level settings (slower operation).</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Switch to allow exceptions to pass through (default: errors logged as warnings).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Create a snapshot before making configuration changes
+$snap = Export-sqmServerConfiguration -SqlInstance "SQL01" -Label "before MaxMemory change"
+Write-Host "Snapshot saved to: $($snap.SnapshotPath)"</div>
+
+<h3>Invoke-sqmConfigRollback</h3>
+<div class='synopsis'>Restores SQL Server configuration from a previously exported snapshot.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>Target SQL Server instance (default: $env:COMPUTERNAME).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional alternative credentials (PSCredential object).</td></tr>
+<tr><td class='param-name'>-SnapshotPath</td><td>Full path to the JSON snapshot file to restore from. Required parameter.</td></tr>
+<tr><td class='param-name'>-Category</td><td>Limit rollback to specific categories. Valid values: 'SpConfigure', 'InstanceProperties', 'Services', 'DatabaseMail', 'All'. Default: 'All'</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Show what would be changed without making actual modifications.</td></tr>
+<tr><td class='param-name'>-Force</td><td>Skip confirmation dialog and apply changes immediately.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Switch to allow exceptions to pass through (default: errors logged as warnings).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Preview what would be restored
+Invoke-sqmConfigRollback -SqlInstance "SQL01" `
+  -SnapshotPath "C:\Snapshots\SQL01_MSSQLSERVER_20260602_143022.json" `
+  -WhatIf</div>
+
+<h3>Set-sqmConfig</h3>
+<div class='synopsis'>Sets one or more configuration values for the MSSQLTools module.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-LogPath</td><td>Directory for log files (Invoke-sqmLogging).</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Default output directory for reports.</td></tr>
+<tr><td class='param-name'>-CentralPath</td><td>Optional central storage directory (additional copy).</td></tr>
+<tr><td class='param-name'>-OlaJobNameFull</td><td>Name of the full backup job for user databases.</td></tr>
+<tr><td class='param-name'>-OlaJobNameDiff</td><td>Name of the diff backup job for user databases.</td></tr>
+<tr><td class='param-name'>-OlaJobNameLog</td><td>Name of the log backup job for user databases.</td></tr>
+<tr><td class='param-name'>-OlaJobNameIndexOpt</td><td>Name of the IndexOptimize job.</td></tr>
+<tr><td class='param-name'>-OlaJobNameIntUserDb</td><td>Name of the IntegrityCheck job for user databases.</td></tr>
+<tr><td class='param-name'>-OlaJobNameIntSysDb</td><td>Name of the IntegrityCheck job for system databases.</td></tr>
+<tr><td class='param-name'>-OlaJobNameSysDbBackup</td><td>Name of the full backup job for system databases.</td></tr>
+<tr><td class='param-name'>-TsmManagementClasses</td><td>Array of valid TSM management classes (e.g. 'MC_B_NL.NL_42.42.NA').</td></tr>
+<tr><td class='param-name'>-HpuDomainGroupMap</td><td>Array of PSCustomObject with fields DomainPattern (wildcard) and GroupNamePattern (sAMAccountName suffix of the HPU allow group). Evaluated by Get...</td></tr>
+<tr><td class='param-name'>-SsrsInstallerPath</td><td>Full UNC or local path to the SSRS installer file (SQLServerReportingServices.exe or .msi). Used by Install-sqmSsrsReportServer when -InstallerPa...</td></tr>
+<tr><td class='param-name'>-CheckProfile</td><td>Check-Profil fuer Invoke-sqmSetupReport und verwandte Checks. Auto = FI-TS-Checks nur wenn sqmIsFitsEnvironment erkannt (Standard) FiTs = FI-TS-C...</td></tr>
+<tr><td class='param-name'>-CheckCostThresholdMin</td><td>Mindestwert fuer Cost Threshold for Parallelism im Setup-Check. Standard: 50</td></tr>
+<tr><td class='param-name'>-CheckTempDbMaxFiles</td><td>Maximale TempDB-Dateianzahl im Setup-Check. Standard: 8</td></tr>
+<tr><td class='param-name'>-CheckDiskBlockSize</td><td>Empfohlene NTFS-Blockgroesse in Bytes fuer Get-sqmDiskBlockSize. Standard: 65536 (64 KB)</td></tr>
+<tr><td class='param-name'>-Language</td><td>Output language of the module. Allowed values: de-DE, en-US. Default: de-DE. Example: Set-sqmConfig -Language en-US</td></tr>
+<tr><td class='param-name'>-PassThru</td><td>Returns the updated configuration as an object.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Set-sqmConfig -LogPath "D:\Logs" -OlaJobNameFull "Prod-FULL"</div>
+
+<h3>Get-sqmConfig</h3>
+<div class='synopsis'>Returns the current module configuration.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-Key</td><td>Name of the configuration key (e.g. 'LogPath', 'OutputPath', 'CentralPath').</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmConfig</div>
+
+<h3>Set-sqmTcpPort</h3>
+<div class='synopsis'>Konfiguriert den TCP-Port einer SQL Server-Instanz ueber die Registry.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>Name der SQL-Instanz (z.B. "MSSQLSERVER" fuer Default, "INST01" fuer Named Instance). Darf auch als SERVERNAME\INSTANZNAME angegeben werden - der S...</td></tr>
+<tr><td class='param-name'>-BasePort</td><td>Basisport. Standard: 1433.</td></tr>
+<tr><td class='param-name'>-PortIncrement</td><td>Schrittweite pro Instanz. Standard: 10.</td></tr>
+<tr><td class='param-name'>-InstanceNumber</td><td>Optionale explizite Instanznummer (ueberschreibt Auto-Erkennung aus Instanzname).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Set-sqmTcpPort -SqlInstance 'MSSQLSERVER' -BasePort 1433</div>
+
+<h3>Invoke-sqmCollationChange</h3>
+<div class='synopsis'>Automatically changes the server collation of a SQL Server instance.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance (must be local). Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the SQL connection.</td></tr>
+<tr><td class='param-name'>-NewCollation</td><td>Target collation (e.g. 'Latin1_General_CI_AS').</td></tr>
+<tr><td class='param-name'>-IncludeUserDatabases</td><td>When set, the default collation of all user databases is also changed.</td></tr>
+<tr><td class='param-name'>-BackupBeforeChange</td><td>Creates a full backup of all user databases before the change.</td></tr>
+<tr><td class='param-name'>-ExcludeDatabase</td><td>Databases to exclude from -IncludeUserDatabases (wildcards allowed).</td></tr>
+<tr><td class='param-name'>-ServiceName</td><td>Windows service name (automatically determined from SqlInstance if not specified).</td></tr>
+<tr><td class='param-name'>-StartupTimeoutSeconds</td><td>Maximum wait time for sqlservr.exe in minimal mode (default: 120).</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory for rollback documentation and column script. Default: Get-sqmDefaultOutputPath.</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue with the next step on error (rarely used).</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Request confirmation before stopping the service and making the change.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows all planned steps without execution.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Invoke-sqmCollationChange -NewCollation "Latin1_General_CI_AS"</div>
+
+<h2 id='cat-17-SSRS-Configuration'>17. SSRS Configuration</h2>
+
+<h3>Set-sqmSsrsHttpsCertificate</h3>
+<div class='synopsis'>Binds a Windows certificate to SSRS or Power BI Report Server for HTTPS access.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-ComputerName</td><td>Target computer name or IP address. Default: localhost ($env:COMPUTERNAME).</td></tr>
+<tr><td class='param-name'>-Thumbprint</td><td>Mandatory. Certificate thumbprint (40 hex characters) from the LocalMachine\My store. 		Spaces are automatically removed from the thumbprint string.</td></tr>
+<tr><td class='param-name'>-Port</td><td>HTTPS port to bind. Default: 443.</td></tr>
+<tr><td class='param-name'>-InstanceName</td><td>SSRS WMI instance name (e.g. "RS_SSRS", "RS_PBIRS"). 		Auto-detected when only one instance is found under the WMI namespace. 		Required when multi...</td></tr>
+<tr><td class='param-name'>-IPAddress</td><td>IP address for the SSL binding. Default: "0.0.0.0" (all interfaces).</td></tr>
+<tr><td class='param-name'>-RequireSSL</td><td>When specified, sets SecureConnectionLevel = 1 (HTTPS required). 		Default: SecureConnectionLevel = 0 (HTTPS optional, HTTP still allowed).</td></tr>
+<tr><td class='param-name'>-Credential</td><td>PSCredential for the WinRM session (remote operation only).</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows what would happen without making any changes.</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Prompts for confirmation before applying changes.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Set-sqmSsrsHttpsCertificate -Thumbprint "A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2"
+
+		Binds the specified certificate to SSRS on the local machine on port 443.
+		The SSRS instance is auto-detected.</div>
+
+<h2 id='cat-5-Login-&-User-Security'>5. Login & User Security</h2>
+
+<h3>Copy-sqmLogins</h3>
+<div class='synopsis'>Copies logins from a source SQL Server instance to a target instance.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-Source</td><td>Source SQL Server instance. Mandatory.</td></tr>
+<tr><td class='param-name'>-Destination</td><td>Target SQL Server instance. Mandatory.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for both instances (source and target). For different credentials use -SourceCredential / -DestinationCredential.</td></tr>
+<tr><td class='param-name'>-SourceCredential</td><td>PSCredential specifically for the source instance.</td></tr>
+<tr><td class='param-name'>-DestinationCredential</td><td>PSCredential specifically for the target instance.</td></tr>
+<tr><td class='param-name'>-Login</td><td>Filters the copy operation to these login names (wildcards allowed). Without specification, all logins (after ExcludeLogin filter) are copied.</td></tr>
+<tr><td class='param-name'>-ExcludeLogin</td><td>Logins that should not be copied (wildcards allowed). Example: 'AppLogin_*', 'OldUser'.</td></tr>
+<tr><td class='param-name'>-IncludeSystemLogins</td><td>When set, system logins (sa, ##MS_*, NT SERVICE\*, NT AUTHORITY\*) are also copied. Default: $false.</td></tr>
+<tr><td class='param-name'>-DisablePolicy</td><td>Controls whether the default policy on the target is disabled before copying and re-enabled afterwards (via Set-sqmSqlPolicyState). Default: $tru...</td></tr>
+<tr><td class='param-name'>-AdjustAuthMode</td><td>When set and the target is Windows-only auth but the source uses Mixed Mode, the target is automatically switched to Mixed Mode. Without this swi...</td></tr>
+<tr><td class='param-name'>-RestartServiceIfRequired</td><td>When set, the SQL Server service on the target server is automatically restarted after an authentication mode change. Without this switch, only a...</td></tr>
+<tr><td class='param-name'>-Force</td><td>Existing logins on the target server are overwritten.</td></tr>
+<tr><td class='param-name'>-AdModuleAction</td><td>Controls behavior when the ActiveDirectory module is not present. 'Install' (default) - Install-sqmAdModule is called to install the module. If i...</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue with the next login on error.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately (overrides ContinueOnError).</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Request confirmation before critical actions.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows all planned actions without executing them.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Copy-sqmLogins -Source 'SQL01' -Destination 'SQL02'
+
+    Copies all non-system logins. Policy is disabled/re-enabled,
+    AD check and orphan repair run automatically.</div>
+
+<h3>Get-sqmADAccountStatus</h3>
+<div class='synopsis'>Checks the status of an Active Directory user account.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SamAccountName</td><td>The SamAccountName of the AD account to check.</td></tr>
+<tr><td class='param-name'>-DomainController</td><td>Optional target DC. Only used via the RSAT path.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmADAccountStatus -SamAccountName 'jdoe'</div>
+
+<h3>Get-sqmADGroupMembers</h3>
+<div class='synopsis'>Lists all members of an Active Directory group.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-GroupName</td><td>Name of the AD group. Pipeline-capable. Format: "GroupName" or "DOMAIN\GroupName"</td></tr>
+<tr><td class='param-name'>-Domain</td><td>Optional: AD domain (e.g., "FITS.LOCAL", "corp.de") If not specified, auto-detects current domain.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmADGroupMembers -GroupName "DL_SQL_Admins"</div>
+
+<h3>Get-sqmLoginSettings</h3>
+<div class='synopsis'>Zeigt alle Logins mit Default-Datenbank und Spracheinstellung.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server-Instanz(en). Pipeline-faehig. Standard: aktueller Computername.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optionales PSCredential.</td></tr>
+<tr><td class='param-name'>-LoginType</td><td>Filter: 'All' (Standard), 'SQL', 'Windows'</td></tr>
+<tr><td class='param-name'>-ExcludeSystemLogins</td><td>NT SERVICE\*, NT AUTHORITY\*, ##MS_*## automatisch ausblenden.</td></tr>
+<tr><td class='param-name'>-DefaultDatabase</td><td>Filter: nur Logins mit dieser Default-Datenbank anzeigen.</td></tr>
+<tr><td class='param-name'>-DefaultLanguage</td><td>Filter: nur Logins mit dieser Sprache anzeigen.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Wenn angegeben, wird eine CSV-Datei geschrieben. Standard: kein Export.</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Bei Fehler auf einer Instanz fortfahren.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Fehler sofort als Ausnahme ausloesen.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmLoginSettings</div>
+
+<h3>Get-sqmSysadminAccounts</h3>
+<div class='synopsis'>Retrieves all logins with sysadmin rights on a SQL Server instance.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance(s). Pipeline-capable. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-ExcludeLogin</td><td>Logins to be marked as 'Excluded' (wildcards allowed).</td></tr>
+<tr><td class='param-name'>-ExcludeSysAccounts</td><td>When set, known system accounts are automatically excluded.</td></tr>
+<tr><td class='param-name'>-IncludeDisabled</td><td>If $true (default), disabled sysadmin logins are also included.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory for report files. Default: C:\System\WinSrvLog\MSSQL</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue on error for an instance.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately (overrides ContinueOnError).</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Request confirmation before writing files.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows which files would be created without writing them.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmSysadminAccounts</div>
+
+<h3>Invoke-sqmSaObfuscation</h3>
+<div class='synopsis'>Obfuscates the SA account on a SQL Server instance by renaming it, disabling it, and setting a random password.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>Target SQL Server instance(s). Pipeline-capable. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for the SQL connection.</td></tr>
+<tr><td class='param-name'>-NewName</td><td>New name for the SA account. Default: 'sqmsa'.</td></tr>
+<tr><td class='param-name'>-PasswordLength</td><td>Length of the random password (12-128). Default: 18.</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue with the next instance on error (otherwise aborts).</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately (overrides ContinueOnError).</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Prompts for confirmation before critical changes (default: off).</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows what would happen without making any changes.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Invoke-sqmSaObfuscation -SqlInstance "SQL01"</div>
+
+<h3>Remove-sqmAdOrphanLogin</h3>
+<div class='synopsis'>Removes Windows logins whose Active Directory account no longer exists (AD orphans).</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>Target SQL Server instance. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for the instance.</td></tr>
+<tr><td class='param-name'>-ExcludeLogin</td><td>Additional logins to exclude from removal (wildcards allowed). Combined with the always-on safety exclusions (system and sysadmin logins).</td></tr>
+<tr><td class='param-name'>-AdModuleAction</td><td>Behavior when the ActiveDirectory module is not present: 'Abort' (default) - stop with an error; nothing is verified or deleted. 'Install' - try In...</td></tr>
+<tr><td class='param-name'>-BackupPath</td><td>Directory for the rollback script. Default: C:\System\WinSrvLog\MSSQL (created if missing).</td></tr>
+<tr><td class='param-name'>-SkipBackup</td><td>Skip writing the rollback script. Not recommended.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately instead of returning error status.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Remove-sqmAdOrphanLogin -SqlInstance "SQL01" -WhatIf
+    Lists exactly which AD-orphaned logins would be removed, without changing anything.</div>
+
+<h3>Set-sqmDatabaseOwner</h3>
+<div class='synopsis'>Sets the owner of one or more databases to a uniform login.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance(s). Pipeline-capable. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-Database</td><td>Database name(s). Wildcards allowed (e.g. 'Prod*'). Default: all user databases.</td></tr>
+<tr><td class='param-name'>-ExcludeDatabase</td><td>Databases to exclude. Wildcards allowed.</td></tr>
+<tr><td class='param-name'>-OwnerLogin</td><td>Login to set as the new owner. Default: sa account (automatically determined via SID 0x01, regardless of whether it has been renamed).</td></tr>
+<tr><td class='param-name'>-IncludeSystemDatabases</td><td>Also include system databases (master, model, msdb). Default: $false. tempdb is always excluded.</td></tr>
+<tr><td class='param-name'>-Force</td><td>Also process databases that already have the correct owner (forces re-assignment).</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Directory for the change log. Default: from module configuration.</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue on error for one instance. Default: $false.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Set sa account on all user databases
+    Set-sqmDatabaseOwner -SqlInstance "SQL01"</div>
+
+<h2 id='cat-12-Server-Configuration-Testing'>12. Server Configuration Testing</h2>
+
+<h3>Get-sqmClusterInfo</h3>
+<div class='synopsis'>Retrieves information about a Windows Failover Cluster: cluster name, nodes and roles including IP addresses.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-ClusterName</td><td>The name of the cluster to query. If not specified, the function attempts to determine the local cluster (only meaningful on a cluster node).</td></tr>
+<tr><td class='param-name'>-IncludeCoreGroup</td><td>Switch to include the core cluster group ("Cluster Group") in the roles list. Storage groups are always excluded.</td></tr>
+<tr><td class='param-name'>-NoAutoInstall</td><td>Suppresses the automatic installation of RSAT clustering tools if the module is missing.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>When set, errors are thrown as exceptions (by default an error object is returned).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>$info = Get-sqmClusterInfo -ClusterName "MYCLUSTER"
+    if (-not $info.Success) { Write-Error $info.ErrorMessage; return }
+    $info.ClusterName
+    $info.Nodes | Format-Table
+    $info.Roles | Where-Object OwnerNode -eq "Node1" | Select Name, IPAddresses</div>
+
+<h3>Get-sqmPerfCounters</h3>
+<div class='synopsis'>Reads SQL Server performance counters from sys.dm_os_performance_counters.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance. Default: local computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-Category</td><td>Filter on category fragments, e.g. @('Buffer','Memory','Locks'). Default: all key counters.</td></tr>
+<tr><td class='param-name'>-TopN</td><td>Maximum number of results. Default: 50.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>If specified, a CSV report is saved.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmPerfCounters -SqlInstance "SQL01"</div>
+
+<h3>Get-sqmSpnReport</h3>
+<div class='synopsis'>Checks the registered SPNs for SQL Server instances (default and named instances).</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-ComputerName</td><td>Target computer. Default: local computer. Pipeline-capable.</td></tr>
+<tr><td class='param-name'>-InstanceFilter</td><td>Optional filter on instance names (wildcards allowed). Example: 'MSSQLSERVER' for default instance only, 'SQL*' for named instances.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory for report and CSV. Default: module configuration (Get-sqmConfig -Key 'OutputPath').</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue with the next instance on error.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately (overrides ContinueOnError).</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Request confirmation before creating files.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows which files would be created without writing them.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmSpnReport
+
+    Checks all SQL Server instances on the local computer.</div>
+
+<h3>Test-sqmSQLFirewall</h3>
+<div class='synopsis'>Tests whether the firewall and network allow a TCP connection to SQL Server.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-Server</td><td>Hostname or IP address of the SQL Server. Pipeline-capable.</td></tr>
+<tr><td class='param-name'>-Port</td><td>TCP port to test. Default: 1433. Ignored when -Instance is specified and the SQL Browser provides the dynamic port.</td></tr>
+<tr><td class='param-name'>-Instance</td><td>Name of the named instance (without server prefix). When specified, the SQL Browser (UDP 1434) is first queried for the dynamic port of the instanc...</td></tr>
+<tr><td class='param-name'>-TimeoutSeconds</td><td>Timeout for the TCP connection test in seconds. Default: 5.</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue with the next server on error instead of aborting.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately (overrides ContinueOnError).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Test-sqmSQLFirewall -Server "SQL01"
+
+    Tests the default instance on TCP port 1433.</div>
+
+<h3>Test-sqmSqlInstanceInstalled</h3>
+<div class='synopsis'>Prueft ob eine SQL Server-Instanz auf dem lokalen System installiert ist.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-InstanceName</td><td>Name der zu pruefenden SQL-Instanz. Default: "MSSQLSERVER" (Default-Instanz).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Test-sqmSqlInstanceInstalled
+    # Prueft Default-Instanz MSSQLSERVER</div>
+
+<h2 id='cat-4-Monitoring-&-Health-Checks'>4. Monitoring & Health Checks</h2>
+
+<h3>Get-sqmBlockingReport</h3>
+<div class='synopsis'>Retrieves current blocking chains on a SQL Server instance.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance (default: current computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-MinWaitSeconds</td><td>Only report blocking that has been waiting longer than this value (in seconds). Default: 0.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>If specified, a CSV snapshot is written to this directory.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately instead of returning as errors.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmBlockingReport</div>
+
+<h3>Get-sqmConnectionStats</h3>
+<div class='synopsis'>Analyzes active SQL Server connections and connection statistics.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance. Default: local computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-GroupBy</td><td>Grouping criterion: Application | Login | Host | Database. Default: Application.</td></tr>
+<tr><td class='param-name'>-TopN</td><td>Number of top groups. Default: 25.</td></tr>
+<tr><td class='param-name'>-IncludeSystemConnections</td><td>Include system connections (is_user_process = 0).</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>If specified, a CSV report is saved.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmConnectionStats -SqlInstance "SQL01"</div>
+
+<h3>Get-sqmDatabaseHealth</h3>
+<div class='synopsis'>Aggregated health report for all databases on an instance.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance(s). Pipeline-capable. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-MaxCheckDbAgeDays</td><td>Maximum age in days of the last error-free DBCC CHECKDB. Default: 14.</td></tr>
+<tr><td class='param-name'>-MaxVlfCount</td><td>Warning threshold for VLF count per database. Default: 200.</td></tr>
+<tr><td class='param-name'>-HistoryDays</td><td>Time range for AutoGrowth evaluation in days. Default: 30.</td></tr>
+<tr><td class='param-name'>-ExcludeDatabase</td><td>Databases to exclude. Wildcards allowed.</td></tr>
+<tr><td class='param-name'>-IncludeSystemDatabases</td><td>Include system databases (except tempdb). Default: $false.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory for report files. Default: C:\System\WinSrvLog\MSSQL</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue on error for an instance (otherwise the error is thrown).</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately (overrides ContinueOnError).</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Request confirmation before writing files.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows which files would be created without actually writing them.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmDatabaseHealth</div>
+
+<h3>Get-sqmDeadlockReport</h3>
+<div class='synopsis'>Reads and analyzes deadlock events from the System Health Extended Event session.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance (default: current computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-StartTime</td><td>Return only deadlocks from this point in time. Default: last 24 hours.</td></tr>
+<tr><td class='param-name'>-EndTime</td><td>Return only deadlocks up to this point in time. Default: now.</td></tr>
+<tr><td class='param-name'>-MaxDeadlocks</td><td>Maximum number of deadlocks returned (newest first). Default: 100.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>If specified, deadlock graphs are saved as .xdl files in this directory (format: Deadlock_&lt;Instance&gt;_&lt;Timestamp&gt;.xdl).</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately instead of returning as errors.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmDeadlockReport</div>
+
+<h3>Get-sqmLongRunningQueries</h3>
+<div class='synopsis'>Identifies long-running queries on a SQL Server instance.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance (default: current computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-MinDurationSeconds</td><td>Return only queries running longer than this value (seconds). Default: 30.</td></tr>
+<tr><td class='param-name'>-MinCpuMs</td><td>Return only queries whose CPU time exceeds this value (milliseconds). Default: 0.</td></tr>
+<tr><td class='param-name'>-ExcludeWaitType</td><td>Wait types to exclude (e.g. 'SLEEP_TASK','WAITFOR'). Default: common idle waits.</td></tr>
+<tr><td class='param-name'>-IncludeSystemSessions</td><td>Include system sessions (SPID &lt;= 50) as well. Default: $false.</td></tr>
+<tr><td class='param-name'>-IncludeQueryPlan</td><td>Retrieve the XML execution plan as well (expensive - only on demand). Default: $false.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>If specified, a CSV snapshot is written to this directory.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately instead of returning as errors.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmLongRunningQueries</div>
+
+<h3>Get-sqmServerSetting</h3>
+<div class='synopsis'>Reads one or all server properties from a SQL Server instance.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>The target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE"). If not specified, the current computer name is used.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Alternative credentials (PSCredential). If not specified, Windows Authentication is used.</td></tr>
+<tr><td class='param-name'>-Name</td><td>The name of the server property to retrieve. Only the following values are allowed: BackupDirectory, DefaultFile, DefaultLog, MasterDBPath, ErrorL...</td></tr>
+<tr><td class='param-name'>-All</td><td>When set, all properties of the server object are returned as a list.</td></tr>
+<tr><td class='param-name'>-DefaultValue</td><td>Optional default value if the property does not exist or cannot be read. Ignored when -All is used.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Switch to allow exceptions to pass through (by default errors are logged as warnings).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Read BackupDirectory from the local server
+$backupPath = Get-sqmServerSetting -Name "BackupDirectory"</div>
+
+<h3>Get-sqmSQLInstanceCheck</h3>
+<div class='synopsis'>Checks a SQL Server instance against best practices.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>The target SQL Server instance (default: current computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Alternative credentials.</td></tr>
+<tr><td class='param-name'>-Detailed</td><td>Detailed output (e.g. path checks, analyze all databases). Default: $false.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Allow exceptions to pass through.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmSQLInstanceCheck</div>
+
+<h3>Invoke-sqmLoginAudit</h3>
+<div class='synopsis'>Comprehensive audit of all SQL Server logins on one or more instances.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance(s). Pipeline-capable. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential.</td></tr>
+<tr><td class='param-name'>-InactivityThresholdDays</td><td>Logins without login since this value are considered inactive. Default: 90.</td></tr>
+<tr><td class='param-name'>-MaxPasswordAgeDays</td><td>SQL logins with password older than this value are reported (non-sysadmins). Default: 180. 0 = disabled.</td></tr>
+<tr><td class='param-name'>-MaxPasswordAgeDaysSysadmin</td><td>SQL logins with password older than this value are reported (sysadmins). Default: 365. 0 = disabled.</td></tr>
+<tr><td class='param-name'>-ExcludeLogin</td><td>Logins to exclude (wildcards). E.g. 'NT SERVICE\*', 'sqmsa'.</td></tr>
+<tr><td class='param-name'>-IncludeSystemLogins</td><td>When set, NT SERVICE\*, NT AUTHORITY\* are also included.</td></tr>
+<tr><td class='param-name'>-CheckPolicyNonSysadmin</td><td>Check password policy violations for non-sysadmin logins. Default: $true.</td></tr>
+<tr><td class='param-name'>-CheckPolicySysadmin</td><td>Check password policy violations for sysadmin logins. Default: $true.</td></tr>
+<tr><td class='param-name'>-ReportBuiltInAdmins</td><td>When BUILTIN\Administrators is found in logins, report as warning. Default: $true.</td></tr>
+<tr><td class='param-name'>-CheckAdOrphans</td><td>When set, AD orphan check is performed for Windows logins (requires AD module).</td></tr>
+<tr><td class='param-name'>-GenerateHtmlReport</td><td>Generate HTML report in addition to TXT/CSV. Default: $true.</td></tr>
+<tr><td class='param-name'>-HtmlReportTemplate</td><td>HTML template style: 'Standard', 'Compact', 'Detailed'. Default: 'Standard'.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory. Default: from module configuration (Get-sqmDefaultOutputPath).</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue on error for an instance.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately (overrides ContinueOnError).</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Request confirmation before file creation.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows what would happen.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Invoke-sqmLoginAudit</div>
+
+<h2 id='cat-8-Storage-&-Disk-Management'>8. Storage & Disk Management</h2>
+
+<h3>Copy-sqmNTFSPermissions</h3>
+<div class='synopsis'>Copies NTFS permissions (ACLs) from a source path to a destination path.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SourcePath</td><td>Source path (e.g. "D:\" or "D:\Data").</td></tr>
+<tr><td class='param-name'>-DestinationPath</td><td>Destination path (e.g. "E:\" or "E:\Data").</td></tr>
+<tr><td class='param-name'>-Recurse</td><td>Recursive traversal of all subfolders and files.</td></tr>
+<tr><td class='param-name'>-CreateMissingFolders</td><td>Automatically creates missing target folders (directories only, not files). Files missing at the destination are skipped.</td></tr>
+<tr><td class='param-name'>-IncludeSystemAndHidden</td><td>Includes hidden and system objects in the processing.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Copy-sqmNTFSPermissions -SourcePath "D:\" -DestinationPath "E:\" -Recurse
+    Copies all permissions from D: to E: (recursively).</div>
+
+<h3>Get-sqmDiskBlockSize</h3>
+<div class='synopsis'>Prueft die NTFS-Blockgroesse (Cluster-Groesse) von Laufwerken auf 64KB.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-Drive</td><td>Laufwerkbuchstabe(n) ohne Doppelpunkt, z.B. 'F', 'G', 'H'. Pipeline-faehig. Wenn nicht angegeben: -SqlInstance muss gesetzt sein.</td></tr>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server-Instanz. Wenn angegeben werden automatisch alle von SQL Server genutzten Laufwerke (Data, Log, Backup, TempDB) aus der Registry ermittelt.</td></tr>
+<tr><td class='param-name'>-ComputerName</td><td>Zielcomputer fuer die WMI-Abfrage. Standard: lokaler Computer.</td></tr>
+<tr><td class='param-name'>-RecommendedBlockSize</td><td>Empfohlene Blockgroesse in Bytes. Standard: 65536 (64 KB).</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Ausnahmen sofort ausloesen statt Write-Error.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Einzelne Laufwerke pruefen
+    Get-sqmDiskBlockSize -Drive 'F', 'G', 'H'</div>
+
+<h3>Get-sqmDiskInfoByDriveLetter</h3>
+<div class='synopsis'>Returns disk information for a given drive letter.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-DriveLetter</td><td>Drive letter of the volume (e.g. "C", "C:" or "D:").</td></tr>
+<tr><td class='param-name'>-NoClipboard</td><td>Suppresses copying the result to the clipboard.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmDiskInfoByDriveLetter -DriveLetter "C"
+
+    Returns disk information for drive C: and copies it to the clipboard.</div>
+
+<h3>Get-sqmOrphanedFiles</h3>
+<div class='synopsis'>Finds MDF/LDF/NDF database files that are not assigned to any database.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance. Default: local computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-SearchPath</td><td>Directories to search. Default: all unique directories from sys.master_files + SQL Server default paths.</td></tr>
+<tr><td class='param-name'>-FileExtension</td><td>File extensions to search for. Default: .mdf, .ldf, .ndf</td></tr>
+<tr><td class='param-name'>-Recurse</td><td>Recursively search subdirectories.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmOrphanedFiles -SqlInstance "SQL01"</div>
+
+<h2 id='cat-11-Module-&-Update-Management'>11. Module & Update Management</h2>
+
+<h3>Install-sqmAdModule</h3>
+<div class='synopsis'>Ensures that the ActiveDirectory PowerShell module (RSAT) is installed.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SkipIfPresent</td><td>If $true (default) and the module is already present, $true is returned immediately without attempting installation. Set to $false to force a re-...</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>When set, the function returns $false on failed installation instead of throwing an error.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>When set, the function throws an exception on failed installation (overrides ContinueOnError).</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows which installation method would be attempted, without executing it.</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Request confirmation before installation.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Install-sqmAdModule
+
+    Checks whether the AD module is present and installs it if necessary.</div>
+
+<h3>Test-sqmModuleUpdate</h3>
+<div class='synopsis'>Checks all configured update sources for a newer sqmSQLTool version.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-Source</td><td>Which sources to check. Valid values: GitHub, PSGallery, UNC, All. Default: All</td></tr>
+<tr><td class='param-name'>-RepositoryPath</td><td>UNC path for the UNC source check. Default: W:\75084-Datenbanken\MSSQL\DEV\sqmSQLTool</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately instead of returning error object.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Test-sqmModuleUpdate</div>
+
+<h3>Test-sqmUpdateViaGitHub</h3>
+<div class='synopsis'>Checks if a newer version of sqmSQLTool is available on GitHub.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-Owner</td><td>GitHub repository owner. Default: JankeUwe</td></tr>
+<tr><td class='param-name'>-Repository</td><td>GitHub repository name. Default: sqmSQLTool</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately instead of returning error object.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Test-sqmUpdateViaGitHub</div>
+
+<h3>Test-sqmUpdateViaPSGallery</h3>
+<div class='synopsis'>Checks if a newer version of sqmSQLTool is available on PowerShell Gallery.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-ModuleName</td><td>Module name to check. Default: sqmSQLTool</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately instead of returning error object.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Test-sqmUpdateViaPSGallery</div>
+
+<h3>Test-sqmUpdateViaUNC</h3>
+<div class='synopsis'>Checks if a newer version of sqmSQLTool is available on a UNC share.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-RepositoryPath</td><td>UNC path to the sqmSQLTool repository share. Default: W:\75084-Datenbanken\MSSQL\DEV\sqmSQLTool</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately instead of returning error object.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Test-sqmUpdateViaUNC</div>
+
+<h3>Update-sqmModule</h3>
+<div class='synopsis'>Updates the sqmSQLTool module from GitHub, PSGallery or a UNC share.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-Source</td><td>Update source. Valid values: GitHub, PSGallery, UNC. Default: GitHub</td></tr>
+<tr><td class='param-name'>-RepositoryPath</td><td>UNC path for UNC source. Default: W:\75084-Datenbanken\MSSQL\DEV\sqmSQLTool</td></tr>
+<tr><td class='param-name'>-Destination</td><td>Installation path for the module. Default: C:\Windows\System32\WindowsPowerShell\v1.0\Modules\sqmSQLTool (or %ProgramFiles%\WindowsPowerShell\Modul...</td></tr>
+<tr><td class='param-name'>-Force</td><td>Install even if no newer version is available.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Update-sqmModule</div>
+
+<h2 id='cat-16-SQL-Drivers-&-Tools-Installation'>16. SQL Drivers & Tools Installation</h2>
+
+<h3>Install-sqmDb2Driver</h3>
+<div class='synopsis'>Installiert den IBM DB2 ODBC/CLI-Treiber.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SourcePath</td><td>Pfad zum DB2-Installer oder Verzeichnis mit dem Installer. Z.B.: \\srv\Treiber\DB2 oder C:\Downloads\db2_odbc_cli_64.exe</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Install-sqmDb2Driver -SourcePath '\\srv\Treiber\DB2'</div>
+
+<h3>Install-sqmJdbcDriver</h3>
+<div class='synopsis'>Installiert den Microsoft JDBC Driver for SQL Server.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SourcePath</td><td>Quellpfad wo der JDBC-Installer oder die .jar liegt. Z.B.: \\srv\Treiber\JDBC oder C:\Downloads\sqljdbc_12.4</td></tr>
+<tr><td class='param-name'>-DestinationPath</td><td>Zielpfad fuer die .jar-Datei. Standard: C:\Program Files\Microsoft JDBC Driver for SQL Server\</td></tr>
+<tr><td class='param-name'>-UpdateClassPath</td><td>Wenn $true: CLASSPATH-Systemumgebungsvariable wird um den Zielpfad erweitert. Standard: $false</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Install-sqmJdbcDriver -SourcePath '\\srv\Treiber\JDBC'</div>
+
+<h3>Install-sqmOdbcDriver</h3>
+<div class='synopsis'>Installiert den Microsoft ODBC Driver for SQL Server.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SourcePath</td><td>Pfad zum ODBC-Installer oder Verzeichnis mit dem Installer. Z.B.: \\srv\Treiber\ODBC oder C:\Downloads\msodbcsql.msi</td></tr>
+<tr><td class='param-name'>-DriverName</td><td>Optionaler Treibername fuer die Vorab-Pruefung via Test-sqmDriverInstalled. Standard: automatische Erkennung (neuester Microsoft SQL ODBC-Treiber).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Install-sqmOdbcDriver -SourcePath '\\srv\Treiber\ODBC'</div>
+
+<h3>Uninstall-sqmDb2Driver</h3>
+<div class='synopsis'>Deinstalliert den IBM DB2 ODBC/CLI-Treiber.</div>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Uninstall-sqmDb2Driver</div>
+
+<h3>Uninstall-sqmJdbcDriver</h3>
+<div class='synopsis'>Deinstalliert den Microsoft JDBC Driver for SQL Server.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-RemoveClassPath</td><td>Entfernt den CLASSPATH-Systemeintrag wenn vorhanden. Standard: $false.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Uninstall-sqmJdbcDriver</div>
+
+<h3>Uninstall-sqmOdbcDriver</h3>
+<div class='synopsis'>Deinstalliert den Microsoft ODBC Driver for SQL Server.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-DriverName</td><td>Optionaler Treibername fuer gezieltes Matching. Standard: Wildcard 'Microsoft ODBC Driver * for SQL Server'.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Uninstall-sqmOdbcDriver</div>
+
+<h2 id='cat-19-External-Systems-Integration'>19. External Systems Integration</h2>
+
+<h3>Invoke-sqmSplunkConfiguration</h3>
+<div class='synopsis'>Configures the Splunk Universal Forwarder on SQL Server hosts.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-Mode</td><td>Set - Set environment variables and start/restart SplunkForwarder (default). Test - Check only, no changes.</td></tr>
+<tr><td class='param-name'>-Remote</td><td>Remote execution via AD OU search. Combine with -SearchOU.</td></tr>
+<tr><td class='param-name'>-SearchOU</td><td>Distinguished Name or simple OU name. Default: OUServDatabase.</td></tr>
+<tr><td class='param-name'>-ComputerList</td><td>Explicit server list: string array or path to a text file (# = comment).</td></tr>
+<tr><td class='param-name'>-Credential</td><td>Credentials for AD and remoting.</td></tr>
+<tr><td class='param-name'>-LogPath</td><td>Directory for log files. Default: sqmSQLTool LogPath configuration.</td></tr>
+<tr><td class='param-name'>-LogCallback</td><td>Optional ScriptBlock for GUI logging.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Invoke-sqmSplunkConfiguration</div>
+
+<h3>Test-sqmTsmConnection</h3>
+<div class='synopsis'>Tests the connection to an IBM Spectrum Protect (TSM) server using dsmadmc.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-ComputerName</td><td>Target computer on which the connection test is performed. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-DsmadmcPath</td><td>Full path to dsmadmc.exe. Determined automatically from the registry if not specified.</td></tr>
+<tr><td class='param-name'>-UserName</td><td>TSM user name (USERID from dsm.opt if not specified).</td></tr>
+<tr><td class='param-name'>-Password</td><td>TSM password as SecureString (PASSWORD from dsm.opt if not specified).</td></tr>
+<tr><td class='param-name'>-ServerName</td><td>TSM server address (TCPServeraddress from dsm.opt if not specified).</td></tr>
+<tr><td class='param-name'>-DsmOptPath</td><td>Full path to dsm.opt. Determined automatically if not specified.</td></tr>
+<tr><td class='param-name'>-Credential</td><td>PSCredential for remote access (WinRM).</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Test-sqmTsmConnection</div>
+
+<h2 id='cat-13-SQL-Agent-&-Proxy-Jobs'>13. SQL Agent & Proxy Jobs</h2>
+
+<h3>Get-sqmAgentJobHistory</h3>
+<div class='synopsis'>Displays the execution history of SQL Agent jobs.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance (default: current computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-JobName</td><td>Name or wildcard pattern (e.g. '*Backup*') to filter jobs.</td></tr>
+<tr><td class='param-name'>-Status</td><td>'Success', 'Failure', 'Retry' or 'Cancelled'. Default: all.</td></tr>
+<tr><td class='param-name'>-Since</td><td>Show history from this date onwards. Default: today minus 7 days.</td></tr>
+<tr><td class='param-name'>-LastX</td><td>Instead of a time range: number of last executions per job (e.g. -LastX 5).</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Export as CSV (optional). If specified, a CSV file is created.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmAgentJobHistory</div>
+
+<h3>New-sqmAgentProxy</h3>
+<div class='synopsis'>Erstellt einen SQL Server Credential und einen SQL Agent Proxy und verbindet beide.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server-Instanz. Standard: lokaler Computername.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential fuer die SQL-Verbindung (Windows-Auth wenn nicht angegeben).</td></tr>
+<tr><td class='param-name'>-CredentialName</td><td>Name des neuen SQL Server Credentials (z.B. "DOMAIN\ServiceAccount").</td></tr>
+<tr><td class='param-name'>-ProxyName</td><td>Name des neuen SQL Agent Proxys.</td></tr>
+<tr><td class='param-name'>-ProxyDescription</td><td>Optionale Beschreibung fuer den Proxy.</td></tr>
+<tr><td class='param-name'>-WindowsCredential</td><td>Windows-Credential direkt als PSCredential uebergeben (kein Dialog). Wenn nicht angegeben erscheint ein Get-Credential Dialog. Kann z.B. aus einem ...</td></tr>
+<tr><td class='param-name'>-WindowsUserName</td><td>Optionaler Windows-Benutzername (DOMAIN\User) zur Vorbestueckung des Get-Credential Dialogs. Wird ignoriert wenn -WindowsCredential angegeben. Wenn...</td></tr>
+<tr><td class='param-name'>-Subsystem</td><td>Subsysteme die dem Proxy zugewiesen werden. Mehrfachauswahl moeglich. Gueltiger Werte: CmdExec, SSIS, PowerShell, All Standard: All (alle drei Subs...</td></tr>
+<tr><td class='param-name'>-Force</td><td>Ueberschreibt bestehenden Credential und/oder Proxy wenn vorhanden.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Ausnahmen sofort ausloesen statt Write-Error.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Einzeiler - Credential-Dialog erscheint automatisch
+    New-sqmAgentProxy -SqlInstance "SQL01" -CredentialName "DOMAIN\SqlServiceAccount" `
+        -ProxyName "SSIS Proxy"
+
+    # Credential direkt uebergeben - kein Dialog
+    $cred = Get-Credential "DOMAIN\SvcSSIS"
+    New-sqmAgentProxy -SqlInstance "SQL01" -CredentialName "DOMAIN\SvcSSIS" `
+        -ProxyName "SSIS Proxy" -WindowsCredential $cred</div>
+
+<h3>New-sqmAlwaysOnRepairJob</h3>
+<div class='synopsis'>Creates a SQL Server Agent job that runs Repair-Job.ps1 (AutoRepair).</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>Target SQL instance (default: computer name).</td></tr>
+<tr><td class='param-name'>-JobName</td><td>Name of the Agent job. Default: 'sqmAlwaysOnRepair'.</td></tr>
+<tr><td class='param-name'>-Force</td><td>Overwrites an existing job.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>New-sqmAlwaysOnRepairJob -SqlInstance "SQL01"
+#&gt;
+function New-sqmAlwaysOnRepairJob
+{
+	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]
+	param (
+		[Parameter(Mandatory = $false)]
+		[string]$SqlInstance = $env:COMPUTERNAME,
+		[Parameter(Mandatory = $false)]
+		[string]$JobName = 'sqmAlwaysOnRepair',
+		[Parameter(Mandatory = $false)]
+		[switch]$Force
+	)
+
+	process
+	{
+		# Setup output directory with proper permissions FIRST
+		$outputPath = "C:\System\WinSrvLog\MSSQL"
+		if (-not (Test-Path $outputPath)) {
+			New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
+		}
+		# Grant permissions to SQL Agent service accounts
+		@('NT SERVICE\MSSQLSERVER', 'NT SERVICE\SQLSERVERAGENT') | ForEach-Object {
+			$null = icacls $outputPath /grant "$_`:F" /T /C 2&gt;&1
+		}
+
+		# Check if job exists
+		$existingJob = Get-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -ErrorAction SilentlyContinue
+		if ($existingJob -and -not $Force)
+		{
+			throw "Job '$JobName' existiert bereits. -Force zum Ueberschreiben."
+		}
+		if ($existingJob -and $Force)
+		{
+			Remove-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -Confirm:$false -ErrorAction Stop
+		}
+
+		# Create job
+		$job = New-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName `
+			-Description "AutoRepair: Repariert AlwaysOn-Datenbanken" -ErrorAction Stop
+
+		# Create CmdExec job step (calls Repair-Job.ps1)
+		$psExePath = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
+		$repairScriptPath = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs\Repair-Job.ps1'
+		$command = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$repairScriptPath`""
+
+		$jobStep = New-DbaAgentJobStep -SqlInstance $SqlInstance -Job $JobName `
+			-StepName "RunRepair" -Subsystem 'CmdExec' -Command $command -ErrorAction Stop
+
+		# Add hourly schedule
+		$schedName = "sch_$JobName"
+		$schedSql = @"
+DECLARE @sid INT;
+WHILE EXISTS (SELECT 1 FROM msdb.dbo.sysschedules WHERE name = N'$schedName')
+BEGIN
+    SELECT TOP (1) @sid = schedule_id FROM msdb.dbo.sysschedules WHERE name = N'$schedName';
+    EXEC msdb.dbo.sp_delete_schedule @schedule_id = @sid, @force_delete = 1;
+END
+EXEC msdb.dbo.sp_add_schedule
+    @schedule_name          = N'$schedName',
+    @enabled                = 1,
+    @freq_type              = 4,
+    @freq_interval          = 1;
+EXEC msdb.dbo.sp_attach_schedule @job_name = N'$JobName', @schedule_name = N'$schedName';
+"@
+		$null = Invoke-DbaQuery -SqlInstance $SqlInstance -Database msdb -Query $schedSql -ErrorAction Stop
+
+		[PSCustomObject]@{
+			SqlInstance = $SqlInstance
+			JobName     = $JobName
+			Status      = "Success"
+			Message     = "Job created"
+			Timestamp   = Get-Date
+		}
+	}
+}</div>
+
+<h3>New-sqmAutoLoginSyncJob</h3>
+<div class='synopsis'>Creates a SQL Agent job that runs Sync-Job.ps1 (AutoSync).</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>Target SQL instance (default: computer name).</td></tr>
+<tr><td class='param-name'>-JobName</td><td>Name of the Agent job. Default: 'sqmAutoLoginSync'.</td></tr>
+<tr><td class='param-name'>-Force</td><td>Overwrites an existing job.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>New-sqmAutoLoginSyncJob -SqlInstance "SQL01"
+#&gt;
+function New-sqmAutoLoginSyncJob
+{
+	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]
+	param (
+		[Parameter(Mandatory = $false)]
+		[string]$SqlInstance = $env:COMPUTERNAME,
+		[Parameter(Mandatory = $false)]
+		[string]$JobName = 'sqmAutoLoginSync',
+		[Parameter(Mandatory = $false)]
+		[switch]$Force
+	)
+
+	process
+	{
+		# Setup output directory with proper permissions FIRST
+		$outputPath = "C:\System\WinSrvLog\MSSQL"
+		if (-not (Test-Path $outputPath)) {
+			New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
+		}
+		# Grant permissions to SQL Agent service accounts
+		@('NT SERVICE\MSSQLSERVER', 'NT SERVICE\SQLSERVERAGENT') | ForEach-Object {
+			$null = icacls $outputPath /grant "$_`:F" /T /C 2&gt;&1
+		}
+
+		# Check if job exists
+		$existingJob = Get-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -ErrorAction SilentlyContinue
+		if ($existingJob -and -not $Force)
+		{
+			throw "Job '$JobName' existiert bereits. -Force zum Ueberschreiben."
+		}
+		if ($existingJob -and $Force)
+		{
+			Remove-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -Confirm:$false -ErrorAction Stop
+		}
+
+		# Create job
+		$job = New-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName `
+			-Description "AutoSync: Synchronisiert Logins ueber AlwaysOn-Replicas" -ErrorAction Stop
+
+		# Create CmdExec job step (calls Sync-Job.ps1)
+		$psExePath = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
+		$syncScriptPath = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs\Sync-Job.ps1'
+		$command = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$syncScriptPath`""
+
+		$jobStep = New-DbaAgentJobStep -SqlInstance $SqlInstance -Job $JobName `
+			-StepName "RunSync" -Subsystem 'CmdExec' -Command $command -ErrorAction Stop
+
+		# Add daily schedule (2:00 AM)
+		$schedName = "sch_$JobName"
+		$schedSql = @"
+DECLARE @sid INT;
+WHILE EXISTS (SELECT 1 FROM msdb.dbo.sysschedules WHERE name = N'$schedName')
+BEGIN
+    SELECT TOP (1) @sid = schedule_id FROM msdb.dbo.sysschedules WHERE name = N'$schedName';
+    EXEC msdb.dbo.sp_delete_schedule @schedule_id = @sid, @force_delete = 1;
+END
+EXEC msdb.dbo.sp_add_schedule
+    @schedule_name          = N'$schedName',
+    @enabled                = 1,
+    @freq_type              = 4,
+    @freq_interval          = 1,
+    @active_start_time      = 020000;
+EXEC msdb.dbo.sp_attach_schedule @job_name = N'$JobName', @schedule_name = N'$schedName';
+"@
+		$null = Invoke-DbaQuery -SqlInstance $SqlInstance -Database msdb -Query $schedSql -ErrorAction Stop
+
+		[PSCustomObject]@{
+			SqlInstance = $SqlInstance
+			JobName     = $JobName
+			Status      = "Success"
+			Message     = "Job created"
+			Timestamp   = Get-Date
+		}
+	}
+}</div>
+
+<h2 id='cat-1-Always-On-&-Availability-Groups'>1. Always On & Availability Groups</h2>
+
+<h3>Add-sqmDatabaseToAG</h3>
+<div class='synopsis'>Adds one or more databases to an Always On availability group (AutoSeed).</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>Primary SQL instance (default: computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Credentials.</td></tr>
+<tr><td class='param-name'>-AvailabilityGroup</td><td>Name of the target availability group (mandatory).</td></tr>
+<tr><td class='param-name'>-Database</td><td>Name or array of databases. Ignored when -All is set.</td></tr>
+<tr><td class='param-name'>-All</td><td>Add all user databases that are not yet in an AG.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Allow exceptions to pass through.</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Request confirmation.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Test only (no changes).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Add-sqmDatabaseToAG -AvailabilityGroup "AG1" -Database "SalesDB"</div>
+
+<h3>Add-sqmDatabaseToDistributedAg</h3>
+<div class='synopsis'>Adds a database to a Distributed AlwaysOn Availability Group.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>Primary SQL Server instance. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-AvailabilityGroupName</td><td>Name of the Distributed AG.</td></tr>
+<tr><td class='param-name'>-DatabaseName</td><td>Name of the database to add.</td></tr>
+<tr><td class='param-name'>-SecondaryInstance</td><td>Secondary SQL Server instance where database will be restored.</td></tr>
+<tr><td class='param-name'>-BackupPath</td><td>Path for full and log backups. Default: C:\Backups</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Add-sqmDatabaseToDistributedAg -SqlInstance "SQL01" -AvailabilityGroupName "MyDAG" -DatabaseName "MyDb" -SecondaryInstance "DR-SQL01"</div>
+
+<h3>Compare-sqmAlwaysOnLogins</h3>
+<div class='synopsis'>Vergleicht die Logins aller Replicas einer AlwaysOn Availability Group.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>Einstiegs-Instanz der AG (Primary oder eine Secondary). Standard: aktueller Computer.</td></tr>
+<tr><td class='param-name'>-AvailabilityGroupName</td><td>Name der Availability Group. Ohne Angabe wird die erste gefundene AG verwendet (bei mehreren: Warnung, erste wird genommen).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optionales PSCredential fuer alle Replicas.</td></tr>
+<tr><td class='param-name'>-IncludeSystemLogins</td><td>Wenn gesetzt, werden auch Systemlogins (sa, ##MS_*, NT SERVICE\*, NT AUTHORITY\*, BUILTIN\*) verglichen. Standard: ausgeblendet. Hinweis: Das 'sa'-...</td></tr>
+<tr><td class='param-name'>-Login</td><td>Nur diese Logins vergleichen (Wildcards erlaubt).</td></tr>
+<tr><td class='param-name'>-ExcludeLogin</td><td>Diese Logins ausschliessen (Wildcards erlaubt).</td></tr>
+<tr><td class='param-name'>-OnlyDifferences</td><td>Nur Logins mit Abweichung (Status Warning/Critical) ausgeben.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Ausgabeverzeichnis fuer TXT/HTML. Standard: aus Modulkonfiguration.</td></tr>
+<tr><td class='param-name'>-NoOpen</td><td>Unterdrueckt das automatische Oeffnen des Reports.</td></tr>
+<tr><td class='param-name'>-FailOnDrift</td><td>Wenn gesetzt: bei Login-Drift (Status Warning oder Critical) wird ein Windows Event (Source 'sqmSQLTool', EventId 9001) geschrieben und anschliesse...</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Bei Fehler fortfahren.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Fehler sofort als Ausnahme ausloesen.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Compare-sqmAlwaysOnLogins -SqlInstance "SQL01"</div>
+
+<h3>Complete-sqmListenerMigration</h3>
+<div class='synopsis'>Completes listener migration after cluster team recreates the listener resource.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance hosting the AG. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-AvailabilityGroupName</td><td>Name of the Availability Group.</td></tr>
+<tr><td class='param-name'>-ListenerName</td><td>DNS name of the listener to be added (must match new cluster resource).</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory for completion report. Default: C:\System\WinSrvLog\MSSQL</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># STEP 1: DBA runs Invoke-sqmListenerMigrationPrep
+    # STEP 2: AD team deletes/recreates listener role (15-30 min wait)
+    # STEP 3: DBA runs this function
+
+    Complete-sqmListenerMigration -SqlInstance "SQL02" -AvailabilityGroupName "ProdAG" -ListenerName "PROD-SQL-Listener"</div>
+
+<h3>Export-sqmAlwaysOnConfiguration</h3>
+<div class='synopsis'>Exports the complete AlwaysOn AG configuration for one or more SQL Server instances.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance(s). Pipeline-capable. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory for report files. Default: $env:ProgramData\sqmSQLTool\Logs</td></tr>
+<tr><td class='param-name'>-NoWarning</td><td>Suppress FI-TS ReadableSecondary warnings (Write-Warning is skipped). 	Note: Status will still be Warning if ReadableSecondary != NO.</td></tr>
+<tr><td class='param-name'>-NoOpen</td><td>Do not automatically open the TXT report after creation.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately (overrides ContinueOnError).</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Request confirmation before writing files.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows which files would be created without actually writing them.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Export-sqmAlwaysOnConfiguration -SqlInstance "SQL01"
+	# Exports all AGs from SQL01, warns if ReadableSecondary != NO</div>
+
+<h3>Get-sqmAlwaysOnFailoverHistory</h3>
+<div class='synopsis'>Ermittelt AlwaysOn-Failover-Ereignisse aus dem Windows Event Log.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-ComputerName</td><td>Zielcomputer. Standard: aktueller Computer. Mehrere Computer moeglich (Pipeline). Event Log wird remote abgefragt.</td></tr>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server-Instanz fuer role_start_time-Ergaenzung. Optional. Wird nicht benoetigt wenn nur Event Log ausgewertet wird.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optionales PSCredential fuer die SQL-Verbindung.</td></tr>
+<tr><td class='param-name'>-AvailabilityGroup</td><td>Filter auf eine bestimmte AG. Leer = alle AGs.</td></tr>
+<tr><td class='param-name'>-Since</td><td>Wie weit zurueck suchen. Standard: 30 Tage.</td></tr>
+<tr><td class='param-name'>-IncludeClusterLog</td><td>WSFC Operational Log (Microsoft-Windows-FailoverClustering/Operational) zusaetzlich auswerten. Nur verfuegbar auf WSFC-Nodes.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Ausgabeverzeichnis. Standard: C:\System\WinSrvLog\MSSQL</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Bei Fehler auf einem Computer fortfahren.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Fehler als terminierende Ausnahmen ausloesen.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmAlwaysOnFailoverHistory</div>
+
+<h3>Get-sqmAlwaysOnHealthReport</h3>
+<div class='synopsis'>Creates a detailed health report for all Always On availability groups on an instance.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance(s). Pipeline-capable. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-MaxRedoQueueMB</td><td>Warning threshold for the redo queue in MB. Default: 100.</td></tr>
+<tr><td class='param-name'>-MaxSendQueueMB</td><td>Warning threshold for the send queue in MB. Default: 50.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory for report files. Default: C:\System\WinSrvLog\MSSQL</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue on error for an instance (otherwise the error is thrown).</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately (overrides ContinueOnError).</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Request confirmation before writing files.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows which files would be created without actually writing them.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmAgHealthReport</div>
+
+<h3>Get-sqmDistributedAgHealth</h3>
+<div class='synopsis'>Creates a detailed health report for Distributed AlwaysOn Availability Groups.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance(s). Pipeline-capable. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory for report files. Default: C:\System\WinSrvLog\MSSQL</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue on error for an instance (otherwise the error is thrown).</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately (overrides ContinueOnError).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmDistributedAgHealth -SqlInstance "SQL01"</div>
+
+<h3>Invoke-sqmDistributedFailover</h3>
+<div class='synopsis'>Initiates failover of a Distributed AlwaysOn AG.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>Primary SQL Server instance. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-AvailabilityGroupName</td><td>Name of the Distributed AG to failover. Required.</td></tr>
+<tr><td class='param-name'>-Force</td><td>Skip confirmation dialog.</td></tr>
+<tr><td class='param-name'>-Rollback</td><td>Rollback zum urspruenglichen Primary. Ueberspringt den Readiness-Check. Verwenden wenn nach einem Failover Probleme auftreten und das alte System w...</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows what would be done without actually performing the failover.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory for report files. Default: C:\System\WinSrvLog\MSSQL</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Invoke-sqmDistributedFailover -SqlInstance "SQL01" -AvailabilityGroupName "MyDAG" -Force</div>
+
+<h3>Invoke-sqmFailover</h3>
+<div class='synopsis'>Performs a controlled AlwaysOn AG failover with pre- and post-checks.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>Current PRIMARY instance.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-AvailabilityGroup</td><td>Name of the availability group.</td></tr>
+<tr><td class='param-name'>-TargetReplica</td><td>Instance name of the target replica. If not specified, the first SYNCHRONIZED secondary replica is selected automatically.</td></tr>
+<tr><td class='param-name'>-MaxRedoQueueMB</td><td>Maximum redo queue size in MB. Failover is aborted if exceeded. Default: 50 MB.</td></tr>
+<tr><td class='param-name'>-WaitAfterFailoverSeconds</td><td>Wait time in seconds after the failover command before post-checks run. Default: 30 seconds.</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Do not throw errors; return them in the result object instead.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Invoke-sqmFailover -SqlInstance "SQL01" -AvailabilityGroup "AG_Prod" -WhatIf</div>
+
+<h3>Invoke-sqmSqlAlwaysOnAutoseeding</h3>
+<div class='synopsis'>Enables Automatic Seeding on all replicas of an Always On Availability Group.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>The target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE"). If not specified, the current computer name is used.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Alternative credentials (PSCredential). If not specified, Windows authentication is used.</td></tr>
+<tr><td class='param-name'>-AvailabilityGroup</td><td>Name of the Availability Group(s). Ignored when -All is set.</td></tr>
+<tr><td class='param-name'>-All</td><td>When set, all Availability Groups on the instance are processed.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Switch to propagate exceptions immediately (by default errors are logged as warnings).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Uses the current computer name as default
+Invoke-sqmSqlAlwaysOnAutoseeding</div>
+
+<h3>Move-sqmAlwaysOnListener</h3>
+<div class='synopsis'>Migrates an AG Listener from one Availability Group to another.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance hosting the SOURCE AG. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SourceAgName</td><td>Name of the source AG (currently has the listener).</td></tr>
+<tr><td class='param-name'>-TargetAgName</td><td>Name of the target AG (will receive the listener).</td></tr>
+<tr><td class='param-name'>-TargetInstance</td><td>SQL Server instance hosting the target AG. Default: same as SourceInstance.</td></tr>
+<tr><td class='param-name'>-ListenerName</td><td>Specific listener name to move (if multiple listeners exist). Optional.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for both instances.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows what would be done without actually moving the listener.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory for detailed logs. Default: C:\System\WinSrvLog\MSSQL</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Move listener from Primary AG to Secondary AG (before failover)
+    Move-sqmAgListener -SqlInstance "SQL01" -SourceAgName "ProductionAG" `
+        -TargetAgName "DrAG" -TargetInstance "DR-SQL01"</div>
+
+<h3>New-sqmDistributedAvailabilityGroup</h3>
+<div class='synopsis'>Creates a new Distributed AlwaysOn Availability Group.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-PrimaryInstance</td><td>SQL Server instance hosting the PRIMARY Availability Group.</td></tr>
+<tr><td class='param-name'>-PrimaryAgName</td><td>Name of the primary AG (the one that will remain primary).</td></tr>
+<tr><td class='param-name'>-SecondaryInstance</td><td>SQL Server instance hosting the SECONDARY Availability Group.</td></tr>
+<tr><td class='param-name'>-SecondaryAgName</td><td>Name of the secondary AG (the one that will be secondary in Distributed AG).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for both instances (same account required).</td></tr>
+<tr><td class='param-name'>-EnableAutoSeed</td><td>Configure AutoSeed for the distributed relationship (recommended).</td></tr>
+<tr><td class='param-name'>-SeedingMode</td><td>'Automatic' (default) = AutoSeed enabled 'Manual' = Manual backup/restore required for new databases</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory for detailed logs. Default: C:\System\WinSrvLog\MSSQL</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>New-sqmDistributedAvailabilityGroup `
+        -PrimaryInstance   "SQL01" `
+        -PrimaryAgName     "ProductionAG" `
+        -PrimaryFqdn       "SQL01.domain.local" `
+        -SecondaryInstance "DR-SQL01" `
+        -SecondaryAgName   "DrAG" `
+        -SecondaryFqdn     "DR-SQL01.domain.local" `
+        -ServiceAccount    "DOMAIN\SqlServiceAccount" `
+        -SeedingMode       Automatic</div>
+
+<h3>Prepare-sqmListenerForMigration</h3>
+<div class='synopsis'>Prepares an AG listener for cluster-level migration without downtime.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance hosting the AG. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-AvailabilityGroupName</td><td>Name of the Availability Group.</td></tr>
+<tr><td class='param-name'>-ListenerName</td><td>DNS name of the listener to be removed (must exist). Optional if only one listener.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory for listener documentation. Default: C:\System\WinSrvLog\MSSQL</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># STEP 1: Prepare listener before AD team deletes it
+    Invoke-sqmListenerMigrationPrep -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG"
+
+    # STEP 2: Wait 15 minutes for DNS/application timeout
+
+    # STEP 3: AD team deletes old listener role and creates new one
+
+    # STEP 4: You run Complete-sqmListenerMigration</div>
+
+<h3>Remove-sqmDatabaseFromAG</h3>
+<div class='synopsis'>Removes one or more databases from their Always On Availability Group.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>The primary SQL Server instance (the primary replica of the AG). Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Alternative credentials.</td></tr>
+<tr><td class='param-name'>-Database</td><td>Name or array of user databases to remove from their AG. Ignored when -All is set.</td></tr>
+<tr><td class='param-name'>-All</td><td>When set, all user databases that are members of an AG are removed.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Switch to propagate exceptions immediately.</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Prompts for confirmation before critical actions (remove from AG, delete on secondaries).</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows what would happen without making any changes.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Remove a single database from its AG
+Remove-sqmDatabaseFromAG -Database "SalesDB"</div>
+
+<h3>Repair-sqmAlwaysOnDatabases</h3>
+<div class='synopsis'>Checks all AlwaysOn databases for problems and repairs them (Remove -> Cleanup -> Add).</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>Primary SQL instance (default: computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Credentials.</td></tr>
+<tr><td class='param-name'>-Force</td><td>Also repair databases that are considered healthy (e.g. to force a refresh).</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Propagate exceptions immediately.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Test only.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Automatically repairs all problematic AG databases.
+Repair-sqmAlwaysOnDatabases</div>
+
+<h3>Sync-sqmLoginsToAlwaysOn</h3>
+<div class='synopsis'>Synchronizes logins from the primary replica to all secondary replicas in an AlwaysOn Availability Group.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>The SQL Server instance hosting the primary replica. Default: $env:COMPUTERNAME</td></tr>
+<tr><td class='param-name'>-AvailabilityGroupName</td><td>Name of the Availability Group. If not specified, the first AG found on the instance is used. If multiple AGs exist: Warning is displayed, first AG...</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for all replicas (source and destination).</td></tr>
+<tr><td class='param-name'>-SourceCredential</td><td>PSCredential specifically for the primary replica (overrides -SqlCredential for source).</td></tr>
+<tr><td class='param-name'>-DestinationCredential</td><td>PSCredential for the secondary replicas (overrides -SqlCredential for destinations).</td></tr>
+<tr><td class='param-name'>-Login</td><td>Filters the copy operation to these login names (wildcards allowed). Without specification, all logins (after ExcludeLogin filter) are copied.</td></tr>
+<tr><td class='param-name'>-ExcludeLogin</td><td>Logins that should not be copied (wildcards allowed). Example: 'AppLogin_*', 'OldUser'.</td></tr>
+<tr><td class='param-name'>-IncludeSystemLogins</td><td>When set, system logins are also copied. Default: $false.</td></tr>
+<tr><td class='param-name'>-AdjustAuthMode</td><td>When set, automatically adjust target replica authentication mode to match primary if needed.</td></tr>
+<tr><td class='param-name'>-RestartServiceIfRequired</td><td>When set, restart the SQL Server service on secondary replicas if auth mode was changed.</td></tr>
+<tr><td class='param-name'>-DisablePolicy</td><td>Disable SQL Server policies on secondaries during the copy (default: $true).</td></tr>
+<tr><td class='param-name'>-SkipSecondaryServers</td><td>Comma-separated list of secondary instance names to skip (for maintenance). Example: 'SQL02', 'SQL03'</td></tr>
+<tr><td class='param-name'>-Force</td><td>Existing logins on secondaries are overwritten (password / language / default-db drift), not only new ones added. Default: $true - so a bare 'Sync-...</td></tr>
+<tr><td class='param-name'>-ForceIncludeOnly</td><td>When Force is set with this parameter, only these logins are updated (whitelist). Overrides other login filters. System logins still excluded per S...</td></tr>
+<tr><td class='param-name'>-ForceExclude</td><td>Additional logins to exclude from Force operation (blacklist). Combined with SafeForceMode exclusions. Default: none.</td></tr>
+<tr><td class='param-name'>-SafeForceMode</td><td>When Force is set and SafeForceMode is true (default), automatically excludes dangerous logins: - sa (system admin) - SQL Agent Service Account - N...</td></tr>
+<tr><td class='param-name'>-BackupLogins</td><td>Creates a backup of existing logins on each secondary BEFORE applying -Force (rollback safety). Default: $true (paired with the Force default). Opt...</td></tr>
+<tr><td class='param-name'>-BackupPath</td><td>Path where login backups are stored. Default: configured output path (Get-sqmDefaultOutputPath), i.e. C:\System\WinSrvLog\MSSQL unless overridden i...</td></tr>
+<tr><td class='param-name'>-BackupRetentionDays</td><td>When greater than 0, login backups (LoginBackup_*.sql) in BackupPath older than this many days are deleted after the sync. With -AuditAdOrphans, th...</td></tr>
+<tr><td class='param-name'>-AuditAdOrphans</td><td>When set, runs an AD-orphan check (Invoke-sqmLoginAudit -CheckAdOrphans) on the primary AFTER the sync and reports Windows logins whose AD account ...</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately instead of returning error status.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG"
+    Syncs all logins from primary to all secondaries in ProdAG.</div>
+
+<h3>Test-sqmDistributedAgReadiness</h3>
+<div class='synopsis'>Tests Distributed AlwaysOn AG readiness for failover.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>Primary SQL Server instance. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-TargetInstance</td><td>Secondary SQL Server instance for network testing. Optional.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory for report files. Default: C:\System\WinSrvLog\MSSQL</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Test-sqmDistributedAgReadiness -SqlInstance "SQL01" -TargetInstance "DR-SQL01"</div>
+
+<h2 id='cat-18-SSIS-Configuration'>18. SSIS Configuration</h2>
+
+<h3>Test-sqmSSISPackageCompatibility</h3>
+<div class='synopsis'>Validates SSIS package compatibility for SQL Server upgrades (2016 - 2025).</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance to connect to (for SSISDB source). Omit to check only filesystem packages.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for SQL authentication.</td></tr>
+<tr><td class='param-name'>-FolderName</td><td>Filter SSISDB packages to specific catalog folder(s). Example: 'MyFolder', 'Integration', etc.</td></tr>
+<tr><td class='param-name'>-PackagePath</td><td>Path to .dtsx files (filesystem source). Omit to check only SSISDB packages.</td></tr>
+<tr><td class='param-name'>-Recurse</td><td>Recurse into subfolders when reading .dtsx files.</td></tr>
+<tr><td class='param-name'>-TargetVersion</td><td>Target SQL Server version for compatibility check. Supported: 2016, 2017, 2019, 2022, 2025 Default: 2022</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Directory for HTML/TXT/CSV reports. Default: $env:ProgramData\sqmSQLTool\SSISReports</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions instead of returning error status.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Check deployed packages on target server
+    Test-sqmSSISPackageCompatibility -SqlInstance "NewServer2025" -TargetVersion 2025</div>
+
+<h2 id='cat-21-Analysis-Services-(SSAS)'>21. Analysis Services (SSAS)</h2>
+
+<h3>Test-sqmSsasDirectoryPermissions</h3>
+<div class='synopsis'>Checks and corrects NTFS permissions for SSAS directories (Data, Log, Temp, Backup).</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-InstanceName</td><td>Name of the SSAS instance. Default: 'MSSQLSERVER' (default instance). For named instances e.g. 'SSAS2019'.</td></tr>
+<tr><td class='param-name'>-ServiceAccount</td><td>Optional: Name of the service account (e.g. 'NT SERVICE\MSSQLServerOLAPService'). If not specified, the account is automatically determined from t...</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows which changes would be made without executing them.</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Prompts for confirmation before each change.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throws an exception immediately on errors (otherwise the error is logged).</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continues checking the next directories even on errors.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Test-sqmSsasDirectoryPermissions
+
+    Checks the directories of the default SSAS instance and corrects missing permissions.</div>
+
+<h2 id='cat-2-Performance-Analysis-&-Optimization'>2. Performance Analysis & Optimization</h2>
+
+<h3>Get-sqmIndexFragmentation</h3>
+<div class='synopsis'>Analyzes index fragmentation in one or more databases.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance (default: current computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-Database</td><td>Database name or wildcard pattern (e.g. 'Sales*'). Default: all user databases.</td></tr>
+<tr><td class='param-name'>-TableName</td><td>Table name or wildcard pattern (e.g. 'Order*'). Default: all tables.</td></tr>
+<tr><td class='param-name'>-MinFragmentationPercent</td><td>Show only indexes with fragmentation &gt;= this value. Default: 5.</td></tr>
+<tr><td class='param-name'>-PageCountMin</td><td>Show only indexes with at least this page count. Default: 0 (all indexes).</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Optional CSV export path.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmIndexFragmentation -Database 'AdventureWorks' -MinFragmentationPercent 10</div>
+
+<h3>Get-sqmMissingIndexes</h3>
+<div class='synopsis'>Retrieves missing index recommendations from the SQL Server DMV cache.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance (default: current computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-Database</td><td>Filter by database name(s). Wildcards allowed. Default: all user databases.</td></tr>
+<tr><td class='param-name'>-MinImpactScore</td><td>Return only recommendations with impact score &gt;= this value. Default: 10.</td></tr>
+<tr><td class='param-name'>-MinSeeks</td><td>Return only recommendations with at least this number of seeks/scans. Default: 50.</td></tr>
+<tr><td class='param-name'>-Top</td><td>Return at most this number of recommendations (sorted by impact score). Default: 50.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>If specified, a CSV file with the recommendations and CREATE statements is written to this directory.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmMissingIndexes -SqlInstance "SQL01"</div>
+
+<h3>Get-sqmWaitStatistics</h3>
+<div class='synopsis'>Reads and analyzes SQL Server wait statistics from sys.dm_os_wait_stats.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance. Default: local computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-TopN</td><td>Number of top wait types to return. Default: 25.</td></tr>
+<tr><td class='param-name'>-IncludeIdle</td><td>Include idle waits (SLEEP_*, WAITFOR, etc.). Default: off.</td></tr>
+<tr><td class='param-name'>-SnapshotBefore</td><td>PSCustomObject array of an earlier snapshot (output of -SaveSnapshot). If specified, only the delta is calculated.</td></tr>
+<tr><td class='param-name'>-SaveSnapshot</td><td>Returns a snapshot array that can later be used as SnapshotBefore.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>If specified, a CSV report is saved.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmWaitStatistics -SqlInstance "SQL01" -TopN 20</div>
+
+<h3>Invoke-sqmPerfBaseline</h3>
+<div class='synopsis'>Creates, compares or lists performance baselines (wait stats + perf counters).</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance. Default: local computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-Action</td><td>Capture | Compare | List. Default: Capture.</td></tr>
+<tr><td class='param-name'>-BaselineName</td><td>Label for the snapshot (used in the file name). Default: timestamp.</td></tr>
+<tr><td class='param-name'>-BaselineA</td><td>Path or file name (without path) of the first baseline for comparison. Default: the second-to-last file in OutputPath.</td></tr>
+<tr><td class='param-name'>-BaselineB</td><td>Path or file name of the second (newer) baseline. Default: the most recent file in OutputPath.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Directory for baseline JSON files. Default: from module configuration + \PerfBaseline.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Capture baseline
+    Invoke-sqmPerfBaseline -SqlInstance "SQL01" -BaselineName "before_patch"</div>
+
+<h3>Invoke-sqmQueryStore</h3>
+<div class='synopsis'>Configures the Query Store, reads from it, detects issues and saves reports.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-Database</td><td>One or more databases. Ignored when -All is set.</td></tr>
+<tr><td class='param-name'>-All</td><td>Process all accessible user databases.</td></tr>
+<tr><td class='param-name'>-Configure</td><td>Configure Query Store (enable/set parameters).</td></tr>
+<tr><td class='param-name'>-Query</td><td>Read top-N queries from the Query Store.</td></tr>
+<tr><td class='param-name'>-Diagnose</td><td>Detect issues in the Query Store and return them as issues.</td></tr>
+<tr><td class='param-name'>-OperationMode</td><td>Query Store operation mode. Values: READ_WRITE, READ_ONLY, OFF. Default: READ_WRITE.</td></tr>
+<tr><td class='param-name'>-FlushIntervalSeconds</td><td>Frequency of writing to the Query Store (seconds). Default: 900.</td></tr>
+<tr><td class='param-name'>-IntervalLengthMinutes</td><td>Length of a statistics interval (minutes). Default: 60.</td></tr>
+<tr><td class='param-name'>-MaxStorageSizeMB</td><td>Maximum size of the Query Store (MB). Default: 1000.</td></tr>
+<tr><td class='param-name'>-QueryCaptureMode</td><td>Capture mode. Values: ALL, AUTO, NONE. Default: AUTO.</td></tr>
+<tr><td class='param-name'>-SizeBasedCleanupMode</td><td>Automatic cleanup under memory pressure. Values: OFF, AUTO. Default: AUTO.</td></tr>
+<tr><td class='param-name'>-MaxPlansPerQuery</td><td>Maximum number of execution plans per query. Default: 200.</td></tr>
+<tr><td class='param-name'>-TopN</td><td>Number of top queries to return. Default: 25.</td></tr>
+<tr><td class='param-name'>-OrderBy</td><td>Sort column for top queries. Values: Duration, CPU, LogicalReads, ExecutionCount, Memory. Default: Duration.</td></tr>
+<tr><td class='param-name'>-LookbackHours</td><td>Lookback period in hours (from now backwards). Default: 24.</td></tr>
+<tr><td class='param-name'>-MinExecutionCount</td><td>Minimum number of executions required to be included in top queries. Default: 5.</td></tr>
+<tr><td class='param-name'>-StorageWarningPct</td><td>Fill level (%) at which a storage warning is issued. Default: 80.</td></tr>
+<tr><td class='param-name'>-MaxPlansWarning</td><td>Number of plans per query at which a plan instability warning is issued. Default: 5.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Directory for reports (CSV + TXT). Default: from module configuration + \QueryStore.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Report for all databases (Query + Diagnose)
+    Invoke-sqmQueryStore -All</div>
+
+<h3>Test-sqmCostThreshold</h3>
+<div class='synopsis'>Prueft ob CostThresholdForParallelism auf dem empfohlenen Wert liegt.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server-Instanz. Standard: lokaler Computername.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential fuer die SQL-Verbindung.</td></tr>
+<tr><td class='param-name'>-MinRecommendedValue</td><td>Mindestwert fuer CostThresholdForParallelism. Standard: 50.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Ausnahmen sofort ausloesen statt Write-Error.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Test-sqmCostThreshold -SqlInstance "SQL01"</div>
+
+<h3>Test-sqmMaxDop</h3>
+<div class='synopsis'>Prueft ob MAXDOP (Max Degree of Parallelism) korrekt konfiguriert ist.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server-Instanzname. Z.B. "MSSQLSERVER" oder "SERVER\INST01".</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Test-sqmMaxDop -SqlInstance 'MSSQLSERVER'</div>
+
+<h3>Test-sqmMaxMemory</h3>
+<div class='synopsis'>Prueft ob SQL Server Max Server Memory korrekt konfiguriert ist.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server-Instanzname. Z.B. "MSSQLSERVER" oder "SERVER\INST01".</td></tr>
+<tr><td class='param-name'>-RecommendedPct</td><td>Empfohlener Prozentsatz des RAM fuer SQL Server. Standard: 90.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Test-sqmMaxMemory -SqlInstance 'MSSQLSERVER'</div>
+
+<h3>Get-sqmTempDbRecommendation</h3>
+<div class='synopsis'>Analyzes the TempDB configuration and provides optimization recommendations.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance (default: current computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Optional CSV export path.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmTempDbRecommendation -SqlInstance "SQL01"
+#&gt;
+function Get-sqmTempDbRecommendation
+{
+	[CmdletBinding()]
+	[OutputType([PSCustomObject])]
+	param (
+		[Parameter(Mandatory = $false)]
+		[string]$SqlInstance = $env:COMPUTERNAME,
+		[Parameter(Mandatory = $false)]
+		[System.Management.Automation.PSCredential]$SqlCredential,
+		[Parameter(Mandatory = $false)]
+		[string]$OutputPath,
+		[Parameter(Mandatory = $false)]
+		[switch]$EnableException
+	)
+	
+	begin
+	{
+		$functionName = $MyInvocation.MyCommand.Name
+		if (-not (Get-Module -ListAvailable -Name dbatools))
+		{
+			throw "dbatools-Modul nicht gefunden."
+		}
+	}
+	
+	process
+	{
+		try
+		{
+			$server = Connect-DbaInstance -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction Stop
+			$tempdb = $server.Databases['tempdb']
+			$cpuCount = $server.Processors
+			$idealFileCount = [Math]::Min($cpuCount, 8)
+			
+			$files = $tempdb.FileGroups[0].Files
+			$fileCount = $files.Count
+			$fileSizeMB = $files | ForEach-Object { [math]::Round($_.Size / 1024, 2) }
+			$fileGrowth = $files.ForEach('Growth') | ForEach-Object { ($_ / 1024) } # in MB
+			$growthTypes = $files.ForEach('GrowthType')
+			$paths = $files.ForEach('FileName') | ForEach-Object { Split-Path $_ -Parent }
+			
+			# Bewertung
+			$status = 'OK'
+			$messages = [System.Collections.Generic.List[string]]::new()
+			if ($fileCount -ne $idealFileCount)
+			{
+				$status = 'Warning'
+				$messages.Add("Anzahl TempDB-Dateien: $fileCount (empfohlen $idealFileCount).")
+			}
+			$sizeDifferences = ($fileSizeMB | Select-Object -Unique).Count -gt 1
+			if ($sizeDifferences)
+			{
+				$status = 'Warning'
+				$messages.Add("TempDB-Dateien haben unterschiedliche Groessen: $($fileSizeMB -join ', ') MB.")
+			}
+			$hasPercent = $growthTypes -contains 'Percent'
+			if ($hasPercent)
+			{
+				$status = 'Warning'
+				$messages.Add("Autogrow in Prozent wird verwendet (MB empfohlen).")
+			}
+			$hasLargeGrow = $fileGrowth -gt 1024
+			if ($hasLargeGrow)
+			{
+				$status = 'Warning'
+				$messages.Add("Autogrow-Schrittweite &gt;1024 MB: $($fileGrowth -join ', ') MB.")
+			}
+			$uniquePaths = $paths | Select-Object -Unique
+			if ($uniquePaths.Count -eq 1)
+			{
+				$messages.Add("Alle TempDB-Dateien liegen auf demselben Laufwerk ($($uniquePaths[0])) - fuer optimale Leistung separate Laufwerke empfehlenswert.")
+				if ($status -eq 'OK') { $status = 'Info' }
+			}
+			if ($messages.Count -eq 0) { $messages.Add("TempDB-Konfiguration ist optimal.") }
+			
+			$result = [PSCustomObject]@{
+				SqlInstance	     = $SqlInstance
+				Status		     = $status
+				FileCount	     = $fileCount
+				RecommendedCount = $idealFileCount
+				FileSizesMB	     = $fileSizeMB
+				GrowthMB		 = $fileGrowth
+				Paths		     = $paths
+				Recommendations  = ($messages -join ' ')
+			}
+			
+			if ($OutputPath) { $result | Export-Csv -Path $OutputPath -NoTypeInformation -Encoding UTF8 -Force }
+			return $result
+		}
+		catch
+		{
+			Invoke-sqmLogging -Message $_.Exception.Message -FunctionName $functionName -Level "ERROR"
+			if ($EnableException) { throw }
+			return $null
+		}
+	}
+}</div>
+
+<h3>Test-sqmTempDbFileCount</h3>
+<div class='synopsis'>Prueft ob die Anzahl der TempDB-Datendateien der empfohlenen CPU-Anzahl entspricht.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server-Instanz. Standard: lokaler Computername.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential fuer die SQL-Verbindung.</td></tr>
+<tr><td class='param-name'>-MaxFiles</td><td>Maximale empfohlene Dateianzahl. Standard: 8 (Microsoft-Empfehlung).</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Ausnahmen sofort ausloesen statt Write-Error.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Test-sqmTempDbFileCount -SqlInstance "SQL01"</div>
+
+<h2 id='cat-6-Certificates-&-TLS-Security'>6. Certificates & TLS Security</h2>
+
+<h3>Get-sqmCertificateReport</h3>
+<div class='synopsis'>Creates a comprehensive report on SQL Server certificates and their expiration dates.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance(s). Pipeline-capable. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-WarningThresholdDays</td><td>Certificates expiring in less than this number of days receive status 'Warning'. Default: 90.</td></tr>
+<tr><td class='param-name'>-CriticalThresholdDays</td><td>Certificates expiring in less than this number of days receive status 'Critical'. Default: 30.</td></tr>
+<tr><td class='param-name'>-IncludeUserDatabases</td><td>Also include certificates in user databases. Default: $false.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Output directory for report files. Default: from module configuration.</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue on error for an instance instead of aborting.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmCertificateReport</div>
+
+<h3>New-sqmSqlCertificate</h3>
+<div class='synopsis'>Creates a new self-signed SQL Server certificate as a renewal of an existing one.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance (default: current computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-CertificateName</td><td>Name of the certificate to renew (exact name from sys.certificates).</td></tr>
+<tr><td class='param-name'>-Database</td><td>Database where the certificate resides. Default: master.</td></tr>
+<tr><td class='param-name'>-NewCertificateName</td><td>Name of the new certificate. Default: &lt;OldName&gt;_&lt;Year&gt; (e.g. AG_CERT_2027).</td></tr>
+<tr><td class='param-name'>-ValidityYears</td><td>Validity period of the new certificate in years. Default: 5.</td></tr>
+<tr><td class='param-name'>-BackupPath</td><td>Path for backing up the old certificate (.cer and .pvk). Default: from module configuration (OutputPath).</td></tr>
+<tr><td class='param-name'>-BackupEncryptionPassword</td><td>Password for encrypting the exported private key (.pvk). Required when the old certificate has a private key.</td></tr>
+<tr><td class='param-name'>-RenameOldCertificate</td><td>Rename the old certificate after renewal (suffix _OLD_&lt;date&gt;). Default: $true.</td></tr>
+<tr><td class='param-name'>-BindEndpoint</td><td>Automatically bind the new certificate to the existing endpoint (AlwaysOn/Broker). Default: $false — must be explicitly confirmed.</td></tr>
+<tr><td class='param-name'>-BindTde</td><td>Automatically activate the new certificate for TDE-encrypted databases. Default: $false — must be explicitly confirmed.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Simple renewal without automatic binding
+    New-sqmSqlCertificate -SqlInstance "SQL01" -CertificateName "AG_CERT" -BackupEncryptionPassword (Read-Host -AsSecureString)</div>
+
+<h3>Set-sqmSqlTlsCertificate</h3>
+<div class='synopsis'>Binds a Windows certificate from the Machine store to SQL Server as the TLS certificate.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance name. For a default instance use the computer name or leave at default ($env:COMPUTERNAME). For a named instance use COMPUTERNA...</td></tr>
+<tr><td class='param-name'>-Thumbprint</td><td>Certificate thumbprint (hex string). Spaces are stripped automatically. Must match a certificate in Cert:\LocalMachine\My.</td></tr>
+<tr><td class='param-name'>-ForceEncryption</td><td>If specified, sets ForceEncryption = 1 in the SuperSocketNetLib registry key, requiring all connections to use TLS encryption.</td></tr>
+<tr><td class='param-name'>-Restart</td><td>If specified, restarts the SQL Server service automatically after the registry change. Without this switch the service must be restarted manually.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows what would be changed without making any modifications.</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Prompts for confirmation before making changes.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Set-sqmSqlTlsCertificate -SqlInstance "SQL01" -Thumbprint "A1B2C3D4E5F6..."
+
+    Binds the specified certificate to the default instance on SQL01.
+    Service restart must be performed manually.</div>
+
+<h3>Set-sqmSsrsHttpsCertificate</h3>
+<div class='synopsis'>Binds a Windows certificate to SSRS or Power BI Report Server for HTTPS access.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-ComputerName</td><td>Target computer name or IP address. Default: localhost ($env:COMPUTERNAME).</td></tr>
+<tr><td class='param-name'>-Thumbprint</td><td>Mandatory. Certificate thumbprint (40 hex characters) from the LocalMachine\My store. 		Spaces are automatically removed from the thumbprint string.</td></tr>
+<tr><td class='param-name'>-Port</td><td>HTTPS port to bind. Default: 443.</td></tr>
+<tr><td class='param-name'>-InstanceName</td><td>SSRS WMI instance name (e.g. "RS_SSRS", "RS_PBIRS"). 		Auto-detected when only one instance is found under the WMI namespace. 		Required when multi...</td></tr>
+<tr><td class='param-name'>-IPAddress</td><td>IP address for the SSL binding. Default: "0.0.0.0" (all interfaces).</td></tr>
+<tr><td class='param-name'>-RequireSSL</td><td>When specified, sets SecureConnectionLevel = 1 (HTTPS required). 		Default: SecureConnectionLevel = 0 (HTTPS optional, HTTP still allowed).</td></tr>
+<tr><td class='param-name'>-Credential</td><td>PSCredential for the WinRM session (remote operation only).</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows what would happen without making any changes.</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Prompts for confirmation before applying changes.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Set-sqmSsrsHttpsCertificate -Thumbprint "A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2"
+
+		Binds the specified certificate to SSRS on the local machine on port 443.
+		The SSRS instance is auto-detected.</div>
+
+<h3>Get-sqmTlsStatus</h3>
+<div class='synopsis'>Audits TLS/SSL configuration and certificate status for all SQL Server instances on one or more computers.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-ComputerName</td><td>One or more computer names to audit. Default: current computer ($env:COMPUTERNAME).</td></tr>
+<tr><td class='param-name'>-Credential</td><td>Optional PSCredential used for Invoke-Command when auditing remote computers.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Directory where the CSV and TXT report files are saved. Default: C:\System\WinSrvLog\MSSQL</td></tr>
+<tr><td class='param-name'>-WarnDaysBeforeExpiry</td><td>Number of days before certificate expiry that triggers a Warning status. Default: 60</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmTlsStatus
+
+    Audits all SQL Server instances on the local computer and saves results to the default log folder.</div>
+
+<h2 id='cat-15-Extended-Events-&-Diagnostics'>15. Extended Events & Diagnostics</h2>
+
+<h3>Get-sqmDeadlockReport</h3>
+<div class='synopsis'>Reads and analyzes deadlock events from the System Health Extended Event session.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance (default: current computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-StartTime</td><td>Return only deadlocks from this point in time. Default: last 24 hours.</td></tr>
+<tr><td class='param-name'>-EndTime</td><td>Return only deadlocks up to this point in time. Default: now.</td></tr>
+<tr><td class='param-name'>-MaxDeadlocks</td><td>Maximum number of deadlocks returned (newest first). Default: 100.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>If specified, deadlock graphs are saved as .xdl files in this directory (format: Deadlock_&lt;Instance&gt;_&lt;Timestamp&gt;.xdl).</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately instead of returning as errors.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Get-sqmDeadlockReport</div>
+
+<h3>Invoke-sqmExtendedEvents</h3>
+<div class='synopsis'>Manages Extended Events sessions for performance analysis on SQL Server.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-SessionName</td><td>Name of the XEvent session. Default: 'sqmPerformance'.</td></tr>
+<tr><td class='param-name'>-Template</td><td>Session template when creating. Values: SlowQueries, Blocking, Waits, Deadlocks, AllInOne. Default: AllInOne.</td></tr>
+<tr><td class='param-name'>-SlowQueryThresholdMs</td><td>Minimum execution duration in milliseconds for SlowQueries capture. Default: 1000.</td></tr>
+<tr><td class='param-name'>-WaitTypes</td><td>Comma-separated list of wait types for the Waits template. Default: LCK_M_X,LCK_M_S,LCK_M_U,PAGEIOLATCH_SH,PAGEIOLATCH_EX,CXPACKET,SOS_SCHEDULER_YIELD</td></tr>
+<tr><td class='param-name'>-TargetType</td><td>Target type for event storage: RingBuffer or File. Default: RingBuffer.</td></tr>
+<tr><td class='param-name'>-TargetFilePath</td><td>Directory for XEL files (only for TargetType = File). Default: from module configuration OutputPath + \XEvents.</td></tr>
+<tr><td class='param-name'>-MaxFileSizeMB</td><td>Maximum size of an XEL file (MB). Default: 100.</td></tr>
+<tr><td class='param-name'>-MaxRolloverFiles</td><td>Number of XEL rollover files. Default: 5.</td></tr>
+<tr><td class='param-name'>-RingBufferMaxMB</td><td>Maximum size of the ring buffer (MB). Default: 50.</td></tr>
+<tr><td class='param-name'>-MaxEventsRead</td><td>Maximum number of events when reading. Default: 10000.</td></tr>
+<tr><td class='param-name'>-LookbackMinutes</td><td>Time window for diagnostic aggregation in minutes. Default: 60.</td></tr>
+<tr><td class='param-name'>-TopN</td><td>Number of top entries in diagnostic tables. Default: 25.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Directory for saved reports. Default: from module configuration + \XEvents.</td></tr>
+<tr><td class='param-name'>-Create</td><td>Create session.</td></tr>
+<tr><td class='param-name'>-Start</td><td>Start session.</td></tr>
+<tr><td class='param-name'>-Stop</td><td>Stop session.</td></tr>
+<tr><td class='param-name'>-Read</td><td>Read events.</td></tr>
+<tr><td class='param-name'>-Diagnose</td><td>Aggregate events and detect issues.</td></tr>
+<tr><td class='param-name'>-Drop</td><td>Remove session.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Create AllInOne session and start immediately
+    Invoke-sqmExtendedEvents -SqlInstance SQL01 -Create -Start</div>
+
+<h3>Invoke-sqmMonitoringKey</h3>
+<div class='synopsis'>Gets or sets monitoring registry values for the sqmSQLTool on one or more computers.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-ComputerName</td><td>Target computer(s). Pipeline-capable. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-Operation</td><td>'Get' (default) reads the current values; 'Set' writes the specified values.</td></tr>
+<tr><td class='param-name'>-SQL</td><td>SQL monitoring level: 'None', 'Standard', or 'Full'. Stored as DWORD (0/1/2) in the registry.</td></tr>
+<tr><td class='param-name'>-SQLFreeSpaceVersion</td><td>Free-space monitoring variant: 'Standard' (standalone) or 'Cluster' (AlwaysOn AG).</td></tr>
+<tr><td class='param-name'>-TSM</td><td>TSM backup monitoring: 0 = inactive, 1 = active.</td></tr>
+<tr><td class='param-name'>-RegistryBase</td><td>Registry hive path base under HKLM. Default: 'System'.</td></tr>
+<tr><td class='param-name'>-AutoDetectSQLFreeSpaceVersion</td><td>When set (and -Operation Set), automatically detects whether the instance belongs to an AlwaysOn AG and sets SQLFreeSpaceVersion accordingly (Clus...</td></tr>
+<tr><td class='param-name'>-Credential</td><td>PSCredential for remote computer access.</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue with the next computer on error.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately (overrides ContinueOnError).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Invoke-sqmMonitoringKey</div>
+
+<h2 id='cat-9-Database-Maintenance'>9. Database Maintenance</h2>
+
+<h3>Find-sqmDatabaseObject</h3>
+<div class='synopsis'>Searches all (or selected) databases on an instance for an object name.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance (default: current computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-ObjectName</td><td>Name of the object to search for, or wildcard (e.g. '*customer*').</td></tr>
+<tr><td class='param-name'>-ObjectType</td><td>Restrict to type: 'TABLE', 'VIEW', 'PROCEDURE', 'FUNCTION', 'TRIGGER', 'SYNONYM'. Multiple values possible as array.</td></tr>
+<tr><td class='param-name'>-Database</td><td>Databases to search (wildcard, default: all user databases).</td></tr>
+<tr><td class='param-name'>-IncludeSystem</td><td>Include system databases. Default: $false.</td></tr>
+<tr><td class='param-name'>-SearchDefinition</td><td>If $true, the object text (definition) is also searched for &lt;ObjectName&gt; (slower).</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Find-sqmDatabaseObject -SqlInstance "SQL01" -ObjectName "sp_GetOrders"</div>
+
+<h3>Invoke-sqmLogShrink</h3>
+<div class='synopsis'>Shrinks the transaction log file (LDF) of one or more databases.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance (default: current computer name). For AG members, automatically redirected to the primary.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optional PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-Database</td><td>Target database name(s) (wildcards allowed). Without specification, all user databases are processed (equivalent to -All).</td></tr>
+<tr><td class='param-name'>-All</td><td>Processes all user databases (excl. system databases, online only). Also used implicitly when neither -Database nor -All is specified.</td></tr>
+<tr><td class='param-name'>-ShrinkTargetPercent</td><td>Target size as a percentage of the current log size (1-99). Default: 10.</td></tr>
+<tr><td class='param-name'>-MinTargetMB</td><td>Minimum target size in MB (default: 64 MB).</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue with the next database on error.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately (overrides ContinueOnError).</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Request confirmation before shrinking. Disabled by default.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows what would happen without executing the shrink.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Invoke-sqmLogShrink -Database "MyDB" -ShrinkTargetPercent 20</div>
+
+<h3>Invoke-sqmSetDatabaseRecoveryMode</h3>
+<div class='synopsis'>Changes the recovery mode of one or more user databases.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>The target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE"). If not specified, the current computer name is used.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Alternative credentials (PSCredential). If not specified, Windows authentication is used.</td></tr>
+<tr><td class='param-name'>-Database</td><td>Name or array of user databases whose recovery mode should be changed. Ignored when -All is set.</td></tr>
+<tr><td class='param-name'>-All</td><td>When set, changes the recovery mode for all user databases.</td></tr>
+<tr><td class='param-name'>-RecoveryMode</td><td>The desired recovery mode. Allowed values: Simple, Full, BulkLogged.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Switch to propagate exceptions immediately (by default errors are logged as warnings).</td></tr>
+<tr><td class='param-name'>-Confirm</td><td>Prompts for confirmation before execution. Disabled by default. Passed through to Set-DbaDbRecoveryModel.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows what would happen without actually making the change. Passed through to Set-DbaDbRecoveryModel.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Set all user databases to Full (without prompting)
+Invoke-sqmSetDatabaseRecoveryMode -All -RecoveryMode Full</div>
+
+<h3>Invoke-sqmUpdateStatistics</h3>
+<div class='synopsis'>Updates statistics in one or more databases.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance (default: current computer name).</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-Database</td><td>Database name or wildcard pattern.</td></tr>
+<tr><td class='param-name'>-Table</td><td>Table name or wildcard pattern.</td></tr>
+<tr><td class='param-name'>-Statistics</td><td>Statistic name or wildcard pattern.</td></tr>
+<tr><td class='param-name'>-SamplePercent</td><td>Percentage of rows used for the update (0 = full scan). Default: 0.</td></tr>
+<tr><td class='param-name'>-OnlyModified</td><td>Only update statistics that have changed since the last update. Default: $true.</td></tr>
+<tr><td class='param-name'>-Index</td><td>Also update statistics associated with an index. Default: $true.</td></tr>
+<tr><td class='param-name'>-WhatIf</td><td>Shows which statistics would be affected.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Invoke-sqmUpdateStatistics -Database 'SalesDB' -SamplePercent 10</div>
+
+<h3>Set-sqmDatabaseOwner</h3>
+<div class='synopsis'>Sets the owner of one or more databases to a uniform login.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance(s). Pipeline-capable. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-Database</td><td>Database name(s). Wildcards allowed (e.g. 'Prod*'). Default: all user databases.</td></tr>
+<tr><td class='param-name'>-ExcludeDatabase</td><td>Databases to exclude. Wildcards allowed.</td></tr>
+<tr><td class='param-name'>-OwnerLogin</td><td>Login to set as the new owner. Default: sa account (automatically determined via SID 0x01, regardless of whether it has been renamed).</td></tr>
+<tr><td class='param-name'>-IncludeSystemDatabases</td><td>Also include system databases (master, model, msdb). Default: $false. tempdb is always excluded.</td></tr>
+<tr><td class='param-name'>-Force</td><td>Also process databases that already have the correct owner (forces re-assignment).</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Directory for the change log. Default: from module configuration.</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue on error for one instance. Default: $false.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Set sa account on all user databases
+    Set-sqmDatabaseOwner -SqlInstance "SQL01"</div>
+
+<h2 id='cat-22-Monitoring-&-Registry'>22. Monitoring & Registry</h2>
+
+<h3>Enable-sqmMonitoringAccess</h3>
+<div class='synopsis'>Richtet einen Monitoring-Account auf allen SQL Server-Instanzen eines Computers ein.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-ComputerName</td><td>Zielcomputer. Standard: aktueller Computer.</td></tr>
+<tr><td class='param-name'>-MonitoringUser</td><td>Windows-Login des Monitoring-Accounts (z.B. "DOMAIN\MonUser").</td></tr>
+<tr><td class='param-name'>-ServerRoleName</td><td>Name der SQL Server-Rolle die angelegt wird. Standard: "MonitoringRole".</td></tr>
+<tr><td class='param-name'>-DatabaseRoleName</td><td>Name der Datenbank-Rolle die in master und msdb angelegt wird. Standard: "MonitoringDbRole".</td></tr>
+<tr><td class='param-name'>-PolicyName</td><td>Name einer SQL Server Policy die vor dem Setup deaktiviert und danach wieder aktiviert wird. Wird der Parameter weggelassen, wird keine Policy vera...</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>Ausgabeverzeichnis fuer das Log. Standard: C:\System\WinSrvLog\MSSQL</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>Optionales PSCredential fuer die SQL Server-Verbindung.</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Bei Fehler auf einer Instanz fortfahren statt abbrechen.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Fehler als terminierende Ausnahmen ausloesen.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Enable-sqmMonitoringAccess -MonitoringUser "CORP\SvcMonitoring"</div>
+
+<h3>Invoke-sqmMonitoringKey</h3>
+<div class='synopsis'>Gets or sets monitoring registry values for the sqmSQLTool on one or more computers.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-ComputerName</td><td>Target computer(s). Pipeline-capable. Default: current computer name.</td></tr>
+<tr><td class='param-name'>-Operation</td><td>'Get' (default) reads the current values; 'Set' writes the specified values.</td></tr>
+<tr><td class='param-name'>-SQL</td><td>SQL monitoring level: 'None', 'Standard', or 'Full'. Stored as DWORD (0/1/2) in the registry.</td></tr>
+<tr><td class='param-name'>-SQLFreeSpaceVersion</td><td>Free-space monitoring variant: 'Standard' (standalone) or 'Cluster' (AlwaysOn AG).</td></tr>
+<tr><td class='param-name'>-TSM</td><td>TSM backup monitoring: 0 = inactive, 1 = active.</td></tr>
+<tr><td class='param-name'>-RegistryBase</td><td>Registry hive path base under HKLM. Default: 'System'.</td></tr>
+<tr><td class='param-name'>-AutoDetectSQLFreeSpaceVersion</td><td>When set (and -Operation Set), automatically detects whether the instance belongs to an AlwaysOn AG and sets SQLFreeSpaceVersion accordingly (Clus...</td></tr>
+<tr><td class='param-name'>-Credential</td><td>PSCredential for remote computer access.</td></tr>
+<tr><td class='param-name'>-ContinueOnError</td><td>Continue with the next computer on error.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately (overrides ContinueOnError).</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Invoke-sqmMonitoringKey</div>
+
+<h3>Invoke-sqmPatchAnalysis</h3>
+<div class='synopsis'>Compares the installed SQL Server version with known CU/SP builds.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>One or more SQL Server instances. Default: local computer name. Pipeline-capable.</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for the connection.</td></tr>
+<tr><td class='param-name'>-OutputPath</td><td>If specified, a CSV report is saved.</td></tr>
+<tr><td class='param-name'>-EnableException</td><td>Throw exceptions immediately.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'>Invoke-sqmPatchAnalysis -SqlInstance "SQL01"</div>
+
+<h2 id='cat-20-Script-Execution-&-Deployment'>20. Script Execution & Deployment</h2>
+
+<h3>Invoke-sqmDeployScripts</h3>
+<div class='synopsis'>Executes numbered SQL scripts from a directory sequentially against a SQL Server database.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-SqlInstance</td><td>SQL Server instance name (e.g. "SQLSERVER01" or "SQLSERVER01\INST1").</td></tr>
+<tr><td class='param-name'>-Database</td><td>Target database name.</td></tr>
+<tr><td class='param-name'>-ScriptPath</td><td>Directory that contains the numbered SQL script files.</td></tr>
+<tr><td class='param-name'>-LogPath</td><td>Directory where the .log and .csv output files are written. Created if it does not exist.</td></tr>
+<tr><td class='param-name'>-JobNumber</td><td>Optional job or order number. When provided it is embedded in the log filename: yyyyMMdd_HHmmss_{JobNumber}_Deploy.log / .csv</td></tr>
+<tr><td class='param-name'>-QueryTimeout</td><td>Timeout in seconds per script execution. Default: 30.</td></tr>
+<tr><td class='param-name'>-SkipBackup</td><td>Skip the pre-deployment backup. Requires ShouldProcess confirmation (ConfirmImpact=High). If the user declines the confirmation the function aborts...</td></tr>
+<tr><td class='param-name'>-NoWrapTransaction</td><td>Do not wrap all scripts in one outer transaction. Each script is responsible for its own transaction management. Default behavior: all scripts run ...</td></tr>
+<tr><td class='param-name'>-SqlCredential</td><td>PSCredential for SQL Server authentication. When omitted Windows Authentication is used.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># Basic deploy with automatic backup
+    Invoke-sqmDeployScripts -SqlInstance "SQLSERVER01" -Database "SalesDB" `
+        -ScriptPath "D:\Deploy\v2.3" -LogPath "D:\Logs\Deploy"</div>
+
+<h3>Invoke-sqmSignModule</h3>
+<div class='synopsis'>Signs all PowerShell script files in a module directory using Set-AuthenticodeSignature.</div>
+
+<table class='params-table'>
+<thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class='param-name'>-ModulePath</td><td>Path to the module root directory. All matching files are signed recursively. If omitted, the parent of $PSScriptRoot is used (auto-detect for modu...</td></tr>
+<tr><td class='param-name'>-CertificateThumbprint</td><td>Thumbprint of a certificate in Cert:\LocalMachine\My or Cert:\CurrentUser\My. If omitted and -CertificatePath is also omitted, the function auto-de...</td></tr>
+<tr><td class='param-name'>-CertificatePath</td><td>Path to a .pfx file. Takes precedence over -CertificateThumbprint.</td></tr>
+<tr><td class='param-name'>-CertificatePassword</td><td>SecureString password for the PFX file specified in -CertificatePath.</td></tr>
+<tr><td class='param-name'>-TimestampServer</td><td>URL of the timestamp authority (TSA). Default: http://timestamp.digicert.com. On failure the function retries with http://timestamp.sectigo.com as ...</td></tr>
+<tr><td class='param-name'>-IncludeExtensions</td><td>File extensions to sign. Default: @('.ps1', '.psm1', '.psd1').</td></tr>
+<tr><td class='param-name'>-Force</td><td>Re-signs files that already carry a valid signature. Without -Force those files are skipped.</td></tr>
+</tbody>
+</table>
+<div class='example-label'>Example:</div>
+<div class='code-example'># 1. Sign with a specific certificate from the store
+    Invoke-sqmSignModule -ModulePath "C:\Dev\MyModule" `
+        -CertificateThumbprint "AB12CD34EF56..."</div>
+
+<h3>Copy-sqmToCentralPath</h3>
+<div class='synopsis'>Copies one or more files to the configured CentralPath.</div>
+
+<!-- FOOTER -->
+<div class="footer">
+    <p>sqmSQLTool Complete User Manual | 129 Functions | 22 Categories</p>
+    <p>Generated on 2026-06-12 21:59:37 | Version 2.0</p>
+</div>
+
+</body>
+</html>
