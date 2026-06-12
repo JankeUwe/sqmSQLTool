@@ -463,32 +463,36 @@ WHERE sp.type IN ('S','U','G')
 					$loginShort = if ($e.LoginName.Length -gt 35) { $e.LoginName.Substring(0, 32) + '...' } else { $e.LoginName }
 					$lines.Add(("{0,-10} {1,-35} {2,-14} {3,-9} {4}" -f $e.OverallStatus, $loginShort, $e.LoginType, $e.Present, ($befund -join '; ')))
 				}
-				[System.IO.File]::WriteAllText($txtFile, ($lines -join "`n"), [System.Text.Encoding]::UTF8)
 
-				# HTML
-				$rowsHtml = ''
-				foreach ($e in ($results | Sort-Object OverallStatus, LoginName))
+				# Write reports only if NOT suppressed by -NoReport
+				if (-not $NoReport)
 				{
-					$cls = switch ($e.OverallStatus) { 'Critical' { 'crit' } 'Warning' { 'warn' } default { 'ok' } }
-					$missClass = if ($e.MissingOn) { 'crit' } else { '' }
-					$sidClass  = if ($e.SidConsistent -eq $false) { 'crit' } else { '' }
-					$hashTxt   = switch ($e.PasswordHashConsistent) { $true { 'OK' } $false { 'abweichend' } default { 'N/A' } }
-					$hashClass = if ($e.PasswordHashConsistent -eq $false) { 'crit' } else { '' }
-					$dbClass   = if ($e.DefaultDbConsistent -eq $false) { 'warn' } else { '' }
-					$langClass = if ($e.LanguageConsistent -eq $false) { 'warn' } else { '' }
-					$rowsHtml += "<tr>" +
-						"<td class='$cls'>$($e.OverallStatus)</td>" +
-						"<td>$(_h $e.LoginName)</td>" +
-						"<td>$(_h $e.LoginType)</td>" +
-						"<td>$($e.Present)</td>" +
-						"<td class='$missClass'>$(_h $e.MissingOn)</td>" +
-						"<td class='$dbClass'>$(_h $e.DefaultDatabase)</td>" +
-						"<td class='$langClass'>$(_h $e.DefaultLanguage)</td>" +
-						"<td class='$hashClass'>$hashTxt</td>" +
-						"<td class='$sidClass'>$(if ($e.SidConsistent) { 'OK' } else { 'abweichend' })</td>" +
-						"</tr>`n"
-				}
-				$bodyHtml = @"
+					[System.IO.File]::WriteAllText($txtFile, ($lines -join "`n"), [System.Text.Encoding]::UTF8)
+
+					# HTML
+					$rowsHtml = ''
+					foreach ($e in ($results | Sort-Object OverallStatus, LoginName))
+					{
+						$cls = switch ($e.OverallStatus) { 'Critical' { 'crit' } 'Warning' { 'warn' } default { 'ok' } }
+						$missClass = if ($e.MissingOn) { 'crit' } else { '' }
+						$sidClass  = if ($e.SidConsistent -eq $false) { 'crit' } else { '' }
+						$hashTxt   = switch ($e.PasswordHashConsistent) { $true { 'OK' } $false { 'abweichend' } default { 'N/A' } }
+						$hashClass = if ($e.PasswordHashConsistent -eq $false) { 'crit' } else { '' }
+						$dbClass   = if ($e.DefaultDbConsistent -eq $false) { 'warn' } else { '' }
+						$langClass = if ($e.LanguageConsistent -eq $false) { 'warn' } else { '' }
+						$rowsHtml += "<tr>" +
+							"<td class='$cls'>$($e.OverallStatus)</td>" +
+							"<td>$(_h $e.LoginName)</td>" +
+							"<td>$(_h $e.LoginType)</td>" +
+							"<td>$($e.Present)</td>" +
+							"<td class='$missClass'>$(_h $e.MissingOn)</td>" +
+							"<td class='$dbClass'>$(_h $e.DefaultDatabase)</td>" +
+							"<td class='$langClass'>$(_h $e.DefaultLanguage)</td>" +
+							"<td class='$hashClass'>$hashTxt</td>" +
+							"<td class='$sidClass'>$(if ($e.SidConsistent) { 'OK' } else { 'abweichend' })</td>" +
+							"</tr>`n"
+					}
+					$bodyHtml = @"
 <table>
 <thead><tr><th>Status</th><th>Login</th><th>Typ</th><th>Vorhanden</th><th>Fehlt auf</th><th>Standard-DB</th><th>Sprache</th><th>Passwort-Hash</th><th>SID</th></tr></thead>
 <tbody>
@@ -497,11 +501,12 @@ $rowsHtml
 </table>
 <p style="color:#94a8c0;font-size:12px;">Replicas: $($reachable -join ', ')$(if ($unreach) { " &nbsp;|&nbsp; Nicht erreichbar: $($unreach -join ', ')" }) &nbsp;|&nbsp; OK: $cntOk, Warning: $cntWarn, Critical: $cntCrit</p>
 "@
-				$html = ConvertTo-sqmHtmlReport -Title "AlwaysOn Login-Vergleich - $AvailabilityGroupName" -Subtitle "Erstellt: $timestamp" -BodyHtml $bodyHtml
-				[System.IO.File]::WriteAllText($htmlFile, $html, [System.Text.Encoding]::UTF8)
+					$html = ConvertTo-sqmHtmlReport -Title "AlwaysOn Login-Vergleich - $AvailabilityGroupName" -Subtitle "Erstellt: $timestamp" -BodyHtml $bodyHtml
+					[System.IO.File]::WriteAllText($htmlFile, $html, [System.Text.Encoding]::UTF8)
 
-				Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
-				Invoke-sqmLogging -Message "Bericht erstellt: $htmlFile" -FunctionName $functionName -Level "INFO"
+					Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
+					Invoke-sqmLogging -Message "Bericht erstellt: $htmlFile" -FunctionName $functionName -Level "INFO"
+				}
 			}
 		}
 		catch
