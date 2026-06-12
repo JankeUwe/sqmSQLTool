@@ -124,7 +124,10 @@ function New-sqmOlaSysDbBackupJob
 			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 			throw $errMsg
 		}
-		
+
+		. "C:\CMP\SQL-Tools\sqmSQLTool\jobs\SqlVersionDetection.ps1"
+		$null = Initialize-SqlTrustServerCertificate -SqlInstance $SqlInstance
+
 		$cfg = Get-sqmConfig
 		$effJobName = if ($JobName) { $JobName }
 		else { $cfg['OlaJobNameSysDbBackup'] }

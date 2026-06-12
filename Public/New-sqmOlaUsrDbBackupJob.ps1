@@ -268,14 +268,17 @@ function New-sqmOlaUsrDbBackupJob
 	begin
 	{
 		$functionName = $MyInvocation.MyCommand.Name
-		
+
 		if (-not $script:dbatoolsAvailable)
 		{
 			$errMsg = "dbatools-Modul nicht gefunden."
 			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 			throw $errMsg
 		}
-		
+
+		. "C:\CMP\SQL-Tools\sqmSQLTool\jobs\SqlVersionDetection.ps1"
+		$null = Initialize-SqlTrustServerCertificate -SqlInstance $SqlInstance
+
 		if (-not $Full -and -not $Diff -and -not $Log)
 		{
 			$errMsg = "Mindestens einer der Parameter -Full, -Diff oder -Log muss angegeben werden."
