@@ -488,7 +488,7 @@ ORDER BY sp.name
 							$backupContent = Invoke-DbaQuery -SqlInstance $secondaryName -SqlCredential $dstCred -Query $backupQuery
 							if ($backupContent)
 							{
-								$backupContent | Out-File -FilePath $backupFile -Encoding UTF8 -Force
+								[System.IO.File]::WriteAllText($backupFile, ($backupContent | Out-String), [System.Text.Encoding]::UTF8)
 								Invoke-sqmLogging -Message "[$secondaryName] Login-Backup erstellt: $backupFile" `
 												  -FunctionName $functionName -Level 'INFO'
 							}
