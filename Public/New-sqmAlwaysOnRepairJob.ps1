@@ -28,6 +28,16 @@ function New-sqmAlwaysOnRepairJob
 
 	process
 	{
+		# Setup output directory with proper permissions FIRST
+		$outputPath = "C:\System\WinSrvLog\MSSQL"
+		if (-not (Test-Path $outputPath)) {
+			New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
+		}
+		# Grant permissions to SQL Agent service accounts
+		@('NT SERVICE\MSSQLSERVER', 'NT SERVICE\SQLSERVERAGENT') | ForEach-Object {
+			$null = icacls $outputPath /grant "$_`:F" /T /C 2>&1
+		}
+
 		# Check if job exists
 		$existingJob = Get-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -ErrorAction SilentlyContinue
 		if ($existingJob -and -not $Force)
