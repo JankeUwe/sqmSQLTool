@@ -137,25 +137,20 @@ function New-sqmAlwaysOnRepairJob
 			}
 			Invoke-sqmLogging -Message "Permissions für Output-Verzeichnis gesetzt: $defaultOutputPath" -FunctionName $functionName -Level 'INFO'
 
-			# Create CmdExec job step (einfaches Copy-Script)
-			$jobsDir = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs'
-			if (-not (Test-Path $jobsDir)) { New-Item -ItemType Directory -Path $jobsDir -Force | Out-Null }
+			# Create CmdExec job step (use pre-built lightweight script)
+			$modulePath = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool'
+			$scriptPath = Join-Path $modulePath 'jobs\Repair-sqmAlwaysOnDatabases-job.ps1'
 
-			$wrapperScript = @"
-`$ErrorActionPreference = 'Stop'
-Import-Module sqmSQLTool -Force
-Repair-sqmAlwaysOnDatabases -Confirm:`$false
-"@
-			$wrapperPath = Join-Path $jobsDir "Repair-sqmAlwaysOnDatabases-$JobName.ps1"
-			[System.IO.File]::WriteAllText($wrapperPath, $wrapperScript, [System.Text.Encoding]::UTF8)
+			if (-not (Test-Path $scriptPath)) {
+				throw "Lightweight job script nicht gefunden: $scriptPath"
+			}
 
-			# Create CmdExec job step
 			$psExePath = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
-			$command = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$wrapperPath`""
+			$command = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
 
 			$jobStep = New-DbaAgentJobStep -SqlInstance $SqlInstance -Job $JobName `
 				-StepName "RunRepair_Step1" -Subsystem 'CmdExec' -Command $command -ErrorAction Stop
-			Invoke-sqmLogging -Message "Job-Schritt (CmdExec) hinzugefuegt: RunRepair_Step1, Wrapper: $wrapperPath" -FunctionName $functionName -Level 'INFO'
+			Invoke-sqmLogging -Message "Job-Schritt (CmdExec) hinzugefuegt: RunRepair_Step1, Script: $scriptPath" -FunctionName $functionName -Level 'INFO'
 
 			# Add schedule if provided
 			if ($Schedule)

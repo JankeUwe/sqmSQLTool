@@ -291,32 +291,21 @@ function New-sqmAutoLoginCompareJob
 			Invoke-sqmLogging -Message "Permissions für Output-Verzeichnis gesetzt: $OutputPath" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
-			# 5. Job-Step (CmdExec - einfaches Copy-Script)
+			# 5. Job-Step (CmdExec - use pre-built lightweight script)
 			# -------------------------------------------------------------------
-			$jobsDir = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs'
-			if (-not (Test-Path $jobsDir)) { New-Item -ItemType Directory -Path $jobsDir -Force | Out-Null }
+			$modulePath = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool'
+			$scriptPath = Join-Path $modulePath 'jobs\Compare-sqmAlwaysOnLogins-job.ps1'
 
-			# Build wrapper script with all parameters
-			$switchParams = @()
-			if ($IncludeSystemLogins) { $switchParams += "-IncludeSystemLogins" }
-			if ($OnlyDifferences) { $switchParams += "-OnlyDifferences" }
-			$switchLine = if ($switchParams) { " " + ($switchParams -join " ") } else { "" }
+			if (-not (Test-Path $scriptPath)) {
+				throw "Lightweight job script nicht gefunden: $scriptPath"
+			}
 
-			$wrapperScript = @"
-`$ErrorActionPreference = 'Stop'
-Import-Module sqmSQLTool -Force
-Compare-sqmAlwaysOnLogins -AvailabilityGroupName '$AvailabilityGroupName' -OutputPath '$OutputPath' -FailOnDrift -NoOpen -Confirm:`$false$switchLine
-"@
-			$wrapperPath = Join-Path $jobsDir "Compare-sqmAlwaysOnLogins-$JobName.ps1"
-			[System.IO.File]::WriteAllText($wrapperPath, $wrapperScript, [System.Text.Encoding]::UTF8)
-
-			# Create CmdExec job step
 			$psExePath = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
-			$command = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$wrapperPath`""
+			$command = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
 
 			$jobStep = New-DbaAgentJobStep -SqlInstance $SqlInstance -Job $JobName `
 				-StepName "CompareLogins_Step1" -Subsystem 'CmdExec' -Command $command -ErrorAction Stop
-			Invoke-sqmLogging -Message "Job-Schritt (CmdExec) hinzugefuegt: CompareLogins_Step1, Copy-Script: $wrapperPath" -FunctionName $functionName -Level 'INFO'
+			Invoke-sqmLogging -Message "Job-Schritt (CmdExec) hinzugefuegt: CompareLogins_Step1, Script: $scriptPath" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
 			# 6. Zeitplan
