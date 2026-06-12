@@ -305,7 +305,16 @@ function New-sqmAutoLoginCompareJob
 			$wrapperScript = @"
 `$ErrorActionPreference = 'Stop'
 Import-Module sqmSQLTool -Force
-Compare-sqmAlwaysOnLogins -AvailabilityGroupName '$AvailabilityGroupName' -OutputPath '$OutputPath' -FailOnDrift -NoOpen -Confirm:`$false$switchLine
+try {
+    Compare-sqmAlwaysOnLogins -AvailabilityGroupName '$AvailabilityGroupName' -OutputPath '$OutputPath' -FailOnDrift -NoOpen -NoReport -Confirm:`$false$switchLine
+    Write-EventLog -LogName Application -Source 'sqmSQLTool' -EventId 5000 -EntryType Information `
+        -Message "Job SUCCESS: Compare-sqmAlwaysOnLogins on `$env:COMPUTERNAME AG='$AvailabilityGroupName'" -ErrorAction SilentlyContinue
+    exit 0
+} catch {
+    Write-EventLog -LogName Application -Source 'sqmSQLTool' -EventId 5001 -EntryType Error `
+        -Message "Job FEHLER: Compare-sqmAlwaysOnLogins - `$_" -ErrorAction SilentlyContinue
+    exit 1
+}
 "@
 			$wrapperPath = Join-Path $jobsDir "Compare-sqmAlwaysOnLogins-$JobName.ps1"
 			[System.IO.File]::WriteAllText($wrapperPath, $wrapperScript, [System.Text.Encoding]::UTF8)

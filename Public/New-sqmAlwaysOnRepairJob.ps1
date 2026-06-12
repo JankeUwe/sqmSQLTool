@@ -144,7 +144,16 @@ function New-sqmAlwaysOnRepairJob
 			$wrapperScript = @"
 `$ErrorActionPreference = 'Stop'
 Import-Module sqmSQLTool -Force
-Repair-sqmAlwaysOnDatabases -Confirm:`$false
+try {
+    Repair-sqmAlwaysOnDatabases -NoReport -Confirm:`$false
+    Write-EventLog -LogName Application -Source 'sqmSQLTool' -EventId 5000 -EntryType Information `
+        -Message "Job SUCCESS: Repair-sqmAlwaysOnDatabases on `$env:COMPUTERNAME" -ErrorAction SilentlyContinue
+    exit 0
+} catch {
+    Write-EventLog -LogName Application -Source 'sqmSQLTool' -EventId 5001 -EntryType Error `
+        -Message "Job FEHLER: Repair-sqmAlwaysOnDatabases - `$_" -ErrorAction SilentlyContinue
+    exit 1
+}
 "@
 			$wrapperPath = Join-Path $jobsDir "Repair-sqmAlwaysOnDatabases-$JobName.ps1"
 			[System.IO.File]::WriteAllText($wrapperPath, $wrapperScript, [System.Text.Encoding]::UTF8)

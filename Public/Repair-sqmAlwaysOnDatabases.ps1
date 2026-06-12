@@ -47,7 +47,9 @@ function Repair-sqmAlwaysOnDatabases
 		[Parameter(Mandatory = $false)]
 		[switch]$Force,
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoReport  # Skip report generation (for job context)
 	)
 	
 	begin

@@ -122,7 +122,10 @@ function Compare-sqmAlwaysOnLogins
 		[switch]$ContinueOnError,
 
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+
+		[Parameter(Mandatory = $false)]
+		[switch]$NoReport  # Skip report generation (for job context)
 	)
 
 	begin
@@ -424,7 +427,7 @@ WHERE sp.type IN ('S','U','G')
 
 			Invoke-sqmLogging -Message "Vergleich abgeschlossen. OK: $cntOk | Warning: $cntWarn | Critical: $cntCrit" -FunctionName $functionName -Level "INFO"
 
-			if ($PSCmdlet.ShouldProcess($AvailabilityGroupName, "Login-Vergleichsbericht erstellen"))
+			if ($PSCmdlet.ShouldProcess($AvailabilityGroupName, "Login-Vergleichsbericht erstellen") -and -not $NoReport)
 			{
 				if (-not (Test-Path $OutputPath)) { New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null }
 				$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'

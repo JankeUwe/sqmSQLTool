@@ -437,7 +437,16 @@ ORDER BY name ASC
 			$wrapperScript = @"
 `$ErrorActionPreference = 'Stop'
 Import-Module sqmSQLTool -Force
-Sync-sqmLoginsToAlwaysOn -AvailabilityGroupName '$AvailabilityGroupName' -Force:`$$Force -BackupLogins:`$$BackupLogins -BackupRetentionDays $BackupRetentionDays$switchLine$skipServerLine$forceIncludeLine -Confirm:`$false
+try {
+    Sync-sqmLoginsToAlwaysOn -AvailabilityGroupName '$AvailabilityGroupName' -Force:`$$Force -BackupLogins:`$$BackupLogins -BackupRetentionDays $BackupRetentionDays -NoReport$switchLine$skipServerLine$forceIncludeLine -Confirm:`$false
+    Write-EventLog -LogName Application -Source 'sqmSQLTool' -EventId 5000 -EntryType Information `
+        -Message "Job SUCCESS: Sync-sqmLoginsToAlwaysOn on `$env:COMPUTERNAME AG='$AvailabilityGroupName'" -ErrorAction SilentlyContinue
+    exit 0
+} catch {
+    Write-EventLog -LogName Application -Source 'sqmSQLTool' -EventId 5001 -EntryType Error `
+        -Message "Job FEHLER: Sync-sqmLoginsToAlwaysOn - `$_" -ErrorAction SilentlyContinue
+    exit 1
+}
 "@
 			$wrapperPath = Join-Path $jobsDir "Sync-sqmLoginsToAlwaysOn-$JobName.ps1"
 			[System.IO.File]::WriteAllText($wrapperPath, $wrapperScript, [System.Text.Encoding]::UTF8)
