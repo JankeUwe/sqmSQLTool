@@ -143,15 +143,21 @@ function New-sqmAlwaysOnRepairJob
 
 			$wrapperScript = @"
 `$ErrorActionPreference = 'Stop'
+`$VerbosePreference = 'Continue'
 Import-Module sqmSQLTool -Force
 try {
-    Repair-sqmAlwaysOnDatabases -NoReport -Confirm:`$false
+    Write-Verbose "Starting Repair-sqmAlwaysOnDatabases..."
+    `$result = Repair-sqmAlwaysOnDatabases -NoReport -Confirm:`$false -ErrorAction Stop
+    Write-Verbose "Repair completed successfully"
     Write-EventLog -LogName Application -Source 'sqmSQLTool' -EventId 5000 -EntryType Information `
-        -Message "Job SUCCESS: Repair-sqmAlwaysOnDatabases on `$env:COMPUTERNAME" -ErrorAction SilentlyContinue
+        -Message "Job SUCCESS: Repair-sqmAlwaysOnDatabases DBs repaired" -ErrorAction SilentlyContinue
     exit 0
 } catch {
+    `$errMsg = `$_.ToString()
+    `$errLine = `$_.InvocationInfo.ScriptLineNumber
+    Write-Verbose "ERROR on line `$errLine: `$errMsg"
     Write-EventLog -LogName Application -Source 'sqmSQLTool' -EventId 5001 -EntryType Error `
-        -Message "Job FEHLER: Repair-sqmAlwaysOnDatabases - `$_" -ErrorAction SilentlyContinue
+        -Message "Job FEHLER: Repair-sqmAlwaysOnDatabases Line:`$errLine Msg:`$errMsg" -ErrorAction SilentlyContinue
     exit 1
 }
 "@

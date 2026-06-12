@@ -436,15 +436,21 @@ ORDER BY name ASC
 
 			$wrapperScript = @"
 `$ErrorActionPreference = 'Stop'
+`$VerbosePreference = 'Continue'
 Import-Module sqmSQLTool -Force
 try {
-    Sync-sqmLoginsToAlwaysOn -AvailabilityGroupName '$AvailabilityGroupName' -Force:`$$Force -BackupLogins:`$$BackupLogins -BackupRetentionDays $BackupRetentionDays -NoReport$switchLine$skipServerLine$forceIncludeLine -Confirm:`$false
+    Write-Verbose "Starting Sync-sqmLoginsToAlwaysOn..."
+    `$result = Sync-sqmLoginsToAlwaysOn -AvailabilityGroupName '$AvailabilityGroupName' -Force:`$$Force -BackupLogins:`$$BackupLogins -BackupRetentionDays $BackupRetentionDays -NoReport$switchLine$skipServerLine$forceIncludeLine -Confirm:`$false -ErrorAction Stop
+    Write-Verbose "Sync completed successfully"
     Write-EventLog -LogName Application -Source 'sqmSQLTool' -EventId 5000 -EntryType Information `
-        -Message "Job SUCCESS: Sync-sqmLoginsToAlwaysOn on `$env:COMPUTERNAME AG='$AvailabilityGroupName'" -ErrorAction SilentlyContinue
+        -Message "Job SUCCESS: Sync-sqmLoginsToAlwaysOn AG='$AvailabilityGroupName' Replicas synced" -ErrorAction SilentlyContinue
     exit 0
 } catch {
+    `$errMsg = `$_.ToString()
+    `$errLine = `$_.InvocationInfo.ScriptLineNumber
+    Write-Verbose "ERROR on line `$errLine: `$errMsg"
     Write-EventLog -LogName Application -Source 'sqmSQLTool' -EventId 5001 -EntryType Error `
-        -Message "Job FEHLER: Sync-sqmLoginsToAlwaysOn - `$_" -ErrorAction SilentlyContinue
+        -Message "Job FEHLER: Sync-sqmLoginsToAlwaysOn Line:`$errLine Msg:`$errMsg" -ErrorAction SilentlyContinue
     exit 1
 }
 "@

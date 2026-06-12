@@ -304,15 +304,21 @@ function New-sqmAutoLoginCompareJob
 
 			$wrapperScript = @"
 `$ErrorActionPreference = 'Stop'
+`$VerbosePreference = 'Continue'
 Import-Module sqmSQLTool -Force
 try {
-    Compare-sqmAlwaysOnLogins -AvailabilityGroupName '$AvailabilityGroupName' -OutputPath '$OutputPath' -FailOnDrift -NoOpen -NoReport -Confirm:`$false$switchLine
+    Write-Verbose "Starting Compare-sqmAlwaysOnLogins..."
+    `$result = Compare-sqmAlwaysOnLogins -AvailabilityGroupName '$AvailabilityGroupName' -OutputPath '$OutputPath' -FailOnDrift -NoOpen -NoReport -Confirm:`$false -ErrorAction Stop$switchLine
+    Write-Verbose "Compare completed successfully"
     Write-EventLog -LogName Application -Source 'sqmSQLTool' -EventId 5000 -EntryType Information `
-        -Message "Job SUCCESS: Compare-sqmAlwaysOnLogins on `$env:COMPUTERNAME AG='$AvailabilityGroupName'" -ErrorAction SilentlyContinue
+        -Message "Job SUCCESS: Compare-sqmAlwaysOnLogins AG='$AvailabilityGroupName'" -ErrorAction SilentlyContinue
     exit 0
 } catch {
+    `$errMsg = `$_.ToString()
+    `$errLine = `$_.InvocationInfo.ScriptLineNumber
+    Write-Verbose "ERROR on line `$errLine: `$errMsg"
     Write-EventLog -LogName Application -Source 'sqmSQLTool' -EventId 5001 -EntryType Error `
-        -Message "Job FEHLER: Compare-sqmAlwaysOnLogins - `$_" -ErrorAction SilentlyContinue
+        -Message "Job FEHLER: Compare-sqmAlwaysOnLogins Line:`$errLine Msg:`$errMsg" -ErrorAction SilentlyContinue
     exit 1
 }
 "@
