@@ -11,8 +11,8 @@ function Sync-sqmLoginsToAlwaysOn
 
 	$results = [System.Collections.Generic.List[PSCustomObject]]::new()
 
-	# Enable TrustServerCertificate for all SQL versions (required for certificate validation)
-	Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Scope Session -Force
+	# Enable TrustServerCertificate (SQL 2022+, safe to ignore on older versions)
+	Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Scope Session -Force -ErrorAction SilentlyContinue
 
 	try
 	{

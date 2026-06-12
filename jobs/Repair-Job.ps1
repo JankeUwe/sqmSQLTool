@@ -22,8 +22,8 @@ function Repair-sqmAlwaysOnDatabases
 			throw "dbatools-Modul nicht gefunden."
 		}
 
-		# Enable TrustServerCertificate for all SQL versions (required for certificate validation)
-		Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Scope Session -Force
+		# Enable TrustServerCertificate (SQL 2022+, safe to ignore on older versions)
+		Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Scope Session -Force -ErrorAction SilentlyContinue
 
 		# Eventlog-Quelle sicherstellen
 		$logSource = "sqmAlwaysOn"
