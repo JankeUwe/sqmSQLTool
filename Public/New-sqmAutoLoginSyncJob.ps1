@@ -440,7 +440,7 @@ ORDER BY name ASC
 Import-Module sqmSQLTool -Force
 try {
     Write-Verbose "Starting Sync-sqmLoginsToAlwaysOn..."
-    `$result = Sync-sqmLoginsToAlwaysOn -AvailabilityGroupName '$AvailabilityGroupName' -Force:`$$Force -BackupLogins:`$$BackupLogins -BackupRetentionDays $BackupRetentionDays -NoReport$switchLine$skipServerLine$forceIncludeLine -Confirm:`$false -ErrorAction Stop
+    `$result = Sync-sqmLoginsToAlwaysOn -AvailabilityGroupName '$AvailabilityGroupName' -Force:`$$Force -BackupLogins:`$$BackupLogins -BackupRetentionDays 0 -NoReport$switchLine$skipServerLine$forceIncludeLine -Confirm:`$false -ErrorAction Stop
     Write-Verbose "Sync completed successfully"
     Write-EventLog -LogName Application -Source 'sqmSQLTool' -EventId 5000 -EntryType Information `
         -Message "Job SUCCESS: Sync-sqmLoginsToAlwaysOn AG='$AvailabilityGroupName' Replicas synced" -ErrorAction SilentlyContinue
