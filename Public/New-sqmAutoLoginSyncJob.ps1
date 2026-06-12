@@ -400,7 +400,17 @@ ORDER BY name ASC
 			Invoke-sqmLogging -Message "Job '$JobName' erstellt" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
-			# 5. Add job step (CmdExec - einfaches Wrapper-Script)
+			# 4b. Output-Verzeichnis + Permissions
+			# -------------------------------------------------------------------
+			$defaultOutputPath = Get-sqmDefaultOutputPath
+			if (-not (Test-Path $defaultOutputPath)) { New-Item -ItemType Directory -Path $defaultOutputPath -Force | Out-Null }
+			@('NT SERVICE\MSSQLSERVER', 'NT SERVICE\SQLSERVERAGENT') | ForEach-Object {
+				$null = icacls $defaultOutputPath /grant "$_`:F" /T /C 2>&1
+			}
+			Invoke-sqmLogging -Message "Permissions für Output-Verzeichnis gesetzt: $defaultOutputPath" -FunctionName $functionName -Level 'INFO'
+
+			# -------------------------------------------------------------------
+			# 5. Add job step (CmdExec - einfaches Copy-Script)
 			# -------------------------------------------------------------------
 			$jobsDir = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs'
 			if (-not (Test-Path $jobsDir)) { New-Item -ItemType Directory -Path $jobsDir -Force | Out-Null }

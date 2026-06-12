@@ -129,7 +129,15 @@ function New-sqmAlwaysOnRepairJob
 				-Description "Repariert regelmaessig AlwaysOn-Datenbanken und heilt autoseeding-Fehler." -ErrorAction Stop
 			Invoke-sqmLogging -Message "Job '$JobName' erstellt" -FunctionName $functionName -Level 'INFO'
 
-			# Create CmdExec job step (einfaches Wrapper-Script)
+			# Output-Verzeichnis + Permissions
+			$defaultOutputPath = Get-sqmDefaultOutputPath
+			if (-not (Test-Path $defaultOutputPath)) { New-Item -ItemType Directory -Path $defaultOutputPath -Force | Out-Null }
+			@('NT SERVICE\MSSQLSERVER', 'NT SERVICE\SQLSERVERAGENT') | ForEach-Object {
+				$null = icacls $defaultOutputPath /grant "$_`:F" /T /C 2>&1
+			}
+			Invoke-sqmLogging -Message "Permissions für Output-Verzeichnis gesetzt: $defaultOutputPath" -FunctionName $functionName -Level 'INFO'
+
+			# Create CmdExec job step (einfaches Copy-Script)
 			$jobsDir = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs'
 			if (-not (Test-Path $jobsDir)) { New-Item -ItemType Directory -Path $jobsDir -Force | Out-Null }
 

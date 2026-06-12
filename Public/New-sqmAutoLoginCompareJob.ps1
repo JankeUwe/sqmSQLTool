@@ -282,7 +282,16 @@ function New-sqmAutoLoginCompareJob
 			Invoke-sqmLogging -Message "Job '$JobName' erstellt" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
-			# 4. Job-Step (CmdExec - einfaches Wrapper-Script)
+			# 4. Output-Verzeichnis + Permissions
+			# -------------------------------------------------------------------
+			if (-not (Test-Path $OutputPath)) { New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null }
+			@('NT SERVICE\MSSQLSERVER', 'NT SERVICE\SQLSERVERAGENT') | ForEach-Object {
+				$null = icacls $OutputPath /grant "$_`:F" /T /C 2>&1
+			}
+			Invoke-sqmLogging -Message "Permissions für Output-Verzeichnis gesetzt: $OutputPath" -FunctionName $functionName -Level 'INFO'
+
+			# -------------------------------------------------------------------
+			# 5. Job-Step (CmdExec - einfaches Copy-Script)
 			# -------------------------------------------------------------------
 			$jobsDir = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs'
 			if (-not (Test-Path $jobsDir)) { New-Item -ItemType Directory -Path $jobsDir -Force | Out-Null }
@@ -307,10 +316,10 @@ Compare-sqmAlwaysOnLogins -AvailabilityGroupName '$AvailabilityGroupName' -Outpu
 
 			$jobStep = New-DbaAgentJobStep -SqlInstance $SqlInstance -Job $JobName `
 				-StepName "CompareLogins_Step1" -Subsystem 'CmdExec' -Command $command -ErrorAction Stop
-			Invoke-sqmLogging -Message "Job-Schritt (CmdExec) hinzugefuegt: CompareLogins_Step1, Wrapper: $wrapperPath" -FunctionName $functionName -Level 'INFO'
+			Invoke-sqmLogging -Message "Job-Schritt (CmdExec) hinzugefuegt: CompareLogins_Step1, Copy-Script: $wrapperPath" -FunctionName $functionName -Level 'INFO'
 
 			# -------------------------------------------------------------------
-			# 5. Zeitplan
+			# 6. Zeitplan
 			# -------------------------------------------------------------------
 			$schedName = "sch_$JobName"
 			$schedSql = @"
