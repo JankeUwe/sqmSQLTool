@@ -23,7 +23,7 @@ function Sync-sqmLoginsToAlwaysOn
 		[int]$BackupRetentionDays = 0
 	)
 
-	# Load module FIRST (before any dbatools operations)
+	# Load module
 	if (-not (Get-Module -ListAvailable -Name dbatools)) {
 		throw "dbatools-Modul nicht gefunden."
 	}
@@ -31,43 +31,14 @@ function Sync-sqmLoginsToAlwaysOn
 
 	$results = [System.Collections.Generic.List[PSCustomObject]]::new()
 
-	# Try connection WITHOUT TrustServerCertificate first
-	$connStringBase = "Server=$SqlInstance;Integrated Security=SSPI;Timeout=5"
-	$version = Get-SqlVersionWithoutError -ConnectionString $connStringBase
-
-	# If that failed, try WITH TrustServerCertificate and enable it for dbatools
-	if (-not $version) {
-		$connStringWithTrust = $connStringBase + ";TrustServerCertificate=True"
-		$version = Get-SqlVersionWithoutError -ConnectionString $connStringWithTrust
-
-		# Only set dbatools config if second attempt worked
-		if ($version) {
-			Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Scope Session -Force -ErrorAction SilentlyContinue
-		}
-	}
-
-	if (-not $version) {
-		throw "Verbindung zu $SqlInstance fehlgeschlagen (weder ohne noch mit TrustServerCertificate)."
-	}
+	# Connect with TrustServerCertificate (handles both SQL 2019 and 2022+)
+	$server = Connect-DbaInstance -SqlInstance $SqlInstance -SqlCredential $SqlCredential -TrustServerCertificate -ErrorAction Stop
 
 	try
 	{
-		# Resolve AG - try, if fails set TrustServerCertificate and retry
-		$allAgs = $null
-		try {
-			$allAgs = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
-				-Query "SELECT name FROM sys.availability_groups ORDER BY name ASC" -ErrorAction Stop
-		}
-		catch {
-			# If certificate error, set config and retry
-			if ($_ -match "certificate|trust") {
-				Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Scope Session -Force -ErrorAction SilentlyContinue
-				$allAgs = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
-					-Query "SELECT name FROM sys.availability_groups ORDER BY name ASC" -ErrorAction Stop
-			} else {
-				throw
-			}
-		}
+		# Resolve AG
+		$allAgs = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
+			-Query "SELECT name FROM sys.availability_groups ORDER BY name ASC" -ErrorAction Stop
 
 		if (-not $allAgs)
 		{

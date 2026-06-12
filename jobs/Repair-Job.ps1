@@ -37,24 +37,8 @@ function Repair-sqmAlwaysOnDatabases
 		}
 		Import-Module dbatools -Force -ErrorAction Stop
 
-		# Try connection WITHOUT TrustServerCertificate first
-		$connStringBase = "Server=$SqlInstance;Integrated Security=SSPI;Timeout=5"
-		$version = Get-SqlVersionWithoutError -ConnectionString $connStringBase
-
-		# If that failed, try WITH TrustServerCertificate and enable it for dbatools
-		if (-not $version) {
-			$connStringWithTrust = $connStringBase + ";TrustServerCertificate=True"
-			$version = Get-SqlVersionWithoutError -ConnectionString $connStringWithTrust
-
-			# Only set dbatools config if second attempt worked
-			if ($version) {
-				Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Scope Session -Force -ErrorAction SilentlyContinue
-			}
-		}
-
-		if (-not $version) {
-			throw "Verbindung zu $SqlInstance fehlgeschlagen (weder ohne noch mit TrustServerCertificate)."
-		}
+		# Connect with TrustServerCertificate (handles both SQL 2019 and 2022+)
+		$server = Connect-DbaInstance -SqlInstance $SqlInstance -SqlCredential $SqlCredential -TrustServerCertificate -ErrorAction Stop
 
 		# Eventlog-Quelle sicherstellen
 		$logSource = "sqmAlwaysOn"
