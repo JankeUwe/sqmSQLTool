@@ -1,3 +1,17 @@
+function Get-SqlVersionWithoutError {
+	param([string]$ConnectionString)
+	try {
+		$conn = New-Object System.Data.SqlClient.SqlConnection($ConnectionString)
+		$conn.Open()
+		$cmd = $conn.CreateCommand()
+		$cmd.CommandText = "SELECT SERVERPROPERTY('ProductVersion')"
+		$version = $cmd.ExecuteScalar()
+		$conn.Close()
+		return $version
+	}
+	catch { return $null }
+}
+
 function Sync-sqmLoginsToAlwaysOn
 {
 	param (
@@ -11,8 +25,19 @@ function Sync-sqmLoginsToAlwaysOn
 
 	$results = [System.Collections.Generic.List[PSCustomObject]]::new()
 
-	# Enable TrustServerCertificate (SQL 2022+, safe to ignore on older versions)
-	Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Scope Session -Force -ErrorAction SilentlyContinue
+	# Detect SQL version and set TrustServerCertificate if needed
+	$connStringBase = "Server=$SqlInstance;Integrated Security=SSPI;Timeout=5"
+	$version = Get-SqlVersionWithoutError -ConnectionString $connStringBase
+
+	if (-not $version) {
+		$connStringWithTrust = $connStringBase + ";TrustServerCertificate=True"
+		$version = Get-SqlVersionWithoutError -ConnectionString $connStringWithTrust
+		Set-DbatoolsConfig -FullName sql.connection.trustcert -Value $true -Scope Session -Force -ErrorAction SilentlyContinue
+	}
+
+	if (-not $version) {
+		throw "Verbindung zu $SqlInstance fehlgeschlagen."
+	}
 
 	try
 	{
