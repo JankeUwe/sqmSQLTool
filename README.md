@@ -37,11 +37,6 @@ Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" `
 
 ## 📦 Installation
 
-### From PowerShell Gallery
-```powershell
-Install-Module -Name sqmSQLTool -Repository PSGallery
-```
-
 ### From GitHub
 ```powershell
 # Clone repository
