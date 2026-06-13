@@ -231,6 +231,9 @@
 
 			# ReleaseNotes of this module
 			ReleaseNotes = 'See CHANGELOG.md and GitHub: https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.5.1.0'
+
+			# External module dependencies
+			ExternalModuleDependencies = @('dbatools')
 		}
 	}
 }
