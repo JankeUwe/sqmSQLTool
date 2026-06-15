@@ -104,6 +104,31 @@ Complete documentation with examples for all 124 functions:
 
 ---
 
+## ❓ FAQ
+
+**Q: Can I use sqmSQLTool with SQL Server 2012 or 2014?**  
+A: No. Minimum requirement is SQL Server 2016. Features like Distributed AGs require SQL Server 2019+.
+
+**Q: Do I need sysadmin rights for all functions?**  
+A: Most functions require sysadmin. Some read-only functions (e.g., `Get-sqmDiskSpaceReport`) work with lower roles, but login synchronization and configuration export require sysadmin.
+
+**Q: How do I import the module in PowerShell 5.1 vs 7.x?**  
+A: Same command works for both: `Import-Module ./sqmSQLTool/sqmSQLTool.psd1`. Module is compatible with .NET Framework 4.8 (PS 5.1) and .NET 6+ (PS 7.x).
+
+**Q: What if `Sync-sqmLoginsToAlwaysOn` fails with "Login already exists"?**  
+A: Use `-Force` flag to update existing logins. Use `-SafeForceMode` to auto-exclude system accounts. Run with `-WhatIf` first to preview changes.
+
+**Q: Can I schedule login sync across multiple AG instances?**  
+A: Yes. Use `New-sqmAutoLoginSyncJob` on the primary replica. It creates a SQL Agent job that runs daily at 2:00 AM.
+
+**Q: How do I export AlwaysOn configuration for documentation?**  
+A: Use `Export-sqmAlwaysOnConfiguration -SqlInstance "SQL01" -OutputPath "C:\Exports"`. Generates HTML + CSV with replica status, listeners, and database sync state.
+
+**Q: Does the module support Azure SQL Managed Instance?**  
+A: Limited support. AlwaysOn features don't apply. Use security/login functions (`Get-sqmSysadminAccounts`, `Get-sqmTlsStatus`) with caution due to API differences.
+
+---
+
 ## 📄 License
 
 MIT License - See LICENSE file for details

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Finds all Active Directory groups that contain a specified user, group, or computer.
 
