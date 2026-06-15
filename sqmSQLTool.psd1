@@ -87,6 +87,8 @@
 		'Find-sqmDatabaseObject',
 		'Get-sqmADAccountStatus',
 		'Get-sqmADGroupMembers',
+		'Get-sqmADGroupMembersRecursive',
+		'Get-sqmADMemberGroups',
 		'Get-sqmAgentJobHistory',
 		'Get-sqmAlwaysOnFailoverHistory',
 		'Get-sqmAlwaysOnHealthReport',
