@@ -6,14 +6,8 @@
     Enhanced version of Get-sqmADGroupMembers with support for limiting nesting depth.
     Recursively resolves nested groups up to the specified depth level.
 
-    Example: If GroupA contains GroupB (which contains User2):
-    - Depth 0: GroupB only (direct members)
-    - Depth 1: GroupB + User2 (one level of nesting)
-    - Depth 2: GroupB + User2 + any groups within (two levels)
-
 .PARAMETER GroupName
     Name of the AD group. Pipeline-capable.
-    Format: "GroupName" or "DOMAIN\GroupName"
 
 .PARAMETER Domain
     Optional: AD domain (e.g., "FITS.LOCAL", "corp.de")
@@ -21,10 +15,6 @@
 
 .PARAMETER Depth
     Maximum nesting depth for group expansion (default: 2)
-    - 0: Direct members only (no recursion)
-    - 1: Expand nested groups one level
-    - 2: Expand nested groups two levels (recommended)
-    - 3+: Deeper nesting (may slow down large AD structures)
 
 .PARAMETER OutputPath
     Optional: Output directory for TXT/CSV reports
@@ -36,12 +26,9 @@
 .EXAMPLE
     Get-sqmADGroupMembersRecursive -GroupName "DL_SQL_Admins" -Depth 2
 
-.EXAMPLE
-    Get-sqmADGroupMembersRecursive -GroupName "Administrators" -Domain "FITS" -Depth 1
-
 .NOTES
     Author: sqmSQLTool
-    Supports controlled recursive expansion of nested groups
+    Based on Get-sqmADGroupMembers with -Depth parameter
 #>
 function Get-sqmADGroupMembersRecursive
 {
@@ -67,22 +54,21 @@ function Get-sqmADGroupMembersRecursive
     {
         $functionName = $MyInvocation.MyCommand.Name
         $allResults = [System.Collections.Generic.List[PSCustomObject]]::new()
-        $processedGroups = @{}  # Track processed groups to avoid circular references
+        $processedGroups = @{}
 
-        # Test ADSI connectivity
         try
         {
             $null = [ADSI]"LDAP://RootDSE"
-            Invoke-sqmLogging -Message "ADSI-Verbindung erfolgreich." -FunctionName $functionName -Level "INFO"
+            Invoke-sqmLogging -Message "ADSI connection successful." -FunctionName $functionName -Level "INFO"
         }
         catch
         {
-            $errMsg = "ADSI-Verbindung fehlgeschlagen - kein Domain Controller erreichbar."
+            $errMsg = "ADSI connection failed - no Domain Controller reachable."
             Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
             throw $errMsg
         }
 
-        Invoke-sqmLogging -Message "Starte $functionName mit Depth=$Depth" -FunctionName $functionName -Level "INFO"
+        Invoke-sqmLogging -Message "Starting $functionName with Depth=$Depth" -FunctionName $functionName -Level "INFO"
     }
 
     process
@@ -95,7 +81,6 @@ function Get-sqmADGroupMembersRecursive
 
             try
             {
-                # Determine domain
                 $targetDomain = $Domain
                 if (-not $targetDomain)
                 {
@@ -113,7 +98,7 @@ function Get-sqmADGroupMembersRecursive
                 Invoke-sqmLogging -Message "[$cleanGroup] Domain: $targetDomain, Depth: $Depth" -FunctionName $functionName -Level "VERBOSE"
 
                 # Helper function for recursive expansion
-                function Expand-ADGroupMembers
+                function Expand-GroupMembers
                 {
                     param(
                         [string]$GroupIdentity,
@@ -122,7 +107,6 @@ function Get-sqmADGroupMembersRecursive
                         [hashtable]$Visited
                     )
 
-                    # Prevent circular references
                     if ($Visited.ContainsKey($GroupIdentity.ToLower()))
                     {
                         return @()
@@ -133,11 +117,21 @@ function Get-sqmADGroupMembersRecursive
 
                     try
                     {
-                        # Try Get-ADGroupMember first
                         if (Get-Module -ListAvailable -Name ActiveDirectory -ErrorAction SilentlyContinue)
                         {
                             $null = Import-Module ActiveDirectory -ErrorAction Stop
-                            $adMembers = Get-ADGroupMember -Identity $GroupIdentity -ErrorAction Stop
+
+                            # CRITICAL: Use -Recursive to get nested members
+                            if ($CurrentDepth -eq 0)
+                            {
+                                # First call: Get all with -Recursive built-in
+                                $adMembers = Get-ADGroupMember -Identity $GroupIdentity -Recursive -ErrorAction Stop
+                            }
+                            else
+                            {
+                                # Nested calls: only direct members
+                                $adMembers = Get-ADGroupMember -Identity $GroupIdentity -ErrorAction Stop
+                            }
 
                             foreach ($member in $adMembers)
                             {
@@ -146,40 +140,35 @@ function Get-sqmADGroupMembersRecursive
                                     DisplayName    = $member.Name
                                     ObjectClass    = $member.objectClass
                                     Depth          = $CurrentDepth
-                                    DN             = if ($member | Get-Member -Name DistinguishedName) { $member.DistinguishedName } else { $null }
                                 }
                                 $expandedMembers += $memberObj
-
-                                # If it's a group and we haven't reached max depth, recurse
-                                if ($member.objectClass -eq 'group' -and $CurrentDepth -lt $MaxDepth)
-                                {
-                                    $nestedMembers = Expand-ADGroupMembers -GroupIdentity $member.SamAccountName -CurrentDepth ($CurrentDepth + 1) -MaxDepth $MaxDepth -Visited $Visited
-                                    $expandedMembers += $nestedMembers
-                                }
                             }
                         }
                     }
                     catch
                     {
-                        # Fallback to LDAP if AD module fails
+                        # Fallback to LDAP - use original method
                         try
                         {
                             $root = [ADSI]"LDAP://$targetDomain/RootDSE"
                             $searcher = [System.DirectoryServices.DirectorySearcher]::new()
                             $searcher.SearchRoot = [ADSI]("LDAP://" + $root.defaultNamingContext[0])
-                            $searcher.Filter = "(&(|(sAMAccountName=$GroupIdentity)(distinguishedName=$GroupIdentity)))"
-                            $result = $searcher.FindOne()
+                            $searcher.Filter = "(sAMAccountName=$GroupIdentity)"
+                            $groupResult = $searcher.FindOne()
 
-                            if ($result)
+                            if ($groupResult)
                             {
+                                $groupDN = $groupResult.Properties['distinguishedName'][0]
+                                $groupEntry = [ADSI]"LDAP://$groupDN"
+
                                 $memberDNs = @()
                                 try
                                 {
-                                    $memberDNs = @($result.Properties['member'])
+                                    $memberDNs = @($groupEntry.psbase.InvokeGet("member"))
                                 }
                                 catch
                                 {
-                                    $memberDNs = @($result.GetDirectoryEntry().psbase.InvokeGet("member"))
+                                    $memberDNs = @($groupEntry.psbase.Properties['member'])
                                 }
 
                                 foreach ($memberDN in $memberDNs)
@@ -197,44 +186,35 @@ function Get-sqmADGroupMembersRecursive
                                             DisplayName    = $disp
                                             ObjectClass    = $cls
                                             Depth          = $CurrentDepth
-                                            DN             = $memberDN
                                         }
                                         $expandedMembers += $memberObj
 
-                                        # If group and not at max depth, recurse
+                                        # Recurse if group and not at max depth
                                         if ($cls -eq 'group' -and $CurrentDepth -lt $MaxDepth)
                                         {
-                                            $nestedMembers = Expand-ADGroupMembers -GroupIdentity $sam -CurrentDepth ($CurrentDepth + 1) -MaxDepth $MaxDepth -Visited $Visited
-                                            $expandedMembers += $nestedMembers
+                                            $nested = Expand-GroupMembers -GroupIdentity $sam -CurrentDepth ($CurrentDepth + 1) -MaxDepth $MaxDepth -Visited $Visited
+                                            $expandedMembers += $nested
                                         }
                                     }
-                                    catch
-                                    {
-                                        # Skip members we can't process
-                                    }
+                                    catch { }
                                 }
                             }
                         }
-                        catch
-                        {
-                            # Last resort failed
-                        }
+                        catch { }
                     }
 
                     return $expandedMembers
                 }
 
-                # Start recursive expansion
-                $allMembers = Expand-ADGroupMembers -GroupIdentity $cleanGroup -CurrentDepth 0 -MaxDepth $Depth -Visited $processedGroups
-
-                # Remove duplicates and sort
+                # Start expansion
+                $allMembers = Expand-GroupMembers -GroupIdentity $cleanGroup -CurrentDepth 0 -MaxDepth $Depth -Visited $processedGroups
                 $members = $allMembers | Sort-Object -Property SamAccountName -Unique
 
-                # Write report files
+                # Write reports
                 $txtFile = $null
                 $csvFile = $null
 
-                if ($PSCmdlet.ShouldProcess($cleanGroup, "Erstelle Bericht"))
+                if ($PSCmdlet.ShouldProcess($cleanGroup, "Create report"))
                 {
                     if (-not (Test-Path $OutputPath))
                     {
@@ -248,11 +228,11 @@ function Get-sqmADGroupMembersRecursive
                     $lines = @(
                         "# sqmSQLTool - www.powershelldba.de"
                         "# ================================================================"
-                        "# AD Group Members Report (Recursive)"
-                        "# Gruppe    : $cleanGroup"
+                        "# AD Group Members Report (Recursive with Depth Control)"
+                        "# Group     : $cleanGroup"
                         "# Domain    : $targetDomain"
                         "# Depth     : $Depth"
-                        "# Erstellt  : $timestamp"
+                        "# Created   : $timestamp"
                         "# Members   : $($members.Count)"
                         "# ================================================================"
                         ""
@@ -268,10 +248,9 @@ function Get-sqmADGroupMembersRecursive
                     $lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
                     $members | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 
-                    Invoke-sqmLogging -Message "[$cleanGroup] Bericht: $txtFile" -FunctionName $functionName -Level "INFO"
+                    Invoke-sqmLogging -Message "[$cleanGroup] Report: $txtFile" -FunctionName $functionName -Level "INFO"
                 }
 
-                # Result object
                 $allResults.Add([PSCustomObject]@{
                         GroupName   = $cleanGroup
                         Domain      = $targetDomain
@@ -284,11 +263,11 @@ function Get-sqmADGroupMembersRecursive
                         Status      = if ($members.Count -gt 0) { 'OK' } else { 'Warning' }
                     })
 
-                Invoke-sqmLogging -Message "[$cleanGroup] $($members.Count) Members mit Depth=$Depth expandiert" -FunctionName $functionName -Level "VERBOSE"
+                Invoke-sqmLogging -Message "[$cleanGroup] $($members.Count) Members found with Depth=$Depth" -FunctionName $functionName -Level "VERBOSE"
             }
             catch
             {
-                $errMsg = "Fehler bei Gruppe '$group': $($_.Exception.Message)"
+                $errMsg = "Error processing group '$group': $($_.Exception.Message)"
                 Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
                 $allResults.Add([PSCustomObject]@{
                         GroupName   = $group
@@ -308,7 +287,7 @@ function Get-sqmADGroupMembersRecursive
 
     end
     {
-        Invoke-sqmLogging -Message "$functionName abgeschlossen. $($allResults.Count) Gruppen verarbeitet." -FunctionName $functionName -Level "INFO"
+        Invoke-sqmLogging -Message "$functionName completed. $($allResults.Count) groups processed." -FunctionName $functionName -Level "INFO"
         return $allResults
     }
 }

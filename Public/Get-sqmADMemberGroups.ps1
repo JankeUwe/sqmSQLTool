@@ -6,31 +6,16 @@
     Inverse operation to Get-sqmADGroupMembers.
     Lists all groups (direct and nested) that contain the specified member.
 
-    Useful for:
-    - Security audits: "Which groups is this user in?"
-    - Troubleshooting permissions: "Why does this user have these rights?"
-    - Access verification: "Confirm user group membership"
-
-    Example: If User is in GroupA, and GroupA is in GroupB:
-    - Depth 0: GroupA only (direct groups)
-    - Depth 1: GroupA + GroupB (one level up)
-    - Depth 2: GroupA + GroupB + any parent groups
-
 .PARAMETER Identity
-    Identity of the user, group, or computer to find parent groups for.
+    Identity of the user, group, or computer.
     Can be: SamAccountName, UPN, or DistinguishedName
     Pipeline-capable.
 
 .PARAMETER Domain
-    Optional: AD domain (e.g., "FITS.LOCAL", "corp.de")
-    If not specified, auto-detects current domain.
+    Optional: AD domain
 
 .PARAMETER Depth
     Maximum nesting depth for group expansion (default: 2)
-    - 0: Direct groups only (immediate parent groups)
-    - 1: Direct groups + their parent groups (one level up)
-    - 2: Two levels up (recommended)
-    - 3+: Deeper nesting
 
 .PARAMETER OutputPath
     Optional: Output directory for TXT/CSV reports
@@ -42,15 +27,9 @@
 .EXAMPLE
     Get-sqmADMemberGroups -Identity "john.doe" -Depth 2
 
-.EXAMPLE
-    Get-sqmADMemberGroups -Identity "contoso\Domain Users" -Domain "FITS"
-
-.EXAMPLE
-    "user1", "user2" | Get-sqmADMemberGroups -Depth 1
-
 .NOTES
     Author: sqmSQLTool
-    Complements Get-sqmADGroupMembers for bidirectional AD group analysis
+    Inverse of Get-sqmADGroupMembers
 #>
 function Get-sqmADMemberGroups
 {
@@ -76,22 +55,20 @@ function Get-sqmADMemberGroups
     {
         $functionName = $MyInvocation.MyCommand.Name
         $allResults = [System.Collections.Generic.List[PSCustomObject]]::new()
-        $processedMembers = @{}  # Track to avoid circular references
 
-        # Test ADSI connectivity
         try
         {
             $null = [ADSI]"LDAP://RootDSE"
-            Invoke-sqmLogging -Message "ADSI-Verbindung erfolgreich." -FunctionName $functionName -Level "INFO"
+            Invoke-sqmLogging -Message "ADSI connection successful." -FunctionName $functionName -Level "INFO"
         }
         catch
         {
-            $errMsg = "ADSI-Verbindung fehlgeschlagen - kein Domain Controller erreichbar."
+            $errMsg = "ADSI connection failed - no Domain Controller reachable."
             Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
             throw $errMsg
         }
 
-        Invoke-sqmLogging -Message "Starte $functionName mit Depth=$Depth" -FunctionName $functionName -Level "INFO"
+        Invoke-sqmLogging -Message "Starting $functionName with Depth=$Depth" -FunctionName $functionName -Level "INFO"
     }
 
     process
@@ -104,7 +81,6 @@ function Get-sqmADMemberGroups
 
             try
             {
-                # Determine domain
                 $targetDomain = $Domain
                 if (-not $targetDomain)
                 {
@@ -121,14 +97,13 @@ function Get-sqmADMemberGroups
                 $cleanIdentity = $member -replace '^[^\\]*\\', ''
                 Invoke-sqmLogging -Message "[$cleanIdentity] Domain: $targetDomain, Depth: $Depth" -FunctionName $functionName -Level "VERBOSE"
 
-                # Helper function for recursive parent group lookup
+                # Helper function for recursive group lookup
                 function Find-ParentGroups
                 {
                     param(
                         [string]$MemberIdentity,
                         [int]$CurrentDepth,
                         [int]$MaxDepth,
-                        [string]$TargetDomain,
                         [hashtable]$Visited
                     )
 
@@ -142,27 +117,33 @@ function Get-sqmADMemberGroups
 
                     try
                     {
-                        # Try Get-ADPrincipalGroupMembership if available
                         if (Get-Module -ListAvailable -Name ActiveDirectory -ErrorAction SilentlyContinue)
                         {
                             $null = Import-Module ActiveDirectory -ErrorAction Stop
+
+                            # Get immediate parent groups
                             $memberGroups = Get-ADPrincipalGroupMembership -Identity $MemberIdentity -ErrorAction Stop
 
                             foreach ($group in $memberGroups)
                             {
+                                # Skip Domain Users - it's everyone
+                                if ($group.Name -eq 'Domain Users')
+                                {
+                                    continue
+                                }
+
                                 $groupObj = [PSCustomObject]@{
                                     SamAccountName = $group.SamAccountName
                                     DisplayName    = $group.Name
                                     GroupScope     = if ($group | Get-Member -Name GroupScope) { $group.GroupScope } else { 'Unknown' }
                                     Depth          = $CurrentDepth
-                                    DN             = if ($group | Get-Member -Name DistinguishedName) { $group.DistinguishedName } else { $null }
                                 }
                                 $foundGroups += $groupObj
 
-                                # If not at max depth, find parent groups of this group
+                                # Recurse if not at max depth
                                 if ($CurrentDepth -lt $MaxDepth)
                                 {
-                                    $parentOfParent = Find-ParentGroups -MemberIdentity $group.SamAccountName -CurrentDepth ($CurrentDepth + 1) -MaxDepth $MaxDepth -TargetDomain $TargetDomain -Visited $Visited
+                                    $parentOfParent = Find-ParentGroups -MemberIdentity $group.SamAccountName -CurrentDepth ($CurrentDepth + 1) -MaxDepth $MaxDepth -Visited $Visited
                                     $foundGroups += $parentOfParent
                                 }
                             }
@@ -170,13 +151,13 @@ function Get-sqmADMemberGroups
                     }
                     catch
                     {
-                        # Fallback to LDAP
+                        # LDAP fallback if AD module fails
                         try
                         {
-                            $root = [ADSI]"LDAP://$TargetDomain/RootDSE"
+                            $root = [ADSI]"LDAP://$targetDomain/RootDSE"
                             $searcher = [System.DirectoryServices.DirectorySearcher]::new()
                             $searcher.SearchRoot = [ADSI]("LDAP://" + $root.defaultNamingContext[0])
-                            $searcher.Filter = "(&(|(sAMAccountName=$MemberIdentity)(distinguishedName=$MemberIdentity)))"
+                            $searcher.Filter = "(&(|(sAMAccountName=$MemberIdentity)(userPrincipalName=$MemberIdentity)))"
                             $result = $searcher.FindOne()
 
                             if ($result)
@@ -198,49 +179,43 @@ function Get-sqmADMemberGroups
                                         $disp = $groupEntry.psbase.InvokeGet("displayName")
                                         $scope = $groupEntry.psbase.InvokeGet("groupScope")
 
-                                        $groupObj = [PSCustomObject]@{
-                                            SamAccountName = $sam
-                                            DisplayName    = $disp
-                                            GroupScope     = $scope
-                                            Depth          = $CurrentDepth
-                                            DN             = $groupResult.Properties['distinguishedName'][0]
-                                        }
-                                        $foundGroups += $groupObj
-
-                                        # Recurse if not at max depth
-                                        if ($CurrentDepth -lt $MaxDepth)
+                                        if ($sam -ne 'Domain Users')
                                         {
-                                            $parentOfParent = Find-ParentGroups -MemberIdentity $sam -CurrentDepth ($CurrentDepth + 1) -MaxDepth $MaxDepth -TargetDomain $TargetDomain -Visited $Visited
-                                            $foundGroups += $parentOfParent
+                                            $groupObj = [PSCustomObject]@{
+                                                SamAccountName = $sam
+                                                DisplayName    = $disp
+                                                GroupScope     = $scope
+                                                Depth          = $CurrentDepth
+                                            }
+                                            $foundGroups += $groupObj
+
+                                            # Recurse if not at max depth
+                                            if ($CurrentDepth -lt $MaxDepth)
+                                            {
+                                                $parentOfParent = Find-ParentGroups -MemberIdentity $sam -CurrentDepth ($CurrentDepth + 1) -MaxDepth $MaxDepth -Visited $Visited
+                                                $foundGroups += $parentOfParent
+                                            }
                                         }
                                     }
-                                    catch
-                                    {
-                                        # Skip groups we can't process
-                                    }
+                                    catch { }
                                 }
                             }
                         }
-                        catch
-                        {
-                            # Last resort failed
-                        }
+                        catch { }
                     }
 
                     return $foundGroups
                 }
 
-                # Start recursive parent group lookup
-                $allGroups = Find-ParentGroups -MemberIdentity $cleanIdentity -CurrentDepth 0 -MaxDepth $Depth -TargetDomain $targetDomain -Visited $processedMembers
-
-                # Remove duplicates and sort
+                # Start lookup
+                $allGroups = Find-ParentGroups -MemberIdentity $cleanIdentity -CurrentDepth 0 -MaxDepth $Depth -Visited @{}
                 $parentGroups = $allGroups | Sort-Object -Property SamAccountName -Unique
 
-                # Write report files
+                # Write reports
                 $txtFile = $null
                 $csvFile = $null
 
-                if ($PSCmdlet.ShouldProcess($cleanIdentity, "Erstelle Bericht"))
+                if ($PSCmdlet.ShouldProcess($cleanIdentity, "Create report"))
                 {
                     if (-not (Test-Path $OutputPath))
                     {
@@ -258,7 +233,7 @@ function Get-sqmADMemberGroups
                         "# Member    : $cleanIdentity"
                         "# Domain    : $targetDomain"
                         "# Depth     : $Depth"
-                        "# Erstellt  : $timestamp"
+                        "# Created   : $timestamp"
                         "# Groups    : $($parentGroups.Count)"
                         "# ================================================================"
                         ""
@@ -274,10 +249,9 @@ function Get-sqmADMemberGroups
                     $lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
                     $parentGroups | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 
-                    Invoke-sqmLogging -Message "[$cleanIdentity] Bericht: $txtFile" -FunctionName $functionName -Level "INFO"
+                    Invoke-sqmLogging -Message "[$cleanIdentity] Report: $txtFile" -FunctionName $functionName -Level "INFO"
                 }
 
-                # Result object
                 $allResults.Add([PSCustomObject]@{
                         Identity    = $cleanIdentity
                         Domain      = $targetDomain
@@ -290,11 +264,11 @@ function Get-sqmADMemberGroups
                         Status      = if ($parentGroups.Count -gt 0) { 'OK' } else { 'NoGroups' }
                     })
 
-                Invoke-sqmLogging -Message "[$cleanIdentity] $($parentGroups.Count) Gruppen mit Depth=$Depth gefunden" -FunctionName $functionName -Level "VERBOSE"
+                Invoke-sqmLogging -Message "[$cleanIdentity] $($parentGroups.Count) Groups found with Depth=$Depth" -FunctionName $functionName -Level "VERBOSE"
             }
             catch
             {
-                $errMsg = "Fehler bei Member '$member': $($_.Exception.Message)"
+                $errMsg = "Error processing member '$member': $($_.Exception.Message)"
                 Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
                 $allResults.Add([PSCustomObject]@{
                         Identity    = $member
@@ -314,7 +288,7 @@ function Get-sqmADMemberGroups
 
     end
     {
-        Invoke-sqmLogging -Message "$functionName abgeschlossen. $($allResults.Count) Members verarbeitet." -FunctionName $functionName -Level "INFO"
+        Invoke-sqmLogging -Message "$functionName completed. $($allResults.Count) members processed." -FunctionName $functionName -Level "INFO"
         return $allResults
     }
 }
