@@ -90,6 +90,7 @@
 		'Get-sqmADGroupMembersRecursive',
 		'Get-sqmADMemberGroups',
 		'Get-sqmAgentJobHistory',
+		'Get-sqmAgentJobScheduleReport',
 		'Get-sqmAlwaysOnFailoverHistory',
 		'Get-sqmAlwaysOnHealthReport',
 		'Get-sqmAutoGrowthReport',
