@@ -213,18 +213,30 @@ function Get-sqmAgentJobScheduleReport {
             # Export CSV if requested
             if ($OutputCsv -and $jobData) {
                 $csvPath = Join-Path $OutputPath "AgentJobSchedule_${cleanInstance}_${timestamp}.csv"
-                $jobData | Export-Csv -Path $csvPath -NoTypeInformation -Force
-                Invoke-sqmLogging -Message "CSV exported to: $csvPath" `
-                                  -FunctionName $functionName -Level "INFO"
+                try {
+                    $jobData | Export-Csv -Path $csvPath -NoTypeInformation -Force -ErrorAction Stop
+                    Invoke-sqmLogging -Message "CSV exported to: $csvPath" `
+                                      -FunctionName $functionName -Level "INFO"
+                } catch {
+                    $csvErr = "Failed to write CSV to '$csvPath': $($_.Exception.Message)"
+                    Invoke-sqmLogging -Message $csvErr -FunctionName $functionName -Level "ERROR"
+                    throw $csvErr
+                }
             }
 
             # Generate HTML report
             $htmlPath = Join-Path $OutputPath "AgentJobSchedule_${cleanInstance}_${timestamp}.html"
             $html = _GenerateAgentJobHtml -JobData $jobData -SqlInstance $SqlInstance -Timestamp $timestamp
-            $html | Out-File -FilePath $htmlPath -Encoding UTF8 -Force
 
-            Invoke-sqmLogging -Message "HTML report generated: $htmlPath" `
-                              -FunctionName $functionName -Level "INFO"
+            try {
+                $html | Out-File -FilePath $htmlPath -Encoding UTF8 -Force -ErrorAction Stop
+                Invoke-sqmLogging -Message "HTML report generated: $htmlPath" `
+                                  -FunctionName $functionName -Level "INFO"
+            } catch {
+                $fileErr = "Failed to write HTML report to '$htmlPath': $($_.Exception.Message)"
+                Invoke-sqmLogging -Message $fileErr -FunctionName $functionName -Level "ERROR"
+                throw $fileErr
+            }
 
         } catch {
             $errMsg = "Error generating Agent Job Report: $($_.Exception.Message)"
