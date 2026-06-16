@@ -177,9 +177,9 @@ function Get-sqmAgentJobScheduleReport {
                     $null
                 }
 
-                # Calculate average duration
-                $avgDuration = if ($history.AvgDurationSeconds) {
-                    $seconds = [int]$history.AvgDurationSeconds
+                # Calculate average duration (safe conversion from SQL NULL/empty)
+                $avgDuration = if ($history.AvgDurationSeconds -and [int]::TryParse([string]$history.AvgDurationSeconds, [ref]$null)) {
+                    $seconds = [int][string]$history.AvgDurationSeconds
                     "$([math]::Floor($seconds / 60))m $($seconds % 60)s"
                 } else {
                     'N/A'
@@ -206,7 +206,7 @@ function Get-sqmAgentJobScheduleReport {
                     } else {
                         'N/A'
                     }
-                    RawAvgSeconds       = if ($history.AvgDurationSeconds) { [int]$history.AvgDurationSeconds } else { 0 }
+                    RawAvgSeconds       = if ($history.AvgDurationSeconds -and [int]::TryParse([string]$history.AvgDurationSeconds, [ref]$null)) { [int][string]$history.AvgDurationSeconds } else { 0 }
                 }
             }
 
@@ -321,9 +321,16 @@ function _ConvertJobSchedule {
 
 function _ConvertJobRunTime {
     param(
-        [int]$RunDate,
-        [int]$RunTime
+        [object]$RunDate,
+        [object]$RunTime
     )
+
+    # Safe conversion from SQL NULL/empty
+    [int]$RunDate = if ([int]::TryParse([string]$RunDate, [ref]$null)) { [int][string]$RunDate } else { 0 }
+    [int]$RunTime = if ([int]::TryParse([string]$RunTime, [ref]$null)) { [int][string]$RunTime } else { 0 }
+
+    # If date is 0 (NULL/empty from SQL), return null
+    if ($RunDate -eq 0) { return $null }
 
     try {
         $dateStr = $RunDate.ToString('00000000')
