@@ -261,9 +261,9 @@ function _ConvertJobSchedule {
 
     # Add start time (format: HHMMSS)
     if ($StartTime -gt 0) {
-        $hours = [math]::Floor($StartTime / 10000)
-        $minutes = [math]::Floor(($StartTime % 10000) / 100)
-        $seconds = $StartTime % 100
+        $hours = [int][math]::Floor($StartTime / 10000)
+        $minutes = [int][math]::Floor(($StartTime % 10000) / 100)
+        $seconds = [int]($StartTime % 100)
 
         # Format as HH:MM or HH:MM:SS if seconds present
         if ($seconds -gt 0) {
