@@ -115,7 +115,11 @@ function Get-sqmAgentJobScheduleReport {
                 MAX(jh.run_date) AS LastRunDate,
                 MAX(jh.run_time) AS LastRunTime,
                 MAX(CASE WHEN jh.run_status = 1 THEN 'Success' ELSE 'Failed' END) AS LastRunStatus,
-                AVG(CAST(jh.run_duration AS INT)) AS AvgDurationSeconds,
+                AVG(CAST(
+                    (jh.run_duration / 10000 * 3600) +
+                    ((jh.run_duration % 10000) / 100 * 60) +
+                    (jh.run_duration % 100)
+                    AS FLOAT)) AS AvgDurationSeconds,
                 MAX(jh.message) AS LastErrorMessage
             FROM msdb.dbo.sysjobs sj
             LEFT JOIN msdb.dbo.sysjobschedules sjs ON sj.job_id = sjs.job_id
