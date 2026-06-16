@@ -244,22 +244,34 @@ function _ConvertJobSchedule {
     }
 
     # Add subday interval if present
+    # freq_subday_type: 1=AtSpecifiedTime, 2=Seconds, 4=Minutes, 8=Hours, 16=Days
     if ($SubdayType -and $SubdayInterval) {
         $subdayDesc = switch ($SubdayType) {
-            1 { "every $SubdayInterval second(s)" }
-            2 { "every $SubdayInterval minute(s)" }
-            4 { "every $SubdayInterval hour(s)" }
+            1 { '' }  # At specified time only - no subday interval
+            2 { "every $SubdayInterval second(s)" }
+            4 { "every $SubdayInterval minute(s)" }
+            8 { "every $SubdayInterval hour(s)" }
+            16 { "every $SubdayInterval day(s)" }
             default { '' }
         }
-        $freqDesc += " $subdayDesc"
+        if ($subdayDesc) {
+            $freqDesc += " $subdayDesc"
+        }
     }
 
-    # Add start time
+    # Add start time (format: HHMMSS)
     if ($StartTime -gt 0) {
         $hours = [math]::Floor($StartTime / 10000)
         $minutes = [math]::Floor(($StartTime % 10000) / 100)
         $seconds = $StartTime % 100
-        $freqDesc += " @ ${hours}:${minutes:D2}"
+
+        # Format as HH:MM or HH:MM:SS if seconds present
+        if ($seconds -gt 0) {
+            $timeStr = "{0:D2}:{1:D2}:{2:D2}" -f $hours, $minutes, $seconds
+        } else {
+            $timeStr = "{0:D2}:{1:D2}" -f $hours, $minutes
+        }
+        $freqDesc += " @ $timeStr"
     }
 
     return $freqDesc
