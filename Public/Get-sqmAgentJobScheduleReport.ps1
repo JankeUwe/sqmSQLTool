@@ -226,14 +226,16 @@ function Get-sqmAgentJobScheduleReport {
             Invoke-sqmLogging -Message "HTML report generated: $htmlPath" `
                               -FunctionName $functionName -Level "INFO"
 
-            # Return data for pipeline
-            return $jobData
-
         } catch {
             $errMsg = "Error generating Agent Job Report: $($_.Exception.Message)"
             Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
             if ($EnableException) { throw } else { return }
         }
+    }
+
+    end {
+        # Return all job data collected from process block
+        return $jobData
     }
 }
 
