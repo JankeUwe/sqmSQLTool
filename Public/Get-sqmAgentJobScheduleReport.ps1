@@ -247,6 +247,8 @@ function Get-sqmAgentJobScheduleReport {
 
     end {
         # Return all job data collected from process block
+        # Note: If reports failed to write, error will have been thrown in process block
+        # Only reach here if process completed successfully
         return $jobData
     }
 }
@@ -255,12 +257,19 @@ function Get-sqmAgentJobScheduleReport {
 
 function _ConvertJobSchedule {
     param(
-        [int]$FrequencyType,
-        [int]$FrequencyInterval,
-        [int]$SubdayType,
-        [int]$SubdayInterval,
-        [int]$StartTime
+        [object]$FrequencyType,
+        [object]$FrequencyInterval,
+        [object]$SubdayType,
+        [object]$SubdayInterval,
+        [object]$StartTime
     )
+
+    # Convert to int, handle NULL/empty
+    [int]$FrequencyType = if ([int]::TryParse($FrequencyType, [ref]$null)) { [int]$FrequencyType } else { 0 }
+    [int]$FrequencyInterval = if ([int]::TryParse($FrequencyInterval, [ref]$null)) { [int]$FrequencyInterval } else { 0 }
+    [int]$SubdayType = if ([int]::TryParse($SubdayType, [ref]$null)) { [int]$SubdayType } else { 0 }
+    [int]$SubdayInterval = if ([int]::TryParse($SubdayInterval, [ref]$null)) { [int]$SubdayInterval } else { 0 }
+    [int]$StartTime = if ([int]::TryParse($StartTime, [ref]$null)) { [int]$StartTime } else { 0 }
 
     if (-not $FrequencyType) { return 'No Schedule' }
 
