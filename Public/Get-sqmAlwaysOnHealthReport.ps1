@@ -11,7 +11,7 @@
     - Listener configuration
     - Running AutoSeed operations
 
-    Results are saved as a TXT report and CSV file in the specified directory.
+    Results are saved as a TXT report, CSV file, and HTML report in the specified directory.
     The function also returns an object with the detail data and file paths.
 
 .PARAMETER SqlInstance
@@ -28,6 +28,9 @@
 
 .PARAMETER OutputPath
     Output directory for report files. Default: C:\System\WinSrvLog\MSSQL
+
+.PARAMETER OutputHtml
+    Generate HTML report (in addition to TXT and CSV). Default: $true
 
 .PARAMETER ContinueOnError
     Continue on error for an instance (otherwise the error is thrown).
@@ -67,6 +70,8 @@ function Get-sqmAlwaysOnHealthReport
 		[int]$MaxSendQueueMB = 50,
 		[Parameter(Mandatory = $false)]
 		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+		[Parameter(Mandatory = $false)]
+		[switch]$OutputHtml = $true,
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
@@ -295,6 +300,7 @@ ORDER BY has.start_time;
 				$safeInst = $instance -replace '[\\/:*?"<>|]', '_'
 				$txtFile = Join-Path $OutputPath "AgHealthReport_${safeInst}_${datestamp}.txt"
 				$csvFile = Join-Path $OutputPath "AgHealthReport_${safeInst}_${datestamp}.csv"
+				$htmlFile = Join-Path $OutputPath "AgHealthReport_${safeInst}_${datestamp}.html"
 				
 				if ($PSCmdlet.ShouldProcess($instance, "Erstelle Health-Bericht in $OutputPath"))
 				{
@@ -340,6 +346,18 @@ ORDER BY has.start_time;
 					# CSV-Datei erstellen
 					$healthRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 
+					# HTML-Bericht erstellen (falls gewuenscht)
+					if ($OutputHtml)
+					{
+						$htmlContent = _GenerateAlwaysOnHealthHtml -HealthRows $healthRows -Instance $instance -Timestamp $timestamp -MaxRedoQueueMB $MaxRedoQueueMB -MaxSendQueueMB $MaxSendQueueMB
+						$htmlContent | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+						Invoke-sqmLogging -Message "[$instance] HTML-Bericht erstellt: $htmlFile" -FunctionName $functionName -Level "INFO"
+					}
+					else
+					{
+						$htmlFile = $null
+					}
+
 					Invoke-sqmOpenReport -TxtFile $txtFile -NoOpen:$NoOpen
 
 					Invoke-sqmLogging -Message "[$instance] Health-Bericht erstellt: $txtFile" -FunctionName $functionName -Level "INFO"
@@ -349,6 +367,7 @@ ORDER BY has.start_time;
 					Invoke-sqmLogging -Message "[$instance] WhatIf: Berichtsdateien wuerden erstellt werden." -FunctionName $functionName -Level "VERBOSE"
 					$txtFile = $null
 					$csvFile = $null
+					$htmlFile = $null
 				}
 				
 				# Ergebnisobjekt fuer diese Instanz
@@ -358,6 +377,7 @@ ORDER BY has.start_time;
 					HealthRows					     = $healthRows
 					TxtFile						     = $txtFile
 					CsvFile						     = $csvFile
+					HtmlFile					     = $htmlFile
 					Status						     = if ($cntCrit -gt 0) { 'Critical' } elseif ($cntWarn -gt 0) { 'Warning' } else { 'OK' }
 				}
 				$allInstanceResults.Add($result)
@@ -378,6 +398,7 @@ ORDER BY has.start_time;
 						HealthRows  = $null
 						TxtFile	    = $null
 						CsvFile	    = $null
+						HtmlFile    = $null
 					})
 				if ($EnableException) { throw }
 				if (-not $ContinueOnError) { throw $_ }
@@ -390,5 +411,376 @@ ORDER BY has.start_time;
 		Invoke-sqmLogging -Message "$functionName abgeschlossen. $($allInstanceResults.Count) Instanzen verarbeitet." -FunctionName $functionName -Level "INFO"
 		return $allInstanceResults
 	}
+}
+
+# ============ Helper Functions ============
+
+function _GenerateAlwaysOnHealthHtml
+{
+	param(
+		[PSCustomObject[]]$HealthRows,
+		[string]$Instance,
+		[string]$Timestamp,
+		[int]$MaxRedoQueueMB,
+		[int]$MaxSendQueueMB
+	)
+
+	$reportDate = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+	$cntCritical = ($HealthRows | Where-Object OverallStatus -eq 'Critical').Count
+	$cntWarning = ($HealthRows | Where-Object OverallStatus -eq 'Warning').Count
+	$cntOk = ($HealthRows | Where-Object OverallStatus -eq 'OK').Count
+	$totalAgs = ($HealthRows | Select-Object -ExpandProperty AgName -Unique).Count
+
+	$html = @"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Always On Health Report</title>
+	<style>
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+		body {
+			font-family: 'Segoe UI', Arial, sans-serif;
+			background: #0f172a;
+			color: #e2e8f0;
+			padding: 20px;
+		}
+		.container { max-width: 1800px; margin: 0 auto; }
+
+		.header {
+			background: linear-gradient(160deg, #1e3a8a 0%, #2e5090 100%);
+			padding: 30px;
+			border-radius: 12px;
+			margin-bottom: 30px;
+			border-left: 4px solid #3b82f6;
+		}
+
+		.header h1 {
+			color: #60a5fa;
+			font-size: 2em;
+			margin-bottom: 10px;
+		}
+
+		.header p {
+			color: #94a3b8;
+			font-size: 0.95em;
+		}
+
+		.stats {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+			gap: 15px;
+			margin-bottom: 30px;
+		}
+
+		.stat-card {
+			background: #0b1e3d;
+			border: 1px solid #3b82f6;
+			padding: 20px;
+			border-radius: 8px;
+			text-align: center;
+		}
+
+		.stat-value {
+			font-size: 2.2em;
+			font-weight: bold;
+			margin-bottom: 5px;
+		}
+
+		.stat-label {
+			color: #94a3b8;
+			font-size: 0.9em;
+		}
+
+		.stat-card:nth-child(1) .stat-value { color: #60a5fa; }
+		.stat-card:nth-child(2) .stat-value { color: #34d399; }
+		.stat-card:nth-child(3) .stat-value { color: #f59e0b; }
+		.stat-card:nth-child(4) .stat-value { color: #ef4444; }
+
+		.controls {
+			display: flex;
+			gap: 10px;
+			margin-bottom: 20px;
+			flex-wrap: wrap;
+		}
+
+		.controls input {
+			background: #0b1e3d;
+			border: 1px solid #3b82f6;
+			color: #e2e8f0;
+			padding: 10px;
+			border-radius: 6px;
+			flex: 1;
+			min-width: 200px;
+		}
+
+		.controls button {
+			background: #1e3a8a;
+			border: 1px solid #3b82f6;
+			color: #60a5fa;
+			padding: 10px 20px;
+			border-radius: 6px;
+			cursor: pointer;
+			font-weight: bold;
+		}
+
+		.controls button:hover { background: #2e5090; }
+
+		.section-title {
+			color: #5dade2;
+			font-size: 1.3em;
+			margin-top: 30px;
+			margin-bottom: 15px;
+			font-weight: 600;
+			border-bottom: 2px solid #3b82f6;
+			padding-bottom: 10px;
+		}
+
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			background: #0b1e3d;
+			border-radius: 8px;
+			overflow: hidden;
+			margin-bottom: 30px;
+		}
+
+		th {
+			background: #1e3a8a;
+			color: #60a5fa;
+			padding: 15px;
+			text-align: left;
+			font-weight: 600;
+			border-bottom: 2px solid #3b82f6;
+		}
+
+		td {
+			padding: 12px 15px;
+			border-bottom: 1px solid #2d5a8c;
+		}
+
+		tr:hover { background: #1a2f4d; }
+
+		.ag-name {
+			color: #60a5fa;
+			font-weight: 600;
+		}
+
+		.replica-name {
+			font-family: monospace;
+			color: #e2e8f0;
+		}
+
+		.status-critical {
+			color: #ef4444;
+			font-weight: bold;
+		}
+
+		.status-warning {
+			color: #f59e0b;
+			font-weight: bold;
+		}
+
+		.status-ok {
+			color: #34d399;
+			font-weight: bold;
+		}
+
+		.role-primary {
+			background: rgba(59, 130, 246, 0.1);
+			color: #60a5fa;
+			padding: 2px 8px;
+			border-radius: 4px;
+			font-weight: 600;
+		}
+
+		.role-secondary {
+			background: rgba(148, 163, 184, 0.1);
+			color: #cbd5e1;
+			padding: 2px 8px;
+			border-radius: 4px;
+		}
+
+		.sync-synchronized {
+			color: #34d399;
+		}
+
+		.sync-synchronizing {
+			color: #f59e0b;
+		}
+
+		.sync-not-synchronized {
+			color: #ef4444;
+		}
+
+		.queue-normal {
+			color: #34d399;
+		}
+
+		.queue-warning {
+			color: #f59e0b;
+		}
+
+		.queue-critical {
+			color: #ef4444;
+		}
+
+		.footer {
+			color: #94a3b8;
+			font-size: 0.85em;
+			text-align: center;
+			margin-top: 50px;
+			padding-top: 20px;
+			border-top: 1px solid #3b82f6;
+		}
+
+		.hidden { display: none; }
+	</style>
+</head>
+<body>
+	<div class="container">
+		<div class="header">
+			<h1>📊 Always On Health Report</h1>
+			<p>Instance: <strong>$Instance</strong> | Generated: $reportDate</p>
+		</div>
+
+		<div class="stats">
+			<div class="stat-card">
+				<div class="stat-value">$totalAgs</div>
+				<div class="stat-label">Total AGs</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-value">$cntOk</div>
+				<div class="stat-label">OK Status</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-value">$cntWarning</div>
+				<div class="stat-label">Warning Issues</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-value">$cntCritical</div>
+				<div class="stat-label">Critical Issues</div>
+			</div>
+		</div>
+
+		<div class="controls">
+			<input type="text" id="searchBox" placeholder="Search AG name, replica, or database..." onkeyup="filterTable()">
+			<button onclick="sortTable('AgName')">Sort by AG</button>
+			<button onclick="sortTable('Status')">Sort by Status</button>
+		</div>
+
+		<div class="section-title">Replica & Database Status</div>
+
+		<table id="healthTable">
+			<thead>
+				<tr>
+					<th style="width: 15%;">AG Name</th>
+					<th style="width: 15%;">Replica Name</th>
+					<th style="width: 8%;">Role</th>
+					<th style="width: 15%;">Database</th>
+					<th style="width: 12%;">Sync State</th>
+					<th style="width: 10%;">Connection</th>
+					<th style="width: 10%;">Redo Queue (MB)</th>
+					<th style="width: 10%;">Send Queue (MB)</th>
+					<th style="width: 8%;">Status</th>
+				</tr>
+			</thead>
+			<tbody>
+"@
+
+	# Add table rows
+	foreach ($row in $HealthRows) {
+		$statusClass = switch ($row.OverallStatus) {
+			'Critical' { 'status-critical' }
+			'Warning' { 'status-warning' }
+			default { 'status-ok' }
+		}
+
+		$syncClass = switch ($row.DbSyncState) {
+			'SYNCHRONIZED' { 'sync-synchronized' }
+			'SYNCHRONIZING' { 'sync-synchronizing' }
+			default { 'sync-not-synchronized' }
+		}
+
+		$roleClass = if ($row.Role -eq 'PRIMARY') { 'role-primary' } else { 'role-secondary' }
+
+		# Queue styling
+		$redoClass = if ($row.Role -eq 'PRIMARY') { 'queue-normal' }
+		elseif ($row.RedoQueueMB -gt $MaxRedoQueueMB) { 'queue-critical' }
+		else { 'queue-normal' }
+
+		$sendClass = if ($row.SendQueueMB -gt $MaxSendQueueMB) { 'queue-warning' }
+		else { 'queue-normal' }
+
+		$connectionState = if ($row.ConnectionState -eq 'CONNECTED') { '<span style="color: #34d399;">Connected</span>' }
+		else { '<span style="color: #ef4444;">Disconnected</span>' }
+
+		$html += @"
+				<tr>
+					<td class="ag-name">$($row.AgName)</td>
+					<td class="replica-name">$($row.ReplicaName)</td>
+					<td><span class="$roleClass">$($row.Role)</span></td>
+					<td>$($row.DatabaseName)</td>
+					<td class="$syncClass">$($row.DbSyncState)</td>
+					<td>$connectionState</td>
+					<td class="$redoClass">$($row.RedoQueueMB)</td>
+					<td class="$sendClass">$($row.SendQueueMB)</td>
+					<td class="$statusClass">$($row.OverallStatus)</td>
+				</tr>
+"@
+	}
+
+	$html += @"
+			</tbody>
+		</table>
+
+		<div class="footer">
+			<p>Generated by sqmSQLTool | Get-sqmAlwaysOnHealthReport</p>
+			<p>Configuration: RedoQueue Threshold=$MaxRedoQueueMB MB | SendQueue Threshold=$MaxSendQueueMB MB</p>
+			<p>Report ID: $Timestamp</p>
+		</div>
+	</div>
+
+	<script>
+		function filterTable() {
+			const input = document.getElementById('searchBox');
+			const filter = input.value.toLowerCase();
+			const table = document.getElementById('healthTable');
+			const rows = table.getElementsByTagName('tr');
+
+			for (let i = 1; i < rows.length; i++) {
+				const agName = rows[i].cells[0].textContent.toLowerCase();
+				const replicaName = rows[i].cells[1].textContent.toLowerCase();
+				const dbName = rows[i].cells[3].textContent.toLowerCase();
+				const match = agName.includes(filter) || replicaName.includes(filter) || dbName.includes(filter);
+				rows[i].style.display = match ? '' : 'none';
+			}
+		}
+
+		function sortTable(column) {
+			const table = document.getElementById('healthTable');
+			const tbody = table.querySelector('tbody');
+			const rows = Array.from(tbody.querySelectorAll('tr'));
+
+			const columnIndex = {
+				'AgName': 0,
+				'Status': 8
+			}[column] || 0;
+
+			rows.sort((a, b) => {
+				const aText = a.cells[columnIndex].textContent.trim();
+				const bText = b.cells[columnIndex].textContent.trim();
+				return aText.localeCompare(bText);
+			});
+
+			rows.forEach(row => tbody.appendChild(row));
+		}
+	</script>
+</body>
+</html>
+"@
+
+	return $html
 }
 
