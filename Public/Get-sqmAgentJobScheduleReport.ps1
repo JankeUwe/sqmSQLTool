@@ -202,7 +202,8 @@ function Get-sqmAgentJobScheduleReport {
                     NextExecution       = $nextExecution
                     AvgDuration         = $avgDuration
                     LastError           = if ($history.LastErrorMessage -and $history.LastRunStatus -eq 'Failed') {
-                        ($history.LastErrorMessage -replace '\[.*?\]', '' -replace '\r\n', ' ').Trim().Substring(0, [math]::Min(100, $history.LastErrorMessage.Length))
+                        $cleanMsg = ($history.LastErrorMessage -replace '\[.*?\]', '' -replace '\r\n', ' ').Trim()
+                        $cleanMsg.Substring(0, [math]::Min(100, $cleanMsg.Length))
                     } else {
                         'N/A'
                     }
