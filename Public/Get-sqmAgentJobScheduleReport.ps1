@@ -126,11 +126,11 @@ function Get-sqmAgentJobScheduleReport {
             ORDER BY sj.name
 "@
 
-            $jobHistoryData = Invoke-Sqlcmd -ServerInstance $SqlInstance `
-                                           -Credential $SqlCredential `
-                                           -Database 'msdb' `
-                                           -Query $jobHistoryQuery `
-                                           -ErrorAction Stop
+            $jobHistoryData = Invoke-DbaQuery -SqlInstance $SqlInstance `
+                                              -SqlCredential $SqlCredential `
+                                              -Database 'msdb' `
+                                              -Query $jobHistoryQuery `
+                                              -ErrorAction Stop
 
             # Process each job
             foreach ($job in $jobs) {
@@ -172,10 +172,10 @@ function Get-sqmAgentJobScheduleReport {
                 $jobData += [PSCustomObject]@{
                     JobName             = $job.Name
                     Enabled             = if ($job.IsEnabled) { 'Yes' } else { 'No' }
-                    ScheduleName        = $history.ScheduleName ?? 'Not Scheduled'
+                    ScheduleName        = if ($history.ScheduleName) { $history.ScheduleName } else { 'Not Scheduled' }
                     Schedule            = $scheduleText
-                    LastExecution       = $lastRunDateTime ?? 'Never'
-                    LastStatus          = $history.LastRunStatus ?? 'Unknown'
+                    LastExecution       = if ($lastRunDateTime) { $lastRunDateTime } else { 'Never' }
+                    LastStatus          = if ($history.LastRunStatus) { $history.LastRunStatus } else { 'Unknown' }
                     NextExecution       = $nextExecution
                     AvgDuration         = $avgDuration
                     LastError           = if ($history.LastErrorMessage -and $history.LastRunStatus -eq 'Failed') {
@@ -183,7 +183,7 @@ function Get-sqmAgentJobScheduleReport {
                     } else {
                         'N/A'
                     }
-                    RawAvgSeconds       = [int]($history.AvgDurationSeconds ?? 0)
+                    RawAvgSeconds       = if ($history.AvgDurationSeconds) { [int]$history.AvgDurationSeconds } else { 0 }
                 }
             }
 
