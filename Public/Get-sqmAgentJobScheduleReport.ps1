@@ -178,7 +178,7 @@ function Get-sqmAgentJobScheduleReport {
                 }
 
                 # Calculate average duration
-                $avgDuration = if ($history.AvgDurationSeconds -and [int]::TryParse($history.AvgDurationSeconds, [ref]$null)) {
+                $avgDuration = if ($history.AvgDurationSeconds) {
                     $seconds = [int]$history.AvgDurationSeconds
                     "$([math]::Floor($seconds / 60))m $($seconds % 60)s"
                 } else {
