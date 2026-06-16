@@ -117,9 +117,9 @@ SELECT
     name,
     state_desc,
     protocol_desc,
-    port,
-    authentication_desc
-FROM sys.service_broker_endpoints
+    type_desc
+FROM sys.endpoints
+WHERE type = 3
 ORDER BY name
 "@
 
@@ -128,16 +128,16 @@ ORDER BY name
 			{
 				foreach ($ep in $endpoints)
 				{
-					$reportContent.Add("  Endpoint:        $($ep.name)") | Out-Null
-					$reportContent.Add("  State:           $($ep.state_desc)") | Out-Null
-					$reportContent.Add("  Port:            $($ep.port)") | Out-Null
-					$reportContent.Add("  Authentication:  $($ep.authentication_desc)") | Out-Null
+					$reportContent.Add("  Endpoint:    $($ep.name)") | Out-Null
+					$reportContent.Add("  State:       $($ep.state_desc)") | Out-Null
+					$reportContent.Add("  Protocol:    $($ep.protocol_desc)") | Out-Null
+					$reportContent.Add("  Type:        $($ep.type_desc)") | Out-Null
 					$reportContent.Add("") | Out-Null
 				}
 			}
 			else
 			{
-				$reportContent.Add("  No Service Broker endpoints found on port 4022") | Out-Null
+				$reportContent.Add("  No Service Broker endpoints found") | Out-Null
 				$reportContent.Add("") | Out-Null
 			}
 
@@ -171,21 +171,19 @@ ORDER BY name
 			}
 			$reportContent.Add("") | Out-Null
 
-			# 4. Service Queues und Message Counts
+			# 4. Service Queues
 			$reportContent.Add("-" * 80) | Out-Null
-			$reportContent.Add("Service Queues and Message Status") | Out-Null
+			$reportContent.Add("Service Queues") | Out-Null
 			$reportContent.Add("-" * 80) | Out-Null
 
 			$queueQuery = @"
 SELECT
-    DB_NAME() as DatabaseName,
     name,
+    is_activation_enabled,
     is_enqueue_enabled,
-    is_dequeue_enabled,
-    is_retention_enabled,
-    (SELECT COUNT(*) FROM sys.service_queue_internal_table WHERE queue_id = sq.object_id) as MessageCount
-FROM sys.service_queues sq
-WHERE database_id = DB_ID()
+    is_receive_enabled,
+    is_retention_enabled
+FROM sys.service_queues
 ORDER BY name
 "@
 
@@ -198,9 +196,9 @@ ORDER BY name
 					foreach ($q in $queues)
 					{
 						$reportContent.Add("    Queue:       $($q.name)") | Out-Null
-						$reportContent.Add("    Messages:    $($q.MessageCount)") | Out-Null
 						$reportContent.Add("    Enqueue:     $(if ($q.is_enqueue_enabled) { 'ON' } else { 'OFF' })") | Out-Null
-						$reportContent.Add("    Dequeue:     $(if ($q.is_dequeue_enabled) { 'ON' } else { 'OFF' })") | Out-Null
+						$reportContent.Add("    Receive:     $(if ($q.is_receive_enabled) { 'ON' } else { 'OFF' })") | Out-Null
+						$reportContent.Add("    Activation:  $(if ($q.is_activation_enabled) { 'ON' } else { 'OFF' })") | Out-Null
 						$reportContent.Add("") | Out-Null
 					}
 				}
@@ -212,27 +210,22 @@ ORDER BY name
 			$reportContent.Add("-" * 80) | Out-Null
 
 			$undeliverableQuery = @"
-SELECT
-    COUNT(*) as UndeliverableCount,
-    DB_NAME() as DatabaseName
-FROM sys.transmission_queue
-WHERE database_id = DB_ID()
-GROUP BY database_id
+SELECT COUNT(*) as UndeliverableCount FROM sys.transmission_queue
 "@
 
-			$undeliverable = $server.Query($undeliverableQuery)
-			if ($undeliverable -and $undeliverable.UndeliverableCount -gt 0)
+			foreach ($db in $brokerDbs | Where-Object { $_.is_broker_enabled -eq 1 })
 			{
-				foreach ($u in $undeliverable)
+				$undeliverable = $server.Query($undeliverableQuery, $db.name)
+				$count = $undeliverable[0].UndeliverableCount
+				$reportContent.Add("  Database: $($db.name)") | Out-Null
+				if ($count -gt 0)
 				{
-					$reportContent.Add("  Database: $($u.DatabaseName)") | Out-Null
-					$reportContent.Add("  Count:    $($u.UndeliverableCount) messages") | Out-Null
-					$reportContent.Add("") | Out-Null
+					$reportContent.Add("  Undeliverable: $count messages") | Out-Null
 				}
-			}
-			else
-			{
-				$reportContent.Add("  No undeliverable messages found") | Out-Null
+				else
+				{
+					$reportContent.Add("  Undeliverable: 0 messages") | Out-Null
+				}
 				$reportContent.Add("") | Out-Null
 			}
 
@@ -243,13 +236,11 @@ GROUP BY database_id
 
 			$serviceQuery = @"
 SELECT
-    DB_NAME() as DatabaseName,
     s.name as ServiceName,
     sc.name as ContractName
 FROM sys.services s
 LEFT JOIN sys.service_contract_usages scu ON s.service_id = scu.service_id
 LEFT JOIN sys.service_contracts sc ON scu.service_contract_id = sc.service_contract_id
-WHERE s.database_id = DB_ID()
 ORDER BY s.name
 "@
 
