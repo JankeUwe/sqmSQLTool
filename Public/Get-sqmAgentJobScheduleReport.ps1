@@ -321,13 +321,9 @@ function _ConvertJobSchedule {
 
 function _ConvertJobRunTime {
     param(
-        [object]$RunDate,
-        [object]$RunTime
+        [int]$RunDate,
+        [int]$RunTime
     )
-
-    # Safe conversion from SQL NULL/empty
-    [int]$RunDate = if ([int]::TryParse($RunDate, [ref]$null)) { [int]$RunDate } else { 0 }
-    [int]$RunTime = if ([int]::TryParse($RunTime, [ref]$null)) { [int]$RunTime } else { 0 }
 
     try {
         $dateStr = $RunDate.ToString('00000000')
