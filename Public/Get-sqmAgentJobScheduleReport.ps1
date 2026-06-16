@@ -80,7 +80,26 @@ function Get-sqmAgentJobScheduleReport {
 
         # Create output directory if needed
         if (-not (Test-Path $OutputPath)) {
-            New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
+            try {
+                $null = New-Item -ItemType Directory -Path $OutputPath -Force -ErrorAction Stop
+                Invoke-sqmLogging -Message "Created output directory: $OutputPath" `
+                                  -FunctionName $functionName -Level "INFO"
+            } catch {
+                $errMsg = "Failed to create output directory '$OutputPath': $($_.Exception.Message)"
+                Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+                if ($EnableException) { throw $errMsg } else { return }
+            }
+        }
+
+        # Verify directory is writable
+        try {
+            $testFile = Join-Path $OutputPath ".sqmtest"
+            $null = "test" | Out-File -FilePath $testFile -Encoding UTF8 -Force -ErrorAction Stop
+            Remove-Item $testFile -Force -ErrorAction SilentlyContinue
+        } catch {
+            $errMsg = "Output directory '$OutputPath' is not writable: $($_.Exception.Message)"
+            Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+            if ($EnableException) { throw $errMsg } else { return }
         }
 
         $jobData = @()
