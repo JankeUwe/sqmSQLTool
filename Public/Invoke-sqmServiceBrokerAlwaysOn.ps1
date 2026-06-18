@@ -120,7 +120,8 @@ function Invoke-sqmServiceBrokerAlwaysOn
 			}
 
 			$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-			$logFile = Join-Path $OutputPath ("ServiceBrokerAlwaysOn_" + $SqlInstances[0] + "_" + $AvailabilityGroupName + "_" + $timestamp + ".txt")
+			$cleanInstanceName = $SqlInstances[0] -replace '\\', '-'
+			$logFile = Join-Path $OutputPath ("ServiceBrokerAlwaysOn_" + $cleanInstanceName + "_" + $AvailabilityGroupName + "_" + $timestamp + ".txt")
 			$logContent = [System.Collections.Generic.List[string]]::new()
 
 			$logContent.Add("Service Broker AlwaysOn Orchestration Log") | Out-Null

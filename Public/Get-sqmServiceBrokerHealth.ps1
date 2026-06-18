@@ -89,7 +89,8 @@ function Get-sqmServiceBrokerHealth
 
 			# Report-Metadaten
 			$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-			$reportFile = Join-Path $OutputPath "ServiceBrokerHealth_$($server.Name)_$timestamp.txt"
+			$cleanServerName = $server.Name -replace '\\', '-'
+			$reportFile = Join-Path $OutputPath ("ServiceBrokerHealth_" + $cleanServerName + "_" + $timestamp + ".txt")
 			$reportContent = [System.Collections.Generic.List[string]]::new()
 
 			# Header

@@ -95,7 +95,8 @@ function Enable-sqmServiceBroker
 
 			# Log-Datei
 			$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-			$logFile = Join-Path $OutputPath "ServiceBrokerEnable_$($server.Name)_$timestamp.txt"
+			$cleanServerName = $server.Name -replace '\\', '-'
+			$logFile = Join-Path $OutputPath ("ServiceBrokerEnable_" + $cleanServerName + "_" + $timestamp + ".txt")
 			$logContent = [System.Collections.Generic.List[string]]::new()
 
 			$logContent.Add("Service Broker Enable Log") | Out-Null
