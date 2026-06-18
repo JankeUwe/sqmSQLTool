@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Enables Service Broker on all nodes of an AlwaysOn Availability Group with automatic failover orchestration.
 
