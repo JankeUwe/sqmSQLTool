@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Lokales Release-Signing fuer sqmSQLTool via SignPath.io API.

@@ -172,6 +172,7 @@
 		'New-sqmOlaUsrDbBackupJob',
 		'New-sqmAutoLoginSyncJob',
 		'New-sqmRandomSaPassword',
+		'New-sqmSetupReport',
 		'New-sqmSqlCertificate',
 		'Invoke-sqmListenerMigrationPrep',
 		'Remove-sqmAdOrphanLogin',
@@ -204,7 +205,8 @@
 		'Test-sqmTsmConnection',
 		'Uninstall-sqmDb2Driver',
 		'Uninstall-sqmJdbcDriver',
-		'Uninstall-sqmOdbcDriver'
+		'Uninstall-sqmOdbcDriver',
+		'Write-sqmSetupEvent'
 	)
 	
 	# KORREKTUR #9: Keine Cmdlets im Modul - explizit leer statt '*'

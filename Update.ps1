@@ -1,4 +1,4 @@
-#Requires -RunAsAdministrator
+﻿#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
     Aktualisiert das sqmSQLTool-Modul aus dem zentralen Share.

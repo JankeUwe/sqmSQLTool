@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Helper: Creates a SQL Agent CmdExec job step with PowerShell wrapper.
 .DESCRIPTION
