@@ -145,7 +145,12 @@ function Invoke-sqmSetupReport
                 $sysadmins = @(Get-DbaLogin -SqlInstance $server | Where-Object { $_.IsSysAdmin -eq $true } | Select-Object -ExpandProperty Name)
             }
             catch { }
-            $sysadminList = if ($sysadmins.Count -gt 0) { $sysadmins -join ', ' } else { 'None' }
+            # Warnung: BUILTIN\Administrators (bzw. lokalisiert VORDEFINIERT\Administratoren) als sysadmin
+            # ist ein Least-Privilege-Verstoss (jeder lokale Admin wird damit zum SQL-sysadmin).
+            $builtinAdmins   = @($sysadmins | Where-Object { $_ -match '^(BUILTIN|VORDEFINIERT)\\Admin' })
+            $hasBuiltinAdmins = $builtinAdmins.Count -gt 0
+            $sysadminColor   = if ($hasBuiltinAdmins) { 'red' } else { '' }
+            $sysadminWarning = if ($hasBuiltinAdmins) { "WARNUNG: $($builtinAdmins -join ', ') hat sysadmin-Rechte - fuer Least Privilege entfernen" } else { '' }
 
             # Logins with Server Roles (only server-level roles)
             $advancedLogins = @()
@@ -176,7 +181,7 @@ function Invoke-sqmSetupReport
                 }
             }
             catch { }
-            $advancedLoginList = if ($advancedLogins.Count -gt 0) { $advancedLogins -join ' | ' } else { 'None with server roles' }
+            if ($advancedLogins.Count -eq 0) { $advancedLogins = @('None with server roles') }
 
             # CLR Status
             $clrEnabled = $server.Configuration.IsSqlClrEnabled.ConfigValue
@@ -219,26 +224,26 @@ function Invoke-sqmSetupReport
                 }
             }
             catch { }
-            $serviceAccountList = if ($serviceAccounts.Count -gt 0) { $serviceAccounts -join ' | ' } else { 'Unable to determine' }
+            if ($serviceAccounts.Count -eq 0) { $serviceAccounts = @('Unable to determine') }
 
             # SPN Status (List all SPNs)
-            $spnList = 'Not checked'
-            $spnDetails = @()
+            $spnLines = @('Not checked')
             try
             {
                 $spnReport = Get-sqmSpnReport -ComputerName $env:COMPUTERNAME -ErrorAction SilentlyContinue
                 if ($spnReport -and $spnReport.DetailRows)
                 {
+                    $spnDetails = @()
                     foreach ($row in $spnReport.DetailRows)
                     {
                         $spnDetails += "$($row.SPN) [$($row.Status)]"
                     }
-                    $spnList = if ($spnDetails.Count -gt 0) { $spnDetails -join ' | ' } else { 'No SPNs found' }
+                    $spnLines = if ($spnDetails.Count -gt 0) { $spnDetails } else { @('No SPNs found') }
                 }
             }
             catch
             {
-                $spnList = 'Error retrieving SPNs'
+                $spnLines = @('Error retrieving SPNs')
             }
 
             # Splunk Status (via Invoke-sqmSplunkConfiguration -Test)
@@ -322,14 +327,16 @@ function Invoke-sqmSetupReport
                 -BackupStatusColor $backupStatusColor `
                 -MaxMemStatus $maxMemStatus `
                 -MaxMemColor $maxMemColor `
-                -Sysadmins $sysadminList `
-                -AdvancedLogins $advancedLoginList `
+                -Sysadmins $sysadmins `
+                -SysadminColor $sysadminColor `
+                -SysadminWarning $sysadminWarning `
+                -AdvancedLogins $advancedLogins `
                 -CLRStatus $clrStatus `
                 -CLRColor $clrColor `
                 -XPStatus $xpStatus `
                 -XPColor $xpColor `
-                -ServiceAccounts $serviceAccountList `
-                -SPNList $spnList `
+                -ServiceAccounts $serviceAccounts `
+                -SPNList $spnLines `
                 -SplunkStatus $splunkStatus `
                 -MAXDOP $maxdopStatus `
                 -CostThreshold $ctpStatus `
@@ -382,14 +389,16 @@ function _Build-ModernReportHtml
         [string]$BackupStatusColor,
         [string]$MaxMemStatus,
         [string]$MaxMemColor,
-        [string]$Sysadmins,
-        [string]$AdvancedLogins,
+        [string[]]$Sysadmins,
+        [string]$SysadminColor,
+        [string]$SysadminWarning,
+        [string[]]$AdvancedLogins,
         [string]$CLRStatus,
         [string]$CLRColor,
         [string]$XPStatus,
         [string]$XPColor,
-        [string]$ServiceAccounts,
-        [string]$SPNList,
+        [string[]]$ServiceAccounts,
+        [string[]]$SPNList,
         [string]$SplunkStatus,
         [string]$MAXDOP,
         [string]$CostThreshold,
@@ -403,6 +412,17 @@ function _Build-ModernReportHtml
         if (-not $Text) { return '' }
         $Text -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;' -replace '"', '&quot;' -replace "'", '&#39;'
     }
+
+    # Rendert eine Werteliste untereinander (eine Zeile pro Eintrag), HTML-kodiert.
+    function _HtmlList
+    {
+        param([string[]]$Items, [string]$EmptyText = 'None')
+        $vals = @($Items | Where-Object { $_ -ne $null -and "$_".Trim() -ne '' })
+        if ($vals.Count -eq 0) { return (_HtmlEncode $EmptyText) }
+        return (($vals | ForEach-Object { _HtmlEncode $_ }) -join '<br>')
+    }
+
+    $sysadminWarningHtml = if ($SysadminWarning) { "<div class=`"card-detail`" style=`"color:#e74c3c;font-weight:600;`">$(_HtmlEncode $SysadminWarning)</div>" } else { '' }
 
     $dbRows = if ($Databases) {
         $Databases | ForEach-Object {
@@ -492,13 +512,14 @@ function _Build-ModernReportHtml
   <!-- SECURITY -->
   <div class="section-title">SECURITY</div>
   <div class="cards-grid">
-    <div class="card">
+    <div class="card $SysadminColor">
       <div class="card-label">Sysadmin Accounts</div>
-      <div class="card-value">$(_HtmlEncode $Sysadmins)</div>
+      <div class="card-value" style="font-size: 13px; line-height: 1.8;">$(_HtmlList $Sysadmins 'None')</div>
+      $sysadminWarningHtml
     </div>
     <div class="card">
       <div class="card-label">Logins with Extended Roles</div>
-      <div class="card-value" style="font-size: 13px;">$(_HtmlEncode $AdvancedLogins)</div>
+      <div class="card-value" style="font-size: 13px; line-height: 1.8;">$(_HtmlList $AdvancedLogins 'None with server roles')</div>
     </div>
   </div>
 
@@ -510,7 +531,8 @@ function _Build-ModernReportHtml
     </div>
     <div class="info-block">
       <h3>Infrastructure</h3>
-      <p><span class="info-label">SPNs:</span> $(_HtmlEncode $SPNList)</p>
+      <p><span class="info-label">SPNs:</span></p>
+      <p style="margin-left: 12px;">$(_HtmlList $SPNList 'Not checked')</p>
       <p><span class="info-label">Splunk:</span> $SplunkStatus</p>
     </div>
   </div>
@@ -518,7 +540,7 @@ function _Build-ModernReportHtml
   <!-- SERVICE ACCOUNTS -->
   <div class="section-title">SERVICE ACCOUNTS</div>
   <div class="info-block">
-    <p>$(_HtmlEncode $ServiceAccounts)</p>
+    <p>$(_HtmlList $ServiceAccounts 'Unable to determine')</p>
   </div>
 
   <!-- CONFIGURATION -->
