@@ -1,4 +1,4 @@
-# SQL Version Detection Helper
+﻿# SQL Version Detection Helper
 # Used by all job scripts to handle TrustServerCertificate on SQL 2022+
 
 function Get-SqlVersionWithoutError {

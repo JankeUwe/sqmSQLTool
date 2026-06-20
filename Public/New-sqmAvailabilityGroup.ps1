@@ -182,7 +182,10 @@ function New-sqmAvailabilityGroup
 		[System.Management.Automation.PSCredential]$SqlCredential,
 
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+
+		[Parameter(Mandatory = $false)]
+		[string]$EventLog
 	)
 
 	begin
@@ -299,6 +302,16 @@ function New-sqmAvailabilityGroup
 		{
 			$result.Steps.Add("[$level] $msg")
 			Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level $level
+			if ($EventLog)
+			{
+				$state = switch ($level) { 'ERROR' { 'error' } 'WARNING' { 'warn' } default { 'progress' } }
+				$node  = if ($msg -match '^([^\s:]+):') { $matches[1] } else { '' }
+				$viz   = if ($msg -match 'eustart|estart')                  { 'node-restart' }
+						 elseif ($msg -match 'Listener')                    { 'listener' }
+						 elseif ($msg -match 'Endpoint|HADR|CONNECT|Login')  { 'gears' }
+						 else                                               { 'data-replicate' }
+				Write-sqmSetupEvent -Path $EventLog -Phase 'alwayson' -Step 'ag' -State $state -Title $msg -Node $node -Viz $viz
+			}
 		}
 	}
 

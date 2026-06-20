@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Generates a complete HTML reference with functions, descriptions, parameters, and examples.
 

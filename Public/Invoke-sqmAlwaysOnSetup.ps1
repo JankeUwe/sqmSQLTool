@@ -140,7 +140,10 @@ function Invoke-sqmAlwaysOnSetup
 		[switch]$SkipLoginSync,
 
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+
+		[Parameter(Mandatory = $false)]
+		[string]$EventLog
 	)
 
 	begin
@@ -184,9 +187,11 @@ function Invoke-sqmAlwaysOnSetup
 			# ------------------------------------------------------------
 			# 1. WSFC + Nodes + Listener-Rolle einlesen
 			# ------------------------------------------------------------
+			Write-sqmSetupEvent -Path $EventLog -Phase 'alwayson' -Step 'cluster' -State 'start' -Title 'Lese Cluster-Informationen' -Viz 'node-fetch'
 			$cluster = Get-Cluster -ErrorAction Stop
 			$result.ClusterName = $cluster.Name.Trim()
 			Invoke-sqmLogging -Message "Cluster gefunden: $($result.ClusterName)" -FunctionName $functionName -Level 'INFO'
+			Write-sqmSetupEvent -Path $EventLog -Phase 'alwayson' -Step 'cluster' -State 'progress' -Title "Cluster gefunden: $($result.ClusterName)" -Node $result.ClusterName -Viz 'node-fetch'
 
 			$nodes = @(Get-ClusterNode -ErrorAction Stop | Select-Object -ExpandProperty Name | ForEach-Object { $_.Trim() })
 			$result.Nodes = $nodes
@@ -371,6 +376,7 @@ function Invoke-sqmAlwaysOnSetup
 				$result.Listener = $discListenerName
 			}
 			if ($EnableException) { $agParams.EnableException = $true }
+			if ($EventLog) { $agParams.EventLog = $EventLog }
 
 			if ($PSCmdlet.ShouldProcess($AvailabilityGroupName, "AlwaysOn-AG ueber $($sqlInstances.Count) Replikate erstellen"))
 			{

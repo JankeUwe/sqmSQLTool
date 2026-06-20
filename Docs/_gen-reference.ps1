@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $pub  = 'C:\CMP\SQL-Tools\sqmSQLTool\Public'
 $file = 'C:\CMP\SQL-Tools\sqmSQLTool\Docs\sqmSQLTool-reference.html'
 

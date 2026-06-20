@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Pester-Konfiguration fuer sqmSQLTool
     Aufruf: Invoke-Pester -Configuration (. .\tests\pester.config.ps1)
