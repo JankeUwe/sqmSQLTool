@@ -107,8 +107,15 @@ function Invoke-sqmSetupReport
             $backupStatusColor = if ($backupJobCount -gt 0 -and $backupJobsEnabled -eq $backupJobCount) { 'green' } else { 'orange' }
 
             # Max Memory (synchronized with Test-sqmMaxMemory logic)
+            # WICHTIG: sowohl max server memory (ConfigValue) als auch SMO Server.PhysicalMemory
+            # sind in MB. Frueher wurde PhysicalMemory faelschlich durch 1024 geteilt (= GB),
+            # wodurch jeder konfigurierte Wert als "TOO HIGH" erschien.
             $maxMem = $server.Configuration.MaxServerMemory.ConfigValue
-            $totalMem = [math]::Round($server.PhysicalMemory / 1024, 0)
+            $totalMem = [int]$server.PhysicalMemory
+            if (-not $totalMem -or $totalMem -le 0)
+            {
+                try { $totalMem = [math]::Round((Get-WmiObject -Class Win32_ComputerSystem -ErrorAction Stop).TotalPhysicalMemory / 1MB) } catch { }
+            }
             $unconfiguredValue = 2147483647
             $lowerBound = [math]::Round($totalMem * 0.85)
             $upperBound = [math]::Round($totalMem * 0.95)
@@ -139,15 +146,35 @@ function Invoke-sqmSetupReport
             # ==========================================
 
             # Sysadmin Accounts
-            $sysadmins = @()
+            $sysadminLogins = @()
             try
             {
-                $sysadmins = @(Get-DbaLogin -SqlInstance $server | Where-Object { $_.IsSysAdmin -eq $true } | Select-Object -ExpandProperty Name)
+                $sysadminLogins = @(Get-DbaLogin -SqlInstance $server | Where-Object { $_.IsSysAdmin -eq $true })
             }
             catch { }
-            # Warnung: BUILTIN\Administrators (bzw. lokalisiert VORDEFINIERT\Administratoren) als sysadmin
+            $sysadmins = @($sysadminLogins | Select-Object -ExpandProperty Name)
+
+            # Warnung: BUILTIN\Administrators (lokalisiert z.B. VORDEFINIERT\Administratoren) als sysadmin
             # ist ein Least-Privilege-Verstoss (jeder lokale Admin wird damit zum SQL-sysadmin).
-            $builtinAdmins   = @($sysadmins | Where-Object { $_ -match '^(BUILTIN|VORDEFINIERT)\\Admin' })
+            # Erkennung primaer ueber die Well-Known-SID S-1-5-32-544 (sprachunabhaengig),
+            # Fallback ueber den Namen.
+            $builtinAdmins = @()
+            foreach ($sa in $sysadminLogins)
+            {
+                $isBuiltin = $false
+                try
+                {
+                    if ($sa.Sid)
+                    {
+                        $sidStr = (New-Object System.Security.Principal.SecurityIdentifier(([byte[]]$sa.Sid), 0)).Value
+                        if ($sidStr -eq 'S-1-5-32-544') { $isBuiltin = $true }
+                    }
+                }
+                catch { }
+                if (-not $isBuiltin -and $sa.Name -match '^(BUILTIN|VORDEFINIERT|INTEGR)\\.*Admin') { $isBuiltin = $true }
+                if ($isBuiltin) { $builtinAdmins += $sa.Name }
+            }
+            $builtinAdmins   = @($builtinAdmins | Select-Object -Unique)
             $hasBuiltinAdmins = $builtinAdmins.Count -gt 0
             $sysadminColor   = if ($hasBuiltinAdmins) { 'red' } else { '' }
             $sysadminWarning = if ($hasBuiltinAdmins) { "WARNUNG: $($builtinAdmins -join ', ') hat sysadmin-Rechte - fuer Least Privilege entfernen" } else { '' }
@@ -226,24 +253,52 @@ function Invoke-sqmSetupReport
             catch { }
             if ($serviceAccounts.Count -eq 0) { $serviceAccounts = @('Unable to determine') }
 
-            # SPN Status (List all SPNs)
-            $spnLines = @('Not checked')
+            # SPN Status (List all SPNs + overall OK/Warning summary)
+            $spnLines  = @('Not checked')
+            $spnStatus = 'Not checked'
+            $spnColor  = 'orange'
             try
             {
                 $spnReport = Get-sqmSpnReport -ComputerName $env:COMPUTERNAME -ErrorAction SilentlyContinue
-                if ($spnReport -and $spnReport.DetailRows)
+                if ($spnReport)
                 {
-                    $spnDetails = @()
-                    foreach ($row in $spnReport.DetailRows)
+                    if ($spnReport.DetailRows)
                     {
-                        $spnDetails += "$($row.SPN) [$($row.Status)]"
+                        $spnDetails = @()
+                        foreach ($row in $spnReport.DetailRows)
+                        {
+                            $spnDetails += "$($row.SPN) [$($row.Status)]"
+                        }
+                        $spnLines = if ($spnDetails.Count -gt 0) { $spnDetails } else { @('No SPNs found') }
+
+                        $cntOk      = @($spnReport.DetailRows | Where-Object { $_.Status -eq 'OK' }).Count
+                        $cntMissing = @($spnReport.DetailRows | Where-Object { $_.Status -eq 'Missing' }).Count
+                        $cntUnexp   = @($spnReport.DetailRows | Where-Object { $_.Status -eq 'Unexpected' }).Count
+                        $cntTotal   = @($spnReport.DetailRows).Count
                     }
-                    $spnLines = if ($spnDetails.Count -gt 0) { $spnDetails } else { @('No SPNs found') }
+                    else { $cntOk = 0; $cntMissing = 0; $cntUnexp = 0; $cntTotal = 0 }
+
+                    # Gesamtstatus: bevorzugt das Status-Feld des Reports, sonst aus den Zaehlern ableiten
+                    switch ("$($spnReport.Status)")
+                    {
+                        'OK'        { $spnStatus = "OK ($cntOk/$cntTotal SPNs registriert)"; $spnColor = 'green' }
+                        'Warning'   { $spnStatus = "WARNUNG ($cntMissing fehlend, $cntUnexp unerwartet)"; $spnColor = 'orange' }
+                        'NoNetwork' { $spnStatus = 'Nicht pruefbar (kein AD/Netzwerk)'; $spnColor = 'orange' }
+                        'Error'     { $spnStatus = 'Fehler bei SPN-Pruefung'; $spnColor = 'red' }
+                        default
+                        {
+                            if ($cntMissing -gt 0 -or $cntUnexp -gt 0) { $spnStatus = "WARNUNG ($cntMissing fehlend, $cntUnexp unerwartet)"; $spnColor = 'orange' }
+                            elseif ($cntOk -gt 0) { $spnStatus = "OK ($cntOk/$cntTotal SPNs registriert)"; $spnColor = 'green' }
+                            else { $spnStatus = 'Keine SPNs gefunden'; $spnColor = 'orange' }
+                        }
+                    }
                 }
             }
             catch
             {
-                $spnLines = @('Error retrieving SPNs')
+                $spnLines  = @('Error retrieving SPNs')
+                $spnStatus = 'Fehler bei SPN-Pruefung'
+                $spnColor  = 'red'
             }
 
             # Splunk Status (via Invoke-sqmSplunkConfiguration -Test)
@@ -337,6 +392,8 @@ function Invoke-sqmSetupReport
                 -XPColor $xpColor `
                 -ServiceAccounts $serviceAccounts `
                 -SPNList $spnLines `
+                -SPNStatus $spnStatus `
+                -SPNColor $spnColor `
                 -SplunkStatus $splunkStatus `
                 -MAXDOP $maxdopStatus `
                 -CostThreshold $ctpStatus `
@@ -399,6 +456,8 @@ function _Build-ModernReportHtml
         [string]$XPColor,
         [string[]]$ServiceAccounts,
         [string[]]$SPNList,
+        [string]$SPNStatus,
+        [string]$SPNColor,
         [string]$SplunkStatus,
         [string]$MAXDOP,
         [string]$CostThreshold,
@@ -420,6 +479,13 @@ function _Build-ModernReportHtml
         $vals = @($Items | Where-Object { $_ -ne $null -and "$_".Trim() -ne '' })
         if ($vals.Count -eq 0) { return (_HtmlEncode $EmptyText) }
         return (($vals | ForEach-Object { _HtmlEncode $_ }) -join '<br>')
+    }
+
+    # Mappt die Status-Farbnamen (green/orange/red) auf Hex fuer Inline-Text.
+    function _SpnColorHex
+    {
+        param([string]$Color)
+        switch ($Color) { 'green' { '#27ae60' } 'red' { '#e74c3c' } 'orange' { '#f39c12' } default { '#e2e8f0' } }
     }
 
     $sysadminWarningHtml = if ($SysadminWarning) { "<div class=`"card-detail`" style=`"color:#e74c3c;font-weight:600;`">$(_HtmlEncode $SysadminWarning)</div>" } else { '' }
@@ -531,7 +597,7 @@ function _Build-ModernReportHtml
     </div>
     <div class="info-block">
       <h3>Infrastructure</h3>
-      <p><span class="info-label">SPNs:</span></p>
+      <p><span class="info-label">SPN Status:</span> <strong style="color: $(_SpnColorHex $SPNColor);">$(_HtmlEncode $SPNStatus)</strong></p>
       <p style="margin-left: 12px;">$(_HtmlList $SPNList 'Not checked')</p>
       <p><span class="info-label">Splunk:</span> $SplunkStatus</p>
     </div>
