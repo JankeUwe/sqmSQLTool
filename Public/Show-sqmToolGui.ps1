@@ -259,7 +259,8 @@
 	$right.Controls.Add($grpOut, 0, 3)
 
 	# --- State of the currently selected function ----------------------------------
-	$script:guiState = @{ Command = $null; Controls = @{ } }
+	# Controls: regular inputs (textbox/checkbox/combobox). Creds: PSCredential parameters.
+	$script:guiState = @{ Command = $null; Controls = @{ }; Creds = @{ } }
 	$script:synCache = @{ }
 	$common = [System.Management.Automation.PSCmdlet]::CommonParameters +
 	[System.Management.Automation.PSCmdlet]::OptionalCommonParameters
@@ -291,6 +292,11 @@
 				}
 			}
 		}
+		foreach ($cn in $script:guiState.Creds.Keys)
+		{
+			$cred = $script:guiState.Creds[$cn].Cred
+			if ($cred) { $parts.Add("-$cn (Get-Credential -UserName '$($cred.UserName)' -Message '...')") }
+		}
 		if ($chkWhatIf.Visible -and $chkWhatIf.Checked) { $parts.Add('-WhatIf') }
 		return ($parts -join ' ')
 	}
@@ -304,6 +310,7 @@
 		if (-not $cmd) { return }
 		$script:guiState.Command = $cmd
 		$script:guiState.Controls = @{ }
+		$script:guiState.Creds = @{ }
 
 		$lblFunc.Text = $fnName
 		# Parse the synopsis quickly from the source file (Get-Help is much slower), cached.
@@ -342,6 +349,10 @@
 			{
 				if ($a -is [System.Management.Automation.ParameterAttribute] -and $a.Mandatory) { $isMandatory = $true }
 			}
+			# ValidateSet -> allowed values for a dropdown
+			$validValues = $null
+			$vsAttr = $p.Attributes | Where-Object { $_ -is [System.Management.Automation.ValidateSetAttribute] } | Select-Object -First 1
+			if ($vsAttr) { $validValues = $vsAttr.ValidValues }
 
 			$lbl = New-Object System.Windows.Forms.Label
 			$lbl.Text = $p.Name + $(if ($isMandatory) { ' *' } else { '' })
@@ -354,6 +365,7 @@
 			$tip.SetToolTip($lbl, "$($p.ParameterType.Name)")
 
 			$pt = $p.ParameterType
+			$isCred = $false
 			if ($pt -eq [switch] -or $pt -eq [bool])
 			{
 				$ctrl = New-Object System.Windows.Forms.CheckBox
@@ -361,7 +373,7 @@
 				$ctrl.ForeColor = $cText
 				$ctrl.Add_CheckedChanged($updatePreview)
 			}
-			elseif ($pt.IsEnum)
+			elseif ($validValues -or $pt.IsEnum)
 			{
 				$ctrl = New-Object System.Windows.Forms.ComboBox
 				$ctrl.DropDownStyle = 'DropDownList'
@@ -370,8 +382,43 @@
 				$ctrl.ForeColor = $cText
 				$ctrl.FlatStyle = 'Flat'
 				[void]$ctrl.Items.Add('')
-				foreach ($ev in [Enum]::GetNames($pt)) { [void]$ctrl.Items.Add($ev) }
+				$values = if ($validValues) { $validValues } else { [Enum]::GetNames($pt) }
+				foreach ($ev in $values) { [void]$ctrl.Items.Add($ev) }
 				$ctrl.Add_SelectedIndexChanged($updatePreview)
+			}
+			elseif ($pt.Name -eq 'PSCredential')
+			{
+				# Credential: read-only username box + Set.../Clear buttons; the PSCredential
+				# object is stored in $guiState.Creds, not in Controls.
+				$isCred = $true
+				$ctrl = New-Object System.Windows.Forms.FlowLayoutPanel
+				$ctrl.AutoSize = $true
+				$ctrl.WrapContents = $false
+				$ctrl.Margin = '0,0,0,0'
+				$txtUser = New-Object System.Windows.Forms.TextBox
+				$txtUser.Width = 190
+				$txtUser.ReadOnly = $true
+				$txtUser.BackColor = $cWindow
+				$txtUser.ForeColor = $cText
+				$txtUser.BorderStyle = 'FixedSingle'
+				$btnSet = New-Object System.Windows.Forms.Button
+				$btnSet.Text = 'Set...'
+				$btnSet.Width = 60
+				& $styleButton $btnSet
+				$btnClr = New-Object System.Windows.Forms.Button
+				$btnClr.Text = 'Clear'
+				$btnClr.Width = 55
+				& $styleButton $btnClr
+				$pn = $p.Name
+				$btnSet.Add_Click({
+						$c = Get-Credential -Message "Credential for -$pn" -ErrorAction SilentlyContinue
+						if ($c) { $script:guiState.Creds[$pn].Cred = $c; $txtUser.Text = $c.UserName; & $updatePreview }
+					}.GetNewClosure())
+				$btnClr.Add_Click({
+						$script:guiState.Creds[$pn].Cred = $null; $txtUser.Text = ''; & $updatePreview
+					}.GetNewClosure())
+				$ctrl.Controls.AddRange(@($txtUser, $btnSet, $btnClr))
+				$script:guiState.Creds[$pn] = @{ Cred = $null }
 			}
 			else
 			{
@@ -388,7 +435,7 @@
 
 			$paramPanel.Controls.Add($lbl, 0, $row)
 			$paramPanel.Controls.Add($ctrl, 1, $row)
-			$script:guiState.Controls[$p.Name] = $ctrl
+			if (-not $isCred) { $script:guiState.Controls[$p.Name] = $ctrl }
 			$row++
 		}
 		if ($row -eq 0)
@@ -443,6 +490,13 @@
 					if ($ctrl -is [System.Windows.Forms.TextBox] -and [string]::IsNullOrWhiteSpace($ctrl.Text)) { $missing += $pname }
 				}
 			}
+			foreach ($cn in $script:guiState.Creds.Keys)
+			{
+				$cp = $script:guiState.Command.Parameters[$cn]
+				$man = $false
+				foreach ($a in $cp.Attributes) { if ($a -is [System.Management.Automation.ParameterAttribute] -and $a.Mandatory) { $man = $true } }
+				if ($man -and -not $script:guiState.Creds[$cn].Cred) { $missing += $cn }
+			}
 			if ($missing.Count -gt 0)
 			{
 				[System.Windows.Forms.MessageBox]::Show("Required parameters missing:`n  - $($missing -join "`n  - ")", 'Incomplete input', 'OK', 'Warning') | Out-Null
@@ -457,6 +511,10 @@
 				if ($ctrl -is [System.Windows.Forms.CheckBox]) { if ($ctrl.Checked) { $params[$pname] = $true } }
 				elseif ($ctrl -is [System.Windows.Forms.ComboBox]) { if ($ctrl.SelectedItem) { $params[$pname] = [string]$ctrl.SelectedItem } }
 				else { if (-not [string]::IsNullOrWhiteSpace($ctrl.Text)) { $params[$pname] = $ctrl.Text } }
+			}
+			foreach ($cn in $script:guiState.Creds.Keys)
+			{
+				if ($script:guiState.Creds[$cn].Cred) { $params[$cn] = $script:guiState.Creds[$cn].Cred }
 			}
 			if ($chkWhatIf.Visible -and $chkWhatIf.Checked) { $params['WhatIf'] = $true }
 
