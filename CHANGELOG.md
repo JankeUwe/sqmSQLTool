@@ -1,5 +1,26 @@
 # sqmSQLTool — Changelog
 
+## [1.6.0.0] — 2026-06-21
+
+### ✨ Neu
+
+- **Invoke-sqmNtfsSetup**: Setzt NTFS-Berechtigungen für die SQL-Dienstkonten auf den
+  Data/Log/TempDB/Backup-Verzeichnissen. Ermittelt Dienstkonten (Get-DbaService) und
+  Verzeichnisse (Get-DbaDefaultPath + sys.master_files) automatisch, schreibt vorher ein
+  ACL-Backup (SDDL je Verzeichnis), unterstützt `-WhatIf`/`-EnableException`.
+  Schließt den Aufruf in SQLSetupTool\Modules\PostInstall.psm1, der bisher ins Leere lief.
+- **Show-sqmToolGui**: Kleine WinForms-Oberfläche (Visual-Studio-Dark) mit allen exportierten
+  Funktionen nach Kategorie gruppiert; erzeugt Parameter-Eingaben automatisch (inkl.
+  Credential-Picker für PSCredential und Dropdowns für ValidateSet/Enum), Befehlsvorschau,
+  Ausführen/Kopieren/Hilfe.
+
+### 🔧 Fixes / Wartung
+
+- **category-map.ps1** neu generiert (war Encoding-korrupt und unvollständig); deckt jetzt
+  alle exportierten Funktionen ab.
+- **CI**: GitHub-Actions-Workflow (PSScriptAnalyzer, BOM-Check, Import PS 5.1 + 7, Pester).
+- **Tests**: Contract-Test, der die von SQLSetupTool genutzte Funktions-API einfriert.
+
 ## [1.5.1.0] — 2026-06-10
 
 Versionssprung über das (fehlbenannte) Tag v1.5.0, damit die gesammelten Fixes 1.4.8 - 1.4.15
