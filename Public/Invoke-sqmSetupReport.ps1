@@ -146,13 +146,33 @@ function Invoke-sqmSetupReport
             # ==========================================
 
             # Sysadmin Accounts
+            # Robuste Ermittlung ueber die Rollenmitgliedschaft (Get-DbaLogin hat keine
+            # zuverlaessige IsSysAdmin-Eigenschaft -> Liste blieb sonst leer).
+            # sys.server_principals.sid liefert zugleich die SID fuer die BUILTIN-Erkennung.
             $sysadminLogins = @()
             try
             {
-                $sysadminLogins = @(Get-DbaLogin -SqlInstance $server | Where-Object { $_.IsSysAdmin -eq $true })
+                $sysadminQuery = @"
+SELECT sp.name AS Name, sp.sid AS Sid
+FROM sys.server_role_members rm
+JOIN sys.server_principals r  ON rm.role_principal_id   = r.principal_id
+JOIN sys.server_principals sp ON rm.member_principal_id = sp.principal_id
+WHERE r.type = 'R' AND r.name = N'sysadmin'
+ORDER BY sp.name
+"@
+                $sysadminLogins = @(Invoke-DbaQuery -SqlInstance $server -Query $sysadminQuery -ErrorAction Stop)
             }
-            catch { }
-            $sysadmins = @($sysadminLogins | Select-Object -ExpandProperty Name)
+            catch
+            {
+                # Fallback: dbatools-Rollenmitglieder (ohne SID -> nur Namensabgleich)
+                try
+                {
+                    $sysadminLogins = @(Get-DbaServerRoleMember -SqlInstance $server -ServerRole 'sysadmin' -ErrorAction Stop |
+                        ForEach-Object { [PSCustomObject]@{ Name = $_.Name; Sid = $null } })
+                }
+                catch { }
+            }
+            $sysadmins = @($sysadminLogins | Select-Object -ExpandProperty Name | Where-Object { $_ })
 
             # Warnung: BUILTIN\Administrators (lokalisiert z.B. VORDEFINIERT\Administratoren) als sysadmin
             # ist ein Least-Privilege-Verstoss (jeder lokale Admin wird damit zum SQL-sysadmin).
