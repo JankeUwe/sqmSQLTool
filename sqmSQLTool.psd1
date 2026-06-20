@@ -144,6 +144,7 @@
 		'Invoke-sqmLoginAudit',
 		'Invoke-sqmLogShrink',
 		'Invoke-sqmMonitoringKey',
+		'Invoke-sqmNtfsSetup',
 		'Invoke-sqmPatchAnalysis',
 		'Invoke-sqmPerfBaseline',
 		'Invoke-sqmQueryStore',

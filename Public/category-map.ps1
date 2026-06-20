@@ -78,6 +78,7 @@ $categoryMap = @{
     'Invoke-sqmLoginAudit'                = 'Monitoring & Health Checks'
     'Invoke-sqmLogShrink'                 = 'Database Maintenance'
     'Invoke-sqmMonitoringKey'             = 'Monitoring & Registry'
+    'Invoke-sqmNtfsSetup'                 = 'Storage & Disk Management'
     'Invoke-sqmPatchAnalysis'             = 'Monitoring & Registry'
     'Invoke-sqmPerfBaseline'              = 'Performance Analysis & Optimization'
     'Invoke-sqmQueryStore'                = 'Performance Analysis & Optimization'

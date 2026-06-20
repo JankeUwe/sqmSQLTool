@@ -26,6 +26,7 @@ Describe 'Public API contract (downstream consumers)' {
     # Keep in sync with real consumers when intentionally changing the API.
     $consumerApi = @(
         'Invoke-sqmFormatDrive64k', 'Get-sqmHpuAllowGroup', 'Test-sqmSqlInstanceInstalled',
+        'Invoke-sqmNtfsSetup',
         'Get-sqmDiskBlockSize', 'Invoke-sqmSetDatabaseRecoveryMode', 'Invoke-sqmMonitoringKey',
         'Get-sqmSQLInstanceCheck', 'Install-sqmOlaMaintenanceSolution', 'New-sqmOlaMaintenanceJobs',
         'New-sqmOlaSysDbBackupJob', 'New-sqmOlaUsrDbBackupJob', 'Invoke-sqmSplunkConfiguration',
