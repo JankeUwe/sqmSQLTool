@@ -43,6 +43,11 @@ $script:sqmModuleConfig = @{
 	# Monitoring-Zugang (Enable-sqmMonitoringAccess)
 	DefaultPolicy            = $null   # Policy die vor Setup deaktiviert wird, $null = kein Policy-Handling
 	DefaultMonitoringUser    = $null   # Windows-Login des Monitoring-Accounts, $null = Pflicht per Parameter
+	# Verbindungssicherheit: TrustServerCertificate fuer alle dbatools-Verbindungen.
+	# SQL Server 2022+ / neuere Microsoft.Data.SqlClient erzwingen Encrypt=True und pruefen
+	# das Serverzertifikat. Bei self-signed Zertifikaten schlaegt die Verbindung sonst mit
+	# "The certificate chain was issued by an authority that is not trusted" fehl.
+	TrustServerCertificate   = $true
 }
 
 # Aktuelle Version aus der Manifestdatei lesen
@@ -158,6 +163,20 @@ else
 if (-not $script:dbatoolsAvailable)
 {
 	Write-Warning "dbatools-Modul nicht gefunden. Funktionen die dbatools benoetigen sind nicht verfuegbar. Installation: Install-Module dbatools"
+}
+else
+{
+	# TrustServerCertificate fuer ALLE dbatools-Verbindungen aktivieren (self-signed Zertifikate).
+	# Behebt "The certificate chain was issued by an authority that is not trusted" auf SQL 2022+.
+	# Per Set-sqmConfig -TrustServerCertificate $false abschaltbar (vor dem Import gesetzt).
+	if ($script:sqmModuleConfig['TrustServerCertificate'])
+	{
+		try
+		{
+			Set-DbatoolsConfig -FullName 'sql.connection.trustcert' -Value $true -Scope Session -ErrorAction SilentlyContinue
+		}
+		catch { Write-Verbose "Konnte dbatools trustcert nicht setzen: $($_.Exception.Message)" }
+	}
 }
 
 # =============================================================================

@@ -181,6 +181,8 @@
 		'Set-sqmBackupExcludePermission',
 		'Set-sqmConfig',
 		'Set-sqmDatabaseOwner',
+		'Set-sqmMaxDop',
+		'Set-sqmMaxMemory',
 		'Set-sqmSqlPolicyState',
 		'Set-sqmSqlTlsCertificate',
 		'Set-sqmSsrsConfiguration',
