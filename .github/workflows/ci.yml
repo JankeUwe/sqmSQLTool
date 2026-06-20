@@ -72,7 +72,9 @@ jobs:
       - name: Install dbatools and Pester (7)
         shell: pwsh
         run: |
-          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          # -Force bypasses the untrusted-repo prompt; no Set-PSRepository needed.
+          # (GitHub's pwsh shell sets $ErrorActionPreference='stop', so a stray
+          #  Set-PSRepository error would fail the whole job.)
           Install-Module dbatools -Force -Scope CurrentUser -AllowClobber
           Install-Module Pester -MinimumVersion 5.0 -Force -Scope CurrentUser -SkipPublisherCheck
 
