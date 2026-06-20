@@ -21,12 +21,13 @@ jobs:
       - name: PSScriptAnalyzer (errors only)
         shell: pwsh
         run: |
+          $settings = './PSScriptAnalyzerSettings.psd1'
           $findings = @()
           foreach ($p in 'Public', 'Private')
           {
-            if (Test-Path $p) { $findings += Invoke-ScriptAnalyzer -Path $p -Recurse -Severity Error }
+            if (Test-Path $p) { $findings += Invoke-ScriptAnalyzer -Path $p -Recurse -Settings $settings }
           }
-          $findings += Invoke-ScriptAnalyzer -Path sqmSQLTool.psm1 -Severity Error
+          $findings += Invoke-ScriptAnalyzer -Path sqmSQLTool.psm1 -Settings $settings
           if ($findings)
           {
             $findings | Format-Table -AutoSize
@@ -45,26 +46,35 @@ jobs:
           if ($bad) { throw "Missing UTF-8 BOM: $($bad -join ', ')" }
           Write-Host 'BOM check passed.'
 
-  test:
-    name: Import & Pester
+  test-ps51:
+    name: Import (Windows PowerShell 5.1)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies (dbatools, Pester)
+      - name: Install dbatools (5.1) and import
+        shell: powershell
+        run: |
+          $env:MSSQLTOOLS_SKIP_AUTO_UPDATE = '1'
+          Install-PackageProvider -Name NuGet -Force | Out-Null
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          Install-Module dbatools -Force -Scope CurrentUser -AllowClobber
+          Import-Module ./sqmSQLTool.psd1 -Force -ErrorAction Stop
+          if (-not (Get-Command Enable-sqmMonitoringAccess -ErrorAction SilentlyContinue)) { throw 'Export check failed (PS 5.1).' }
+          Write-Host 'PS 5.1 import OK.'
+
+  test-ps7:
+    name: Import & Pester (PowerShell 7)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dbatools and Pester (7)
         shell: pwsh
         run: |
           Set-PSRepository PSGallery -InstallationPolicy Trusted
           Install-Module dbatools -Force -Scope CurrentUser -AllowClobber
           Install-Module Pester -MinimumVersion 5.0 -Force -Scope CurrentUser -SkipPublisherCheck
-
-      - name: Import test (Windows PowerShell 5.1)
-        shell: powershell
-        run: |
-          $env:MSSQLTOOLS_SKIP_AUTO_UPDATE = '1'
-          Import-Module ./sqmSQLTool.psd1 -Force -ErrorAction Stop
-          if (-not (Get-Command Enable-sqmMonitoringAccess -ErrorAction SilentlyContinue)) { throw 'Export check failed (PS 5.1).' }
-          Write-Host 'PS 5.1 import OK.'
 
       - name: Import test (PowerShell 7)
         shell: pwsh
