@@ -60,9 +60,29 @@
 		. $mapFile   # defines $categoryMap
 	}
 
-	# --- Discover functions (exported only) ----------------------------------------
-	$commands = Get-Command -Module 'sqmSQLTool' -CommandType Function -ErrorAction SilentlyContinue |
-	Sort-Object Name
+	# --- Discover functions ---------------------------------------------------------
+	# Authoritative source = the manifest's FunctionsToExport (the declared public API).
+	# Never enumerate Get-Command alone: if the module was imported via the bare .psm1,
+	# internal helpers (and even dbatools cmdlets) would leak in under "Other".
+	$module = Get-Module -Name 'sqmSQLTool'
+	if (-not $module)
+	{
+		[System.Windows.Forms.MessageBox]::Show(
+			"No sqmSQLTool functions were found. Please run 'Import-Module sqmSQLTool' first.",
+			'sqmSQLTool', 'OK', 'Warning') | Out-Null
+		return
+	}
+	$publicNames = @()
+	$manifestPath = Join-Path $module.ModuleBase 'sqmSQLTool.psd1'
+	if (Test-Path $manifestPath)
+	{
+		$publicNames = (Import-PowerShellDataFile $manifestPath).FunctionsToExport
+	}
+	if (-not $publicNames) { $publicNames = $module.ExportedFunctions.Keys }
+
+	$commands = $publicNames |
+	ForEach-Object { Get-Command -Name $_ -Module 'sqmSQLTool' -ErrorAction SilentlyContinue } |
+	Where-Object { $_ } | Sort-Object Name
 	if (-not $commands)
 	{
 		[System.Windows.Forms.MessageBox]::Show(
@@ -83,7 +103,7 @@
 	# --- Main window ---------------------------------------------------------------
 	$form = New-Object System.Windows.Forms.Form
 	$yearSpan = "2025-$((Get-Date).ToString('yy'))"
-	$form.Text = "sqmSQLTool - Function Browser  v$((Get-Module sqmSQLTool).Version)   |   powershelldba.de - Janke (c) $yearSpan"
+	$form.Text = "sqmSQLTool - Function Browser  v$($module.Version)  [$($commands.Count)]   |   powershelldba.de - Janke (c) $yearSpan"
 	$form.Size = New-Object System.Drawing.Size(1150, 720)
 	$form.StartPosition = 'CenterScreen'
 	$form.MinimumSize = New-Object System.Drawing.Size(900, 560)
