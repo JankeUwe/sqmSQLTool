@@ -2,9 +2,12 @@
 # TestHelpers.ps1 — Gemeinsame Infrastruktur fuer alle sqmSQLTool Pester-Tests
 # =============================================================================
 
-# Modulpfad relativ zum tests/-Verzeichnis
+# Modulpfad relativ zum tests/-Verzeichnis.
+# WICHTIG: ueber das Manifest (.psd1) importieren, nicht die .psm1 direkt - nur so greift
+# FunctionsToExport. Beim direkten .psm1-Import wuerden die per Import-Module dbatools in der
+# psm1 geladenen Funktionen mit re-exportiert (ExportedFunctions enthielte hunderte Dba*-Cmdlets).
 $script:ModuleRoot = Split-Path $PSScriptRoot -Parent
-$script:ModulePath = Join-Path $script:ModuleRoot 'sqmSQLTool.psm1'
+$script:ModulePath = Join-Path $script:ModuleRoot 'sqmSQLTool.psd1'
 
 # ---------------------------------------------------------------------------
 # Hilfsfunktion: Modul frisch laden (isoliert, ohne AutoUpdate)

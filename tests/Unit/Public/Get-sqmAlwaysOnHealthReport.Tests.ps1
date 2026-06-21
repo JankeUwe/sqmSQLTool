@@ -1,7 +1,7 @@
 ﻿#Requires -Modules Pester
 <#
 .SYNOPSIS
-    Unit Tests fuer Get-sqmAgHealthReport
+    Unit Tests fuer Get-sqmAlwaysOnHealthReport
     dbatools-Abhaengigkeiten werden vollstaendig gemockt.
 #>
 
@@ -17,15 +17,15 @@ AfterAll {
     $env:MSSQLTOOLS_SKIP_AUTO_UPDATE = $null
 }
 
-Describe 'Get-sqmAgHealthReport' {
+Describe 'Get-sqmAlwaysOnHealthReport' {
 
     Context 'Parameter-Validierung' {
         It 'Funktion existiert und ist aufrufbar' {
-            Get-Command Get-sqmAgHealthReport | Should -Not -BeNullOrEmpty
+            Get-Command Get-sqmAlwaysOnHealthReport | Should -Not -BeNullOrEmpty
         }
 
         It 'SqlInstance ist nicht mandatory (Default = Computername)' {
-            $cmd = Get-Command Get-sqmAgHealthReport
+            $cmd = Get-Command Get-sqmAlwaysOnHealthReport
             $mandatory = $cmd.Parameters['SqlInstance'].Attributes |
                 Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] } |
                 Select-Object -ExpandProperty Mandatory -First 1
@@ -33,19 +33,19 @@ Describe 'Get-sqmAgHealthReport' {
         }
 
         It 'OutputPath Parameter existiert' {
-            (Get-Command Get-sqmAgHealthReport).Parameters.ContainsKey('OutputPath') | Should -Be $true
+            (Get-Command Get-sqmAlwaysOnHealthReport).Parameters.ContainsKey('OutputPath') | Should -Be $true
         }
 
         It 'WhatIf wird unterstuetzt' {
-            (Get-Command Get-sqmAgHealthReport).Parameters.ContainsKey('WhatIf') | Should -Be $true
+            (Get-Command Get-sqmAlwaysOnHealthReport).Parameters.ContainsKey('WhatIf') | Should -Be $true
         }
 
         It 'MaxRedoQueueMB Parameter existiert' {
-            (Get-Command Get-sqmAgHealthReport).Parameters.ContainsKey('MaxRedoQueueMB') | Should -Be $true
+            (Get-Command Get-sqmAlwaysOnHealthReport).Parameters.ContainsKey('MaxRedoQueueMB') | Should -Be $true
         }
 
         It 'MaxSendQueueMB Parameter existiert' {
-            (Get-Command Get-sqmAgHealthReport).Parameters.ContainsKey('MaxSendQueueMB') | Should -Be $true
+            (Get-Command Get-sqmAlwaysOnHealthReport).Parameters.ContainsKey('MaxSendQueueMB') | Should -Be $true
         }
     }
 
@@ -65,19 +65,19 @@ Describe 'Get-sqmAgHealthReport' {
         }
 
         It 'Laeuft ohne Fehler mit gemockten Daten durch' {
-            { Get-sqmAgHealthReport -SqlInstance 'TESTSERVER' -OutputPath $script:TestDir -WhatIf } |
+            { Get-sqmAlwaysOnHealthReport -SqlInstance 'TESTSERVER' -OutputPath $script:TestDir -WhatIf } |
                 Should -Not -Throw
         }
 
         It 'Erstellt keine Dateien bei -WhatIf' {
-            Get-sqmAgHealthReport -SqlInstance 'TESTSERVER' -OutputPath $script:TestDir -WhatIf
+            Get-sqmAlwaysOnHealthReport -SqlInstance 'TESTSERVER' -OutputPath $script:TestDir -WhatIf
             (Get-ChildItem $script:TestDir -File).Count | Should -Be 0
         }
     }
 
     Context 'SupportsShouldProcess' {
         It 'Funktion unterstuetzt ShouldProcess' {
-            $cmd = Get-Command Get-sqmAgHealthReport
+            $cmd = Get-Command Get-sqmAlwaysOnHealthReport
             $cmd.Parameters.ContainsKey('WhatIf')   | Should -Be $true
             $cmd.Parameters.ContainsKey('Confirm')  | Should -Be $true
         }

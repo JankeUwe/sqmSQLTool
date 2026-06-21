@@ -37,9 +37,12 @@ Describe 'Set-sqmConfig' {
             Get-sqmConfig -Key 'OutputPath' | Should -Be $script:TestDir
         }
 
-        It 'Wirft Fehler bei nicht erstellbarem Pfad' {
-            { Set-sqmConfig -OutputPath 'Z:\GibtEsNicht\Pfad\Test' -ErrorAction Stop } |
-                Should -Throw
+        It 'Speichert nicht erstellbaren Pfad mit Warnung (graceful)' {
+            # Bewusstes Verhalten: ein (noch) nicht erstellbarer Pfad - z.B. ein spaeter
+            # gemapptes Netzlaufwerk - wird mit Warnung uebernommen, nicht als Fehler abgebrochen.
+            $badPath = 'Z:\GibtEsNicht\Pfad\Test'
+            { Set-sqmConfig -OutputPath $badPath -WarningAction SilentlyContinue } | Should -Not -Throw
+            Get-sqmConfig -Key 'OutputPath' | Should -Be $badPath
         }
     }
 

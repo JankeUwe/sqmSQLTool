@@ -193,7 +193,6 @@
 		'Sync-sqmAgNode',
 		'Sync-sqmBackupExcludeTable',
 		'Sync-sqmLoginsToAlwaysOn',
-		'Test-InternetConnectivity',
 		'Test-sqmBackupIntegrity',
 		'Test-sqmCostThreshold',
 		'Test-sqmDistributedAgReadiness',

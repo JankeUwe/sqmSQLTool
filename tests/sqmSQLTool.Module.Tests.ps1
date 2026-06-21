@@ -60,8 +60,11 @@ Describe 'Modulkonfiguration' {
     }
 
     It 'LogPath enthaelt keinen FI-TS spezifischen Pfad' {
-        Get-sqmConfig -Key 'LogPath' | Should -Not -BeLike '*WinSrvLog*'
+        # Hinweis: 'WinSrvLog' ist KEIN FI-TS-Marker - der neutrale Default
+        # (C:\System\WinSrvLog\MSSQL) verwendet ihn ebenfalls. FI-TS-spezifisch sind
+        # das W:\-Netzlaufwerk und 'FITS'-Bezeichner.
         Get-sqmConfig -Key 'LogPath' | Should -Not -BeLike '*FITS*'
+        Get-sqmConfig -Key 'LogPath' | Should -Not -BeLike 'W:\*'
     }
 
     It 'Ola Job-Namen enthalten kein FITS-Prefix' {
