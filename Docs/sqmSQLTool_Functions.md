@@ -2655,7 +2655,7 @@ Downloads and installs the latest version of sqmSQLTool from the specified sourc
     Sources:
     - GitHub  : Downloads latest release ZIP from GitHub Releases
     - PSGallery: Installs via Install-Module / Update-Module
-    - UNC     : Copies from share using robocopy (same as Update.ps1)
+    - UNC     : Copies from share using robocopy
 
 **Parameters:**
 

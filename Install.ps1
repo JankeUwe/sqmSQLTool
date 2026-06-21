@@ -150,7 +150,7 @@ Write-Host "Installing sqmSQLTool to: $Destination" -ForegroundColor Cyan
 robocopy $Source $Destination /E /PURGE /NJH /NJS /NDL /COPY:DAT `
     /XD .git tests bin `
     /XF .gitignore README.md LICENSE `
-          Install.cmd Update.cmd Install.ps1 Update.ps1 `
+          Install.cmd Install.ps1 `
           "*.TempPoint.*" "*.RestorePoint.*" "*.psproj" "*.psproj.psbuild" "*.psprojs" `
           "desktop.ini" "Tester.ps1" "Test-Module*.ps1" `
           "coverage.xml" "testresults.xml"

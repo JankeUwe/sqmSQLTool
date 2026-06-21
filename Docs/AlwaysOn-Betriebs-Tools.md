@@ -34,13 +34,15 @@ Import-Module sqmSQLTool
 Get-Module sqmSQLTool | Select-Object Name, Version
 ```
 
-Update auf eine neuere Version aus derselben Quelle:
+Update auf eine neuere Version aus derselben Quelle: erneut `Install.cmd` ausführen.
+Es gleicht den Modulinhalt vollständig ab (kopiert geänderte Dateien, entfernt verwaiste)
+und dient damit als Installer **und** Updater.
 
 ```powershell
-& "\\75084\Datenbanken\MSSQL\Sourcen\sqmSQLTool\Update.cmd"
+& "\\75084\Datenbanken\MSSQL\Sourcen\sqmSQLTool\Install.cmd"
 ```
 
-> Hinweis: Die `Install.cmd`/`Update.cmd` umgehen die Mark-of-the-Web-Blockade automatisch
+> Hinweis: `Install.cmd` umgeht die Mark-of-the-Web-Blockade automatisch
 > (lokales Staging), falls die Ausführung direkt vom UNC-Pfad per Execution Policy geblockt wird.
 
 ## Health & Monitoring
