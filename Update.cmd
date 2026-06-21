@@ -1,6 +1,7 @@
 @echo off
 :: sqmSQLTool Updater
-:: Startet Update.ps1 mit ExecutionPolicy Bypass
+:: Startet Update.ps1 mit ExecutionPolicy Bypass und laeuft sich bei Bedarf
+:: automatisch via UAC hoch (Admin noetig fuers systemweite Modulverzeichnis).
 :: Empfohlen wenn das Modul von einem cross-domain Share aktualisiert wird
 ::
 :: Aufruf:                    Update.cmd
@@ -12,6 +13,26 @@ setlocal EnableDelayedExpansion
 set "SCRIPT_DIR=%~dp0"
 set "REPOSITORY=%~1"
 set "FORCE=%~2"
+
+:: ---------------------------------------------------------------
+:: Pruefen ob bereits als Administrator -> sonst UAC-Elevation.
+:: Das Update schreibt in das (meist systemweite) Modulverzeichnis
+:: (z.B. C:\Program Files\WindowsPowerShell\Modules) und benoetigt
+:: dafuer Administratorrechte - analog zu Install.cmd.
+:: ---------------------------------------------------------------
+net session >nul 2>&1
+set "IS_ADMIN=%errorlevel%"
+if "%IS_ADMIN%" neq "0" (
+    echo.
+    echo  sqmSQLTool - Elevation erforderlich
+    echo  ============================================================
+    echo  Das Update benoetigt Administratorrechte.
+    echo  Starte UAC-Abfrage ...
+    echo.
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
+        "Start-Process cmd.exe -ArgumentList '/c ""%~f0"" %1 %2' -Verb RunAs"
+    exit /b 0
+)
 
 :: ---------------------------------------------------------------
 :: Bootstrap IMMER lokal stagen und von dort starten (kein Remote-Versuch).

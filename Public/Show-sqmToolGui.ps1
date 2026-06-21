@@ -184,14 +184,14 @@
 	$header.Controls.Add($lblFunc)
 	$right.Controls.Add($header, 0, 0)
 
-	# Parameter area (scrollable)
-	$paramPanel = New-Object System.Windows.Forms.TableLayoutPanel
+	# Parameter area (scrollable). FlowLayoutPanel mit einem festen Zeilen-Panel pro Parameter
+	# -> Label und Eingabe stehen garantiert auf einer Linie (kein TableLayout-Zentrieren).
+	$paramPanel = New-Object System.Windows.Forms.FlowLayoutPanel
 	$paramPanel.Dock = 'Fill'
 	$paramPanel.AutoScroll = $true
-	$paramPanel.ColumnCount = 2
+	$paramPanel.FlowDirection = 'TopDown'
+	$paramPanel.WrapContents = $false
 	$paramPanel.BackColor = $cPanel
-	[void]$paramPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle('Absolute', 200)))
-	[void]$paramPanel.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle('Percent', 100)))
 	$grpParams = New-Object System.Windows.Forms.GroupBox
 	$grpParams.Text = 'Parameters'
 	$grpParams.Dock = 'Fill'
@@ -347,7 +347,6 @@
 
 		$paramPanel.SuspendLayout()
 		$paramPanel.Controls.Clear()
-		$paramPanel.RowStyles.Clear()
 		$row = 0
 		foreach ($p in $cmd.Parameters.Values)
 		{
@@ -367,8 +366,9 @@
 			$lbl = New-Object System.Windows.Forms.Label
 			$lbl.Text = $p.Name + $(if ($isMandatory) { ' *' } else { '' })
 			$lbl.AutoSize = $false
-			$lbl.Width = 190
-			$lbl.Height = 24
+			$lbl.Location = New-Object System.Drawing.Point(3, 6)
+			$lbl.Width = 185
+			$lbl.Height = 20
 			$lbl.TextAlign = 'MiddleLeft'
 			$lbl.ForeColor = if ($isMandatory) { $cText } else { $cDim }
 			if ($isMandatory) { $lbl.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold) }
@@ -402,7 +402,9 @@
 				# object is stored in $guiState.Creds, not in Controls.
 				$isCred = $true
 				$ctrl = New-Object System.Windows.Forms.FlowLayoutPanel
-				$ctrl.AutoSize = $true
+				$ctrl.AutoSize = $false
+				$ctrl.Width = 320
+				$ctrl.Height = 26
 				$ctrl.WrapContents = $false
 				$ctrl.Margin = '0,0,0,0'
 				$txtUser = New-Object System.Windows.Forms.TextBox
@@ -441,15 +443,18 @@
 				if ($p.Name -in @('SqlInstance', 'Instance')) { $ctrl.Text = $env:COMPUTERNAME }
 				$ctrl.Add_TextChanged($updatePreview)
 			}
-			$ctrl.Anchor = 'Left'
-			$ctrl.Margin = '3,3,3,3'
-			$lbl.Margin = '3,3,3,3'
-
-			# Feste Zeilenhoehe pro Zeile -> Label und Eingabe bleiben auf einer Linie,
-			# keine auseinandergezogenen/verschobenen Zeilen (z.B. bei Switch-Parametern).
-			[void]$paramPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
-			$paramPanel.Controls.Add($lbl, 0, $row)
-			$paramPanel.Controls.Add($ctrl, 1, $row)
+			# Ein Zeilen-Panel pro Parameter: Label links, Eingabe rechts, auf einer Linie.
+			$rowP = New-Object System.Windows.Forms.Panel
+			$rowP.Width = 540
+			$rowP.Height = 30
+			$rowP.Margin = '0,0,0,2'
+			$rowP.BackColor = $cPanel
+			# Control vertikal mittig zur Zeile positionieren (CheckBox kleiner als Textbox)
+			$ctrlHeight = if ($ctrl -is [System.Windows.Forms.CheckBox]) { 18 } else { $ctrl.Height }
+			$ctrl.Location = New-Object System.Drawing.Point(195, [Math]::Max(2, [int]((30 - $ctrlHeight) / 2)))
+			$rowP.Controls.Add($lbl)
+			$rowP.Controls.Add($ctrl)
+			$paramPanel.Controls.Add($rowP)
 			if (-not $isCred) { $script:guiState.Controls[$p.Name] = $ctrl }
 			$row++
 		}
@@ -459,7 +464,7 @@
 			$none.Text = '(No parameters)'
 			$none.AutoSize = $true
 			$none.ForeColor = $cDim
-			$paramPanel.Controls.Add($none, 0, 0)
+			$paramPanel.Controls.Add($none)
 		}
 		$paramPanel.ResumeLayout()
 
