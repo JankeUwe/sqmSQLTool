@@ -82,7 +82,8 @@
 
 	# --- Main window ---------------------------------------------------------------
 	$form = New-Object System.Windows.Forms.Form
-	$form.Text = "sqmSQLTool - Function Browser  (v$((Get-Module sqmSQLTool).Version))"
+	$yearSpan = "2025-$((Get-Date).ToString('yy'))"
+	$form.Text = "sqmSQLTool - Function Browser  v$((Get-Module sqmSQLTool).Version)   |   powershelldba.de - Janke (c) $yearSpan"
 	$form.Size = New-Object System.Drawing.Size(1150, 720)
 	$form.StartPosition = 'CenterScreen'
 	$form.MinimumSize = New-Object System.Drawing.Size(900, 560)
@@ -160,7 +161,7 @@
 	$right.BackColor = $cPanel
 	[void]$right.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Absolute', 130)))  # header
 	[void]$right.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Percent', 55)))     # parameters
-	[void]$right.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Absolute', 96)))    # preview + buttons
+	[void]$right.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Absolute', 122)))   # preview + options + buttons
 	[void]$right.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Percent', 45)))     # output
 	$split.Panel2.Controls.Add($right)
 	$split.Panel2.BackColor = $cPanel
@@ -228,16 +229,25 @@
 	$btnHelp.Width = 80
 	$btnHelp.Enabled = $false
 	foreach ($b in @($btnRun, $btnCopy, $btnHelp)) { & $styleButton $b }
+	$btnPanel.Controls.AddRange(@($btnRun, $btnCopy, $btnHelp))
+
+	# WhatIf on its own line (full label always visible)
+	$optPanel = New-Object System.Windows.Forms.Panel
+	$optPanel.Dock = 'Bottom'
+	$optPanel.Height = 26
 	$chkWhatIf = New-Object System.Windows.Forms.CheckBox
-	$chkWhatIf.Text = 'WhatIf (simulation)'
-	$chkWhatIf.AutoSize = $true
+	$chkWhatIf.Text = 'WhatIf (simulation - shows what would happen, changes nothing)'
+	$chkWhatIf.Dock = 'Fill'
+	$chkWhatIf.TextAlign = 'MiddleLeft'
 	$chkWhatIf.Checked = $true
 	$chkWhatIf.Visible = $false
 	$chkWhatIf.ForeColor = $cText
-	$chkWhatIf.Padding = '10,6,0,0'
-	$btnPanel.Controls.AddRange(@($btnRun, $btnCopy, $btnHelp, $chkWhatIf))
-	$midPanel.Controls.Add($preview)
+	$optPanel.Controls.Add($chkWhatIf)
+
+	# Dock order: buttons (very bottom) -> options (above buttons) -> preview (fills top)
 	$midPanel.Controls.Add($btnPanel)
+	$midPanel.Controls.Add($optPanel)
+	$midPanel.Controls.Add($preview)
 	$right.Controls.Add($midPanel, 0, 2)
 
 	# Output area
@@ -432,7 +442,12 @@
 				$ctrl.Add_TextChanged($updatePreview)
 			}
 			$ctrl.Anchor = 'Left'
+			$ctrl.Margin = '3,3,3,3'
+			$lbl.Margin = '3,3,3,3'
 
+			# Feste Zeilenhoehe pro Zeile -> Label und Eingabe bleiben auf einer Linie,
+			# keine auseinandergezogenen/verschobenen Zeilen (z.B. bei Switch-Parametern).
+			[void]$paramPanel.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Absolute, 30)))
 			$paramPanel.Controls.Add($lbl, 0, $row)
 			$paramPanel.Controls.Add($ctrl, 1, $row)
 			if (-not $isCred) { $script:guiState.Controls[$p.Name] = $ctrl }
@@ -452,12 +467,22 @@
 		$btnCopy.Enabled = $true
 		$btnHelp.Enabled = $true
 		& $updatePreview
+
+		# Output sofort aktualisieren: Funktionsname + Synopsis + Befehlsvorschau
+		$sep = '-' * [Math]::Max($fnName.Length, 12)
+		$output.Text = "$fnName`r`n$sep`r`n$($script:synCache[$fnName])`r`n`r`nVorschau:`r`n  $(& $buildCommand)`r`n"
 	}
 
 	# --- Events --------------------------------------------------------------------
 	$tree.Add_AfterSelect({
 			$node = $tree.SelectedNode
 			if ($node -and $node.Tag) { & $loadFunction $node.Tag }
+		})
+
+	# Auch ein erneuter Klick auf einen bereits ausgewaehlten Funktions-Node aktualisiert sofort
+	$tree.Add_NodeMouseClick({
+			param ($sender, $e)
+			if ($e.Node -and $e.Node.Tag) { & $loadFunction $e.Node.Tag }
 		})
 
 	$searchBox.Add_TextChanged({ & $populateTree $searchBox.Text })
