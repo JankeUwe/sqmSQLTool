@@ -229,12 +229,17 @@ function Invoke-sqmRestoreDatabase
 			{
 				Invoke-sqmLogging -Message "Datenbank '$DatabaseName' existiert auf $SqlInstance." -FunctionName $functionName -Level "INFO"
 				
-				# Pruefen, ob die Datenbank in einer AG ist
-				$agCheck = Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $DatabaseName -ErrorAction SilentlyContinue
-				if ($agCheck)
+				# Pruefen, ob die Datenbank in einer AG ist.
+				# WICHTIG: Get-DbaAvailabilityGroup hat KEINEN -Database-Parameter. Ein -Database loest einen
+				# terminierenden Parameter-Binding-Fehler aus, den -ErrorAction SilentlyContinue NICHT abfaengt.
+				# Daher Mitgliedschaft ueber Get-DbaAgDatabase pruefen und das AG-Objekt (mit .Name) anschliessend
+				# ueber den AG-Namen nachladen.
+				$agDbCheck = Get-DbaAgDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $DatabaseName -ErrorAction SilentlyContinue
+				if ($agDbCheck)
 				{
 					$isAGDatabase = $true
-					$availabilityGroup = $agCheck
+					$agName = ($agDbCheck | Select-Object -First 1).AvailabilityGroup
+					$availabilityGroup = Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $agName -ErrorAction SilentlyContinue
 					Invoke-sqmLogging -Message "Datenbank ist Mitglied der AG '$($availabilityGroup.Name)'." -FunctionName $functionName -Level "INFO"
 					if (-not $KeepAlwaysOn)
 					{

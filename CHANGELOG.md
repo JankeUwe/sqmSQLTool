@@ -1,5 +1,19 @@
 # sqmSQLTool — Changelog
 
+## [1.6.1.0] — 2026-06-22
+
+### 🔧 Fixes
+
+- **Invoke-sqmRestoreDatabase**: Brach bei existierender Ziel-Datenbank mit
+  „A parameter cannot be found that matches parameter name 'Database'" ab. Ursache war
+  `Get-DbaAvailabilityGroup -Database` (diesen Parameter gibt es nicht; der Parameter-Binding-Fehler
+  ist terminierend und wird von `-ErrorAction SilentlyContinue` nicht abgefangen). AG-Mitgliedschaft
+  wird jetzt über `Get-DbaAgDatabase` geprüft, das AG-Objekt über den AG-Namen nachgeladen.
+- **Invoke-sqmLogging**: `-WhatIf` des Aufrufers leakte über `$WhatIfPreference` in die
+  internen `Out-File`/`New-Item`-Aufrufe und erzeugte „What if: Output to File"-Rauschen, während
+  gar kein Log geschrieben wurde. Beide Aufrufe laufen jetzt mit `-WhatIf:$false` (Logging ist ein
+  Seitenkanal und darf nicht unter ShouldProcess fallen).
+
 ## [1.6.0.0] — 2026-06-21
 
 ### ✨ Neu

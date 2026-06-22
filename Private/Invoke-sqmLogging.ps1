@@ -38,7 +38,10 @@ function Invoke-sqmLogging
 			# Sicherstellung dass LogPath existiert (könnte nach Modulimport gelöscht worden sein)
 			if (-not (Test-Path $logPath -PathType Container))
 			{
-				New-Item -ItemType Directory -Path $logPath -Force -ErrorAction Stop | Out-Null
+				# -WhatIf:$false: Logging ist ein Seitenkanal und darf nicht unter ShouldProcess
+				# fallen. Sonst leakt ein -WhatIf des Aufrufers (via $WhatIfPreference) hier herein
+				# und erzeugt "What if: Output to File"-Rauschen statt zu schreiben.
+				New-Item -ItemType Directory -Path $logPath -Force -ErrorAction Stop -WhatIf:$false | Out-Null
 			}
 
 			$dateStamp = Get-Date -Format "yyyyMMdd"
@@ -46,7 +49,7 @@ function Invoke-sqmLogging
 			$fullPath = Join-Path $logPath $fileName
 
 			$timestamp = Get-Date -Format "HH:mm:ss"
-			"[$timestamp] [$Level] $Message" | Out-File -FilePath $fullPath -Append -Encoding UTF8 -ErrorAction Stop
+			"[$timestamp] [$Level] $Message" | Out-File -FilePath $fullPath -Append -Encoding UTF8 -ErrorAction Stop -WhatIf:$false
 		}
 		catch
 		{
