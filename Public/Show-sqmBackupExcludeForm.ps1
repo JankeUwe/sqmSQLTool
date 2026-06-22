@@ -1,4 +1,4 @@
-function Show-sqmBackupExcludeForm
+﻿function Show-sqmBackupExcludeForm
 {
 <#
 .SYNOPSIS
