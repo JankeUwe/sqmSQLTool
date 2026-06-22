@@ -193,7 +193,12 @@
     $colAt.Width        = 140
     $colAt.AutoSizeMode = 'None'
 
-    $grid.Columns.AddRange(@($colActive, $colName, $colReason, $colOrphaned, $colBy, $colAt))
+    $grid.Columns.Add($colActive)   | Out-Null
+    $grid.Columns.Add($colName)     | Out-Null
+    $grid.Columns.Add($colReason)   | Out-Null
+    $grid.Columns.Add($colOrphaned) | Out-Null
+    $grid.Columns.Add($colBy)       | Out-Null
+    $grid.Columns.Add($colAt)       | Out-Null
 
     # ----- Untere Leiste (Status + Speichern / Schliessen) ----------------------------
     $pBottom = New-Object System.Windows.Forms.Panel
