@@ -110,17 +110,20 @@ WHERE r.command IN ('BACKUP DATABASE', 'RESTORE DATABASE', 'BACKUP LOG', 'RESTOR
 				# 2. AutoSeed Operationen ueber sys.dm_hadr_physical_seeding_stats abrufen
 				# Diese DMV existiert ab SQL Server 2016
 				$autoSeedQuery = @"
-SELECT 
+-- Echte Spalten von sys.dm_hadr_physical_seeding_stats: database_size_bytes (nicht total_size_bytes),
+-- start_time_utc (nicht start_time), estimate_time_complete_utc (UTC-Zeit, nicht *_ms). Per Alias auf die
+-- vom PowerShell-Teil erwarteten Namen abgebildet; Restzeit aus der UTC-Zielzeit in ms umgerechnet.
+SELECT
     local_database_name AS database_name,
     role_desc,
     internal_state_desc,
     transfer_rate_bytes_per_second,
     transferred_size_bytes,
-    total_size_bytes,
-    start_time,
-    estimated_completion_time_ms,
-    CASE 
-        WHEN total_size_bytes > 0 THEN (transferred_size_bytes * 100.0 / total_size_bytes)
+    database_size_bytes AS total_size_bytes,
+    start_time_utc AS start_time,
+    DATEDIFF(second, GETUTCDATE(), estimate_time_complete_utc) * 1000 AS estimated_completion_time_ms,
+    CASE
+        WHEN database_size_bytes > 0 THEN (transferred_size_bytes * 100.0 / database_size_bytes)
         ELSE 0
     END AS percent_complete
 FROM sys.dm_hadr_physical_seeding_stats

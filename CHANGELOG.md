@@ -1,5 +1,22 @@
 # sqmSQLTool — Changelog
 
+## [1.6.4.0] — 2026-06-22
+
+### 🔧 Fixes — ungültige DMV-Spalten (gefunden per Live-Lauf + statischer DMV-Validierung gegen SQL 2022)
+
+- **Get-sqmMissingIndexes**: Join referenzierte `mid.index_group_handle`, das es in
+  `sys.dm_db_missing_index_details` nicht gibt (nur `index_handle`). Query lieferte „Ungültiger
+  Spaltenname index_group_handle" → keine Ergebnisse. Join korrigiert auf
+  `mid.index_handle = mig.index_handle`.
+- **Get-sqmOperationStatus**: AutoSeed-Query nutzte die nicht existierenden Spalten `total_size_bytes`,
+  `start_time` und `estimated_completion_time_ms` aus `sys.dm_hadr_physical_seeding_stats`. Korrigiert
+  auf die realen Spalten `database_size_bytes`, `start_time_utc` und `estimate_time_complete_utc`
+  (Restzeit per `DATEDIFF` in ms), per Alias auf die erwarteten Namen abgebildet.
+- **Get-sqmAlwaysOnFailoverHistory**: optionale SQL-Ergänzung las `ars.role_start_time`, das es in
+  `sys.dm_hadr_availability_replica_states` nicht gibt. Ersetzt durch die valide Spalte
+  `current_configuration_commit_start_time_utc` (UTC-Näherung; maßgeblich bleibt das Event Log,
+  EventID 1480). UTC-Vergleich und NULL-Schutz ergänzt.
+
 ## [1.6.3.0] — 2026-06-22
 
 ### 🔧 Fixes — dbatools-Parameter-/Cmdlet-Drift (gefunden per statischem Audit gegen dbatools 2.8.1, validiert gegen lokalen SQL 2022)

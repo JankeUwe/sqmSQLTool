@@ -150,7 +150,8 @@ SELECT TOP $Top
     mid.database_id                                  AS DatabaseId,
     mid.index_handle                                 AS IndexHandle
 FROM sys.dm_db_missing_index_details   mid
-INNER JOIN sys.dm_db_missing_index_groups      mig  ON mid.index_group_handle = mig.index_group_handle
+-- sys.dm_db_missing_index_details hat KEIN index_group_handle, nur index_handle.
+INNER JOIN sys.dm_db_missing_index_groups      mig  ON mid.index_handle = mig.index_handle
 INNER JOIN sys.dm_db_missing_index_group_stats migs ON mig.index_group_handle = migs.group_handle
 WHERE DB_NAME(mid.database_id) NOT IN ('master','model','msdb','tempdb')
   AND (migs.user_seeks + migs.user_scans) >= $MinSeeks

@@ -16,10 +16,10 @@
     Liefert die Cluster-Perspektive des Failovers. Nur verfuegbar wenn WSFC
     installiert und der Log aktiv ist (-IncludeClusterLog).
 
-    Ergaenzung: sys.dm_hadr_availability_replica_states.role_start_time
-    Zeigt den Zeitpunkt des letzten Rollenwechsels der lokalen Replica.
-    Wird als zusaetzliche Zeile mit Source 'RoleStartTime' ausgegeben wenn
-    -SqlInstance angegeben ist.
+    Ergaenzung: sys.dm_hadr_availability_replica_states.current_configuration_commit_start_time_utc
+    (Naeherung fuer den Rollenzeitpunkt der lokalen Replica - ein echtes role_start_time gibt es in
+    dieser DMV nicht). Wird als zusaetzliche Zeile mit Source 'RoleStartTime' ausgegeben wenn
+    -SqlInstance angegeben ist. Massgeblich bleibt das Event Log (EventID 1480).
 
     FailoverType-Erkennung:
     - 'Planned'   : EventID 1480, Message enthaelt "user" oder "manual"
@@ -321,7 +321,9 @@ SELECT
     ag.name                        AS AGName,
     ar.replica_server_name         AS ReplicaName,
     ars.role_desc                  AS CurrentRole,
-    ars.role_start_time            AS RoleStartTime
+    -- sys.dm_hadr_availability_replica_states hat KEIN role_start_time. Naechstbeste valide Spalte
+    -- ist current_configuration_commit_start_time_utc (UTC) als Naeherung fuer den Rollenzeitpunkt.
+    ars.current_configuration_commit_start_time_utc AS RoleStartTime
 FROM sys.dm_hadr_availability_replica_states ars
 JOIN sys.availability_replicas ar
     ON ar.replica_id = ars.replica_id
@@ -336,7 +338,8 @@ WHERE ars.is_local = 1
 						foreach ($row in $rows)
 						{
 							if ($AvailabilityGroup -and $row.AGName -ne $AvailabilityGroup) { continue }
-							if ($row.RoleStartTime -lt $Since) { continue }
+							# RoleStartTime ist UTC; gegen UTC vergleichen. NULL (z.B. Secondary) ueberspringen.
+							if (-not $row.RoleStartTime -or $row.RoleStartTime -lt $Since.ToUniversalTime()) { continue }
 
 							$computerResults.Add([PSCustomObject]@{
 								ComputerName      = $computer
