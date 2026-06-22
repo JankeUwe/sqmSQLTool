@@ -1,5 +1,14 @@
 # sqmSQLTool — Changelog
 
+## [1.7.2.0] — 2026-06-22
+
+### 🔧 Fixes
+
+- **Show-sqmToolGui**: Bei ShouldProcess-fähigen Befehlen war die „WhatIf (simulation)"-Checkbox
+  **vorab angehakt** (`Checked = $true`/`$supportsWhatIf`). Dadurch lief „Run" bei genau diesen
+  Befehlen ungewollt als reine Simulation statt echt auszuführen. Die Checkbox ist jetzt
+  **standardmäßig deaktiviert** (opt-in): „Run" führt real aus, Simulation wird bewusst angehakt.
+
 ## [1.7.1.0] — 2026-06-22
 
 ### ✨ Neu

@@ -11,7 +11,8 @@
 
     The grouping comes from Public\category-map.ps1. Functions without an entry land under
     "Other". Read-only functions (Get-/Test-) are safe to run; state-changing functions that
-    support -WhatIf automatically get a "WhatIf (simulation)" option that is enabled by default.
+    support -WhatIf get a "WhatIf (simulation)" option. It is OFF by default, so "Run" actually
+    executes - enable the checkbox deliberately to only simulate.
 
     The interface uses a Visual Studio "Dark" colour scheme.
 .PARAMETER Filter
@@ -259,7 +260,7 @@
 	$chkWhatIf.Text = 'WhatIf (simulation - shows what would happen, changes nothing)'
 	$chkWhatIf.Dock = 'Fill'
 	$chkWhatIf.TextAlign = 'MiddleLeft'
-	$chkWhatIf.Checked = $true
+	$chkWhatIf.Checked = $false
 	$chkWhatIf.Visible = $false
 	$chkWhatIf.ForeColor = $cText
 	$optPanel.Controls.Add($chkWhatIf)
@@ -360,10 +361,12 @@
 		}
 		$lblSyn.Text = $script:synCache[$fnName]
 
-		# Show WhatIf only when the function supports ShouldProcess
+		# Show WhatIf only when the function supports ShouldProcess.
+		# WICHTIG: NICHT vorab anhaken - sonst laeuft "Run" bei ShouldProcess-Befehlen ungewollt
+		# als Simulation. Die Simulation ist opt-in (Anwender hakt bewusst an).
 		$supportsWhatIf = $cmd.Parameters.ContainsKey('WhatIf')
 		$chkWhatIf.Visible = $supportsWhatIf
-		$chkWhatIf.Checked = $supportsWhatIf
+		$chkWhatIf.Checked = $false
 
 		$paramPanel.SuspendLayout()
 		$paramPanel.Controls.Clear()
