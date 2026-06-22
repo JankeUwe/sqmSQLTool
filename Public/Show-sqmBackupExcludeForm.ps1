@@ -215,20 +215,22 @@
 
     $btnSave = New-Object System.Windows.Forms.Button
     $btnSave.Text     = 'Speichern'
-    $btnSave.Anchor   = 'Bottom, Right'
-    $btnSave.Location = New-Object System.Drawing.Point(700, 8)
+    $btnSave.Anchor   = [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Right
+    $btnSave.Location = New-Object System.Drawing.Point(720, 8)
     $btnSave.Size     = New-Object System.Drawing.Size(90, 28)
     $btnSave.Enabled  = $false
     & $styleButton $btnSave
 
     $btnClose = New-Object System.Windows.Forms.Button
     $btnClose.Text     = 'Schliessen'
-    $btnClose.Anchor   = 'Bottom, Right'
-    $btnClose.Location = New-Object System.Drawing.Point(800, 8)
+    $btnClose.Anchor   = [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Right
+    $btnClose.Location = New-Object System.Drawing.Point(818, 8)
     $btnClose.Size     = New-Object System.Drawing.Size(90, 28)
     & $styleButton $btnClose
 
-    $pBottom.Controls.AddRange(@($lblStatus, $btnSave, $btnClose))
+    $pBottom.Controls.Add($lblStatus)
+    $pBottom.Controls.Add($btnSave)
+    $pBottom.Controls.Add($btnClose)
 
     # ----- Job-Info-Panel (zwischen Grid und Status-Leiste) ---------------------------
     $pJobInfo = New-Object System.Windows.Forms.Panel
@@ -334,6 +336,8 @@
                 return
             }
 
+            $systemDbs = @('master', 'model', 'msdb', 'tempdb')
+
             foreach ($r in $rows)
             {
                 $isOrphaned = [bool]$r.IsOrphaned
@@ -342,9 +346,24 @@
                 $reason     = if ($r.Reason) { $r.Reason } else { '' }
                 $by         = $r.ExcludedBy
                 $at         = if ($r.ExcludedAt) { ([datetime]$r.ExcludedAt).ToString('dd.MM.yyyy HH:mm') } else { '' }
+                $isSysDb    = $dbName -in $systemDbs
 
                 $rowIdx = $grid.Rows.Add($isActive, $dbName, $reason, $(if ($isOrphaned) { 'Ja' } else { '' }), $by, $at)
-                Set-RowColor $grid.Rows[$rowIdx] $isOrphaned
+                $gridRow = $grid.Rows[$rowIdx]
+
+                if ($isSysDb)
+                {
+                    # System-DBs: Checkbox und Reason sperren, visuell kennzeichnen
+                    $gridRow.Cells['colActive'].ReadOnly = $true
+                    $gridRow.Cells['colReason'].ReadOnly = $true
+                    $gridRow.DefaultCellStyle.ForeColor  = $cDim
+                    $gridRow.DefaultCellStyle.BackColor  = [System.Drawing.Color]::FromArgb(35, 35, 38)
+                    $gridRow.Cells['colName'].ToolTipText = 'System-Datenbank — kann nicht ausgeschlossen werden'
+                }
+                else
+                {
+                    Set-RowColor $gridRow $isOrphaned
+                }
 
                 # Original fuer spaeteres Diff merken
                 $script:originalRows.Add([PSCustomObject]@{
@@ -352,6 +371,7 @@
                     IsActive     = $isActive
                     Reason       = $reason
                     IsOrphaned   = $isOrphaned
+                    IsSystemDb   = $isSysDb
                 })
             }
 
@@ -383,17 +403,18 @@
         {
             $row      = $grid.Rows[$i]
             $dbName   = $row.Cells['colName'].Value
+
+            $orig = $script:originalRows | Where-Object { $_.DatabaseName -eq $dbName } | Select-Object -First 1
+            if (-not $orig) { continue }
+
+            # System-DBs und Waisen nie schreiben
             $isOrphan = ($row.Cells['colOrphaned'].Value -eq 'Ja')
-            if ($isOrphan) { continue }
+            if ($isOrphan -or $orig.IsSystemDb) { continue }
 
             # Checkbox-Wert: nach CommitEdit sollte er bool sein; null absichern
             $cellVal   = $row.Cells['colActive'].Value
             $newActive = if ($null -eq $cellVal) { $false } else { [bool]$cellVal }
             $newReason = if ($row.Cells['colReason'].Value) { $row.Cells['colReason'].Value.ToString().Trim() } else { '' }
-
-            # Select-Object -First 1: Where-Object auf Generic List kann array zurueckgeben
-            $orig = $script:originalRows | Where-Object { $_.DatabaseName -eq $dbName } | Select-Object -First 1
-            if (-not $orig) { continue }
 
             # Null-sicherer Vergleich auf beiden Seiten
             $origActive = [bool]$orig.IsActive
