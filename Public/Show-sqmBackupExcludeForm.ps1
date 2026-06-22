@@ -357,12 +357,14 @@
 
             $btnSave.Enabled = $true
             Set-Status "$($rows.Count) Eintrag/Eintraege geladen. Haken setzen = Backup aktiv." 'OK'
-            Load-JobInfo
         }
         catch
         {
             Set-Status "Fehler: $($_.Exception.Message)" 'Error'
         }
+
+        # Load-JobInfo ausserhalb des try-Blocks — Fehler dort sollen den Save-Button nicht blockieren
+        try { Load-JobInfo } catch { $rtfJobInfo.Text = "  Job-Info nicht verfuegbar: $($_.Exception.Message)" }
     }
 
     function Save-Changes
@@ -518,7 +520,18 @@
 
     $btnLoad.Add_Click({ Load-Grid })
 
-    $btnSave.Add_Click({ Save-Changes })
+    $btnSave.Add_Click({
+        try
+        {
+            Save-Changes
+        }
+        catch
+        {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Unerwarteter Fehler beim Speichern:`n$($_.Exception.Message)",
+                'Speichern – Fehler', 'OK', 'Error') | Out-Null
+        }
+    })
 
     $btnClose.Add_Click({ $form.Close() })
 
