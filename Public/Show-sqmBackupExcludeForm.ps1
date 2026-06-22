@@ -367,6 +367,9 @@
 
     function Save-Changes
     {
+        # Offene Zellen-Edits committen (v.a. Checkbox-Spalte: Wert steht erst nach EndEdit fest)
+        $grid.EndEdit()
+
         if ($grid.Rows.Count -eq 0)
         {
             Set-Status 'Keine Daten geladen.' 'Warn'
@@ -505,6 +508,13 @@
     }
 
     # ----- Event-Handler --------------------------------------------------------------
+
+    # Checkbox-Klick sofort committen — sonst ist der neue Wert beim Speichern noch nicht sichtbar
+    $grid.Add_CurrentCellDirtyStateChanged({
+        if ($grid.IsCurrentCellDirty) {
+            $grid.CommitEdit([System.Windows.Forms.DataGridViewDataErrorContexts]::Commit)
+        }
+    })
 
     $btnLoad.Add_Click({ Load-Grid })
 
