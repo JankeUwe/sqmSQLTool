@@ -396,7 +396,11 @@ ORDER BY drs.role ASC
 							$agentAccount = $null
 							try
 							{
-								$agentAccount = (Get-DbaAgentServiceAccount -SqlInstance $secondaryName -SqlCredential $dstCred).ServiceAccount
+								# Get-DbaAgentServiceAccount existiert nicht. Das Agent-Dienstkonto liefert sys.dm_server_services
+								# ueber die bestehende SQL-Verbindung (kein Windows/WMI noetig). servicename ist lokalisiert
+								# ("SQL Server-Agent" auf DE), daher locale-robustes LIKE '%Agent%'.
+								$agentSvcQuery = "SELECT TOP 1 service_account FROM sys.dm_server_services WHERE servicename LIKE '%Agent%'"
+								$agentAccount = (Invoke-DbaQuery -SqlInstance $secondaryName -SqlCredential $dstCred -Query $agentSvcQuery -ErrorAction Stop).service_account
 								Invoke-sqmLogging -Message "[$secondaryName] SafeForceMode: Auto-excluding Agent Account: $agentAccount" `
 												  -FunctionName $functionName -Level 'INFO'
 							}

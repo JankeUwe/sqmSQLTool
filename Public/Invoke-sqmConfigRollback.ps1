@@ -438,8 +438,15 @@ function Invoke-sqmConfigRollback
 					{
 						try
 						{
-							Set-DbaService -ComputerName $serverName -ServiceName $svcName `
-								-StartMode $svcSnapshot.StartMode -ErrorAction Stop
+							$svcObj = $currentServices | Where-Object { $_.ServiceName -eq $svcName } | Select-Object -First 1
+							if (-not $svcObj) { throw "Service-Objekt '$svcName' nicht verfuegbar (Get-DbaService lieferte es nicht)." }
+							# dbatools' Get-DbaService liefert CIM-Instanzen der Klasse SqlService (kein Set-DbaService-Cmdlet).
+							# Den StartMode aendert deren CIM-Methode SetStartMode(UInt32). Mapping: Automatic=2, Manual=3, Disabled=4.
+							$startModeMap = @{ 'Auto' = [uint32]2; 'Automatic' = [uint32]2; 'Manual' = [uint32]3; 'Disabled' = [uint32]4 }
+							$desiredMode = "$($svcSnapshot.StartMode)".Trim()
+							if (-not $startModeMap.ContainsKey($desiredMode)) { throw "Unbekannter StartMode '$desiredMode'." }
+							$cimRet = Invoke-CimMethod -InputObject $svcObj -MethodName SetStartMode -Arguments @{ StartMode = $startModeMap[$desiredMode] } -ErrorAction Stop
+							if ($cimRet.ReturnValue -ne 0) { throw "SetStartMode fuer '$svcName' lieferte ReturnValue $($cimRet.ReturnValue)." }
 							Invoke-sqmLogging -Message "Service $svcName StartMode geaendert: $svcCurrentMode -> $($svcSnapshot.StartMode)" `
 								-FunctionName $functionName -Level "INFO"
 

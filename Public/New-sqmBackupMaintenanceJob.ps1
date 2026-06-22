@@ -407,7 +407,7 @@ Invoke-sqmUserDatabaseBackup -All -BackupType '$BackupType' -MailProfile '$MailP
 				$op = Get-DbaAgentOperator @connParams -Operator $OperatorName -ErrorAction SilentlyContinue
 				if ($op)
 				{
-					Set-DbaAgentJob @connParams -Job $JobName -OperatorToEmail $OperatorName -EmailLevel OnFailure -ErrorAction SilentlyContinue | Out-Null
+					Set-DbaAgentJob @connParams -Job $JobName -EmailOperator $OperatorName -EmailLevel OnFailure -ErrorAction SilentlyContinue | Out-Null
 					Invoke-sqmLogging -Message "Operator '$OperatorName' fuer Fehler-Benachrichtigung gesetzt." -FunctionName $functionName -Level "INFO"
 				}
 				else

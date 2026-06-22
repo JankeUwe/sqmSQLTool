@@ -593,7 +593,7 @@ EXECUTE master.dbo.DatabaseBackup
 						$op = Get-DbaAgentOperator @connParams -Operator $OperatorName -ErrorAction SilentlyContinue
 						if ($op)
 						{
-							Set-DbaAgentJob @connParams -Job $jobDef.JobName -OperatorToEmail $OperatorName -EmailLevel OnFailure -ErrorAction SilentlyContinue | Out-Null
+							Set-DbaAgentJob @connParams -Job $jobDef.JobName -EmailOperator $OperatorName -EmailLevel OnFailure -ErrorAction SilentlyContinue | Out-Null
 						}
 						else
 						{

@@ -111,7 +111,9 @@ SELECT @BackupDirectory AS BackupDirectory;
 			{
 				if ($FileListOnly)
 				{
-					$fileList = Restore-DbaDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Path $file -FileListOnly -ErrorAction Stop
+					# Restore-DbaDatabase kennt kein -FileListOnly; die Backup-Dateiliste (RESTORE FILELISTONLY)
+						# liefert Read-DbaBackupHeader -FileList (LogicalName/PhysicalName/Type/FileGroupName/Size).
+						$fileList = Read-DbaBackupHeader -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Path $file -FileList -ErrorAction Stop
 					foreach ($f in $fileList)
 					{
 						$allResults.Add([PSCustomObject]@{

@@ -303,7 +303,7 @@ function Invoke-sqmRestoreDatabase
 			if ($BackupBeforeRestore -and $dbExists -and -not $isAGDatabase)
 			{
 				$backupFileName = "${DatabaseName}_preRestore_$(Get-Date -Format 'yyyyMMdd_HHmsqm').bak"
-				$backupFileFull = Join-Path (Get-DbaDefaultPath -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Type Backup) $backupFileName
+				$backupFileFull = Join-Path (Get-DbaDefaultPath -SqlInstance $SqlInstance -SqlCredential $SqlCredential).Backup $backupFileName
 				$backupParams = @{
 					SqlInstance   = $SqlInstance
 					SqlCredential = $SqlCredential

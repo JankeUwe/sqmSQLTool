@@ -1,5 +1,31 @@
 # sqmSQLTool — Changelog
 
+## [1.6.3.0] — 2026-06-22
+
+### 🔧 Fixes — dbatools-Parameter-/Cmdlet-Drift (gefunden per statischem Audit gegen dbatools 2.8.1, validiert gegen lokalen SQL 2022)
+
+Mechanische Parameter-Korrekturen:
+- **Invoke-sqmRestoreDatabase**: `Get-DbaDefaultPath -Type Backup` → `(Get-DbaDefaultPath …).Backup`
+  (`-Type` existiert nicht; betraf den `-BackupBeforeRestore`-Pfad).
+- **Test-sqmBackupIntegrity**: `Restore-DbaDatabase -FileListOnly` → `Read-DbaBackupHeader -FileList`
+  (Restore-DbaDatabase kennt kein `-FileListOnly`; der Verify-Pfad nutzte bereits korrekt `-VerifyOnly`).
+- **New-sqmBackupMaintenanceJob / New-sqmOlaMaintenanceJobs / New-sqmOlaSysDbBackupJob /
+  New-sqmOlaUsrDbBackupJob**: `Set-DbaAgentJob -OperatorToEmail` → `-EmailOperator`.
+- **Invoke-sqmDeployScripts**: `Connect-DbaInstance -EnableException` → `-ErrorAction Stop`
+  (Connect-DbaInstance hat kein `-EnableException`).
+
+Redesigns (Cmdlet existiert gar nicht):
+- **Invoke-sqmUpdateStatistics**: nutzte `Update-DbaDbStatistic` — diesen Cmdlet gibt es nicht, die
+  Funktion war wirkungslos. Neu implementiert über `Invoke-DbaQuery` mit echtem `UPDATE STATISTICS`;
+  Zielstatistiken werden serverseitig aus `sys.stats`/`sys.dm_db_stats_properties` ermittelt, sodass
+  `-OnlyModified`, `-Index`, `-Table`, `-Statistics` und `-SamplePercent` (FULLSCAN/SAMPLE) greifen.
+- **Invoke-sqmConfigRollback**: `Set-DbaService -StartMode` existiert nicht. dbatools' `Get-DbaService`
+  liefert CIM-Instanzen der Klasse `SqlService`; der StartMode wird jetzt über deren CIM-Methode
+  `SetStartMode(UInt32)` gesetzt (Automatic=2, Manual=3, Disabled=4). Funktioniert unter PS 5.1 und 7.
+- **Sync-sqmLoginsToAlwaysOn**: `Get-DbaAgentServiceAccount` existiert nicht. Das Agent-Dienstkonto
+  kommt jetzt aus `sys.dm_server_services` (locale-robustes `LIKE '%Agent%'`) über die bestehende
+  SQL-Verbindung.
+
 ## [1.6.2.0] — 2026-06-22
 
 ### 🔧 Fixes

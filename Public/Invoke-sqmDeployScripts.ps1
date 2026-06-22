@@ -377,7 +377,7 @@ function Invoke-sqmDeployScripts
 
 		try
 		{
-			$server = Connect-DbaInstance @connParams -EnableException
+			$server = Connect-DbaInstance @connParams -ErrorAction Stop
 		}
 		catch
 		{
