@@ -367,68 +367,68 @@
 
     function Save-Changes
     {
-        # Offene Zellen-Edits committen (v.a. Checkbox-Spalte: Wert steht erst nach EndEdit fest)
         $grid.EndEdit()
 
-        if ($grid.Rows.Count -eq 0)
-        {
-            Set-Status 'Keine Daten geladen.' 'Warn'
-            return
-        }
+        if ($grid.Rows.Count -eq 0)        { Set-Status 'Keine Daten geladen.' 'Warn'; return }
+        if (-not $script:connParams.Count)  { Set-Status 'Keine Verbindung — bitte zuerst laden.' 'Warn'; return }
 
+        # Lokale Kopie — @script:connParams ist als Splatting in nested functions nicht zuverlaessig
+        $cp      = $script:connParams
         $changed = 0
         $errors  = 0
 
         for ($i = 0; $i -lt $grid.Rows.Count; $i++)
         {
-            $row        = $grid.Rows[$i]
-            $dbName     = $row.Cells['colName'].Value
-            $newActive  = [bool]$row.Cells['colActive'].Value
-            $newReason  = if ($row.Cells['colReason'].Value) { $row.Cells['colReason'].Value.ToString().Trim() } else { '' }
+            $row      = $grid.Rows[$i]
+            $dbName   = $row.Cells['colName'].Value
+            $isOrphan = ($row.Cells['colOrphaned'].Value -eq 'Ja')
+            if ($isOrphan) { continue }
 
-            $orig = $script:originalRows | Where-Object { $_.DatabaseName -eq $dbName }
+            # Checkbox-Wert: nach CommitEdit sollte er bool sein; null absichern
+            $cellVal   = $row.Cells['colActive'].Value
+            $newActive = if ($null -eq $cellVal) { $false } else { [bool]$cellVal }
+            $newReason = if ($row.Cells['colReason'].Value) { $row.Cells['colReason'].Value.ToString().Trim() } else { '' }
+
+            # Select-Object -First 1: Where-Object auf Generic List kann array zurueckgeben
+            $orig = $script:originalRows | Where-Object { $_.DatabaseName -eq $dbName } | Select-Object -First 1
             if (-not $orig) { continue }
 
-            $activeChanged = ($newActive -ne $orig.IsActive)
-            $reasonChanged = ($newReason -ne $orig.Reason)
+            # Null-sicherer Vergleich auf beiden Seiten
+            $origActive = [bool]$orig.IsActive
+            $origReason = if ($null -eq $orig.Reason) { '' } else { "$($orig.Reason)" }
 
+            $activeChanged = ($newActive -ne $origActive)
+            $reasonChanged = ($newReason -ne $origReason)
             if (-not $activeChanged -and -not $reasonChanged) { continue }
 
             $setParts = [System.Collections.Generic.List[string]]::new()
             if ($activeChanged) { $setParts.Add("IsActive = $(if ($newActive) { 1 } else { 0 })") }
             if ($reasonChanged) { $setParts.Add("Reason = $(if ([string]::IsNullOrWhiteSpace($newReason)) { 'NULL' } else { "N'$($newReason.Replace("'","''"))'" })") }
 
-            $updateSql = "UPDATE master.dbo.sqm_BackupExclude SET $($setParts -join ', ') WHERE DatabaseName = N'$($dbName.Replace("'","''"))'"
+            $sql = "UPDATE master.dbo.sqm_BackupExclude SET $($setParts -join ', ') WHERE DatabaseName = N'$($dbName.Replace("'","''"))'"
 
             try
             {
-                Invoke-DbaQuery @script:connParams -Database master -Query $updateSql -ErrorAction Stop
-                # Original-Snapshot aktualisieren
+                Invoke-DbaQuery @cp -Database master -Query $sql -ErrorAction Stop
                 $orig.IsActive = $newActive
                 $orig.Reason   = $newReason
                 $changed++
             }
             catch
             {
-                Set-Status "Fehler beim Speichern von '$dbName': $($_.Exception.Message)" 'Error'
+                Set-Status "Fehler '$dbName': $($_.Exception.Message)" 'Error'
                 $errors++
             }
         }
 
         if ($errors -eq 0)
         {
-            if ($changed -eq 0)
-            {
-                Set-Status 'Keine Aenderungen erkannt.' 'Info'
-            }
-            else
-            {
-                Set-Status "$changed Zeile(n) erfolgreich gespeichert." 'OK'
-            }
+            Set-Status (if ($changed -eq 0) { 'Keine Aenderungen erkannt.' } else { "$changed Zeile(n) gespeichert." }) `
+                       (if ($changed -eq 0) { 'Info' } else { 'OK' })
         }
         else
         {
-            Set-Status "$changed Zeile(n) gespeichert, $errors Fehler aufgetreten." 'Warn'
+            Set-Status "$changed gespeichert, $errors Fehler." 'Warn'
         }
     }
 
