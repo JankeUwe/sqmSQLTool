@@ -112,6 +112,7 @@ $categoryMap = @{
     'Remove-sqmDatabaseFromAG'            = 'Always On & Availability Groups'
     'Repair-sqmAlwaysOnDatabases'         = 'Always On & Availability Groups'
     'Set-sqmBackupExcludePermission'      = 'Backup & Recovery'
+    'Show-sqmBackupExcludeForm'           = 'Backup & Recovery'
     'Set-sqmConfig'                       = 'Configuration Management'
     'Set-sqmDatabaseOwner'                = 'Database Maintenance'
     'Set-sqmMaxDop'                       = 'Configuration Management'

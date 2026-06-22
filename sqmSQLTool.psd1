@@ -189,6 +189,7 @@
 		'Set-sqmSsrsConfiguration',
 		'Set-sqmSsrsHttpsCertificate',
 		'Set-sqmTcpPort',
+		'Show-sqmBackupExcludeForm',
 		'Show-sqmToolGui',
 		'Sync-sqmAgNode',
 		'Sync-sqmBackupExcludeTable',

@@ -410,43 +410,9 @@ function New-sqmOlaUsrDbBackupJob
 				return ($expanded | Select-Object -Unique)
 			}
 			
-			# 5b. Exclude-Tabelle auswerten wenn -UseExcludeTable gesetzt
-			$excludeDatabasesParam = ''
 			if ($UseExcludeTable)
 			{
-				Invoke-sqmLogging -Message "-UseExcludeTable gesetzt: Pruefe master.dbo.sqm_BackupExclude auf Ausnahmen." -FunctionName $functionName -Level "INFO"
-				try
-				{
-					$excludeCheck = Invoke-DbaQuery @connParams -Database master `
-						-Query "SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'master.dbo.sqm_BackupExclude') AND type = 'U'" `
-						-ErrorAction Stop
-
-					if ($excludeCheck)
-					{
-						$excludeRows = Invoke-DbaQuery @connParams -Database master `
-							-Query "SELECT DatabaseName FROM master.dbo.sqm_BackupExclude WHERE IsActive = 1 AND IsOrphaned = 0" `
-							-ErrorAction Stop
-
-						if ($excludeRows)
-						{
-							$excludeList = ($excludeRows | Select-Object -ExpandProperty DatabaseName) -join ','
-							$excludeDatabasesParam = "@ExcludeDatabases = '$excludeList',"
-							Invoke-sqmLogging -Message "sqm_BackupExclude: $($excludeRows.Count) Datenbank(en) werden aus den Jobs ausgeschlossen: $excludeList" -FunctionName $functionName -Level "INFO"
-						}
-						else
-						{
-							Invoke-sqmLogging -Message "sqm_BackupExclude enthaelt keine aktiven Eintraege. Parameter -Databases wird unveraendert verwendet." -FunctionName $functionName -Level "INFO"
-						}
-					}
-					else
-					{
-						Invoke-sqmLogging -Message "Tabelle sqm_BackupExclude nicht gefunden. Parameter -Databases wird unveraendert verwendet." -FunctionName $functionName -Level "WARNING"
-					}
-				}
-				catch
-				{
-					Invoke-sqmLogging -Message "Konnte sqm_BackupExclude nicht auslesen: $($_.Exception.Message). Parameter -Databases wird unveraendert verwendet." -FunctionName $functionName -Level "WARNING"
-				}
+				Invoke-sqmLogging -Message "-UseExcludeTable gesetzt: Job-Step liest sqm_BackupExclude zur Laufzeit dynamisch." -FunctionName $functionName -Level "INFO"
 			}
 
 			# 6. Jeden Job anlegen
@@ -492,10 +458,50 @@ function New-sqmOlaUsrDbBackupJob
 					}
 					
 					# Ola-Kommando aufbauen
-					$olaCommand = @"
+					if ($UseExcludeTable)
+					{
+						# Exclude-Liste wird bei jedem Job-Lauf frisch aus sqm_BackupExclude gelesen —
+						# aenderungen in der Tabelle wirken sofort, ohne den Job neu anlegen zu muessen.
+						$olaCommand = @"
+DECLARE @ExcludeList NVARCHAR(MAX) = NULL;
+
+IF OBJECT_ID(N'master.dbo.sqm_BackupExclude', N'U') IS NOT NULL
+BEGIN
+    SELECT @ExcludeList = STUFF((
+        SELECT ',' + DatabaseName
+        FROM   master.dbo.sqm_BackupExclude
+        WHERE  IsActive   = 1
+          AND  IsOrphaned = 0
+        FOR XML PATH(''), TYPE
+    ).value('.', 'NVARCHAR(MAX)'), 1, 1, '');
+END
+
+DECLARE @cmd NVARCHAR(MAX);
+SET @cmd = N'EXECUTE master.dbo.DatabaseBackup
+    @Databases  = ''$Databases'',
+    @Directory  = N''$usrBackupDir'',
+    @BackupType = ''$($jobDef.BackupType)'',
+    @Verify     = ''$Verify'',
+    $cleanupParam
+    @Compress   = ''$Compress'',
+    @CheckSum   = ''$CheckSum'',
+    @LogToTable = ''$LogToTable'''
+    + CASE
+        WHEN @ExcludeList IS NOT NULL AND @ExcludeList <> ''
+        THEN N',
+    @ExcludeDatabases = ''' + @ExcludeList + N''''
+        ELSE N''
+      END
+    + N';';
+
+EXEC sp_executesql @cmd;
+"@
+					}
+					else
+					{
+						$olaCommand = @"
 EXECUTE master.dbo.DatabaseBackup
     @Databases  = '$Databases',
-    $excludeDatabasesParam
     @Directory  = N'$usrBackupDir',
     @BackupType = '$($jobDef.BackupType)',
     @Verify     = '$Verify',
@@ -504,6 +510,7 @@ EXECUTE master.dbo.DatabaseBackup
     @CheckSum   = '$CheckSum',
     @LogToTable = '$LogToTable';
 "@
+					}
 					$olaCommand = ($olaCommand -split "`n" | Where-Object { $_.Trim() -ne '' }) -join "`n"
 					
 					$timeParts = $jobDef.ScheduleTime -split ':'
