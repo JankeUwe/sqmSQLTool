@@ -1,5 +1,18 @@
 # sqmSQLTool — Changelog
 
+## [1.7.1.0] — 2026-06-22
+
+### ✨ Neu
+
+- **Get-sqmDiskSpaceReport — Bootstrap aus Backup-Historie (Methode B2)**: Neuer Schalter
+  `-SeedFromBackupHistory`. Solange die Snapshot-Historie (B1) für ein Volume noch < `-MinDataPoints`
+  Punkte hat, wird ersatzweise eine Wachstumsrate aus `msdb.dbo.backupset` abgeleitet: je Datenbank
+  der Daten-Wachstumstrend aus den Full-Backup-Größen (lineare Regression, ab 3 Punkten) und
+  proportional zur Datendatei-Größe auf die Volumes verteilt. Überbrückt die ~5-Läufe-Anlaufzeit von
+  B1. Ausgewiesen mit `ForecastBasis='BackupHistory'`, Konfidenz `Low` (Report-Spalte `Boot`). Sobald
+  B1 genug Snapshots hat, übernimmt wieder B1. Greift nur bei gesetztem Schalter; benötigt Lesezugriff
+  auf `msdb.dbo.backupset`.
+
 ## [1.7.0.0] — 2026-06-22
 
 ### ✨ Neu

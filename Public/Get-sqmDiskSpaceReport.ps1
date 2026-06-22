@@ -48,6 +48,12 @@
 .PARAMETER NoHistory
     Do not append the current run to the history (forecast still uses whatever history exists).
 
+.PARAMETER SeedFromBackupHistory
+    Bootstrap (method B2): while the snapshot history has fewer than -MinDataPoints points for a volume,
+    derive a fallback growth rate from msdb full-backup sizes (data growth trend per database, mapped to
+    volumes by data-file location). Used only as long as B1 is insufficient; reported with
+    ForecastBasis='BackupHistory' and confidence Low. Requires read access to msdb.dbo.backupset.
+
 .PARAMETER ContinueOnError
     Continue on error for an instance (otherwise the error is thrown).
 
@@ -98,6 +104,8 @@ function Get-sqmDiskSpaceReport
 		[int]$MinDataPoints = 5,
 		[Parameter(Mandatory = $false)]
 		[switch]$NoHistory,
+		[Parameter(Mandatory = $false)]
+		[switch]$SeedFromBackupHistory,
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
@@ -277,6 +285,23 @@ ORDER BY vs.volume_mount_point;
 					}
 				}
 
+				# 2b. Bootstrap (B2): Wachstumsrate aus msdb-Backup-Historie, solange B1 noch zu wenige
+				#     Snapshots hat. Greift in der Detailschleife nur, wenn der B1-Forecast 'Insufficient' ist.
+				$backupSeed = @{ }
+				if ($SeedFromBackupHistory)
+				{
+					try
+					{
+						$backupSeed = Get-sqmBackupGrowthSeed -ConnParams $connParams -Days ([math]::Max($HistoryDays, 90)) -Volumes $volRows
+						Invoke-sqmLogging -Message "[$instance] Backup-Historie-Seed: $($backupSeed.Keys.Count) Volume(s) mit Trend." -FunctionName $functionName -Level "VERBOSE"
+					}
+					catch
+					{
+						Invoke-sqmLogging -Message "[$instance] Backup-Historie-Seed nicht ermittelbar: $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
+						$backupSeed = @{ }
+					}
+				}
+
 				# 3. Detailzeilen aufbereiten (Prognose je Volume aus der Historie)
 				foreach ($vol in $volRows)
 				{
@@ -289,9 +314,23 @@ ORDER BY vs.volume_mount_point;
 					$volHist = @($histForecast | Where-Object { $_.MountPoint -eq $mount })
 					$fc = Get-sqmVolumeForecast -History $volHist -FreeGB $freeGB -MinDataPoints $MinDataPoints
 
+					$basis   = $fc.Basis
+					$conf    = $fc.Confidence
+					$dpoints = $fc.DataPoints
 					$growthPerDay  = if ($fc.Basis -eq 'History' -and $fc.SlopePerDayGB -gt 0) { $fc.SlopePerDayGB } else { 0 }
 					$daysUntilFull = if ($fc.Basis -eq 'History') { $fc.DaysUntilFull } else { $null }
 					$growthGB      = if ($fc.Basis -eq 'History') { $fc.GrowthWindowGB } else { $null }
+
+					# Bootstrap (B2) nur solange B1 noch nicht greift.
+					if ($fc.Basis -ne 'History' -and $backupSeed.ContainsKey($mount) -and $backupSeed[$mount].SlopePerDayGB -gt 0)
+					{
+						$seedSlope = $backupSeed[$mount].SlopePerDayGB
+						$growthPerDay  = $seedSlope
+						$daysUntilFull = [math]::Round($freeGB / $seedSlope, 0)
+						$growthGB      = [math]::Round($seedSlope * $HistoryDays, 2)
+						$basis = 'BackupHistory'
+						$conf  = 'Low'
+					}
 
 					$status = if ($freePct -le $CriticalThresholdPct) { 'Critical' }
 					elseif ($freePct -le $WarnThresholdPct) { 'Warning' }
@@ -310,9 +349,9 @@ ORDER BY vs.volume_mount_point;
 							GrowthPerDayGB = if ($growthPerDay -gt 0) { $growthPerDay } else { $null }
 							DaysUntilFull = $daysUntilFull
 							HistoryDays = $HistoryDays
-							DataPoints  = $fc.DataPoints
-							ForecastConfidence = $fc.Confidence
-							ForecastBasis = $fc.Basis
+							DataPoints  = $dpoints
+							ForecastConfidence = $conf
+							ForecastBasis = $basis
 							Status	    = $status
 							Message	    = switch ($status)
 							{
@@ -320,16 +359,18 @@ ORDER BY vs.volume_mount_point;
 								'Warning'  {
 									if ($daysUntilFull -and $daysUntilFull -le 30)
 									{
-										"Warnung: voll in ca. $daysUntilFull Tagen (Konfidenz $($fc.Confidence))."
+										$src = if ($basis -eq 'BackupHistory') { 'Bootstrap Backup-Historie' } else { "Konfidenz $conf" }
+										"Warnung: voll in ca. $daysUntilFull Tagen ($src)."
 									}
 									else { "Warnung: nur $freePct% frei ($freeGB GB)." }
 								}
 								default    {
-									if ($fc.Basis -ne 'History')
+									switch ($basis)
 									{
-										"OK: $freePct% frei ($freeGB GB). Prognose sammelt noch Daten ($($fc.DataPoints) von $MinDataPoints Laeufen)."
+										'BackupHistory' { "OK: $freePct% frei ($freeGB GB). Prognose (Bootstrap Backup-Historie): voll in ca. $daysUntilFull Tagen." }
+										'History'       { "OK: $freePct% frei ($freeGB GB)." }
+										default         { "OK: $freePct% frei ($freeGB GB). Prognose sammelt noch Daten ($dpoints von $MinDataPoints Laeufen)." }
 									}
-									else { "OK: $freePct% frei ($freeGB GB)." }
 								}
 							}
 						})
@@ -379,7 +420,7 @@ ORDER BY vs.volume_mount_point;
 						$daysDisplay = if ($e.DaysUntilFull) { $e.DaysUntilFull }
 						elseif ($e.ForecastBasis -ne 'History') { "$($e.DataPoints)/$MinDataPoints" }
 						else { '-' }
-						$confDisplay = if ($e.ForecastBasis -eq 'History') { $e.ForecastConfidence } else { '-' }
+						$confDisplay = switch ($e.ForecastBasis) { 'History' { $e.ForecastConfidence } 'BackupHistory' { 'Boot' } default { '-' } }
 						$lines.Add(("{0,-6} {1,-20} {2,-8} {3,-8} {4,-8} {5,-7} {6,-10} {7,-9} {8,-6} {9}" -f
 								$e.Status, $e.MountPoint, $e.TotalGB, $e.UsedGB, $e.FreeGB,
 								"$($e.FreePct)%", $perDayDisplay, $daysDisplay, $confDisplay, $e.Message))
@@ -396,7 +437,7 @@ ORDER BY vs.volume_mount_point;
 						$cls = switch ($e.Status) { 'Critical' { 'crit' } 'Warning' { 'warn' } default { 'ok' } }
 						$perDayDisplay = if ($e.GrowthPerDayGB) { $e.GrowthPerDayGB } elseif ($e.ForecastBasis -ne 'History') { 'sammelt' } else { 'stabil' }
 						$daysDisplay   = if ($e.DaysUntilFull) { $e.DaysUntilFull } elseif ($e.ForecastBasis -ne 'History') { "$($e.DataPoints)/$MinDataPoints" } else { '-' }
-						$confDisplay   = if ($e.ForecastBasis -eq 'History') { $e.ForecastConfidence } else { '-' }
+						$confDisplay   = switch ($e.ForecastBasis) { 'History' { $e.ForecastConfidence } 'BackupHistory' { 'Boot' } default { '-' } }
 						$mp = [string]$e.MountPoint -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;'
 						$rowsHtml += "<tr><td class='$cls'>$($e.Status)</td><td>$mp</td><td>$($e.TotalGB)</td><td>$($e.UsedGB)</td><td>$($e.FreeGB)</td><td>$($e.FreePct)%</td><td>$perDayDisplay</td><td>$daysDisplay</td><td>$confDisplay</td></tr>`n"
 					}
@@ -529,4 +570,80 @@ function Get-sqmVolumeForecast
 		DaysUntilFull  = $daysUntilFull
 		Basis          = 'History'
 	}
+}
+
+# ---------------------------------------------------------------------------
+# Private Hilfsfunktion: Bootstrap-Wachstumsrate je Volume aus msdb-Backup-Historie (Methode B2)
+# Leitet pro DB den Daten-Wachstumstrend aus Full-Backup-Groessen ab und verteilt die Rate
+# proportional zur Datendatei-Groesse auf die Volumes (volume_mount_point). Rueckgabe:
+# Hashtable mountpoint -> @{ SlopePerDayGB; Dbs }. Fehler werden an den Aufrufer durchgereicht.
+# ---------------------------------------------------------------------------
+function Get-sqmBackupGrowthSeed
+{
+	param (
+		[hashtable]$ConnParams,
+		[int]$Days = 90,
+		[object[]]$Volumes
+	)
+
+	$seed = @{ }
+
+	$backupQuery = @"
+SELECT bs.database_name                 AS DatabaseName,
+       bs.backup_finish_date            AS FinishDate,
+       bs.backup_size / 1073741824.0    AS BackupGB
+FROM msdb.dbo.backupset bs
+WHERE bs.type = 'D' AND bs.is_copy_only = 0 AND bs.backup_size > 0
+  AND bs.backup_finish_date >= DATEADD(DAY, -$Days, GETDATE())
+ORDER BY bs.database_name, bs.backup_finish_date;
+"@
+	$backups = @(Invoke-DbaQuery @ConnParams -Query $backupQuery -EnableException:$true)
+	if ($backups.Count -eq 0) { return $seed }
+
+	# Datendateien (ROWS) -> Volume ueber laengsten Pfad-Praefix der Mount Points.
+	$fileRows = @(Invoke-DbaQuery @ConnParams -Query "SELECT DB_NAME(database_id) AS DatabaseName, physical_name AS PhysicalName, size * 8.0 / 1024 / 1024 AS FileGB FROM sys.master_files WHERE type = 0" -EnableException:$true)
+	$mounts = @($Volumes | ForEach-Object { [string]$_.MountPoint } | Sort-Object { $_.Length } -Descending)
+
+	$dbMountGB = @{ }   # "$db|$mount" -> GB
+	$dbTotalGB = @{ }   # "$db"        -> GB
+	foreach ($fl in $fileRows)
+	{
+		$path = [string]$fl.PhysicalName
+		$mt = $null
+		foreach ($m in $mounts) { if ($path -and $m -and $path.StartsWith($m, [System.StringComparison]::OrdinalIgnoreCase)) { $mt = $m; break } }
+		if (-not $mt) { continue }
+		$g = [double]$fl.FileGB
+		$db = [string]$fl.DatabaseName
+		$dbMountGB["$db|$mt"] = [double]($dbMountGB["$db|$mt"]) + $g
+		$dbTotalGB[$db] = [double]($dbTotalGB[$db]) + $g
+	}
+
+	# Pro DB die Daten-Wachstumsrate (GB/Tag) aus dem Backup-Groessen-Trend bestimmen
+	# (min. 3 Punkte genuegen fuer einen Bootstrap) und proportional auf die Volumes verteilen.
+	foreach ($grp in ($backups | Group-Object DatabaseName))
+	{
+		$db = [string]$grp.Name
+		$total = [double]($dbTotalGB[$db])
+		if ($total -le 0) { continue }
+
+		$pts = @($grp.Group | ForEach-Object { [PSCustomObject]@{ Timestamp = [datetime]$_.FinishDate; UsedGB = [double]$_.BackupGB } })
+		$dbFc = Get-sqmVolumeForecast -History $pts -FreeGB 0 -MinDataPoints 3
+		if ($dbFc.Basis -ne 'History' -or -not $dbFc.SlopePerDayGB -or $dbFc.SlopePerDayGB -le 0) { continue }
+		$slope = [double]$dbFc.SlopePerDayGB
+
+		foreach ($m in $mounts)
+		{
+			$key = "$db|$m"
+			if ($dbMountGB.ContainsKey($key))
+			{
+				$frac = [double]($dbMountGB[$key]) / $total
+				if (-not $seed.ContainsKey($m)) { $seed[$m] = @{ SlopePerDayGB = 0.0; Dbs = 0 } }
+				$seed[$m].SlopePerDayGB += $slope * $frac
+				$seed[$m].Dbs += 1
+			}
+		}
+	}
+
+	foreach ($k in @($seed.Keys)) { $seed[$k].SlopePerDayGB = [math]::Round($seed[$k].SlopePerDayGB, 3) }
+	return $seed
 }
