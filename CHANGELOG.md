@@ -1,5 +1,25 @@
 # sqmSQLTool — Changelog
 
+## [1.7.0.0] — 2026-06-22
+
+### ✨ Neu
+
+- **Get-sqmDiskSpaceReport — Wachstumsprognose neu auf Snapshot-Historie (Methode B1)**:
+  Die Prognose basierte bisher ausschließlich auf AutoGrow-Events des Default Trace und blieb
+  damit leer, sobald keine automatischen Dateivergrößerungen im Zeitfenster lagen (gut dimensionierte
+  DBs) oder die kurze Default-Trace-Retention die Events verdrängt hatte. Stattdessen wird jetzt bei
+  jedem Lauf die Volume-Belegung in eine JSON-Historie (`History\DiskHistory_<Instanz>.json`)
+  geschrieben und über die letzten `-HistoryDays` Tage per **linearer Regression (Least Squares)**
+  ausgewertet: `GB/Tag`, `DaysUntilFull` und eine Konfidenz (R²/Punktzahl: Low/Medium/High).
+  - Misst den **tatsächlichen Verbrauchstrend** (auch Datenwachstum in vorab dimensionierten Dateien)
+    und ist **mountpoint-sicher** (Auswertung je `volume_mount_point`).
+  - Vor `-MinDataPoints` Läufen (Default 5) wird das Volume transparent als „Prognose sammelt noch
+    Daten (n von m)" ausgewiesen statt still `n/a`.
+  - Neue Parameter: `-HistoryPath`, `-MinDataPoints`, `-NoHistory`. Neue Ausgabefelder:
+    `DataPoints`, `ForecastConfidence`, `ForecastBasis`. Report-Spalten: `GB/Tag`, `DaysFull`, `Konf`.
+  - `-WhatIf` persistiert die Historie nicht.
+  - Hinweis: Für belastbare Prognosen die Funktion regelmäßig planen (z. B. täglicher Agent-Job).
+
 ## [1.6.4.0] — 2026-06-22
 
 ### 🔧 Fixes — ungültige DMV-Spalten (gefunden per Live-Lauf + statischer DMV-Validierung gegen SQL 2022)
