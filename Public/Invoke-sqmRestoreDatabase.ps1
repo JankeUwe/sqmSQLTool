@@ -170,7 +170,7 @@ function Invoke-sqmRestoreDatabase
 		
 		$results = @()
 		$tempDir = [System.IO.Path]::GetTempPath()
-		$userExportFile = Join-Path $tempDir "UserExport_$DatabaseName_$(Get-Date -Format 'yyyyMMddHHmsqm').sql"
+		$userExportFile = Join-Path $tempDir "UserExport_${DatabaseName}_$(Get-Date -Format 'yyyyMMddHHmmss').sql"
 		$isAGDatabase = $false
 		$availabilityGroup = $null
 		$primaryInstance = $null
@@ -281,7 +281,7 @@ function Invoke-sqmRestoreDatabase
 							Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 							if ($EnableException) { throw }
 							$results += [PSCustomObject]@{ Action = "SetSingleUser"; Status = "Failed"; Message = $errMsg }
-							return $results
+							return
 						}
 					}
 					else
@@ -327,7 +327,7 @@ function Invoke-sqmRestoreDatabase
 						Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 						if ($EnableException) { throw }
 						$results += [PSCustomObject]@{ Action = "PreRestoreBackup"; Status = "Failed"; Message = $errMsg }
-						return $results
+						return
 					}
 				}
 				else
@@ -344,7 +344,7 @@ function Invoke-sqmRestoreDatabase
 					try
 					{
 						Invoke-sqmLogging -Message "Exportiere User der Datenbank '$DatabaseName' nach $userExportFile" -FunctionName $functionName -Level "INFO"
-						Export-DbaUser -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $DatabaseName -Path $userExportFile -Force -ErrorAction Stop
+						Export-DbaUser -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $DatabaseName -FilePath $userExportFile -ErrorAction Stop
 						Invoke-sqmLogging -Message "User-Export erfolgreich." -FunctionName $functionName -Level "INFO"
 						$results += [PSCustomObject]@{ Action = "UserExport"; Status = "Success"; Message = "Exportdatei: $userExportFile" }
 					}
@@ -354,7 +354,7 @@ function Invoke-sqmRestoreDatabase
 						Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 						if ($EnableException) { throw }
 						$results += [PSCustomObject]@{ Action = "UserExport"; Status = "Failed"; Message = $errMsg }
-						return $results
+						return
 					}
 				}
 				else
@@ -397,7 +397,7 @@ function Invoke-sqmRestoreDatabase
 						Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 						if ($EnableException) { throw }
 						$results += [PSCustomObject]@{ Action = "RemoveFromAG"; Status = "Failed"; Message = $errMsg }
-						return $results
+						return
 					}
 				}
 				else
@@ -458,23 +458,15 @@ function Invoke-sqmRestoreDatabase
 					SqlInstance   = $SqlInstance
 					SqlCredential = $SqlCredential
 					Path		  = $file
-					DatabaseName  = $DatabaseName
+					DatabaseName  = $finalDbName
 					WithReplace   = $true
 					NoRecovery    = (-not $useRecovery)
 					ErrorAction   = 'Stop'
 				}
-				if ($NewDatabaseName)
-				{
-					$restoreParams.NewDatabaseName = $NewDatabaseName
-				}
-				if ($NewDatabaseFilePath)
-				{
-					$restoreParams.DatabaseFilePath = $NewDatabaseFilePath
-				}
-				if ($NewLogFilePath)
-				{
-					$restoreParams.LogFilePath = $NewLogFilePath
-				}
+				# Hinweis: Restore-DbaDatabase kennt KEINE Parameter -NewDatabaseName/-DatabaseFilePath/-LogFilePath.
+				# Der Zielname (auch ein neuer) wird ueber -DatabaseName ($finalDbName) gesetzt; die physischen
+				# Datei-Namen/-Pfade regelt das weiter unten aufgebaute -FileMapping (nutzt NewDatabaseFilePath/
+				# NewLogFilePath als Zielverzeichnisse). Damit sind Umbenennen + Verschieben versionsstabil abgedeckt.
 				# Fuer alle ausser den ersten Restore (Full) muss der Datenbankname bereits existieren; fuer Log-Restores ist das wichtig
 				# Restore-DbaDatabase kann sequenziell verarbeitet werden.
 				
@@ -549,13 +541,13 @@ function Invoke-sqmRestoreDatabase
 						Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 						if ($EnableException) { throw }
 						$results += [PSCustomObject]@{ Action = "RestoreStep"; File = $file; Step = $restoreCount; Status = "Failed"; Message = $errMsg }
-						return $results
+						return
 					}
 				}
 				else
 				{
 					$results += [PSCustomObject]@{ Action = "RestoreStep"; File = $file; Step = $restoreCount; Status = "Skipped"; Message = "WhatIf - Restore uebersprungen." }
-					return $results
+					return
 				}
 			}
 			

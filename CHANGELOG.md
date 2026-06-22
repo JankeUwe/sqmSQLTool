@@ -1,5 +1,23 @@
 # sqmSQLTool — Changelog
 
+## [1.6.2.0] — 2026-06-22
+
+### 🔧 Fixes
+
+- **Invoke-sqmRestoreDatabase**: Mehrere dbatools-Parameter passten nicht zur installierten
+  Version und ließen den scharfen Lauf abbrechen:
+  - `Export-DbaUser -Force` → `-Force` existiert nicht; jetzt `-FilePath` (Vollpfad) ohne `-Force`.
+    (Behebt „A parameter cannot be found that matches parameter name 'Force'".)
+  - `Restore-DbaDatabase -NewDatabaseName/-DatabaseFilePath/-LogFilePath` → diese Parameter gibt es
+    nicht. Der (ggf. neue) Zielname läuft jetzt über `-DatabaseName` (`$finalDbName`), die physischen
+    Datei-Namen/-Pfade regelt das bereits gebaute `-FileMapping`. Umbenennen + Verschieben damit
+    versionsstabil.
+  - User-Export-Dateiname: `$DatabaseName_` wurde als (leere) Variable interpretiert, der DB-Name
+    fehlte im Namen; jetzt `${DatabaseName}` und korrektes Zeitstempelformat.
+- **Invoke-sqmRestoreDatabase**: Doppelte Ergebniszeilen bei Früh-Returns (WhatIf/Fehler) behoben.
+  Die `return $results` im `process`-Block sind jetzt bloße `return`; der `end`-Block gibt die Liste
+  genau einmal zurück.
+
 ## [1.6.1.0] — 2026-06-22
 
 ### 🔧 Fixes
