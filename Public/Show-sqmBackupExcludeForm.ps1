@@ -230,9 +230,41 @@
 
     $pBottom.Controls.AddRange(@($lblStatus, $btnSave, $btnClose))
 
+    # ----- Job-Info-Panel (zwischen Grid und Status-Leiste) ---------------------------
+    $pJobInfo = New-Object System.Windows.Forms.Panel
+    $pJobInfo.Dock      = 'Bottom'
+    $pJobInfo.Height    = 116
+    $pJobInfo.BackColor = [System.Drawing.Color]::FromArgb(37, 37, 40)
+
+    $lblJobHeader = New-Object System.Windows.Forms.Label
+    $lblJobHeader.Text      = 'Backup-Jobs (SQL Agent)'
+    $lblJobHeader.Location  = New-Object System.Drawing.Point(6, 4)
+    $lblJobHeader.AutoSize  = $true
+    $lblJobHeader.ForeColor = $cDim
+    $lblJobHeader.Font      = New-Object System.Drawing.Font('Segoe UI', 8)
+
+    $rtfJobInfo = New-Object System.Windows.Forms.TextBox
+    $rtfJobInfo.Multiline   = $true
+    $rtfJobInfo.ReadOnly    = $true
+    $rtfJobInfo.ScrollBars  = 'Vertical'
+    $rtfJobInfo.Location    = New-Object System.Drawing.Point(6, 22)
+    $rtfJobInfo.Size        = New-Object System.Drawing.Size(892, 88)
+    $rtfJobInfo.Anchor      = [System.Windows.Forms.AnchorStyles]::Top -bor
+                              [System.Windows.Forms.AnchorStyles]::Left -bor
+                              [System.Windows.Forms.AnchorStyles]::Right
+    $rtfJobInfo.BackColor   = [System.Drawing.Color]::FromArgb(37, 37, 40)
+    $rtfJobInfo.ForeColor   = $cText
+    $rtfJobInfo.BorderStyle = 'None'
+    $rtfJobInfo.Font        = New-Object System.Drawing.Font('Consolas', 8.5)
+    $rtfJobInfo.Text        = '  Noch keine Daten geladen.'
+
+    $pJobInfo.Controls.Add($lblJobHeader)
+    $pJobInfo.Controls.Add($rtfJobInfo)
+
     # ----- Layout zusammenbauen -------------------------------------------------------
     $form.Controls.Add($grid)
     $form.Controls.Add($pTop)
+    $form.Controls.Add($pJobInfo)
     $form.Controls.Add($pBottom)
 
     # ----- Hilfsfunktionen -----------------------------------------------------------
@@ -325,6 +357,7 @@
 
             $btnSave.Enabled = $true
             Set-Status "$($rows.Count) Eintrag/Eintraege geladen. Haken setzen = Backup aktiv." 'OK'
+            Load-JobInfo
         }
         catch
         {
@@ -394,6 +427,81 @@
         {
             Set-Status "$changed Zeile(n) gespeichert, $errors Fehler aufgetreten." 'Warn'
         }
+    }
+
+    function Load-JobInfo
+    {
+        $rtfJobInfo.Text = '  Lese Job-Konfiguration ...'
+        $form.Refresh()
+
+        $cfg = @{}
+        try { $cfg = Get-sqmConfig } catch { }
+
+        $jobNames = [ordered]@{
+            FULL = if ($cfg['OlaJobNameFull']) { $cfg['OlaJobNameFull'] } else { 'OlaHH-UserDatabases-FULL' }
+            DIFF = if ($cfg['OlaJobNameDiff']) { $cfg['OlaJobNameDiff'] } else { 'OlaHH-UserDatabases-DIFF' }
+            LOG  = if ($cfg['OlaJobNameLog'])  { $cfg['OlaJobNameLog']  } else { 'OlaHH-UserDatabases-LOG'  }
+        }
+
+        # Liest einen benannten Ola-Parameter aus dem Step-Command (static + dynamic T-SQL)
+        $parseParam = {
+            param ([string]$cmd, [string]$p)
+            if ($cmd -match "(?i)@$p\s*=\s*(?:N?'{1,2})([^']+)") { $Matches[1] } else { '—' }
+        }
+
+        $lines = [System.Collections.Generic.List[string]]::new()
+
+        foreach ($type in $jobNames.Keys)
+        {
+            $jobName = $jobNames[$type]
+            $job     = Get-DbaAgentJob @script:connParams -Job $jobName -ErrorAction SilentlyContinue
+
+            if (-not $job)
+            {
+                $lines.Add("  [$type]  $jobName  →  nicht gefunden")
+                continue
+            }
+
+            # Schedule
+            $sched = $job.JobSchedules | Select-Object -First 1
+            if ($sched)
+            {
+                $t      = $sched.ActiveStartTimeOfDay
+                $time   = '{0:D2}:{1:D2}' -f $t.Hours, $t.Minutes
+                $mask   = [int]$sched.FrequencyInterval
+                $days   = @()
+                if ($mask -band 2)  { $days += 'Mo' }
+                if ($mask -band 4)  { $days += 'Di' }
+                if ($mask -band 8)  { $days += 'Mi' }
+                if ($mask -band 16) { $days += 'Do' }
+                if ($mask -band 32) { $days += 'Fr' }
+                if ($mask -band 64) { $days += 'Sa' }
+                if ($mask -band 1)  { $days += 'So' }
+                $dayStr   = if ($days.Count -eq 7) { 'taeglich' } elseif ($days.Count -eq 0) { '?' } else { $days -join '/' }
+                $schedStr = "$dayStr  $time"
+            }
+            else { $schedStr = 'kein Schedule' }
+
+            # Step-Command
+            $cmd  = ''
+            $step = $job.JobSteps | Where-Object { $_.ID -eq 1 }
+            if ($step) { $cmd = $step.Command }
+
+            $db         = & $parseParam $cmd 'Databases'
+            $dir        = & $parseParam $cmd 'Directory'
+            $cleanup    = if ($cmd -match '(?i)@CleanupTime\s*=\s*(\d+)') { $Matches[1] } else { '—' }
+            $compress   = & $parseParam $cmd 'Compress'
+            $verify     = & $parseParam $cmd 'Verify'
+            $checksum   = & $parseParam $cmd 'CheckSum'
+            $hasExclude = $cmd -match 'sqm_BackupExclude'
+
+            $lines.Add("  [$type]  $jobName  |  Schedule: $schedStr")
+            $lines.Add("         @Databases=$db   @Directory=$dir   @CleanupTime=${cleanup}h")
+            $lines.Add("         @Compress=$compress  @Verify=$verify  @CheckSum=$checksum  ExcludeTable: $(if ($hasExclude) { 'Ja (dynamisch)' } else { 'Nein' })")
+            $lines.Add('')
+        }
+
+        $rtfJobInfo.Text = ($lines -join "`r`n").TrimEnd()
     }
 
     # ----- Event-Handler --------------------------------------------------------------
