@@ -209,17 +209,9 @@
     $lblStatus = New-Object System.Windows.Forms.Label
     $lblStatus.AutoSize   = $false
     $lblStatus.Location   = New-Object System.Drawing.Point(6, 12)
-    $lblStatus.Size       = New-Object System.Drawing.Size(580, 22)
+    $lblStatus.Size       = New-Object System.Drawing.Size(810, 22)
     $lblStatus.ForeColor  = $cDim
     $lblStatus.Text       = 'Bitte eine Instanz eingeben und "Sync && Laden" klicken.'
-
-    $btnSave = New-Object System.Windows.Forms.Button
-    $btnSave.Text     = 'Speichern'
-    $btnSave.Anchor   = [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Right
-    $btnSave.Location = New-Object System.Drawing.Point(720, 8)
-    $btnSave.Size     = New-Object System.Drawing.Size(90, 28)
-    $btnSave.Enabled  = $false
-    & $styleButton $btnSave
 
     $btnClose = New-Object System.Windows.Forms.Button
     $btnClose.Text     = 'Schliessen'
@@ -229,7 +221,6 @@
     & $styleButton $btnClose
 
     $pBottom.Controls.Add($lblStatus)
-    $pBottom.Controls.Add($btnSave)
     $pBottom.Controls.Add($btnClose)
 
     # ----- Job-Info-Panel (zwischen Grid und Status-Leiste) ---------------------------
@@ -310,7 +301,6 @@
 
         Set-Status "Verbinde mit '$instance' und synchronisiere ..." 'Info'
         $grid.Rows.Clear()
-        $btnSave.Enabled = $false
         $script:originalRows.Clear()
 
         $script:connParams = @{ SqlInstance = $instance }
@@ -375,7 +365,6 @@
                 })
             }
 
-            $btnSave.Enabled = $true
             Set-Status "$($rows.Count) Eintrag/Eintraege geladen. Haken setzen = Backup aktiv." 'OK'
         }
         catch
@@ -387,71 +376,51 @@
         try { Load-JobInfo } catch { $rtfJobInfo.Text = "  Job-Info nicht verfuegbar: $($_.Exception.Message)" }
     }
 
-    function Save-Changes
+    function Save-Row
     {
-        $grid.EndEdit()
+        param ([int]$RowIndex)
 
-        if ($grid.Rows.Count -eq 0)        { Set-Status 'Keine Daten geladen.' 'Warn'; return }
-        if (-not $script:connParams.Count)  { Set-Status 'Keine Verbindung — bitte zuerst laden.' 'Warn'; return }
+        if (-not $script:connParams.Count) { Set-Status 'Keine Verbindung — bitte zuerst laden.' 'Warn'; return }
+        if ($RowIndex -lt 0 -or $RowIndex -ge $grid.Rows.Count) { return }
 
-        # Lokale Kopie — @script:connParams ist als Splatting in nested functions nicht zuverlaessig
-        $cp      = $script:connParams
-        $changed = 0
-        $errors  = 0
+        $row    = $grid.Rows[$RowIndex]
+        $dbName = $row.Cells['colName'].Value
 
-        for ($i = 0; $i -lt $grid.Rows.Count; $i++)
+        $orig = $script:originalRows | Where-Object { $_.DatabaseName -eq $dbName } | Select-Object -First 1
+        if (-not $orig) { return }
+
+        # System-DBs und Waisen nie schreiben
+        if ($orig.IsSystemDb -or ($row.Cells['colOrphaned'].Value -eq 'Ja')) { return }
+
+        $cellVal   = $row.Cells['colActive'].Value
+        $newActive = if ($null -eq $cellVal) { $false } else { [bool]$cellVal }
+        $newReason = if ($row.Cells['colReason'].Value) { $row.Cells['colReason'].Value.ToString().Trim() } else { '' }
+
+        $origActive = [bool]$orig.IsActive
+        $origReason = if ($null -eq $orig.Reason) { '' } else { "$($orig.Reason)" }
+
+        $activeChanged = ($newActive -ne $origActive)
+        $reasonChanged = ($newReason -ne $origReason)
+        if (-not $activeChanged -and -not $reasonChanged) { return }
+
+        $setParts = [System.Collections.Generic.List[string]]::new()
+        if ($activeChanged) { $setParts.Add("IsActive = $(if ($newActive) { 1 } else { 0 })") }
+        if ($reasonChanged) { $setParts.Add("Reason = $(if ([string]::IsNullOrWhiteSpace($newReason)) { 'NULL' } else { "N'$($newReason.Replace("'","''"))'" })") }
+
+        $sql = "UPDATE master.dbo.sqm_BackupExclude SET $($setParts -join ', ') WHERE DatabaseName = N'$($dbName.Replace("'","''"))'"
+
+        # Lokale Kopie — @script:connParams als Splatting in nested functions nicht zuverlaessig
+        $cp = $script:connParams
+        try
         {
-            $row      = $grid.Rows[$i]
-            $dbName   = $row.Cells['colName'].Value
-
-            $orig = $script:originalRows | Where-Object { $_.DatabaseName -eq $dbName } | Select-Object -First 1
-            if (-not $orig) { continue }
-
-            # System-DBs und Waisen nie schreiben
-            $isOrphan = ($row.Cells['colOrphaned'].Value -eq 'Ja')
-            if ($isOrphan -or $orig.IsSystemDb) { continue }
-
-            # Checkbox-Wert: nach CommitEdit sollte er bool sein; null absichern
-            $cellVal   = $row.Cells['colActive'].Value
-            $newActive = if ($null -eq $cellVal) { $false } else { [bool]$cellVal }
-            $newReason = if ($row.Cells['colReason'].Value) { $row.Cells['colReason'].Value.ToString().Trim() } else { '' }
-
-            # Null-sicherer Vergleich auf beiden Seiten
-            $origActive = [bool]$orig.IsActive
-            $origReason = if ($null -eq $orig.Reason) { '' } else { "$($orig.Reason)" }
-
-            $activeChanged = ($newActive -ne $origActive)
-            $reasonChanged = ($newReason -ne $origReason)
-            if (-not $activeChanged -and -not $reasonChanged) { continue }
-
-            $setParts = [System.Collections.Generic.List[string]]::new()
-            if ($activeChanged) { $setParts.Add("IsActive = $(if ($newActive) { 1 } else { 0 })") }
-            if ($reasonChanged) { $setParts.Add("Reason = $(if ([string]::IsNullOrWhiteSpace($newReason)) { 'NULL' } else { "N'$($newReason.Replace("'","''"))'" })") }
-
-            $sql = "UPDATE master.dbo.sqm_BackupExclude SET $($setParts -join ', ') WHERE DatabaseName = N'$($dbName.Replace("'","''"))'"
-
-            try
-            {
-                Invoke-DbaQuery @cp -Database master -Query $sql -ErrorAction Stop
-                $orig.IsActive = $newActive
-                $orig.Reason   = $newReason
-                $changed++
-            }
-            catch
-            {
-                Set-Status "Fehler '$dbName': $($_.Exception.Message)" 'Error'
-                $errors++
-            }
+            Invoke-DbaQuery @cp -Database master -Query $sql -ErrorAction Stop
+            $orig.IsActive = $newActive
+            $orig.Reason   = $newReason
+            Set-Status "'$dbName' gespeichert." 'OK'
         }
-
-        if ($errors -eq 0)
+        catch
         {
-            Set-Status (if ($changed -eq 0) { 'Keine Aenderungen erkannt.' } else { "$changed Zeile(n) gespeichert." }) `
-                       (if ($changed -eq 0) { 'Info' } else { 'OK' })
-        }
-        else
-        {
-            Set-Status "$changed gespeichert, $errors Fehler." 'Warn'
+            Set-Status "Fehler '$dbName': $($_.Exception.Message)" 'Error'
         }
     }
 
@@ -541,20 +510,22 @@
 
     $btnLoad.Add_Click({ Load-Grid })
 
-    $btnSave.Add_Click({
-        try
+    $btnClose.Add_Click({ $form.Close() })
+
+    # Reason-Zelle: nach Verlassen der Zelle speichern
+    $grid.Add_CellEndEdit({
+        param ($s, $e)
+        if ($e.ColumnIndex -eq $grid.Columns['colReason'].Index -and $e.RowIndex -ge 0)
         {
-            Save-Changes
-        }
-        catch
-        {
-            [System.Windows.Forms.MessageBox]::Show(
-                "Unerwarteter Fehler beim Speichern:`n$($_.Exception.Message)",
-                'Speichern – Fehler', 'OK', 'Error') | Out-Null
+            try { Save-Row $e.RowIndex }
+            catch
+            {
+                [System.Windows.Forms.MessageBox]::Show(
+                    "Fehler beim Speichern:`n$($_.Exception.Message)",
+                    'Speichern – Fehler', 'OK', 'Error') | Out-Null
+            }
         }
     })
-
-    $btnClose.Add_Click({ $form.Close() })
 
     $btnAlleAn.Add_Click({
         for ($i = 0; $i -lt $grid.Rows.Count; $i++)
@@ -580,19 +551,24 @@
         if ($_.KeyCode -eq [System.Windows.Forms.Keys]::Escape) { $form.Close() }
     })
 
-    # Neue Zeile einfaerben sobald IsOrphaned bekannt (nach Laden bereits gesetzt;
-    # bei Checkbox-Klick kein Farb-Update noetig)
+    # Checkbox-Aenderung: visuelles Feedback + sofort speichern
     $grid.Add_CellValueChanged({
         param ($s, $e)
         if ($e.ColumnIndex -eq $grid.Columns['colActive'].Index -and $e.RowIndex -ge 0)
         {
-            # Visuelles Feedback: deaktivierte Nicht-Waisen leicht abdunkeln
-            $row       = $grid.Rows[$e.RowIndex]
-            $isOrphan  = ($row.Cells['colOrphaned'].Value -eq 'Ja')
+            $row      = $grid.Rows[$e.RowIndex]
+            $isOrphan = ($row.Cells['colOrphaned'].Value -eq 'Ja')
             if (-not $isOrphan)
             {
                 $isNowActive = [bool]$row.Cells['colActive'].Value
                 $row.DefaultCellStyle.ForeColor = if ($isNowActive) { $cText } else { $cDim }
+            }
+            try { Save-Row $e.RowIndex }
+            catch
+            {
+                [System.Windows.Forms.MessageBox]::Show(
+                    "Fehler beim Speichern:`n$($_.Exception.Message)",
+                    'Speichern – Fehler', 'OK', 'Error') | Out-Null
             }
         }
     })
