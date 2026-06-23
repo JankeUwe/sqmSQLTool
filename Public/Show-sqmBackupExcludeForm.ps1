@@ -448,8 +448,17 @@
 
         foreach ($type in $jobNames.Keys)
         {
-            $jobName = $jobNames[$type]
+            $jobName = $jobNames[$type].Trim()
             $job     = Get-DbaAgentJob @script:connParams -Job $jobName -ErrorAction SilentlyContinue
+
+            # Fallback: contains-Suche falls exakter Name nicht trifft (z.B. Spaces im Jobnamen)
+            if (-not $job)
+            {
+                $job = Get-DbaAgentJob @script:connParams -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Name.Trim() -like "*$jobName*" } |
+                    Select-Object -First 1
+                if ($job) { $jobName = $job.Name }
+            }
 
             if (-not $job)
             {
