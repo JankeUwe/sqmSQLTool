@@ -179,6 +179,7 @@
 		'Invoke-sqmListenerMigrationPrep',
 		'Remove-sqmAdOrphanLogin',
 		'Remove-sqmDatabaseFromAG',
+		'Register-sqmBackupExcludeTrigger',
 		'Repair-sqmAlwaysOnDatabases',
 		'Set-sqmBackupExcludePermission',
 		'Set-sqmConfig',

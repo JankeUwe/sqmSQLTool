@@ -111,6 +111,7 @@ $categoryMap = @{
     'New-sqmSqlCertificate'               = 'Certificates & TLS Security'
     'Remove-sqmAdOrphanLogin'             = 'Login & User Security'
     'Remove-sqmDatabaseFromAG'            = 'Always On & Availability Groups'
+    'Register-sqmBackupExcludeTrigger'    = 'Backup & Recovery'
     'Repair-sqmAlwaysOnDatabases'         = 'Always On & Availability Groups'
     'Set-sqmBackupExcludePermission'      = 'Backup & Recovery'
     'Show-sqmBackupExcludeForm'           = 'Backup & Recovery'
