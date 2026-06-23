@@ -98,13 +98,13 @@ if ($script:sqmIsFitsEnvironment)
 	$script:sqmModuleConfig['DefaultPolicy']          = 'New Login_Enforce Passwort Policy'
 	$script:sqmModuleConfig['DefaultMonitoringUser']  = "$env:USERDOMAIN\izt0504"
 	$script:sqmModuleConfig['SsrsInstallerPath']      = 'W:\75084-Datenbanken\MSSQL\SQLSources\Reporting'
-	$script:sqmModuleConfig['OlaJobNameFull']         = 'FITS-UserDatabases-FULL'
-	$script:sqmModuleConfig['OlaJobNameDiff']         = 'FITS-UserDatabases-DIFF'
-	$script:sqmModuleConfig['OlaJobNameLog']          = 'FITS-UserDatabases-LOG'
+	$script:sqmModuleConfig['OlaJobNameFull']         = 'FITS Backup - USER_DATABASES - FULL'
+	$script:sqmModuleConfig['OlaJobNameDiff']         = 'FITS Backup - USER_DATABASES - DIFF'
+	$script:sqmModuleConfig['OlaJobNameLog']          = 'FITS Backup - USER_DATABASES - LOG'
 	$script:sqmModuleConfig['OlaJobNameIndexOpt']     = 'FITS IndexOptimize - USER_DATABASES'
 	$script:sqmModuleConfig['OlaJobNameIntUserDb']    = 'FITS IntegrityCheck - USER_DATABASES'
 	$script:sqmModuleConfig['OlaJobNameIntSysDb']     = 'FITS IntegrityCheck - SYSTEM_DATABASES'
-	$script:sqmModuleConfig['OlaJobNameSysDbBackup']  = 'FITS-SystemDatabases-FULL'
+	$script:sqmModuleConfig['OlaJobNameSysDbBackup']  = 'FITS Backup - SYSTEM_DATABASES - FULL'
 	# FI-TS Check-Profil und Grenzwerte (identisch mit Defaults, explizit gesetzt fuer Ueberschreibbarkeit)
 	$script:sqmModuleConfig['CheckProfile']           = 'FiTs'
 	$script:sqmModuleConfig['CheckCostThresholdMin']  = 50

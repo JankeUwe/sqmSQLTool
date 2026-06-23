@@ -226,7 +226,7 @@
     # ----- Job-Info-Panel (zwischen Grid und Status-Leiste) ---------------------------
     $pJobInfo = New-Object System.Windows.Forms.Panel
     $pJobInfo.Dock      = 'Bottom'
-    $pJobInfo.Height    = 116
+    $pJobInfo.Height    = 200
     $pJobInfo.BackColor = [System.Drawing.Color]::FromArgb(37, 37, 40)
 
     $lblJobHeader = New-Object System.Windows.Forms.Label
@@ -241,7 +241,7 @@
     $rtfJobInfo.ReadOnly    = $true
     $rtfJobInfo.ScrollBars  = 'Vertical'
     $rtfJobInfo.Location    = New-Object System.Drawing.Point(6, 22)
-    $rtfJobInfo.Size        = New-Object System.Drawing.Size(892, 88)
+    $rtfJobInfo.Size        = New-Object System.Drawing.Size(892, 170)
     $rtfJobInfo.Anchor      = [System.Windows.Forms.AnchorStyles]::Top -bor
                               [System.Windows.Forms.AnchorStyles]::Left -bor
                               [System.Windows.Forms.AnchorStyles]::Right
@@ -434,8 +434,8 @@
 
         $jobNames = [ordered]@{
             FULL = if ($cfg['OlaJobNameFull']) { $cfg['OlaJobNameFull'] } else { 'OlaHH-UserDatabases-FULL' }
-            DIFF = if ($cfg['OlaJobNameDiff']) { $cfg['OlaJobNameDiff'] } else { 'OlaHH-UserDatabases-DIFF' }
             LOG  = if ($cfg['OlaJobNameLog'])  { $cfg['OlaJobNameLog']  } else { 'OlaHH-UserDatabases-LOG'  }
+            DIFF = if ($cfg['OlaJobNameDiff']) { $cfg['OlaJobNameDiff'] } else { 'OlaHH-UserDatabases-DIFF' }
         }
 
         # Liest einen benannten Ola-Parameter aus dem Step-Command (static + dynamic T-SQL)
@@ -463,6 +463,11 @@
             if (-not $job)
             {
                 $lines.Add("  [$type]  $jobName  →  nicht gefunden")
+                continue
+            }
+
+            if ($job.IsEnabled -eq $false)
+            {
                 continue
             }
 
