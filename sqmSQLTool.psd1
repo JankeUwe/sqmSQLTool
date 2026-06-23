@@ -105,6 +105,7 @@
 		'Get-sqmDistributedAgHealth',
 		'Get-sqmDiskBlockSize',
 		'Get-sqmDiskInfoByDriveLetter',
+		'Get-sqmDiskPartitionMap',
 		'Get-sqmDiskSpaceReport',
 		'Get-sqmHpuAllowGroup',
 		'Get-sqmIndexFragmentation',

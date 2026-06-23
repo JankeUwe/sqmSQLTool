@@ -237,6 +237,8 @@ function _Get-sqmHardwareData
     $physDisks = _CIM 'Win32_DiskDrive'
     $netAdapt  = _CIM 'Win32_NetworkAdapterConfiguration' 'IPEnabled=True'
     $sqlSvcs   = _CIM 'Win32_Service'        "Name LIKE 'MSSQL%'"
+    $disk2Part = _CIM 'Win32_DiskDriveToDiskPartition'
+    $part2Log  = _CIM 'Win32_LogicalDiskToPartition'
 
     # Optionaler SSD-Check (nur Win8+ / Server 2012+, kann fehlen)
     $physDiskTypes = @{}
@@ -248,6 +250,31 @@ function _Get-sqmHardwareData
             # MediaType: 3=HDD, 4=SSD, 5=SCM
             $typeLabel = switch ($md.MediaType) { 3 { 'HDD' } 4 { 'SSD' } 5 { 'SCM' } default { '' } }
             if ($typeLabel -and $md.DeviceId) { $physDiskTypes[$md.DeviceId.Trim()] = $typeLabel }
+        }
+    }
+    catch { }
+
+    # Disk → Laufwerksbuchstaben Mapping (fuer Partitions-Erkennung im Report)
+    $diskToLetters = @{}
+    try
+    {
+        $partToLetters = @{}
+        foreach ($assoc in $part2Log)
+        {
+            $partId = $assoc.Antecedent.DeviceID
+            $letter = $assoc.Dependent.DeviceID
+            if (-not $partToLetters.ContainsKey($partId)) { $partToLetters[$partId] = [System.Collections.Generic.List[string]]::new() }
+            $partToLetters[$partId].Add($letter)
+        }
+        foreach ($assoc in $disk2Part)
+        {
+            $diskId = $assoc.Antecedent.DeviceID
+            $partId = $assoc.Dependent.DeviceID
+            if (-not $diskToLetters.ContainsKey($diskId)) { $diskToLetters[$diskId] = [System.Collections.Generic.List[string]]::new() }
+            if ($partToLetters.ContainsKey($partId))
+            {
+                foreach ($letter in $partToLetters[$partId]) { $diskToLetters[$diskId].Add($letter) }
+            }
         }
     }
     catch { }
@@ -280,6 +307,7 @@ function _Get-sqmHardwareData
         LogicalDisks    = $logDisks
         PhysicalDisks   = $physDisks
         PhysicalDiskTypes = $physDiskTypes
+        DiskToLetters   = $diskToLetters
         NetworkAdapters = $netAdapt
         SQLServices     = $sqlSvcs
     }
@@ -462,7 +490,7 @@ function _Build-sqmHardwareReportHtml
     # ABSCHNITT: Physikalische Datentraeger
     # -------------------------------------------------------------------------
     $physHtml = "<table class='itbl'><thead><tr>" +
-        "<th>DiskNr</th><th>Modell</th><th>Groesse</th><th>Typ</th><th>Interface</th><th>SerienNr.</th><th>Partitionen</th>" +
+        "<th>DiskNr</th><th>Modell</th><th>Groesse</th><th>Typ</th><th>Interface</th><th>SerienNr.</th><th>Partitionen</th><th>Laufwerke</th>" +
         "</tr></thead><tbody>"
 
     foreach ($pd in ($d.PhysicalDisks | Sort-Object Index))
@@ -470,13 +498,23 @@ function _Build-sqmHardwareReportHtml
         $pdSize    = if ($pd.Size) { _Size ([double]$pd.Size) } else { 'n/a' }
         $pdMedia   = if ($pd.MediaType)    { [string]$pd.MediaType }    else { '' }
         $pdIface   = if ($pd.InterfaceType){ [string]$pd.InterfaceType } else { '' }
-        $pdDevId   = if ($pd.DeviceID)     { [string]$pd.DeviceID -replace '^\\\\\.\\PHYSICALDRIVE', '' } else { '' }
+        $pdDevId   = if ($pd.DeviceID)     { [string]$pd.DeviceID }     else { '' }
+        $pdDevNum  = $pdDevId -replace '^\\\\\.\\PHYSICALDRIVE', ''
         $pdIndex   = if ($pd.Index) { [string]$pd.Index } else { 'n/a' }
         $pdSerial  = if ($pd.SerialNumber) { [string]$pd.SerialNumber } else { 'n/a' }
         # SSD-Info aus MSFT_PhysicalDisk wenn verfuegbar
-        $ssdType   = if ($d.PhysicalDiskTypes.ContainsKey($pdDevId)) { $d.PhysicalDiskTypes[$pdDevId] } else { '' }
+        $ssdType   = if ($d.PhysicalDiskTypes.ContainsKey($pdDevNum)) { $d.PhysicalDiskTypes[$pdDevNum] } else { '' }
         $typeDisp  = if ($ssdType) { $ssdType } elseif ($pdMedia -match 'SSD|Solid') { 'SSD' } else { $pdMedia }
         $parts     = if ($pd.Partitions) { [string]$pd.Partitions } else { 'n/a' }
+
+        # Laufwerksbuchstaben und Geteilt-Badge
+        $pdLetters = if ($d.DiskToLetters -and $d.DiskToLetters.ContainsKey($pdDevId)) {
+            @($d.DiskToLetters[$pdDevId] | Sort-Object)
+        } else { @() }
+        $letterStr    = if ($pdLetters.Count -gt 0) { $pdLetters -join ', ' } else { '&ndash;' }
+        $sharedBadge  = if ($pdLetters.Count -gt 1) {
+            " <span class='badge' style='color:#f39c12;border-color:#f39c12;font-size:10px'>GETEILT</span>"
+        } else { '' }
 
         $physHtml += "<tr><td>$(_H $pdIndex)</td>" +
             "<td>$(_H ([string]$pd.Model))</td>" +
@@ -484,11 +522,12 @@ function _Build-sqmHardwareReportHtml
             "<td>$(_H $typeDisp)</td>" +
             "<td>$(_H $pdIface)</td>" +
             "<td>$(_H $pdSerial)</td>" +
-            "<td>$(_H $parts)</td></tr>"
+            "<td>$(_H $parts)</td>" +
+            "<td>$(_H $letterStr)$sharedBadge</td></tr>"
     }
     if ($d.PhysicalDisks.Count -eq 0)
     {
-        $physHtml += '<tr><td colspan="7" class="norow">Keine physikalischen Datentraeger gefunden</td></tr>'
+        $physHtml += '<tr><td colspan="8" class="norow">Keine physikalischen Datentraeger gefunden</td></tr>'
     }
     $physHtml += '</tbody></table>'
 
@@ -888,7 +927,13 @@ function _Build-sqmHardwareReportTxt
             $pdModel  = if ($pd.Model) { [string]$pd.Model } else { 'n/a' }
             $pdSize   = if ($pd.Size) { '{0:N0}' -f ([double]$pd.Size / 1GB) + ' GB' } else { 'n/a' }
             $pdSerial = if ($pd.SerialNumber) { [string]$pd.SerialNumber } else { 'n/a' }
-            $lines += "    Disk $pdIndex : $pdModel ($pdSize, S/N: $pdSerial)"
+            $pdDevId  = if ($pd.DeviceID) { [string]$pd.DeviceID } else { '' }
+            $pdLetters = if ($Data.DiskToLetters -and $Data.DiskToLetters.ContainsKey($pdDevId)) {
+                ($Data.DiskToLetters[$pdDevId] | Sort-Object) -join ', '
+            } else { '(keine)' }
+            $sharedTag = if ($Data.DiskToLetters -and $Data.DiskToLetters.ContainsKey($pdDevId) -and
+                            $Data.DiskToLetters[$pdDevId].Count -gt 1) { ' [GETEILT]' } else { '' }
+            $lines += "    Disk $pdIndex : $pdModel ($pdSize, S/N: $pdSerial, Laufwerke: $pdLetters)$sharedTag"
         }
     }
 

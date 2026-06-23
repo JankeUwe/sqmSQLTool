@@ -36,6 +36,7 @@ $categoryMap = @{
     'Get-sqmDeadlockReport'               = 'Extended Events & Diagnostics'
     'Get-sqmDiskBlockSize'                = 'Storage & Disk Management'
     'Get-sqmDiskInfoByDriveLetter'        = 'Storage & Disk Management'
+    'Get-sqmDiskPartitionMap'             = 'Storage & Disk Management'
     'Get-sqmDiskSpaceReport'              = 'Storage & Disk Management'
     'Get-sqmDistributedAgHealth'          = 'Always On & Availability Groups'
     'Get-sqmHpuAllowGroup'                = 'Active Directory Integration'

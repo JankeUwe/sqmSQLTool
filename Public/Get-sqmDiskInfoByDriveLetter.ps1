@@ -33,14 +33,16 @@
 
 .OUTPUTS
     PSCustomObject with the following properties:
-    - DriveLetter   : Drive letter (e.g. "C:")
-    - DiskNumber    : Disk number (from Get-Disk)
-    - TotalGB       : Total volume size in gigabytes
-    - FreeGB        : Free disk space in gigabytes
-    - FreePercent   : Percentage of free disk space
-    - SerialNumber  : Serial number of the physical disk (LUN serial number)
-    - IsVM          : True if the machine is a virtual machine
-    - MachineType   : Hyper-V, VMware, VirtualBox, KVM/QEMU or Physisch
+    - DriveLetter        : Drive letter (e.g. "C:")
+    - DiskNumber         : Disk number (from Get-Disk)
+    - TotalGB            : Total volume size in gigabytes
+    - FreeGB             : Free disk space in gigabytes
+    - FreePercent        : Percentage of free disk space
+    - SerialNumber       : Serial number of the physical disk (LUN serial number)
+    - IsVM               : True if the machine is a virtual machine
+    - MachineType        : Hyper-V, VMware, VirtualBox, KVM/QEMU or Physisch
+    - IsPartitionedDisk  : True wenn weitere Laufwerksbuchstaben auf derselben physischen Disk liegen
+    - SharedWith         : Kommagetrennte Liste der anderen Laufwerksbuchstaben auf derselben Disk
 
 .NOTES
     Author:       sqmSQLTool
@@ -98,21 +100,55 @@ function Get-sqmDiskInfoByDriveLetter
 				$disk.SerialNumber.Trim()
 			}
 
+			# Pruefen ob weitere Laufwerksbuchstaben auf derselben physischen Disk liegen
+			$isPartitioned = $false
+			$sharedWith    = ''
+			try
+			{
+				$disk2Part  = @(Get-CimInstance -ClassName Win32_DiskDriveToDiskPartition -ErrorAction Stop)
+				$part2Log   = @(Get-CimInstance -ClassName Win32_LogicalDiskToPartition  -ErrorAction Stop)
+
+				# Partitions-IDs dieser Disk
+				$myPartIds = @($disk2Part |
+					Where-Object { $_.Antecedent.DeviceID -eq $disk.DeviceID } |
+					ForEach-Object { $_.Dependent.DeviceID })
+
+				# Alle Laufwerksbuchstaben auf diesen Partitionen ausser dem aktuellen
+				$otherLetters = @($part2Log |
+					Where-Object { $_.Antecedent.DeviceID -in $myPartIds } |
+					ForEach-Object { $_.Dependent.DeviceID } |
+					Where-Object   { $_ -ne "${Letter}:" } |
+					Sort-Object)
+
+				if ($otherLetters.Count -gt 0)
+				{
+					$isPartitioned = $true
+					$sharedWith    = $otherLetters -join ', '
+				}
+			}
+			catch
+			{
+				Invoke-sqmLogging -Message "[$Letter`:] Partitions-Pruefung nicht moeglich: $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
+			}
+
 			# VM- oder Hardware-Erkennung (zentral via Get-sqmMachineType)
 			$machine = Get-sqmMachineType
 
 			$result = [PSCustomObject]@{
-				DriveLetter  = "${Letter}:"
-				DiskNumber   = $diskNumber
-				TotalGB      = $totalGB
-				FreeGB       = $freeGB
-				FreePercent  = $freePercent
-				SerialNumber = $serialNumber
-				IsVM         = $machine.IsVM
-				MachineType  = $machine.MachineType
+				DriveLetter       = "${Letter}:"
+				DiskNumber        = $diskNumber
+				TotalGB           = $totalGB
+				FreeGB            = $freeGB
+				FreePercent       = $freePercent
+				SerialNumber      = $serialNumber
+				IsVM              = $machine.IsVM
+				MachineType       = $machine.MachineType
+				IsPartitionedDisk = $isPartitioned
+				SharedWith        = $sharedWith
 			}
 
-			Invoke-sqmLogging -Message "[$Letter`:] DiskNr=$diskNumber  Total=${totalGB} GB  Free=${freeGB} GB (${freePercent}%)  SN=$serialNumber  Typ=$($machine.MachineType)" -FunctionName $functionName -Level "INFO"
+			$partMsg = if ($isPartitioned) { "  GETEILT mit: $sharedWith" } else { '' }
+			Invoke-sqmLogging -Message "[$Letter`:] DiskNr=$diskNumber  Total=${totalGB} GB  Free=${freeGB} GB (${freePercent}%)  SN=$serialNumber  Typ=$($machine.MachineType)$partMsg" -FunctionName $functionName -Level "INFO"
 
 			$results.Add($result)
 			$result
