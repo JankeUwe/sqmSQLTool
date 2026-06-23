@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Zeigt die Zuordnung physischer Datentraeger zu logischen Laufwerksbuchstaben.
 
