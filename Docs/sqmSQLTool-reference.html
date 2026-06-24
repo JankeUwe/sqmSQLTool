@@ -181,7 +181,7 @@
 
 	<div class="psdb-st-nav-group" id="nav-backup-&-restore">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-backup-&-restore-list')">
-	<span>💾 Backup & Restore</span><span class="psdb-st-nav-count">9</span>
+	<span>💾 Backup & Restore</span><span class="psdb-st-nav-count">11</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-backup-&-restore-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmlogshrink')">Invoke-sqmLogShrink</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmrestoredatabase')">Invoke-sqmRestoreDatabase</span></li>
@@ -191,7 +191,9 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmolausrdbbackupjob')">New-sqmOlaUsrDbBackupJob</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmbackupexcludepermission')">Set-sqmBackupExcludePermission</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-syncsqmbackupexcludetable')">Sync-sqmBackupExcludeTable</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmbackupintegrity')">Test-sqmBackupIntegrity</span></li></ul>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmbackupintegrity')">Test-sqmBackupIntegrity</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmserversfromou')">Get-sqmServersFromOU</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-registersqmbackupexcludetrigger')">Register-sqmBackupExcludeTrigger</span></li></ul>
 	</div>
 
 	<div class="psdb-st-nav-group" id="nav-sicherheit">
@@ -1142,6 +1144,64 @@ Sync-sqmBackupExcludeTable -SqlInstance &quot;SQL01\INST1&quot;</pre><button cla
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Test-sqmBackupIntegrity -SqlInstance &quot;SQL01&quot; -BackupPath &quot;D:\Backup\AdventureWorks.bak&quot;</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmBackupIntegrity -SqlInstance &quot;SQL01&quot; -BackupPath &quot;D:\Backup\AdventureWorks.bak&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-getsqmserversfromou">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Get-sqmServersFromOU</span>
+	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
+	</div>
+	<div class="psdb-st-func-desc">Queries Active Directory (via ADSI, no AD module required) for all computer objects in a specified OU and returns pipeable objects with a SqlInstance property — ready to feed into any sqmSQLTool function.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># List all SQL servers in the default OU 'srvDatabase'</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmServersFromOU</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Different OU</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmServersFromOU -OUName 'srvApp'</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Register the DDL trigger on all DB servers</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmServersFromOU | ForEach-Object {
+    Register-sqmBackupExcludeTrigger -SqlInstance $_.SqlInstance
+}</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Sync backup exclude table on all DB servers</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmServersFromOU | ForEach-Object {
+    Sync-sqmBackupExcludeTable -SqlInstance $_.SqlInstance
+}</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-registersqmbackupexcludetrigger">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Register-sqmBackupExcludeTrigger</span>
+	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
+	</div>
+	<div class="psdb-st-func-desc">Registers (or removes) a server-level DDL trigger (trg_sqm_BackupExclude_AutoSync) that fires on CREATE_DATABASE and DROP_DATABASE to keep master.dbo.sqm_BackupExclude automatically in sync. In AlwaysOn environments the trigger is propagated to all secondary replicas automatically.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Register trigger on local instance</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Register-sqmBackupExcludeTrigger</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Register on a remote instance</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Register-sqmBackupExcludeTrigger -SqlInstance 'SQL01'</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Remove trigger (incl. AlwaysOn secondaries)</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Register-sqmBackupExcludeTrigger -SqlInstance 'SQL01' -Remove</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Preview without changes</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Register-sqmBackupExcludeTrigger -SqlInstance 'SQL01' -WhatIf</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -3674,7 +3734,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 </div>
 <div id="tab-overview" class="psdb-st-panel">
 	<div style="padding:24px;">
-	<h2 class="psdb-st-section-title">&#128202; All Functions (128)</h2>
+	<h2 class="psdb-st-section-title">&#128202; All Functions (130)</h2>
 	<input type="text" id="psdb-st-ov-search" placeholder="Search function..." oninput="psstOvSearch(this.value)"
 	  style="width:100%;max-width:400px;padding:7px 12px;margin-bottom:16px;background:rgba(255,255,255,0.07);border:1px solid rgba(46,134,193,0.3);border-radius:6px;color:#e2e8f0;font-size:.85rem;font-family:inherit;">
 
@@ -3722,6 +3782,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Get-sqmPerfCounters</td><td>Reads SQL Server performance counters from sys.dm_os_performance_counters.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmServerHardwareReport</td><td>Creates an HTML hardware configuration report for one or more servers.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmServerSetting</td><td>Reads one or all server properties from a SQL Server instance.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Get-sqmServersFromOU</td><td>Queries Active Directory (ADSI, no module required) for all computers in a named OU and returns pipeable objects with SqlInstance property.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmSpnReport</td><td>Checks the registered SPNs for SQL Server instances (default and named instances).</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmSQLInstanceCheck</td><td>Checks a SQL Server instance against best practices.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmSysadminAccounts</td><td>Retrieves all logins with sysadmin rights on a SQL Server instance.</td></tr>
@@ -3774,6 +3835,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">New-sqmOlaUsrDbBackupJob</td><td>Creates SQL Agent backup jobs for user databases using Ola Hallengren solution.</td></tr>
 	<tr><td class="psdb-st-ov-fn">New-sqmRandomSaPassword</td><td>Generates a random, policy-compliant SA password.</td></tr>
 	<tr><td class="psdb-st-ov-fn">New-sqmSqlCertificate</td><td>Creates a new self-signed SQL Server certificate as a renewal of an existing one.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Register-sqmBackupExcludeTrigger</td><td>Registers or removes the DDL trigger trg_sqm_BackupExclude_AutoSync that keeps master.dbo.sqm_BackupExclude in sync on CREATE_DATABASE and DROP_DATABASE.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Remove-sqmAdOrphanLogin</td><td>Removes Windows logins whose Active Directory account no longer exists (AD orphans).</td></tr>
 	<tr><td class="psdb-st-ov-fn">Remove-sqmDatabaseFromAG</td><td>Removes one or more databases from their Always On Availability Group.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Repair-sqmAlwaysOnDatabases</td><td>Checks all AlwaysOn databases for problems and repairs them (Remove -> Cleanup -> Add).</td></tr>
