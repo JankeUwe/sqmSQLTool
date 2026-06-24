@@ -262,23 +262,22 @@ function New-sqmOlaUsrDbBackupJob
 		[Parameter(Mandatory = $false)]
 		[switch]$UseExcludeTable,
 		[Parameter(Mandatory = $false)]
+		[switch]$SkipAlwaysOnPropagation,
+		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
 	
 	begin
 	{
 		$functionName = $MyInvocation.MyCommand.Name
-
+		
 		if (-not $script:dbatoolsAvailable)
 		{
 			$errMsg = "dbatools-Modul nicht gefunden."
 			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 			throw $errMsg
 		}
-
-		. "C:\CMP\SQL-Tools\sqmSQLTool\jobs\SqlVersionDetection.ps1"
-		$null = Initialize-SqlTrustServerCertificate -SqlInstance $SqlInstance
-
+		
 		if (-not $Full -and -not $Diff -and -not $Log)
 		{
 			$errMsg = "Mindestens einer der Parameter -Full, -Diff oder -Log muss angegeben werden."
@@ -295,7 +294,73 @@ function New-sqmOlaUsrDbBackupJob
 		
 		$connParams = @{ SqlInstance = $SqlInstance }
 		if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
-		
+
+		# Auto-Erkennung bestehender Job-Einstellungen bei -UseExcludeTable
+		$script:autoDisableDiff = $false
+		if ($UseExcludeTable)
+		{
+			$existingFullJob = Get-DbaAgentJob @connParams -Job $effFullJobName -ErrorAction SilentlyContinue
+			if ($existingFullJob)
+			{
+				Invoke-sqmLogging -Message "UseExcludeTable: Bestehender FULL-Job '$effFullJobName' gefunden — uebernehme Einstellungen." -FunctionName $functionName -Level "INFO"
+
+				# Schedule-Zeit aus bestehendem Job lesen (nur wenn nicht explizit angegeben)
+				if (-not $PSBoundParameters.ContainsKey('FullScheduleTime'))
+				{
+					$existSched = $existingFullJob.JobSchedules | Select-Object -First 1
+					if ($existSched)
+					{
+						$t = $existSched.ActiveStartTimeOfDay
+						$FullScheduleTime = '{0:D2}:{1:D2}' -f $t.Hours, $t.Minutes
+						Invoke-sqmLogging -Message "FullScheduleTime aus vorhandenem Job: $FullScheduleTime" -FunctionName $functionName -Level "INFO"
+					}
+				}
+
+				# Backup-Verzeichnis aus Step-Command parsen (nur wenn nicht explizit angegeben)
+				if (-not $PSBoundParameters.ContainsKey('BackupDirectory'))
+				{
+					$existStep = $existingFullJob.JobSteps | Select-Object -First 1
+					if ($existStep -and $existStep.Command -match "@Directory\s*=\s*N?'([^']+)'")
+					{
+						$BackupDirectory = $Matches[1] -replace '\\Usr-db$', ''
+						Invoke-sqmLogging -Message "BackupDirectory aus vorhandenem Job: $BackupDirectory" -FunctionName $functionName -Level "INFO"
+					}
+				}
+
+				# LOG-Schedule aus bestehendem LOG-Job lesen
+				if ($Log)
+				{
+					$existingLogJob = Get-DbaAgentJob @connParams -Job $effLogJobName -ErrorAction SilentlyContinue
+					if ($existingLogJob)
+					{
+						$existLogSched = $existingLogJob.JobSchedules | Select-Object -First 1
+						if ($existLogSched)
+						{
+							if (-not $PSBoundParameters.ContainsKey('LogScheduleTime'))
+							{
+								$t = $existLogSched.ActiveStartTimeOfDay
+								$LogScheduleTime = '{0:D2}:{1:D2}' -f $t.Hours, $t.Minutes
+							}
+							if (-not $PSBoundParameters.ContainsKey('LogScheduleIntervalMinutes') -and $existLogSched.FrequencySubDayInterval -gt 0)
+							{
+								$LogScheduleIntervalMinutes = $existLogSched.FrequencySubDayInterval
+							}
+						}
+					}
+				}
+			}
+			else
+			{
+				# Kein bestehender Job — FITS-Standardwerte: FULL taeglich 21:15, LOG alle 15 Min, DIFF deaktiviert
+				Invoke-sqmLogging -Message "UseExcludeTable: Kein bestehender Job '$effFullJobName' gefunden — verwende Standardwerte (FULL 21:15 taeglich, LOG alle 15 Min, DIFF deaktiviert)." -FunctionName $functionName -Level "INFO"
+				if (-not $PSBoundParameters.ContainsKey('FullScheduleTime'))         { $FullScheduleTime         = '21:15' }
+				if (-not $PSBoundParameters.ContainsKey('FullScheduleDays'))         { $FullScheduleDays         = @('EveryDay') }
+				if (-not $PSBoundParameters.ContainsKey('LogScheduleTime'))          { $LogScheduleTime          = '00:00' }
+				if (-not $PSBoundParameters.ContainsKey('LogScheduleIntervalMinutes')) { $LogScheduleIntervalMinutes = 15 }
+				$script:autoDisableDiff = $true
+			}
+		}
+
 		$logDir = $cfg['LogPath']
 		if (-not $logDir) { $logDir = '$env:ProgramData\sqmSQLTool\Logs' }
 		$maintenanceLogDir = Join-Path $logDir 'MaintenanceLog'
@@ -313,6 +378,19 @@ function New-sqmOlaUsrDbBackupJob
 			# 1. Verbindung und Ola-Pruefung
 			$sqlSrv = Connect-DbaInstance @connParams -ErrorAction Stop
 			$olaCheck = Test-sqmOlaInstallation -SqlInstance $SqlInstance -SqlCredential $SqlCredential -RequiredSet Backup
+
+			# 1a. Bei -UseExcludeTable: Tabelle synchronisieren und DDL-Trigger sicherstellen
+			if ($UseExcludeTable)
+			{
+				Invoke-sqmLogging -Message "UseExcludeTable: Stelle sicher dass sqm_BackupExclude und DDL-Trigger vorhanden sind." -FunctionName $functionName -Level "INFO"
+				$syncParams = @{ SqlInstance = $SqlInstance; SkipAlwaysOnPropagation = $true }
+				if ($SqlCredential) { $syncParams['SqlCredential'] = $SqlCredential }
+				Sync-sqmBackupExcludeTable @syncParams -ErrorAction SilentlyContinue | Out-Null
+
+				$triggerParams = @{ SqlInstance = $SqlInstance; SkipAlwaysOnPropagation = $true }
+				if ($SqlCredential) { $triggerParams['SqlCredential'] = $SqlCredential }
+				Register-sqmBackupExcludeTrigger @triggerParams -ErrorAction SilentlyContinue | Out-Null
+			}
 			foreach ($w in $olaCheck.Warnings)
 			{
 				Invoke-sqmLogging -Message $w -FunctionName $functionName -Level "WARNING"
@@ -600,7 +678,7 @@ EXECUTE master.dbo.DatabaseBackup
 						$op = Get-DbaAgentOperator @connParams -Operator $OperatorName -ErrorAction SilentlyContinue
 						if ($op)
 						{
-							Set-DbaAgentJob @connParams -Job $jobDef.JobName -EmailOperator $OperatorName -EmailLevel OnFailure -ErrorAction SilentlyContinue | Out-Null
+							Set-DbaAgentJob @connParams -Job $jobDef.JobName -OperatorToEmail $OperatorName -EmailLevel OnFailure -ErrorAction SilentlyContinue | Out-Null
 						}
 						else
 						{
@@ -608,10 +686,18 @@ EXECUTE master.dbo.DatabaseBackup
 						}
 					}
 					
+					# DIFF-Job im Auto-Modus (kein bestehender Job gefunden) deaktivieren
+					if ($jobDef.BackupType -eq 'DIFF' -and $script:autoDisableDiff)
+					{
+						Set-DbaAgentJob @connParams -Job $jobDef.JobName -Disabled -ErrorAction SilentlyContinue | Out-Null
+						Invoke-sqmLogging -Message "DIFF-Job '$($jobDef.JobName)' wurde automatisch deaktiviert (kein bestehender Job als Vorlage gefunden)." -FunctionName $functionName -Level "INFO"
+					}
+
 					$result.JobStatus    = 'Created'
 					$result.OverallStatus = 'Success'
 					$intervalInfo = if ($jobDef.IntervalMinutes -gt 0) { ", alle $($jobDef.IntervalMinutes) Min." } else { '' }
-					$result.Message      = "Job '$($jobDef.JobName)' erstellt. $($expandedDays -join '/') $($jobDef.ScheduleTime)$intervalInfo -> $usrBackupDir"
+					$diffDisabledNote = if ($jobDef.BackupType -eq 'DIFF' -and $script:autoDisableDiff) { ' (deaktiviert)' } else { '' }
+					$result.Message      = "Job '$($jobDef.JobName)' erstellt$diffDisabledNote. $($expandedDays -join '/') $($jobDef.ScheduleTime)$intervalInfo -> $usrBackupDir"
 					Invoke-sqmLogging -Message $result.Message -FunctionName $functionName -Level "INFO"
 				}
 				catch
@@ -667,7 +753,98 @@ EXECUTE master.dbo.DatabaseBackup
 			if ($EnableException) { throw }
 			if (-not $ContinueOnError) { throw }
 		}
-		
+
+		# AlwaysOn-Propagierung: erfolgreich erstellte Jobs auch auf Secondary-Repliken anlegen
+		if (-not $SkipAlwaysOnPropagation -and $jobDefinitions -and ($results | Where-Object { $_.JobStatus -eq 'Created' }))
+		{
+			try
+			{
+				$replicaQuery = "SELECT r.replica_server_name FROM sys.availability_replicas r WHERE r.replica_server_name <> @@SERVERNAME"
+				$secondaries = Invoke-DbaQuery @connParams -Database master -Query $replicaQuery -ErrorAction SilentlyContinue
+
+				foreach ($sec in $secondaries)
+				{
+					$secName = $sec.replica_server_name
+					Invoke-sqmLogging -Message "AlwaysOn: Propagiere Jobs auf Secondary '$secName'." -FunctionName $functionName -Level "INFO"
+					try
+					{
+						# Parameter aus effektiven Werten (nach auto-detect) aufbauen
+						$secParams = @{
+							SqlInstance             = $secName
+							SkipAlwaysOnPropagation = $true
+							Update                  = $true
+							Databases               = $Databases
+							JobCategory             = $JobCategory
+							CleanupTime             = $CleanupTime
+							Compress                = $Compress
+							Verify                  = $Verify
+							CheckSum                = $CheckSum
+							LogToTable              = $LogToTable
+						}
+						if ($SqlCredential)   { $secParams['SqlCredential']   = $SqlCredential }
+						if ($UseExcludeTable) { $secParams['UseExcludeTable'] = $true }
+						if ($OperatorName)    { $secParams['OperatorName']    = $OperatorName }
+						if ($BackupDirectory) { $secParams['BackupDirectory'] = $BackupDirectory }
+
+						# Job-Typ-Switches und effektive Schedule-Werte aus den erstellten Job-Definitionen
+						foreach ($jd in $jobDefinitions)
+						{
+							switch ($jd.BackupType)
+							{
+								'FULL' {
+									$secParams['Full']                        = $true
+									$secParams['FullJobName']                 = $jd.JobName
+									$secParams['FullScheduleTime']            = $jd.ScheduleTime
+									$secParams['FullScheduleDays']            = $jd.ScheduleDays
+									$secParams['FullScheduleIntervalMinutes'] = $jd.IntervalMinutes
+								}
+								'DIFF' {
+									$secParams['Diff']                        = $true
+									$secParams['DiffJobName']                 = $jd.JobName
+									$secParams['DiffScheduleTime']            = $jd.ScheduleTime
+									$secParams['DiffScheduleDays']            = $jd.ScheduleDays
+									$secParams['DiffScheduleIntervalMinutes'] = $jd.IntervalMinutes
+								}
+								'LOG' {
+									$secParams['Log']                         = $true
+									$secParams['LogJobName']                  = $jd.JobName
+									$secParams['LogScheduleTime']             = $jd.ScheduleTime
+									$secParams['LogScheduleDays']             = $jd.ScheduleDays
+									$secParams['LogScheduleIntervalMinutes']  = $jd.IntervalMinutes
+								}
+							}
+						}
+
+						$secResults = New-sqmOlaUsrDbBackupJob @secParams
+						foreach ($sr in $secResults)
+						{
+							Invoke-sqmLogging -Message "AlwaysOn '$secName': [$($sr.BackupType)] $($sr.JobStatus) — $($sr.Message)" -FunctionName $functionName -Level "INFO"
+							$results.Add([PSCustomObject]@{
+								SqlInstance     = $secName
+								BackupType      = $sr.BackupType
+								JobName         = $sr.JobName
+								BackupDirectory = $sr.BackupDirectory
+								Databases       = $sr.Databases
+								ScheduleTime    = $sr.ScheduleTime
+								ScheduleDays    = $sr.ScheduleDays
+								JobStatus       = "Secondary_$($sr.JobStatus)"
+								OverallStatus   = $sr.OverallStatus
+								Message         = "[AlwaysOn Secondary '$secName'] $($sr.Message)"
+							})
+						}
+					}
+					catch
+					{
+						Invoke-sqmLogging -Message "AlwaysOn: Fehler bei Propagierung auf '$secName': $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
+					}
+				}
+			}
+			catch
+			{
+				Invoke-sqmLogging -Message "AlwaysOn-Erkennung nicht verfuegbar oder kein AG konfiguriert." -FunctionName $functionName -Level "VERBOSE"
+			}
+		}
+
 		return $results.ToArray()
 	}
 }

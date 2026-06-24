@@ -70,6 +70,8 @@ function Sync-sqmBackupExcludeTable
 		[Parameter(Mandatory = $false)]
 		[switch]$IncludeSystemDatabases,
 		[Parameter(Mandatory = $false)]
+		[switch]$SkipAlwaysOnPropagation,
+		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
 
@@ -398,6 +400,57 @@ END
 	end
 	{
 		Invoke-sqmLogging -Message "$functionName abgeschlossen. $($results.Count) Objekte zurueckgegeben." -FunctionName $functionName -Level "INFO"
+
+		# AlwaysOn-Propagierung: Tabelle auch auf Secondary-Repliken anlegen/synchronisieren
+		if (-not $SkipAlwaysOnPropagation)
+		{
+			try
+			{
+				$replicaQuery = @"
+SELECT r.replica_server_name
+FROM   sys.availability_replicas r
+WHERE  r.replica_server_name <> @@SERVERNAME
+"@
+				$secondaries = Invoke-DbaQuery @connParams -Database master -Query $replicaQuery -ErrorAction SilentlyContinue
+
+				foreach ($sec in $secondaries)
+				{
+					$secName = $sec.replica_server_name
+					Invoke-sqmLogging -Message "AlwaysOn: Propagiere auf Secondary '$secName'." -FunctionName $functionName -Level "INFO"
+					try
+					{
+						$secParams = @{
+							SqlInstance              = $secName
+							SkipAlwaysOnPropagation  = $true
+						}
+						if ($SqlCredential)          { $secParams['SqlCredential']          = $SqlCredential }
+						if ($IncludeSystemDatabases) { $secParams['IncludeSystemDatabases'] = $true }
+
+						Sync-sqmBackupExcludeTable @secParams -ErrorAction Stop | Out-Null
+
+						Invoke-sqmLogging -Message "AlwaysOn: Secondary '$secName' erfolgreich synchronisiert." -FunctionName $functionName -Level "INFO"
+						$results.Add([PSCustomObject]@{
+							SqlInstance  = $secName
+							DatabaseName = 'N/A'
+							Action       = 'AlwaysOnPropagated'
+							IsActive     = $null
+							IsOrphaned   = $null
+							Message      = "AlwaysOn Secondary '$secName' synchronisiert."
+						})
+					}
+					catch
+					{
+						Invoke-sqmLogging -Message "AlwaysOn: Fehler bei Propagierung auf '$secName': $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
+					}
+				}
+			}
+			catch
+			{
+				# Kein AG konfiguriert oder Abfrage nicht verfuegbar — kein Fehler
+				Invoke-sqmLogging -Message "AlwaysOn-Erkennung: $($_.Exception.Message)" -FunctionName $functionName -Level "VERBOSE"
+			}
+		}
+
 		return $results.ToArray()
 	}
 }

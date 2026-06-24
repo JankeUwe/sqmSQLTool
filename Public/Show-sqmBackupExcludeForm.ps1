@@ -71,7 +71,7 @@
 
     # ----- Hauptfenster ---------------------------------------------------------------
     $form = New-Object System.Windows.Forms.Form
-    $form.Text            = 'sqmSQLTool – Backup-Ausschlussliste verwalten'
+    $form.Text            = 'sqmSQLTool – Backup-Ausschlussliste verwalten | powershelldba.de'
     $form.Size            = New-Object System.Drawing.Size(920, 640)
     $form.MinimumSize     = New-Object System.Drawing.Size(700, 480)
     $form.StartPosition   = 'CenterScreen'

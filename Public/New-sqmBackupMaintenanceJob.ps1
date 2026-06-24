@@ -157,6 +157,8 @@ function New-sqmBackupMaintenanceJob
 		[Parameter(Mandatory = $false)]
 		[switch]$Update,
 		[Parameter(Mandatory = $false)]
+		[switch]$SkipAlwaysOnPropagation,
+		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
 
@@ -170,13 +172,6 @@ function New-sqmBackupMaintenanceJob
 			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 			throw $errMsg
 		}
-
-		# Load SqlVersionDetection helper for TrustServerCertificate handling
-		$detectionScriptPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'jobs\SqlVersionDetection.ps1'
-		if (Test-Path $detectionScriptPath) { . $detectionScriptPath }
-
-		# Initialize TrustServerCertificate for SQL 2022+
-		$null = Initialize-SqlTrustServerCertificate -SqlInstance $SqlInstance
 
 		# Default-ScheduleDays je BackupType setzen wenn nicht explizit angegeben
 		if (-not $PSBoundParameters.ContainsKey('ScheduleDays'))
@@ -199,6 +194,8 @@ function New-sqmBackupMaintenanceJob
 			SqlInstance    = $SqlInstance
 			JobName        = $JobName
 			BackupType     = $BackupType
+			Step1Command   = $null
+			Step2Command   = $null
 			ScheduleName   = $null
 			ScheduleDays   = ($ScheduleDays -join ', ')
 			ScheduleTime   = $ScheduleTime
@@ -212,6 +209,19 @@ function New-sqmBackupMaintenanceJob
 
 			# 1. Verbindung herstellen
 			$sqlSrv = Connect-DbaInstance @connParams -ErrorAction Stop
+
+			# 1a. Bei -UseExcludeTable: Tabelle synchronisieren und DDL-Trigger sicherstellen
+			if ($UseExcludeTable)
+			{
+				Invoke-sqmLogging -Message "UseExcludeTable: Stelle sicher dass sqm_BackupExclude und DDL-Trigger vorhanden sind." -FunctionName $functionName -Level "INFO"
+				$syncParams = @{ SqlInstance = $SqlInstance; SkipAlwaysOnPropagation = $true }
+				if ($SqlCredential) { $syncParams['SqlCredential'] = $SqlCredential }
+				Sync-sqmBackupExcludeTable @syncParams -ErrorAction SilentlyContinue | Out-Null
+
+				$triggerParams = @{ SqlInstance = $SqlInstance; SkipAlwaysOnPropagation = $true }
+				if ($SqlCredential) { $triggerParams['SqlCredential'] = $SqlCredential }
+				Register-sqmBackupExcludeTrigger @triggerParams -ErrorAction SilentlyContinue | Out-Null
+			}
 
 			# 2. Job-Kategorie sicherstellen
 			$existingCat = Get-DbaAgentJobCategory @connParams -Category $JobCategory -ErrorAction SilentlyContinue
@@ -240,46 +250,51 @@ function New-sqmBackupMaintenanceJob
 				}
 			}
 
-			# 4. Build parameters for Step 1: Sync-sqmBackupExcludeTable
-			$step1Params = @{
-				SqlInstance = $SqlInstance
-			}
+			# 4. Step 1 Command aufbauen: Sync-sqmBackupExcludeTable
+			$step1Lines = [System.Collections.Generic.List[string]]::new()
+			$step1Lines.Add("Import-Module sqmSQLTool -Force")
+			$step1Lines.Add("`$params = @{ SqlInstance = '$SqlInstance' }")
 			if ($IncludeSystemDatabases)
 			{
-				$step1Params['IncludeSystemDatabases'] = $IncludeSystemDatabases
+				$step1Lines.Add("`$params['IncludeSystemDatabases'] = `$true")
 			}
+			$step1Lines.Add("Sync-sqmBackupExcludeTable @params")
+			$step1Command = $step1Lines -join "`r`n"
+			$result.Step1Command = $step1Command
 
-			Invoke-sqmLogging -Message "Step 1 Parameters aufgebaut (Sync-sqmBackupExcludeTable)." -FunctionName $functionName -Level "INFO"
+			Invoke-sqmLogging -Message "Step 1 Command aufgebaut (Sync-sqmBackupExcludeTable)." -FunctionName $functionName -Level "INFO"
 
-			# 5. Build parameters for Step 2: Invoke-sqmUserDatabaseBackup
-			$step2Params = @{
-				SqlInstance = $SqlInstance
-				All = $true
-				BackupType = 'FULL'
-				MailProfile = $MailProfile
-			}
+			# 5. Step 2 Command aufbauen: Invoke-sqmUserDatabaseBackup
+			# DIFF und LOG Unterstuetzung geplant — aktuell wird Type = 'Full' verwendet
+			$step2Lines = [System.Collections.Generic.List[string]]::new()
+			$step2Lines.Add("Import-Module sqmSQLTool -Force")
+			$step2Lines.Add("`$params = @{ SqlInstance = '$SqlInstance'; All = `$true; BackupType = 'FULL' }")
 			if ($UseExcludeTable)
 			{
-				$step2Params['UseExcludeTable'] = $UseExcludeTable
+				$step2Lines.Add("`$params['UseExcludeTable'] = `$true")
 			}
 			if ($CheckPreferredReplica)
 			{
-				$step2Params['CheckPreferredReplica'] = $CheckPreferredReplica
+				$step2Lines.Add("`$params['CheckPreferredReplica'] = `$true")
 			}
 			if ($BackupPath)
 			{
-				$step2Params['BackupPath'] = $BackupPath
+				$step2Lines.Add("`$params['BackupPath'] = '$BackupPath'")
 			}
 			if ($MailTo)
 			{
-				$step2Params['MailTo'] = $MailTo
+				$step2Lines.Add("`$params['MailTo'] = '$MailTo'")
 			}
+			$step2Lines.Add("`$params['MailProfile'] = '$MailProfile'")
 			if ($MailOnSuccess)
 			{
-				$step2Params['MailOnSuccess'] = $MailOnSuccess
+				$step2Lines.Add("`$params['MailOnSuccess'] = `$true")
 			}
+			$step2Lines.Add("Invoke-sqmUserDatabaseBackup @params")
+			$step2Command = $step2Lines -join "`r`n"
+			$result.Step2Command = $step2Command
 
-			Invoke-sqmLogging -Message "Step 2 Parameters aufgebaut (Invoke-sqmUserDatabaseBackup)." -FunctionName $functionName -Level "INFO"
+			Invoke-sqmLogging -Message "Step 2 Command aufgebaut (Invoke-sqmUserDatabaseBackup)." -FunctionName $functionName -Level "INFO"
 
 			# 6. WhatIf-Pruefung
 			if (-not $PSCmdlet.ShouldProcess($SqlInstance, "Erstelle Job '$JobName' [$BackupType]"))
@@ -293,60 +308,36 @@ function New-sqmBackupMaintenanceJob
 			New-DbaAgentJob @connParams `
 				-Job $JobName `
 				-Category $JobCategory `
-				-Description "sqm BackupMaintenance $BackupType - Sync-sqmBackupExcludeTable + Invoke-sqmUserDatabaseBackup - $($ScheduleDays -join '/') $ScheduleTime" `
+				-Description "sqm BackupMaintenance $BackupType — Sync-sqmBackupExcludeTable + Invoke-sqmUserDatabaseBackup — $($ScheduleDays -join '/') $ScheduleTime" `
 				-EnableException -ErrorAction Stop | Out-Null
 
 			Invoke-sqmLogging -Message "Job '$JobName' angelegt." -FunctionName $functionName -Level "INFO"
 
-			# 8. Create wrapper scripts and job steps (einfache Wrapper-Scripts)
-			$jobsDir = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs'
-			if (-not (Test-Path $jobsDir)) { New-Item -ItemType Directory -Path $jobsDir -Force | Out-Null }
+			# 8. Step 1 anlegen: Sync-BackupExcludeTable
+			New-DbaAgentJobStep @connParams `
+				-Job $JobName `
+				-StepId 1 `
+				-StepName 'Sync-BackupExcludeTable' `
+				-Subsystem PowerShell `
+				-Command $step1Command `
+				-OnSuccessAction GoToNextStep `
+				-OnFailAction QuitWithFailure `
+				-EnableException -ErrorAction Stop | Out-Null
 
-			# Step 1: Sync-sqmBackupExcludeTable
-			$switchParams1 = @()
-			if ($IncludeSystemDatabases) { $switchParams1 += "-IncludeSystemDatabases" }
-			$switchLine1 = if ($switchParams1) { " " + ($switchParams1 -join " ") } else { "" }
+			Invoke-sqmLogging -Message "Step 1 'Sync-BackupExcludeTable' angelegt." -FunctionName $functionName -Level "INFO"
 
-			$wrapper1Script = @"
-`$ErrorActionPreference = 'Stop'
-Import-Module sqmSQLTool -Force
-Sync-sqmBackupExcludeTable$switchLine1 -Confirm:`$false
-"@
-			$wrapper1Path = Join-Path $jobsDir "Sync-sqmBackupExcludeTable-$JobName.ps1"
-			[System.IO.File]::WriteAllText($wrapper1Path, $wrapper1Script, [System.Text.Encoding]::UTF8)
+			# 9. Step 2 anlegen: Backup-UserDatabases-<BackupType>
+			New-DbaAgentJobStep @connParams `
+				-Job $JobName `
+				-StepId 2 `
+				-StepName "Backup-UserDatabases-$BackupType" `
+				-Subsystem PowerShell `
+				-Command $step2Command `
+				-OnSuccessAction QuitWithSuccess `
+				-OnFailAction QuitWithFailure `
+				-EnableException -ErrorAction Stop | Out-Null
 
-			$psExePath = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
-			$command1 = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$wrapper1Path`""
-
-			New-DbaAgentJobStep -SqlInstance $SqlInstance -Job $JobName `
-				-StepName 'Sync-BackupExcludeTable' -Subsystem 'CmdExec' -Command $command1 -ErrorAction Stop | Out-Null
-
-			Invoke-sqmLogging -Message "Step 1 (CmdExec) 'Sync-BackupExcludeTable' angelegt, Wrapper: $wrapper1Path" -FunctionName $functionName -Level "INFO"
-
-			# Step 2: Invoke-sqmUserDatabaseBackup
-			$switchParams2 = @()
-			if ($UseExcludeTable) { $switchParams2 += "-UseExcludeTable" }
-			if ($CheckPreferredReplica) { $switchParams2 += "-CheckPreferredReplica" }
-			if ($MailOnSuccess) { $switchParams2 += "-MailOnSuccess" }
-			$switchLine2 = if ($switchParams2) { " " + ($switchParams2 -join " ") } else { "" }
-
-			$backupPathLine = if ($BackupPath) { " -BackupPath `"$BackupPath`"" } else { "" }
-			$mailToLine = if ($MailTo) { " -MailTo `"$MailTo`"" } else { "" }
-
-			$wrapper2Script = @"
-`$ErrorActionPreference = 'Stop'
-Import-Module sqmSQLTool -Force
-Invoke-sqmUserDatabaseBackup -All -BackupType '$BackupType' -MailProfile '$MailProfile'$switchLine2$backupPathLine$mailToLine -Confirm:`$false
-"@
-			$wrapper2Path = Join-Path $jobsDir "Invoke-sqmUserDatabaseBackup-$BackupType-$JobName.ps1"
-			[System.IO.File]::WriteAllText($wrapper2Path, $wrapper2Script, [System.Text.Encoding]::UTF8)
-
-			$command2 = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$wrapper2Path`""
-
-			New-DbaAgentJobStep -SqlInstance $SqlInstance -Job $JobName `
-				-StepName "Backup-UserDatabases-$BackupType" -Subsystem 'CmdExec' -Command $command2 -ErrorAction Stop | Out-Null
-
-			Invoke-sqmLogging -Message "Step 2 (CmdExec) 'Backup-UserDatabases-$BackupType' angelegt, Wrapper: $wrapper2Path" -FunctionName $functionName -Level "INFO"
+			Invoke-sqmLogging -Message "Step 2 'Backup-UserDatabases-$BackupType' angelegt." -FunctionName $functionName -Level "INFO"
 
 			# 10. Hilfsfunktion: Wochentage aufloesen
 			function ConvertTo-WeekdayInterval
@@ -407,12 +398,12 @@ Invoke-sqmUserDatabaseBackup -All -BackupType '$BackupType' -MailProfile '$MailP
 				$op = Get-DbaAgentOperator @connParams -Operator $OperatorName -ErrorAction SilentlyContinue
 				if ($op)
 				{
-					Set-DbaAgentJob @connParams -Job $JobName -EmailOperator $OperatorName -EmailLevel OnFailure -ErrorAction SilentlyContinue | Out-Null
+					Set-DbaAgentJob @connParams -Job $JobName -OperatorToEmail $OperatorName -EmailLevel OnFailure -ErrorAction SilentlyContinue | Out-Null
 					Invoke-sqmLogging -Message "Operator '$OperatorName' fuer Fehler-Benachrichtigung gesetzt." -FunctionName $functionName -Level "INFO"
 				}
 				else
 				{
-					Invoke-sqmLogging -Message "Operator '$OperatorName' nicht gefunden - Benachrichtigung nicht konfiguriert." -FunctionName $functionName -Level "WARNING"
+					Invoke-sqmLogging -Message "Operator '$OperatorName' nicht gefunden — Benachrichtigung nicht konfiguriert." -FunctionName $functionName -Level "WARNING"
 				}
 			}
 
@@ -428,6 +419,56 @@ Invoke-sqmUserDatabaseBackup -All -BackupType '$BackupType' -MailProfile '$MailP
 			$result.Status  = 'Failed'
 			$result.Message = $errMsg
 			if ($EnableException) { throw }
+		}
+
+		# AlwaysOn-Propagierung: Job auch auf Secondary-Repliken anlegen
+		if (-not $SkipAlwaysOnPropagation -and $result.Status -eq 'Created')
+		{
+			try
+			{
+				$replicaQuery = "SELECT r.replica_server_name FROM sys.availability_replicas r WHERE r.replica_server_name <> @@SERVERNAME"
+				$secondaries = Invoke-DbaQuery @connParams -Database master -Query $replicaQuery -ErrorAction SilentlyContinue
+
+				foreach ($sec in $secondaries)
+				{
+					$secName = $sec.replica_server_name
+					Invoke-sqmLogging -Message "AlwaysOn: Propagiere Job '$JobName' auf Secondary '$secName'." -FunctionName $functionName -Level "INFO"
+					try
+					{
+						$secParams = @{
+							SqlInstance             = $secName
+							JobName                 = $JobName
+							BackupType              = $BackupType
+							ScheduleTime            = $ScheduleTime
+							ScheduleDays            = $ScheduleDays
+							ScheduleIntervalMinutes = $ScheduleIntervalMinutes
+							JobCategory             = $JobCategory
+							SkipAlwaysOnPropagation = $true
+							Update                  = $true
+						}
+						if ($SqlCredential)          { $secParams['SqlCredential']          = $SqlCredential }
+						if ($BackupPath)             { $secParams['BackupPath']             = $BackupPath }
+						if ($UseExcludeTable)        { $secParams['UseExcludeTable']        = $true }
+						if ($CheckPreferredReplica)  { $secParams['CheckPreferredReplica']  = $true }
+						if ($IncludeSystemDatabases) { $secParams['IncludeSystemDatabases'] = $true }
+						if ($MailTo)                 { $secParams['MailTo']                 = $MailTo }
+						if ($MailOnSuccess)          { $secParams['MailOnSuccess']          = $true }
+						if ($OperatorName)           { $secParams['OperatorName']           = $OperatorName }
+						$secParams['MailProfile'] = $MailProfile
+
+						$secResult = New-sqmBackupMaintenanceJob @secParams
+						Invoke-sqmLogging -Message "AlwaysOn '$secName': $($secResult.Status) — $($secResult.Message)" -FunctionName $functionName -Level "INFO"
+					}
+					catch
+					{
+						Invoke-sqmLogging -Message "AlwaysOn: Fehler bei Propagierung auf '$secName': $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
+					}
+				}
+			}
+			catch
+			{
+				Invoke-sqmLogging -Message "AlwaysOn-Erkennung nicht verfuegbar oder kein AG konfiguriert." -FunctionName $functionName -Level "VERBOSE"
+			}
 		}
 
 		return $result
