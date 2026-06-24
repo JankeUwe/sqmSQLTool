@@ -195,7 +195,7 @@ END
             Invoke-sqmLogging -Message "[$SqlInstance] Starte $functionName (Remove=$Remove)" -FunctionName $functionName -Level 'INFO'
 
             $triggerExists = Invoke-DbaQuery @connParams `
-                -Query "SELECT 1 AS Exists FROM sys.server_triggers WHERE name = N'$triggerName'" `
+                -Query "SELECT 1 AS Found FROM sys.server_triggers WHERE name = N'$triggerName'" `
                 -ErrorAction Stop
 
             # ── REMOVE ───────────────────────────────────────────────────────────
@@ -233,7 +233,7 @@ END
                 {
                     # Zieltabelle muss vorhanden sein
                     $tableExists = Invoke-DbaQuery @connParams `
-                        -Query "SELECT 1 AS Exists FROM master.sys.objects WHERE object_id = OBJECT_ID(N'master.dbo.sqm_BackupExclude') AND type = 'U'" `
+                        -Query "SELECT 1 AS Found FROM master.sys.objects WHERE object_id = OBJECT_ID(N'master.dbo.sqm_BackupExclude') AND type = 'U'" `
                         -ErrorAction Stop
 
                     if (-not $tableExists)
