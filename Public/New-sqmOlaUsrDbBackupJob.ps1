@@ -513,29 +513,7 @@ function New-sqmOlaUsrDbBackupJob
 				
 				try
 				{
-					# Vorhandenen Job behandeln
-					$existingJob = Get-DbaAgentJob @connParams -Job $jobDef.JobName -ErrorAction SilentlyContinue
-					if ($existingJob)
-					{
-						if (-not $Update)
-						{
-							$msg = "Job '$($jobDef.JobName)' existiert bereits. Verwenden Sie -Update zum ueberschreiben."
-							Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "WARNING"
-							$result.JobStatus    = 'AlreadyExists'
-							$result.OverallStatus = 'AlreadyExists'
-							$result.Message      = $msg
-							$results.Add($result)
-							if (-not $ContinueOnError) { continue }
-							else { continue }
-						}
-						else
-						{
-							Remove-DbaAgentJob @connParams -Job $jobDef.JobName -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
-							Invoke-sqmLogging -Message "Vorhandener Job '$($jobDef.JobName)' wurde entfernt (Update)." -FunctionName $functionName -Level "INFO"
-						}
-					}
-					
-					# Ola-Kommando aufbauen
+					# Ola-Kommando aufbauen (vor Job-Check, damit Update-Pfad es direkt nutzen kann)
 					if ($UseExcludeTable)
 					{
 						# Exclude-Liste wird bei jedem Job-Lauf frisch aus sqm_BackupExclude gelesen —
@@ -590,11 +568,49 @@ EXECUTE master.dbo.DatabaseBackup
 "@
 					}
 					$olaCommand = ($olaCommand -split "`n" | Where-Object { $_.Trim() -ne '' }) -join "`n"
-					
+
+					# Vorhandenen Job behandeln
+					$existingJob = Get-DbaAgentJob @connParams -Job $jobDef.JobName -ErrorAction SilentlyContinue
+					if ($existingJob)
+					{
+						if (-not $Update)
+						{
+							$msg = "Job '$($jobDef.JobName)' existiert bereits. Verwenden Sie -Update zum ueberschreiben."
+							Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "WARNING"
+							$result.JobStatus    = 'AlreadyExists'
+							$result.OverallStatus = 'AlreadyExists'
+							$result.Message      = $msg
+							$results.Add($result)
+							continue
+						}
+						else
+						{
+							# Step-Command direkt per Set-DbaAgentJobStep aktualisieren —
+							# sicherer als Remove+New, da Remove mit SilentlyContinue lautlos fehlschlagen kann
+							# und New-DbaAgentJob bei bestehendem Job in einigen dbatools-Versionen
+							# still den alten Job zurueckgibt ohne den Step zu aendern.
+							Set-DbaAgentJobStep @connParams `
+								-Job $jobDef.JobName `
+								-StepId 1 `
+								-Command $olaCommand `
+								-EnableException -ErrorAction Stop | Out-Null
+							Set-DbaAgentJob @connParams `
+								-Job $jobDef.JobName `
+								-Description "Ola DatabaseBackup - $Databases - $($jobDef.BackupType) - $($jobDef.ScheduleDays -join '/') $($jobDef.ScheduleTime) - Ziel: $usrBackupDir" `
+								-ErrorAction SilentlyContinue | Out-Null
+							Invoke-sqmLogging -Message "Job '$($jobDef.JobName)' aktualisiert: Step-Command neu geschrieben (UseExcludeTable=$UseExcludeTable)." -FunctionName $functionName -Level "INFO"
+							$result.JobStatus    = 'Updated'
+							$result.OverallStatus = 'Success'
+							$result.Message      = "Job '$($jobDef.JobName)' aktualisiert (Step-Command, UseExcludeTable=$UseExcludeTable)."
+							$results.Add($result)
+							continue
+						}
+					}
+
 					$timeParts = $jobDef.ScheduleTime -split ':'
 					$startTime = '{0:D2}{1:D2}00' -f [int]$timeParts[0], [int]$timeParts[1]
 					$outFile   = "$("`$")(ESCAPE_SQUOTE(SQLLOGDIR))\MaintenanceLog\DatabaseBackup_USR_$($jobDef.StepSuffix)_$("`$")(ESCAPE_SQUOTE(STRTDT))_$("`$")(ESCAPE_SQUOTE(STRTTM)).txt"
-					
+
 					# WhatIf-Pruefung
 					if (-not $PSCmdlet.ShouldProcess($SqlInstance, "Erstelle Job '$($jobDef.JobName)' [$($jobDef.BackupType)]"))
 					{
