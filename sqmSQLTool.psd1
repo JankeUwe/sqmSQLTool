@@ -87,6 +87,7 @@
 		'Export-sqmServerConfiguration',
 		'Find-sqmDatabaseObject',
 		'Get-sqmADAccountStatus',
+		'Get-sqmServersFromOU',
 		'Get-sqmADGroupMembers',
 		'Get-sqmADGroupMembersRecursive',
 		'Get-sqmADMemberGroups',
