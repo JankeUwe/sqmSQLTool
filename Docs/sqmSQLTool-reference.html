@@ -181,7 +181,7 @@
 
 	<div class="psdb-st-nav-group" id="nav-backup-&-restore">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-backup-&-restore-list')">
-	<span>💾 Backup & Restore</span><span class="psdb-st-nav-count">11</span>
+	<span>💾 Backup & Restore</span><span class="psdb-st-nav-count">12</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-backup-&-restore-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmlogshrink')">Invoke-sqmLogShrink</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmrestoredatabase')">Invoke-sqmRestoreDatabase</span></li>
@@ -193,7 +193,8 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-syncsqmbackupexcludetable')">Sync-sqmBackupExcludeTable</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmbackupintegrity')">Test-sqmBackupIntegrity</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmserversfromou')">Get-sqmServersFromOU</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-registersqmbackupexcludetrigger')">Register-sqmBackupExcludeTrigger</span></li></ul>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-registersqmbackupexcludetrigger')">Register-sqmBackupExcludeTrigger</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-showsqmbackupexcludeform')">Show-sqmBackupExcludeForm</span></li></ul>
 	</div>
 
 	<div class="psdb-st-nav-group" id="nav-sicherheit">
@@ -261,17 +262,23 @@
 
 	<div class="psdb-st-nav-group" id="nav-konfiguration">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-konfiguration-list')">
-	<span>⚙️ Configuration</span><span class="psdb-st-nav-count">9</span>
+	<span>⚙️ Configuration</span><span class="psdb-st-nav-count">7</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-konfiguration-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-comparesqmserverconfiguration')">Compare-sqmServerConfiguration</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmconfig')">Get-sqmConfig</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmserversetting')">Get-sqmServerSetting</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmcollationchange')">Invoke-sqmCollationChange</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmsetdatabaserecoverymode')">Invoke-sqmSetDatabaseRecoveryMode</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmssisconfiguration')">Invoke-sqmSsisConfiguration</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmconfig')">Set-sqmConfig</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmssrsconfiguration')">Set-sqmSsrsConfiguration</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmtcpport')">Set-sqmTcpPort</span></li></ul>
+	</div>
+
+	<div class="psdb-st-nav-group" id="nav-sqmtool-config">
+	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-sqmtool-config-list')">
+	<span>🔧 sqmTool Config</span><span class="psdb-st-nav-count">2</span>
+	</div>
+	<ul class="psdb-st-nav-funcs" id="nav-sqmtool-config-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmconfig')">Get-sqmConfig</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmconfig')">Set-sqmConfig</span></li></ul>
 	</div>
 
 	<div class="psdb-st-nav-group" id="nav-inventar-&-suche">
@@ -318,6 +325,19 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmtsmconnection')">Test-sqmTsmConnection</span></li></ul>
 	</div>
 
+	<div class="psdb-st-nav-group" id="nav-driver">
+	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-driver-list')">
+	<span>🔌 Driver Install/Uninstall</span><span class="psdb-st-nav-count">7</span>
+	</div>
+	<ul class="psdb-st-nav-funcs" id="nav-driver-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmdb2driver')">Install-sqmDb2Driver</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmjdbcdriver')">Install-sqmJdbcDriver</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmodbcdriver')">Install-sqmOdbcDriver</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmdriverinstalled')">Test-sqmDriverInstalled</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmdb2driver')">Uninstall-sqmDb2Driver</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmjdbcdriver')">Uninstall-sqmJdbcDriver</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmodbcdriver')">Uninstall-sqmOdbcDriver</span></li></ul>
+	</div>
+
 	<div class="psdb-st-nav-group" id="nav-deployment">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-deployment-list')">
 	<span>🚀 Deployment</span><span class="psdb-st-nav-count">2</span>
@@ -328,7 +348,7 @@
 
 	<div class="psdb-st-nav-group" id="nav-sonstige">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-sonstige-list')">
-	<span>🔹 Other</span><span class="psdb-st-nav-count">28</span>
+	<span>🔹 Other</span><span class="psdb-st-nav-count">22</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-sonstige-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-copysqmlogins')">Copy-sqmLogins</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-copysqmtocentralpath')">Copy-sqmToCentralPath</span></li>
@@ -337,16 +357,13 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmhpuallowgroup')">Get-sqmHpuAllowGroup</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmserverhardwarereport')">Get-sqmServerHardwareReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmadmodule')">Install-sqmAdModule</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmdb2driver')">Install-sqmDb2Driver</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmjdbcdriver')">Install-sqmJdbcDriver</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmodbcdriver')">Install-sqmOdbcDriver</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmolamaintenancesolution')">Install-sqmOlaMaintenanceSolution</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmssrsreportserver')">Install-sqmSsrsReportServer</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmmonitoringkey')">Invoke-sqmMonitoringKey</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmolamaintenancejobs')">New-sqmOlaMaintenanceJobs</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmrandomsapassword')">New-sqmRandomSaPassword</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmsqlpolicystate')">Set-sqmSqlPolicyState</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmdriverinstalled')">Test-sqmDriverInstalled</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-showsqmtoolgui')">Show-sqmToolGui</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmmaxdop')">Test-sqmMaxDop</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmmaxmemory')">Test-sqmMaxMemory</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmmoduleupdate')">Test-sqmModuleUpdate</span></li>
@@ -354,9 +371,6 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmupdateviagithub')">Test-sqmUpdateViaGitHub</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmupdateviapsgallery')">Test-sqmUpdateViaPSGallery</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmupdateviaunc')">Test-sqmUpdateViaUNC</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmdb2driver')">Uninstall-sqmDb2Driver</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmjdbcdriver')">Uninstall-sqmJdbcDriver</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmodbcdriver')">Uninstall-sqmOdbcDriver</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-updatesqmmodule')">Update-sqmModule</span></li></ul>
 	</div>
 
@@ -1175,6 +1189,25 @@ Sync-sqmBackupExcludeTable -SqlInstance &quot;SQL01\INST1&quot;</pre><button cla
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmServersFromOU | ForEach-Object {
     Sync-sqmBackupExcludeTable -SqlInstance $_.SqlInstance
 }</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-showsqmbackupexcludeform">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Show-sqmBackupExcludeForm</span>
+	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
+	</div>
+	<div class="psdb-st-func-desc">WinForms dialog for managing master.dbo.sqm_BackupExclude. Loads all entries into a grid, lets you toggle IsActive and edit Reason, and writes back only changed rows. Orphaned entries (IsOrphaned=1) are highlighted in colour.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Open on local instance</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Show-sqmBackupExcludeForm</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Open pre-connected to a named instance</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Show-sqmBackupExcludeForm -SqlInstance 'SQL01\INST1'</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -3638,6 +3671,25 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	</div>
 	</div>
 
+	<div class="psdb-st-func-card" id="f-showsqmtoolgui">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Show-sqmToolGui</span>
+	<span class="psdb-st-badge psdb-st-badge-monitoring">GUI</span>
+	</div>
+	<div class="psdb-st-func-desc">Launches a WinForms GUI that lists all exported sqmSQLTool functions grouped by category (loaded from Public\category-map.ps1). Select a function to get auto-generated input fields, a live command preview, clipboard copy, and direct execution. Read-only functions (Get-/Test-) are safe to run; functions that support -WhatIf get a simulation checkbox.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Open with all functions</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Show-sqmToolGui</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Open pre-filtered to AlwaysOn functions</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Show-sqmToolGui -Filter '*AlwaysOn*'</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
 	</section>
 
 	</div>
@@ -3647,7 +3699,7 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	<div id="tab-quick" class="psdb-st-panel">
 <div class="psdb-st-content">
 <h2 class="psdb-st-section-title">🚀 Quick Start</h2>
-<div class="psdb-st-info">sqmSQLTool is a modular PowerShell toolset for SQL Server administration with 128 functions zur Verwaltung von AlwaysOn, Backup/Restore, Performance, Sicherheit und mehr.</div>
+<div class="psdb-st-info">sqmSQLTool is a modular PowerShell toolset for SQL Server administration with 132 functions zur Verwaltung von AlwaysOn, Backup/Restore, Performance, Sicherheit und mehr.</div>
 <div class="psdb-st-section" style="margin-top:20px;">
 <div class="psdb-st-qs-step"><div class="psdb-st-qs-num">1</div><div class="psdb-st-qs-body"><div class="psdb-st-qs-title">Import module</div><pre class="psdb-st-code" style="margin-top:6px;">Import-Module sqmSQLTool</pre></div></div>
 <div class="psdb-st-qs-step"><div class="psdb-st-qs-num">2</div><div class="psdb-st-qs-body"><div class="psdb-st-qs-title">Set configuration</div><pre class="psdb-st-code" style="margin-top:6px;">Set-sqmConfig -LogPath "C:\System\WinSrvLog\MSSQL" -OutputPath "C:\System\WinSrvLog\MSSQL"</pre></div></div>
@@ -3734,7 +3786,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 </div>
 <div id="tab-overview" class="psdb-st-panel">
 	<div style="padding:24px;">
-	<h2 class="psdb-st-section-title">&#128202; All Functions (130)</h2>
+	<h2 class="psdb-st-section-title">&#128202; All Functions (132)</h2>
 	<input type="text" id="psdb-st-ov-search" placeholder="Search function..." oninput="psstOvSearch(this.value)"
 	  style="width:100%;max-width:400px;padding:7px 12px;margin-bottom:16px;background:rgba(255,255,255,0.07);border:1px solid rgba(46,134,193,0.3);border-radius:6px;color:#e2e8f0;font-size:.85rem;font-family:inherit;">
 
@@ -3847,6 +3899,8 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Set-sqmSsrsConfiguration</td><td>Configures SQL Server Reporting Services (SSRS) fully automatically.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Set-sqmSsrsHttpsCertificate</td><td>Binds a Windows certificate to SSRS or Power BI Report Server for HTTPS access.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Set-sqmTcpPort</td><td>Configures the TCP port of a SQL Server instance via the registry.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Show-sqmBackupExcludeForm</td><td>WinForms dialog for viewing and editing master.dbo.sqm_BackupExclude — toggle IsActive, edit Reason, orphaned entries highlighted.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Show-sqmToolGui</td><td>WinForms GUI listing all sqmSQLTool functions grouped by category (category-map.ps1) with auto-generated input fields, live preview, and direct execution.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Sync-sqmAgNode</td><td>Synchronizes configuration and logins between AlwaysOn AG nodes.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Sync-sqmBackupExcludeTable</td><td>Creates and synchronises the backup exclude table in the master database.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Sync-sqmLoginsToAlwaysOn</td><td>Synchronizes logins from the primary replica to all secondary replicas in an AlwaysOn Availability Group.</td></tr>
