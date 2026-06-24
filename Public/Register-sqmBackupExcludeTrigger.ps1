@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Registriert oder entfernt den DDL-Trigger, der master.dbo.sqm_BackupExclude
     automatisch bei CREATE_DATABASE und DROP_DATABASE aktuell haelt.
