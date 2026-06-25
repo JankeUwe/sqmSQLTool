@@ -49,6 +49,7 @@ $categoryMap = @{
     'Get-sqmOrphanedFiles'                = 'Storage & Disk Management'
     'Get-sqmPerfCounters'                 = 'Server Configuration Testing'
     'Get-sqmServerHardwareReport'         = 'Reporting & Analysis'
+    'Get-sqmServerUtilization'            = 'Performance Analysis & Optimization'
     'Get-sqmServerSetting'                = 'Monitoring & Health Checks'
     'Get-sqmServiceBrokerHealth'          = 'Service Broker'
     'Get-sqmSpnReport'                    = 'Server Configuration Testing'

@@ -8,17 +8,24 @@
     and writes the file back. Before each change a backup copy (dsm.opt.bak)
     is automatically created.
 
-    Configured sections:
-    - EXCLUDE for SQL Server database files (*.mdf, *.ndf, *.ldf)
-    - INCLUDE for backup directories (User-db, Sys-db, additional paths)
-    - MANAGEMENTCLASS for backup files (retention period)
+    Configured sections (within the managed block):
+    - EXCLUDE patterns (default: SQL Server *.mdf/*.ndf/*.ldf; override via -ExcludePatterns)
+    - INCLUDE directories with per-path management class (default: User-db/Sys-db;
+      override via -IncludeRule for arbitrary path -> management class mappings)
+
+    Target file: by default the dsm.opt itself. Real environments often outsource
+    INCLUDE/EXCLUDE statements into a separate file referenced via the INCLEXCL option
+    (e.g. ie_dsm.opt), processed BEFORE the dsm.opt. Use -UseInclExclFile to auto-resolve
+    that file from the dsm.opt's INCLEXCL option, or -InclExclPath to target it explicitly.
+    The target file is created if it does not yet exist (for INCLEXCL files).
 
     When -UseDiff is set, the management class is forced to
     MC_B_NL.NL_42.42.NA (42-day retention).
 
-    The managed block in dsm.opt is delimited by the markers
+    The managed block is delimited by the markers
     '* --- dtcSqlTools BEGIN ---' and '* --- dtcSqlTools END ---'.
-    Manual entries outside this block are preserved.
+    Manual entries outside this block are preserved. NOTE: if the vendor's TSM
+    configurator regenerates the file, our block may be overwritten - re-run as needed.
 
 .PARAMETER ComputerName
     Target computer (TSM client). Default: current computer name.
@@ -40,11 +47,31 @@
     Additional directories to be added as INCLUDE entries.
 
 .PARAMETER ManagementClass
-    TSM management class for the backup files.
-    Allowed values: MC_B_NL.NL_10.10.NA, MC_B_NL.NL_35.35.NA,
-                    MC_B_NL.NL_42.42.NA, MC_B_NL.NL_62.62.NA,
-                    MC_B_NL.NL_96.96.NA, MC_B_NL.NL_370.370.NA.
+    Default TSM management class for the backup includes (used when an include
+    rule does not specify its own class). Accepts any MC_* name (validated by
+    pattern, not a fixed set) so real-world classes such as MC_B_2.2_15.15.NA_IMG
+    or MC_B_NL_NL_365.365.NA are allowed.
     Default: MC_B_NL.NL_42.42.NA.
+
+.PARAMETER ExcludePatterns
+    Custom EXCLUDE patterns (without the EXCLUDE keyword/quotes), e.g.
+    @('S:\...\*', '*:\...\*.ldf'). When omitted, defaults to the three SQL
+    database file types (*.ldf, *.mdf, *.ndf).
+
+.PARAMETER IncludeRule
+    Array of hashtables @{ Path = '...'; ManagementClass = '...' } to bind a
+    management class to a specific include path. Path is taken verbatim (include
+    the pattern, e.g. 'F:\Daten\SQL\Backup\...\*'). ManagementClass is optional
+    and falls back to -ManagementClass. When omitted, the classic User-db/Sys-db
+    model (plus -AdditionalIncludePaths) is used with the default class.
+
+.PARAMETER UseInclExclFile
+    Resolve the INCLEXCL option from the dsm.opt and write the managed block into
+    that referenced include/exclude file instead of the dsm.opt itself.
+
+.PARAMETER InclExclPath
+    Explicit path to the include/exclude file to write into (overrides INCLEXCL
+    resolution and the dsm.opt target).
 
 .PARAMETER UseDiff
     When set, forces the management class to MC_B_NL.NL_42.42.NA
@@ -81,8 +108,17 @@
 .EXAMPLE
     Invoke-sqmTsmConfiguration -ComputerName "SQL01" -AdditionalIncludePaths "E:\Archive"
 
+.EXAMPLE
+    # Write into the INCLEXCL-referenced ie file, with custom excludes and per-path classes
+    Invoke-sqmTsmConfiguration -ComputerName "SQL01" -UseInclExclFile `
+        -ExcludePatterns 'S:\...\*', '*:\...\*.ldf', '*:\...\*.mdf', '*:\...\*.ndf' `
+        -IncludeRule @(
+            @{ Path = 'F:\Daten\SQL\Backup\...\*';   ManagementClass = 'MC_B_NL.NL_35.35.NA' },
+            @{ Path = 'F:\Daten\SQL\Backup\01Year\*'; ManagementClass = 'MC_B_NL_NL_365.365.NA' }
+        )
+
 .OUTPUTS
-    PSCustomObject with ComputerName, DsmOptPath, BackupDirectory,
+    PSCustomObject with ComputerName, DsmOptPath, TargetFile, BackupDirectory,
     ManagementClass, UseDiff, ExcludesWritten, IncludesWritten,
     BackupCreated, Status, Message, ReportPath.
 #>
@@ -102,15 +138,19 @@ function Invoke-sqmTsmConfiguration
 		[Parameter(Mandatory = $false)]
 		[string[]]$AdditionalIncludePaths = @(),
 		[Parameter(Mandatory = $false)]
-		[ValidateSet(
-					 'MC_B_NL.NL_10.10.NA',
-					 'MC_B_NL.NL_35.35.NA',
-					 'MC_B_NL.NL_42.42.NA',
-					 'MC_B_NL.NL_62.62.NA',
-					 'MC_B_NL.NL_96.96.NA',
-					 'MC_B_NL.NL_370.370.NA'
-					 )]
+		# Hinweis: ValidateSet wurde durch ValidatePattern ersetzt, da reale Umgebungen
+		# weitere Klassen nutzen (z. B. MC_B_2.2_15.15.NA_IMG, MC_B_NL_NL_365.365.NA),
+		# die das frühere 6-Werte-Set abgelehnt hätte. Alte gültige Aufrufe bleiben gültig.
+		[ValidatePattern('^MC_[A-Za-z0-9._]+$')]
 		[string]$ManagementClass = 'MC_B_NL.NL_42.42.NA',
+		[Parameter(Mandatory = $false)]
+		[string[]]$ExcludePatterns,
+		[Parameter(Mandatory = $false)]
+		[hashtable[]]$IncludeRule = @(),
+		[Parameter(Mandatory = $false)]
+		[switch]$UseInclExclFile,
+		[Parameter(Mandatory = $false)]
+		[string]$InclExclPath,
 		[Parameter(Mandatory = $false)]
 		[switch]$UseDiff,
 		[Parameter(Mandatory = $false)]
@@ -143,6 +183,7 @@ function Invoke-sqmTsmConfiguration
 		$result = [PSCustomObject]@{
 			ComputerName    = $ComputerName
 			DsmOptPath	    = $null
+			TargetFile	    = $null
 			BackupDirectory = $null
 			ManagementClass = $null
 			UseDiff		    = [bool]$UseDiff
@@ -214,30 +255,98 @@ SELECT @BackupDirectory AS BackupDirectory;
 			$result.BackupDirectory = $effBackupDir
 			Invoke-sqmLogging -Message "Backup-Verzeichnis: $effBackupDir" -FunctionName $functionName -Level "INFO"
 			
-			# --- dsm.opt-Pfad ermitteln ---
+			# --- dsm.opt-Pfad ermitteln (für Record + INCLEXCL-Auflösung) ---
 			$isLocal = $ComputerName -in @($env:COMPUTERNAME, 'localhost', '127.0.0.1', '.')
 			$localDsmOpt = $DsmOptPath
 			if (-not $localDsmOpt)
 			{
 				$localDsmOpt = _FindDsmOptPath -ComputerName $ComputerName -IsLocal $isLocal -Credential $Credential
 			}
-			if (-not $localDsmOpt)
-			{
-				$msg = "dsm.opt konnte nicht gefunden werden. Bitte -DsmOptPath explizit angeben."
-				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "ERROR"
-				if ($EnableException) { throw $msg }
-				$result.Status = 'DsmOptNotFound'
-				$result.Message = $msg
-				return $result
-			}
 			$result.DsmOptPath = $localDsmOpt
+
+			# --- Zieldatei bestimmen: dsm.opt ODER ausgelagerte Include/Exclude-Datei ---
+			# Reale Umgebungen lagern INCLUDE/EXCLUDE über die INCLEXCL-Option in eine separate
+			# Datei (z. B. ie_dsm.opt) aus, die VOR der dsm.opt verarbeitet wird. Mit -InclExclPath
+			# oder -UseInclExclFile schreiben wir dorthin statt in die dsm.opt.
+			$targetLocal = $null
+			$allowCreate = $false
+			if ($InclExclPath)
+			{
+				$targetLocal = $InclExclPath
+				$allowCreate = $true
+				Invoke-sqmLogging -Message "Zieldatei explizit (InclExclPath): $targetLocal" -FunctionName $functionName -Level "INFO"
+			}
+			elseif ($UseInclExclFile)
+			{
+				if (-not $localDsmOpt)
+				{
+					$msg = "dsm.opt nicht gefunden - INCLEXCL-Verweis nicht auflösbar. Bitte -DsmOptPath oder -InclExclPath angeben."
+					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "ERROR"
+					if ($EnableException) { throw $msg }
+					$result.Status = 'DsmOptNotFound'
+					$result.Message = $msg
+					return $result
+				}
+				$dsmAccess = if ($isLocal) { $localDsmOpt }
+				else { _ToUncPath -ComputerName $ComputerName -LocalPath $localDsmOpt }
+				$targetLocal = _ResolveInclExclPath -DsmOptAccessPath $dsmAccess
+				if (-not $targetLocal)
+				{
+					$msg = "Keine INCLEXCL-Option in dsm.opt gefunden ($dsmAccess). Bitte -InclExclPath explizit angeben."
+					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "ERROR"
+					if ($EnableException) { throw $msg }
+					$result.Status = 'InclExclNotFound'
+					$result.Message = $msg
+					return $result
+				}
+				$allowCreate = $true
+				Invoke-sqmLogging -Message "INCLEXCL-Verweis aufgelöst: $targetLocal" -FunctionName $functionName -Level "INFO"
+			}
+			else
+			{
+				if (-not $localDsmOpt)
+				{
+					$msg = "dsm.opt konnte nicht gefunden werden. Bitte -DsmOptPath explizit angeben."
+					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "ERROR"
+					if ($EnableException) { throw $msg }
+					$result.Status = 'DsmOptNotFound'
+					$result.Message = $msg
+					return $result
+				}
+				$targetLocal = $localDsmOpt
+			}
+			$result.TargetFile = $targetLocal
+
+			$accessPath = if ($isLocal) { $targetLocal }
+			else { _ToUncPath -ComputerName $ComputerName -LocalPath $targetLocal }
+			Invoke-sqmLogging -Message "Zieldatei Zugriffspfad: $accessPath" -FunctionName $functionName -Level "VERBOSE"
 			
-			$accessPath = if ($isLocal) { $localDsmOpt }
-			else { _ToUncPath -ComputerName $ComputerName -LocalPath $localDsmOpt }
-			Invoke-sqmLogging -Message "dsm.opt Zugriffspfad: $accessPath" -FunctionName $functionName -Level "VERBOSE"
-			
-			# --- dsm.opt lesen ---
-			if (-not (Test-Path -Path $accessPath -ErrorAction SilentlyContinue))
+			# --- Zieldatei lesen (bei ausgelagerter ie-Datei ggf. neu anlegen) ---
+			$existingLines = [System.Collections.Generic.List[string]]::new()
+			$targetExists = Test-Path -Path $accessPath -ErrorAction SilentlyContinue
+			if ($targetExists)
+			{
+				try
+				{
+					$rawLines = Get-Content -Path $accessPath -Encoding UTF8 -ErrorAction Stop
+					foreach ($l in $rawLines) { $existingLines.Add($l) }
+					Invoke-sqmLogging -Message "Zieldatei gelesen: $($existingLines.Count) Zeilen" -FunctionName $functionName -Level "INFO"
+				}
+				catch
+				{
+					$msg = "Zieldatei konnte nicht gelesen werden: $($_.Exception.Message)"
+					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "ERROR"
+					if ($EnableException) { throw $msg }
+					$result.Status = 'ReadFailed'
+					$result.Message = $msg
+					return $result
+				}
+			}
+			elseif ($allowCreate)
+			{
+				Invoke-sqmLogging -Message "Zieldatei existiert noch nicht - wird neu angelegt: $accessPath" -FunctionName $functionName -Level "INFO"
+			}
+			else
 			{
 				$msg = "dsm.opt nicht gefunden: $accessPath"
 				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "ERROR"
@@ -246,75 +355,90 @@ SELECT @BackupDirectory AS BackupDirectory;
 				$result.Message = $msg
 				return $result
 			}
-			$existingLines = [System.Collections.Generic.List[string]]::new()
-			try
+
+			# --- Backup der Zieldatei (nur wenn vorhanden) ---
+			if ($targetExists)
 			{
-				$rawLines = Get-Content -Path $accessPath -Encoding UTF8 -ErrorAction Stop
-				foreach ($l in $rawLines) { $existingLines.Add($l) }
-				Invoke-sqmLogging -Message "dsm.opt gelesen: $($existingLines.Count) Zeilen" -FunctionName $functionName -Level "INFO"
-			}
-			catch
-			{
-				$msg = "dsm.opt konnte nicht gelesen werden: $($_.Exception.Message)"
-				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "ERROR"
-				if ($EnableException) { throw $msg }
-				$result.Status = 'ReadFailed'
-				$result.Message = $msg
-				return $result
-			}
-			
-			# --- Backup der dsm.opt ---
-			$bakPath = $accessPath + '.bak'
-			try
-			{
-				Copy-Item -Path $accessPath -Destination $bakPath -Force -ErrorAction Stop
-				$result.BackupCreated = $true
-				Invoke-sqmLogging -Message "Backup angelegt: $bakPath" -FunctionName $functionName -Level "INFO"
-			}
-			catch
-			{
-				$msg = "Backup der dsm.opt fehlgeschlagen: $($_.Exception.Message)"
-				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "ERROR"
-				if ($EnableException) { throw $msg }
-				$result.Status = 'BackupFailed'
-				$result.Message = $msg
-				return $result
+				$bakPath = $accessPath + '.bak'
+				try
+				{
+					Copy-Item -Path $accessPath -Destination $bakPath -Force -ErrorAction Stop
+					$result.BackupCreated = $true
+					Invoke-sqmLogging -Message "Backup angelegt: $bakPath" -FunctionName $functionName -Level "INFO"
+				}
+				catch
+				{
+					$msg = "Backup der Zieldatei fehlgeschlagen: $($_.Exception.Message)"
+					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "ERROR"
+					if ($EnableException) { throw $msg }
+					$result.Status = 'BackupFailed'
+					$result.Message = $msg
+					return $result
+				}
 			}
 			
-			# --- Include-Pfade vorbereiten ---
-			$includePaths = [System.Collections.Generic.List[string]]::new()
-			$includePaths.Add("$effBackupDir\User-db")
-			$includePaths.Add("$effBackupDir\Sys-db")
-			foreach ($p in $AdditionalIncludePaths)
+			# --- Exclude-Patterns vorbereiten ---
+			# Default: die drei SQL-Datenbankdatei-Typen. Mit -ExcludePatterns überschreibbar
+			# (eigene Patterns, z. B. 'S:\...\*'). Patterns ohne EXCLUDE-Schlüsselwort/Quotes.
+			$effExcludePatterns = if ($PSBoundParameters.ContainsKey('ExcludePatterns') -and $ExcludePatterns)
 			{
-				if ($p -and $p.Trim()) { $includePaths.Add($p.TrimEnd('\')) }
+				$ExcludePatterns
 			}
-			
+			else
+			{
+				@('*:\...\*.ldf', '*:\...\*.mdf', '*:\...\*.ndf')
+			}
+
+			# --- Include-Regeln vorbereiten ---
+			# Mit -IncludeRule (@{ Path = '...'; ManagementClass = '...' }) lassen sich pro Pfad
+			# eigene Managementklassen setzen (z. B. 365-Tage-Klasse für ein 01Year-Verzeichnis).
+			# Path wird verbatim übernommen (inkl. Pattern wie \...\* ). Ohne -IncludeRule gilt
+			# das klassische User-db/Sys-db-Modell mit der Default-$ManagementClass.
+			$effIncludeRules = [System.Collections.Generic.List[object]]::new()
+			if ($IncludeRule -and $IncludeRule.Count -gt 0)
+			{
+				foreach ($rule in $IncludeRule)
+				{
+					$rPath = $rule['Path']
+					if (-not $rPath -or -not "$rPath".Trim()) { continue }
+					$rMc = $rule['ManagementClass']
+					if (-not $rMc -or -not "$rMc".Trim()) { $rMc = $ManagementClass }
+					$effIncludeRules.Add([PSCustomObject]@{ Path = "$rPath".Trim(); ManagementClass = "$rMc".Trim() })
+				}
+			}
+			else
+			{
+				$effIncludeRules.Add([PSCustomObject]@{ Path = "$effBackupDir\User-db\*"; ManagementClass = $ManagementClass })
+				$effIncludeRules.Add([PSCustomObject]@{ Path = "$effBackupDir\Sys-db\*"; ManagementClass = $ManagementClass })
+				foreach ($p in $AdditionalIncludePaths)
+				{
+					if ($p -and $p.Trim()) { $effIncludeRules.Add([PSCustomObject]@{ Path = ($p.TrimEnd('\') + '\*'); ManagementClass = $ManagementClass }) }
+				}
+			}
+
 			# --- Verwaltungsblock erstellen ---
 			$blockLines = [System.Collections.Generic.List[string]]::new()
 			$blockLines.Add('')
 			$blockLines.Add('* --- dtcSqlTools BEGIN ---')
-			$blockLines.Add("* Konfiguriert von MSSQLTools Invoke-sqmTsmConfiguration")
+			$blockLines.Add("* Konfiguriert von sqmSQLTool Invoke-sqmTsmConfiguration")
 			$blockLines.Add("* Zeitpunkt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')")
 			$blockLines.Add("* Server: $ComputerName  |  SQL-Backup: $effBackupDir")
-			$blockLines.Add("* UseDiff: $UseDiff  |  ManagementClass: $ManagementClass")
+			$blockLines.Add("* UseDiff: $UseDiff  |  Default-ManagementClass: $ManagementClass")
 			$blockLines.Add('*')
-			$blockLines.Add('* SQL Server Datenbankdateien vom TSM-Backup ausschliessen:')
-			$excludePatterns = @('EXCLUDE "*:\...\*.ldf"', 'EXCLUDE "*:\...\*.mdf"', 'EXCLUDE "*:\...\*.ndf"')
-			foreach ($excl in $excludePatterns) { $blockLines.Add($excl) }
-			$result.ExcludesWritten = $excludePatterns.Count
-			$blockLines.Add('*')
-			$blockLines.Add('* SQL Server Backup-Verzeichnisse einschliessen:')
-			foreach ($incPath in $includePaths)
+			$blockLines.Add('* Vom TSM-Backup ausschliessen:')
+			foreach ($excl in $effExcludePatterns)
 			{
-				$blockLines.Add("INCLUDE `"$incPath\*`"")
-				$result.IncludesWritten++
+				$p = "$excl".Trim()
+				if (-not $p) { continue }
+				$blockLines.Add("EXCLUDE `"$p`"")
+				$result.ExcludesWritten++
 			}
 			$blockLines.Add('*')
-			$blockLines.Add('* Management-Klasse fuer Backup-Dateien:')
-			foreach ($incPath in $includePaths)
+			$blockLines.Add('* Backup-Verzeichnisse einschliessen (mit Management-Klasse):')
+			foreach ($rule in $effIncludeRules)
 			{
-				$blockLines.Add("INCLUDE `"$incPath\*`" $ManagementClass")
+				$blockLines.Add("INCLUDE `"$($rule.Path)`" $($rule.ManagementClass)")
+				$result.IncludesWritten++
 			}
 			$blockLines.Add('*')
 			$blockLines.Add('* --- dtcSqlTools END ---')
@@ -346,22 +470,22 @@ SELECT @BackupDirectory AS BackupDirectory;
 			{
 				foreach ($l in $existingLines) { $newLines.Add($l) }
 				foreach ($l in $blockLines) { $newLines.Add($l) }
-				Invoke-sqmLogging -Message "dtcSqlTools-Block am Ende der dsm.opt eingefuegt." -FunctionName $functionName -Level "INFO"
+				Invoke-sqmLogging -Message "dtcSqlTools-Block am Ende der Zieldatei eingefuegt." -FunctionName $functionName -Level "INFO"
 			}
 			
 			# --- Schreiben ---
-			if ($PSCmdlet.ShouldProcess($accessPath, "dsm.opt schreiben"))
+			if ($PSCmdlet.ShouldProcess($accessPath, "Zieldatei schreiben"))
 			{
 				try
 				{
 					$newLines | Out-File -FilePath $accessPath -Encoding UTF8 -Force -ErrorAction Stop
-					Invoke-sqmLogging -Message "dsm.opt geschrieben: $($newLines.Count) Zeilen" -FunctionName $functionName -Level "INFO"
+					Invoke-sqmLogging -Message "Zieldatei geschrieben: $($newLines.Count) Zeilen" -FunctionName $functionName -Level "INFO"
 					$result.Status = 'Success'
-					$result.Message = "dsm.opt konfiguriert: $($result.ExcludesWritten) EXCLUDE(s), $($result.IncludesWritten) INCLUDE(s), ManagementClass: $ManagementClass"
+					$result.Message = "Konfiguriert ($accessPath): $($result.ExcludesWritten) EXCLUDE(s), $($result.IncludesWritten) INCLUDE(s), Default-MgmtClass: $ManagementClass"
 				}
 				catch
 				{
-					$msg = "dsm.opt konnte nicht geschrieben werden: $($_.Exception.Message)"
+					$msg = "Zieldatei konnte nicht geschrieben werden: $($_.Exception.Message)"
 					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "ERROR"
 					if ($EnableException) { throw $msg }
 					$result.Status = 'WriteFailed'
@@ -372,7 +496,7 @@ SELECT @BackupDirectory AS BackupDirectory;
 			else
 			{
 				$result.Status = 'WhatIf'
-				$result.Message = "WhatIf: dsm.opt wuerde geschrieben werden ($($newLines.Count) Zeilen)."
+				$result.Message = "WhatIf: Zieldatei wuerde geschrieben werden ($($newLines.Count) Zeilen)."
 			}
 			
 			# --- Bericht schreiben (optional) ---
@@ -381,26 +505,26 @@ SELECT @BackupDirectory AS BackupDirectory;
 			$safeComp = $ComputerName -replace '[\\/:*?"<>|]', '_'
 			$reportFile = Join-Path $OutputPath "TsmConfiguration_${safeComp}_${datestamp}.txt"
 			$result.ReportPath = $reportFile
+			$exclDisplay = ($effExcludePatterns | ForEach-Object { "EXCLUDE `"$_`"" }) -join "`n  "
+			$incDisplay = ($effIncludeRules | ForEach-Object { "INCLUDE `"$($_.Path)`" $($_.ManagementClass)" }) -join "`n  "
 			@"
 # ================================================================
-# MSSQLTools - TSM dsm.opt Konfigurationsbericht
-# Computer      : $ComputerName
-# Datum         : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-# dsm.opt       : $accessPath
-# Backup-Pfad   : $effBackupDir
-# ManagementClass: $ManagementClass
-# UseDiff       : $UseDiff
-# Status        : $($result.Status)
+# sqmSQLTool - TSM Konfigurationsbericht
+# Computer       : $ComputerName
+# Datum          : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+# dsm.opt        : $($result.DsmOptPath)
+# Zieldatei      : $accessPath
+# Backup-Pfad    : $effBackupDir
+# Default-MgmtCls: $ManagementClass
+# UseDiff        : $UseDiff
+# Status         : $($result.Status)
 # ================================================================
 
 EXCLUDEs:
-  $($excludePatterns -join "`n  ")
+  $exclDisplay
 
-INCLUDEs:
-  $($includePaths -join "`n  ")
-
-ManagementClass-Zuweisungen:
-  $($includePaths -join "`n  ")
+INCLUDEs (mit ManagementClass):
+  $incDisplay
 "@ | Out-File -FilePath $reportFile -Encoding UTF8 -Force
 			Copy-sqmToCentralPath -Path $reportFile
 			Invoke-sqmLogging -Message "Bericht erstellt: $reportFile" -FunctionName $functionName -Level "INFO"
@@ -509,4 +633,36 @@ function _ToUncPath
 		return "\\$ComputerName\$($Matches[1])`$\$($Matches[2])"
 	}
 	return "\\$ComputerName\$($LocalPath.Replace(':', '$'))"
+}
+
+function _ResolveInclExclPath
+{
+	# Liest die dsm.opt und gibt den über die INCLEXCL-Option referenzierten lokalen
+	# Pfad zur ausgelagerten Include/Exclude-Datei zurück (z. B. ie_dsm.opt).
+	# Unterstützt INCLEXCL und INCLEXCL.WINNT, ignoriert Kommentare (*), nimmt den
+	# letzten Treffer. Gibt $null zurück, wenn keine INCLEXCL-Option vorhanden ist.
+	param (
+		[Parameter(Mandatory = $true)]
+		[string]$DsmOptAccessPath
+	)
+
+	if (-not (Test-Path -Path $DsmOptAccessPath -ErrorAction SilentlyContinue)) { return $null }
+
+	$resolved = $null
+	try
+	{
+		$lines = Get-Content -Path $DsmOptAccessPath -Encoding UTF8 -ErrorAction Stop
+	}
+	catch { return $null }
+
+	foreach ($line in $lines)
+	{
+		$trimmed = $line.Trim()
+		if ([string]::IsNullOrWhiteSpace($trimmed) -or $trimmed.StartsWith('*')) { continue }
+		if ($trimmed -match '^(?i)INCLEXCL(\.\w+)?\s+(.+)$')
+		{
+			$resolved = $Matches[2].Trim().Trim('"').Trim("'")
+		}
+	}
+	return $resolved
 }

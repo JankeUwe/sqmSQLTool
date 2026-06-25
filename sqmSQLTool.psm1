@@ -179,7 +179,10 @@ else
 	{
 		try
 		{
-			Set-DbatoolsConfig -FullName 'sql.connection.trustcert' -Value $true -Scope Session -ErrorAction SilentlyContinue
+			# Hinweis: Set-DbatoolsConfig hat KEINEN -Scope-Parameter (dbatools 2.8.x) - die
+			# Einstellung gilt ohnehin sessionweit. Fruehere Variante mit "-Scope Session" warf
+			# eine vom catch verschluckte Exception, sodass trustcert nie gesetzt wurde.
+			Set-DbatoolsConfig -FullName 'sql.connection.trustcert' -Value $true -ErrorAction SilentlyContinue
 		}
 		catch { Write-Verbose "Konnte dbatools trustcert nicht setzen: $($_.Exception.Message)" }
 	}

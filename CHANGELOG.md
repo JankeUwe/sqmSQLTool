@@ -1,5 +1,57 @@
 # sqmSQLTool — Changelog
 
+## [1.7.8.0] — 2026-06-25
+
+### 🐛 Kritischer Fix — TrustServerCertificate griff nie (modulweit)
+
+- **`sqmSQLTool.psm1`**: Der Aufruf `Set-DbatoolsConfig -FullName 'sql.connection.trustcert' -Value $true -Scope Session`
+  verwendete den Parameter **`-Scope`, den `Set-DbatoolsConfig` (dbatools 2.8.x) nicht besitzt**. Die dadurch
+  geworfene Exception wurde vom umgebenden `catch` still verschluckt (nur Write-Verbose), sodass
+  `sql.connection.trustcert` **nie gesetzt** wurde. Folge: Gegen **SQL Server 2022 über TCP** schlug
+  praktisch **jede** dbatools-Verbindung mit „The certificate chain was issued by an authority that is not
+  trusted" fehl. Fix: `-Scope Session` entfernt (die Einstellung gilt ohnehin sessionweit).
+
+### 🐛 Fixes — Get-sqmServerUtilization (gegen SQL 2022 live verifiziert)
+
+- Datei war ohne UTF-8-BOM/CRLF gespeichert → PS 5.1 las Box-/Sonderzeichen falsch (Parse-Fehler). Jetzt BOM+CRLF.
+- Ungültige Format-Interpolation `$($x:N0)` → `.ToString('N0')`.
+- DMV-Queries korrigiert: `COUNT(*) FILTER(...)` (PostgreSQL) → `SUM(CASE...)`; Ring-Buffer-CPU via **XML**
+  (`record.value(...)`) statt `JSON_VALUE`; Memory-Snapshot als ein Resultset (CROSS JOIN).
+- Einzeiliges DMV-Resultat: `$result[0].Spalte` griff bei einem DataRow die erste *Spalte* statt der Zeile
+  (→ 0-Werte). Jetzt `@($result)[0]` + `ISNULL(...)` in SQL gegen DBNull.
+
+## [1.7.7.0] — 2026-06-25
+
+### ✨ Neu / Erweiterung — Invoke-sqmTsmConfiguration
+
+Die TSM-Konfiguration kann jetzt reale Umgebungen abbilden, in denen INCLUDE/EXCLUDE
+in eine ausgelagerte Datei (INCLEXCL, z. B. `ie_dsm.opt`) ausgelagert sind:
+
+- **`-UseInclExclFile`**: löst die `INCLEXCL`-Option aus der `dsm.opt` auf und schreibt
+  den verwalteten Block in die referenzierte Include/Exclude-Datei statt in die `dsm.opt`.
+- **`-InclExclPath`**: Zieldatei explizit angeben (wird bei Bedarf neu angelegt).
+- **`-ExcludePatterns`**: eigene EXCLUDE-Patterns statt der fixen drei SQL-Typen.
+- **`-IncludeRule`** (`@{ Path=...; ManagementClass=... }`): pro Pfad eine eigene
+  Managementklasse (z. B. 365-Tage für ein `01Year`-Verzeichnis).
+- **ManagementClass-Validierung gelockert**: `ValidateSet` → `ValidatePattern '^MC_[A-Za-z0-9._]+$'`.
+  Real eingesetzte Klassen wie `MC_B_2.2_15.15.NA_IMG` oder `MC_B_NL_NL_365.365.NA` werden
+  nicht mehr abgelehnt. **Rückwärtskompatibel**: bisher gültige Aufrufe bleiben gültig.
+- Ergebnisobjekt um **`TargetFile`** erweitert (tatsächlich geschriebene Datei).
+
+### 🔧 Hinweis
+
+Liegt eine `dsm.opt`/ie-Datei unter Kontrolle eines Hersteller-TSM-Konfigurators, kann
+dieser den verwalteten Block überschreiben — ggf. erneut ausführen.
+
+## [1.7.6.0] — 2026-06-25
+
+### ✨ Neu
+
+- **Get-sqmServerUtilization**: Neue Report-Funktion für CPU/RAM-Auslastungs-Trends. Erfasst über mehrere 
+  Zeitpunkte (default 6 Snapshots à 10 Sekunden = 1 Minute) Daten aus SQL-Server-DMVs: CPU %, Speichernutzung,
+  Worker Threads, Kompilierungen. Berechnet Min/Max/Avg je Metrik und erzeugt Reports (TXT/CSV/HTML).
+  Parameter: `-SampleCount` (default 6), `-SampleIntervalSeconds` (default 10).
+
 ## [1.7.2.0] — 2026-06-22
 
 ### 🔧 Fixes
