@@ -1,5 +1,16 @@
 # sqmSQLTool — Changelog
 
+## [1.7.8.1] — 2026-06-25
+
+### 🔧 Installer — dbatools-Abhängigkeit absichern
+
+- **`Install.ps1`** stellt jetzt die Pflicht-Abhängigkeit **`dbatools` im selben Scope** sicher,
+  bevor der Import-Test läuft. Bisher setzte der Installer voraus, dass dbatools bereits vorhanden
+  ist → auf einem **frischen Server ohne dbatools** schlug der Import-Test fehl. Bei `-Scope AllUsers`
+  wird dbatools systemweit installiert (kein Scope-Mismatch mehr, bei dem ein AllUsers-Modul ein nur
+  in CurrentUser liegendes dbatools in fremden/Admin-Sessions nicht findet). Fehlt dbatools, wird es
+  von der PSGallery nachinstalliert (TLS 1.2 + NuGet-Provider werden mit gesetzt).
+
 ## [1.7.8.0] — 2026-06-25
 
 ### 🐛 Kritischer Fix — TrustServerCertificate griff nie (modulweit)

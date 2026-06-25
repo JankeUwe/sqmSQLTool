@@ -11,6 +11,11 @@
       - Running as normal user    -> CurrentUser ($HOME\Documents\WindowsPowerShell\Modules)
     Pass -Scope explicitly to override this behaviour.
 
+    The required dependency 'dbatools' is ensured automatically in the SAME scope
+    before the import test (installed from the PSGallery if missing) - so a fresh
+    server without dbatools installs cleanly and AllUsers installs get dbatools
+    system-wide too.
+
 .PARAMETER Scope
     Installation scope:
       CurrentUser  — installs to $HOME\Documents\WindowsPowerShell\Modules
@@ -161,6 +166,39 @@ robocopy $Source $Destination /E /PURGE /NJH /NJS /NDL /COPY:DAT `
 Write-Host "Unblocking files..." -ForegroundColor Cyan
 Get-ChildItem -Path $Destination -Recurse -File | ForEach-Object {
     Unblock-File -Path $_.FullName -ErrorAction SilentlyContinue
+}
+
+# ---------------------------------------------------------------------------
+# 5b. dbatools-Abhaengigkeit im PASSENDEN Scope sicherstellen
+#     sqmSQLTool.psd1 hat RequiredModules = @('dbatools') -> ohne dbatools
+#     schlaegt der Import-Test (Schritt 6) fehl. Auf einem frischen Server ist
+#     dbatools nicht vorhanden. Installation im GLEICHEN Scope wie sqmSQLTool,
+#     sonst Scope-Mismatch: AllUsers-Modul wuerde ein nur in CurrentUser
+#     liegendes dbatools in fremden/Admin-Sessions nicht finden.
+# ---------------------------------------------------------------------------
+$auDbatools = Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules\dbatools'
+$cuDbatools = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsPowerShell\Modules\dbatools'
+if ($Scope -eq 'AllUsers') {
+    $dbatoolsInScope = Test-Path $auDbatools                       # AllUsers braucht dbatools systemweit
+} else {
+    $dbatoolsInScope = (Test-Path $cuDbatools) -or (Test-Path $auDbatools)  # CurrentUser: beides ok
+}
+
+Write-Host "Pruefe Abhaengigkeit 'dbatools' (Scope $Scope)..." -ForegroundColor Cyan
+if ($dbatoolsInScope) {
+    Write-Host "  dbatools im passenden Scope vorhanden." -ForegroundColor Gray
+} else {
+    Write-Host "  dbatools fehlt im Scope '$Scope' - installiere von der PSGallery..." -ForegroundColor Yellow
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = `
+            [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        try { Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Scope $Scope -Force -ErrorAction Stop | Out-Null } catch {}
+        Install-Module dbatools -Scope $Scope -Force -AllowClobber -ErrorAction Stop
+        Write-Host "  dbatools installiert (-Scope $Scope)." -ForegroundColor Green
+    } catch {
+        Write-Warning "  dbatools-Installation fehlgeschlagen: $_"
+        Write-Warning "  Bitte manuell nachholen:  Install-Module dbatools -Scope $Scope -Force -AllowClobber"
+    }
 }
 
 # ---------------------------------------------------------------------------
