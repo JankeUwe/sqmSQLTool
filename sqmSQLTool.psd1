@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.7.8.1'
+	ModuleVersion		   = '1.7.9.0'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
@@ -248,7 +248,7 @@
 			# IconUri = ''
 
 			# ReleaseNotes of this module
-			ReleaseNotes = 'See CHANGELOG.md and GitHub: https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.7.8.1'
+			ReleaseNotes = 'See CHANGELOG.md and GitHub: https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.7.9.0'
 
 			# External module dependencies
 			ExternalModuleDependencies = @('dbatools')

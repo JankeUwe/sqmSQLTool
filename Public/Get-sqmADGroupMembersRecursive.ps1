@@ -6,6 +6,10 @@
     Enhanced version of Get-sqmADGroupMembers with support for limiting nesting depth.
     Recursively resolves nested groups up to the specified depth level.
 
+    For user accounts the real AD 'displayName' attribute is resolved (via Get-ADUser),
+    so the DisplayName column shows the person's name instead of just the login/CN.
+    Fallback chain: displayName -> CN/Name -> sAMAccountName.
+
 .PARAMETER GroupName
     Name of the AD group. Pipeline-capable.
 
@@ -135,9 +139,22 @@ function Get-sqmADGroupMembersRecursive
 
                             foreach ($member in $adMembers)
                             {
+                                # Get-ADGroupMember liefert nur CN/Name (oft = Login), NICHT das
+                                # AD-Attribut displayName. Fuer User den echten Anzeigenamen nachladen.
+                                $disp = $member.Name
+                                if ($member.objectClass -eq 'user')
+                                {
+                                    try
+                                    {
+                                        $adUser = Get-ADUser -Identity $member.SID -Properties DisplayName -ErrorAction Stop
+                                        if ($adUser.DisplayName) { $disp = $adUser.DisplayName }
+                                    }
+                                    catch { }
+                                }
+
                                 $memberObj = [PSCustomObject]@{
                                     SamAccountName = $member.SamAccountName
-                                    DisplayName    = $member.Name
+                                    DisplayName    = $disp
                                     ObjectClass    = $member.objectClass
                                     Depth          = $CurrentDepth
                                 }
@@ -177,7 +194,13 @@ function Get-sqmADGroupMembersRecursive
                                     {
                                         $memberEntry = [ADSI]"LDAP://$memberDN"
                                         $sam = $memberEntry.psbase.InvokeGet("sAMAccountName")
-                                        $disp = $memberEntry.psbase.InvokeGet("displayName")
+                                        # displayName tolerant lesen: fehlt das Attribut, wirft InvokeGet
+                                        # sonst eine Exception und der Member ginge verloren.
+                                        # Fallback-Kette: displayName -> cn -> sAMAccountName.
+                                        $disp = $null
+                                        try { $disp = $memberEntry.psbase.InvokeGet("displayName") } catch { }
+                                        if (-not $disp) { try { $disp = $memberEntry.psbase.InvokeGet("cn") } catch { } }
+                                        if (-not $disp) { $disp = $sam }
                                         $cls = $memberEntry.psbase.InvokeGet("objectClass")
                                         if ($cls -is [array]) { $cls = $cls[-1] }
 

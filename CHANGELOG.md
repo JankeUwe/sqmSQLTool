@@ -1,5 +1,15 @@
 # sqmSQLTool — Changelog
 
+## [1.7.9.0] — 2026-06-26
+
+### ✨ Get-sqmADGroupMembersRecursive — echter Anzeigename
+
+- Für **User-Accounts** wird jetzt das echte AD-Attribut **`displayName`** aufgelöst (via `Get-ADUser`),
+  statt nur den CN/Namen aus `Get-ADGroupMember` zu zeigen (der bei vielen Konten dem Login entspricht).
+  Die `DisplayName`-Spalte zeigt damit den Personennamen. Fallback-Kette: `displayName` → CN/Name → `sAMAccountName`.
+- **LDAP-Fallback-Pfad gehärtet:** Fehlte das `displayName`-Attribut, warf `InvokeGet` eine Exception und der
+  Member ging verloren. Jetzt tolerantes Lesen mit derselben Fallback-Kette.
+
 ## [1.7.8.1] — 2026-06-25
 
 ### 🔧 Installer — dbatools-Abhängigkeit absichern
