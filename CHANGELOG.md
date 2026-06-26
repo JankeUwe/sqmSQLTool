@@ -1,5 +1,30 @@
 # sqmSQLTool — Changelog
 
+## [1.8.2.0] — 2026-06-26
+
+### ✨ Temporäre Sysadmin-Rechte: AD-Login-Anlage, Cleanup & AlwaysOn
+
+Erweiterung von `Grant-sqmTemporarySysadmin` / `Invoke-sqmTempSysadminAction`:
+
+- **Login wird bei Bedarf angelegt** — fehlt der Login, legt das Tool ihn per
+  `CREATE LOGIN [DOMAIN\Konto] FROM WINDOWS` an (statt wie bisher abzubrechen).
+- **Nur AD-Logins** — `Grant-sqmTemporarySysadmin` weist Nicht-Windows-Logins ab;
+  Existenzprüfung auf `type IN ('U','G')` beschränkt (keine SQL-/Zertifikats-Logins).
+- **PBM-Policy-Handling beim Anlegen** — ist `DefaultPolicy` konfiguriert, wird diese
+  Policy vor dem Anlegen via `Set-sqmSqlPolicyState -State Disable` deaktiviert und
+  danach wieder aktiviert (steuerbar über `-DisablePolicy`, Default `$true`).
+- **Selbst angelegter Login wird nach Ablauf entfernt** — neuer Schalter `-RemoveLogin`
+  in `Invoke-sqmTempSysadminAction`: beim Entzug `DROP LOGIN`, aber als Sicherheitsnetz
+  **nur**, wenn der Login an keiner weiteren festen Serverrolle (außer `public`) hängt.
+  Bereits zuvor vorhandene Logins bleiben grundsätzlich bestehen.
+- **AlwaysOn-fähig (Default)** — ist die Instanz Teil einer AG, werden Login-Anlage,
+  sysadmin-Vergabe und Entzug/Cleanup auf **allen Replicas** ausgeführt. Jede Replica
+  erhält eigene, lokal arbeitende, selbstlöschende Jobs → failover-robust. Abschaltbar
+  über `-PrimaryOnly`; einzelne Replicas via `-SkipSecondaryServers` überspringbar.
+- `Grant-sqmTemporarySysadmin` liefert jetzt **ein Ergebnisobjekt je Replica**
+  (inkl. `LoginExisted`); neue Event-IDs 9003 (Login angelegt), 9004 (Drop übersprungen),
+  9005 (Login entfernt).
+
 ## [1.8.1.0] — 2026-06-26
 
 ### ✨ Temporäre Sysadmin-Rechte mit automatischem Entzug
