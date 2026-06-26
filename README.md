@@ -4,7 +4,7 @@
 
 A comprehensive PowerShell module for SQL Server 2016+ administration, with specialized support for AlwaysOn Availability Groups, performance reporting, and security auditing.
 
-**Latest Release:** [v1.5.0](https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.5.0) | **Functions:** 124 | **Documentation:** [Full Reference](https://www.powershelldba.de/sqmsqltool/sqmSQLTool-reference-full.html)
+**Latest Release:** [v1.7.9.0](https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.7.9.0) | **Functions:** 143 | **Documentation:** [Full Reference](https://www.powershelldba.de/tools/befehls-referenz)
 
 ---
 
@@ -88,8 +88,8 @@ Get-Command -Module sqmSQLTool | Measure-Object
 ## 📚 Documentation
 
 ### Full Command Reference
-Complete documentation with examples for all 124 functions:
-- **HTML Reference**: https://www.powershelldba.de/sqmsqltool/sqmSQLTool-reference-full.html
+Complete documentation with examples for all 143 functions:
+- **HTML Reference**: https://www.powershelldba.de/tools/befehls-referenz
 - **GitHub Releases**: https://github.com/JankeUwe/sqmSQLTool/releases
 
 ---
