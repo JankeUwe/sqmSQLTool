@@ -146,9 +146,9 @@
 	<!-- SIDEBAR -->
 	<div class="psdb-st-sidebar">
 	<input class="psdb-st-sidebar-search" type="text" placeholder="Funktion suchen…" oninput="psstSearch(this.value)">
-						<div class="psdb-st-nav-group" id="nav-alwayson">
+					<div class="psdb-st-nav-group" id="nav-alwayson">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-alwayson-list')">
-	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">18</span>
+	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">17</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-alwayson-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-addsqmdatabasetoag')">Add-sqmDatabaseToAG</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-comparesqmalwaysonlogins')">Compare-sqmAlwaysOnLogins</span></li>
@@ -158,7 +158,6 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmalwaysonhealthreport')">Get-sqmAlwaysOnHealthReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmalwaysonsetup')">Invoke-sqmAlwaysOnSetup</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmfailover')">Invoke-sqmFailover</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmservicebrokeralwayson')">Invoke-sqmServiceBrokerAlwaysOn</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmsqlalwaysonautoseeding')">Invoke-sqmSqlAlwaysOnAutoseeding</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-movesqmalwaysonlistener')">Move-sqmAlwaysOnListener</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmalwaysonrepairjob')">New-sqmAlwaysOnRepairJob</span></li>
@@ -181,11 +180,21 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmdistributedagreadiness')">Test-sqmDistributedAgReadiness</span></li></ul>
 	</div>
 
+	<div class="psdb-st-nav-group" id="nav-service-broker">
+	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-service-broker-list')">
+	<span>📨 Service Broker</span><span class="psdb-st-nav-count">3</span>
+	</div>
+	<ul class="psdb-st-nav-funcs" id="nav-service-broker-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-enablesqmservicebroker')">Enable-sqmServiceBroker</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmservicebrokerhealth')">Get-sqmServiceBrokerHealth</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmservicebrokeralwayson')">Invoke-sqmServiceBrokerAlwaysOn</span></li></ul>
+	</div>
+
 	<div class="psdb-st-nav-group" id="nav-backup-&-restore">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-backup-&-restore-list')">
-	<span>💾 Backup & Restore</span><span class="psdb-st-nav-count">11</span>
+	<span>💾 Backup & Restore</span><span class="psdb-st-nav-count">12</span>
 	</div>
-	<ul class="psdb-st-nav-funcs" id="nav-backup-&-restore-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmlogshrink')">Invoke-sqmLogShrink</span></li>
+	<ul class="psdb-st-nav-funcs" id="nav-backup-&-restore-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmserversfromou')">Get-sqmServersFromOU</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmlogshrink')">Invoke-sqmLogShrink</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmrestoredatabase')">Invoke-sqmRestoreDatabase</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmuserdatabasebackup')">Invoke-sqmUserDatabaseBackup</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmbackupmaintenancejob')">New-sqmBackupMaintenanceJob</span></li>
@@ -219,7 +228,7 @@
 
 	<div class="psdb-st-nav-group" id="nav-diagnose-&-health">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-diagnose-&-health-list')">
-	<span>🩺 Diagnostics & Health</span><span class="psdb-st-nav-count">19</span>
+	<span>🩺 Diagnostics & Health</span><span class="psdb-st-nav-count">18</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-diagnose-&-health-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-copysqmntfspermissions')">Copy-sqmNTFSPermissions</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmagentjobschedulereport')">Get-sqmAgentJobScheduleReport</span></li>
@@ -230,7 +239,6 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmdiskspacereport')">Get-sqmDiskSpaceReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmoperationstatus')">Get-sqmOperationStatus</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmorphanedfiles')">Get-sqmOrphanedFiles</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmservicebrokerhealth')">Get-sqmServiceBrokerHealth</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmspnreport')">Get-sqmSpnReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmsqlinstancecheck')">Get-sqmSQLInstanceCheck</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmtempdbrecommendation')">Get-sqmTempDbRecommendation</span></li>
@@ -271,33 +279,39 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmsqlfirewall')">Test-sqmSQLFirewall</span></li></ul>
 	</div>
 
-	<div class="psdb-st-nav-group" id="nav-konfiguration">
-	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-konfiguration-list')">
-	<span>⚙️ Configuration</span><span class="psdb-st-nav-count">12</span>
+	<div class="psdb-st-nav-group" id="nav-sql-konfiguration">
+	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-sql-konfiguration-list')">
+	<span>⚙️ SQL Configuration</span><span class="psdb-st-nav-count">11</span>
 	</div>
-	<ul class="psdb-st-nav-funcs" id="nav-konfiguration-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-comparesqmserverconfiguration')">Compare-sqmServerConfiguration</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-enablesqmservicebroker')">Enable-sqmServiceBroker</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmconfig')">Get-sqmConfig</span></li>
+	<ul class="psdb-st-nav-funcs" id="nav-sql-konfiguration-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-comparesqmserverconfiguration')">Compare-sqmServerConfiguration</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmserversetting')">Get-sqmServerSetting</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmcollationchange')">Invoke-sqmCollationChange</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmsetdatabaserecoverymode')">Invoke-sqmSetDatabaseRecoveryMode</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmssisconfiguration')">Invoke-sqmSsisConfiguration</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmconfig')">Set-sqmConfig</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmmaxdop')">Set-sqmMaxDop</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmmaxmemory')">Set-sqmMaxMemory</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmssrsconfiguration')">Set-sqmSsrsConfiguration</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmtcpport')">Set-sqmTcpPort</span></li></ul>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmtcpport')">Set-sqmTcpPort</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmmaxdop')">Test-sqmMaxDop</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmmaxmemory')">Test-sqmMaxMemory</span></li></ul>
+	</div>
+
+	<div class="psdb-st-nav-group" id="nav-sqmtool-config">
+	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-sqmtool-config-list')">
+	<span>🔧 sqmTool Config</span><span class="psdb-st-nav-count">2</span>
+	</div>
+	<ul class="psdb-st-nav-funcs" id="nav-sqmtool-config-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmconfig')">Get-sqmConfig</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmconfig')">Set-sqmConfig</span></li></ul>
 	</div>
 
 	<div class="psdb-st-nav-group" id="nav-inventar-&-suche">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-inventar-&-suche-list')">
-	<span>📋 Inventory & Search</span><span class="psdb-st-nav-count">7</span>
+	<span>📋 Inventory & Search</span><span class="psdb-st-nav-count">6</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-inventar-&-suche-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-exportsqmdatabasedocumentation')">Export-sqmDatabaseDocumentation</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-exportsqmserverconfiguration')">Export-sqmServerConfiguration</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-findsqmdatabaseobject')">Find-sqmDatabaseObject</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmlinkedserverusage')">Get-sqmLinkedServerUsage</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmserversfromou')">Get-sqmServersFromOU</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmconfigrollback')">Invoke-sqmConfigRollback</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqminstanceinventory')">Invoke-sqmInstanceInventory</span></li></ul>
 	</div>
@@ -334,6 +348,19 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmtsmconnection')">Test-sqmTsmConnection</span></li></ul>
 	</div>
 
+	<div class="psdb-st-nav-group" id="nav-driver">
+	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-driver-list')">
+	<span>🔌 Driver Install/Uninstall</span><span class="psdb-st-nav-count">7</span>
+	</div>
+	<ul class="psdb-st-nav-funcs" id="nav-driver-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmdb2driver')">Install-sqmDb2Driver</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmjdbcdriver')">Install-sqmJdbcDriver</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmodbcdriver')">Install-sqmOdbcDriver</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmdriverinstalled')">Test-sqmDriverInstalled</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmdb2driver')">Uninstall-sqmDb2Driver</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmjdbcdriver')">Uninstall-sqmJdbcDriver</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmodbcdriver')">Uninstall-sqmOdbcDriver</span></li></ul>
+	</div>
+
 	<div class="psdb-st-nav-group" id="nav-deployment">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-deployment-list')">
 	<span>🚀 Deployment</span><span class="psdb-st-nav-count">2</span>
@@ -344,7 +371,7 @@
 
 	<div class="psdb-st-nav-group" id="nav-sonstige">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-sonstige-list')">
-	<span>🔹 Other</span><span class="psdb-st-nav-count">25</span>
+	<span>🔹 Other</span><span class="psdb-st-nav-count">16</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-sonstige-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-copysqmlogins')">Copy-sqmLogins</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-copysqmtocentralpath')">Copy-sqmToCentralPath</span></li>
@@ -353,9 +380,6 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmhpuallowgroup')">Get-sqmHpuAllowGroup</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmserverhardwarereport')">Get-sqmServerHardwareReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmadmodule')">Install-sqmAdModule</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmdb2driver')">Install-sqmDb2Driver</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmjdbcdriver')">Install-sqmJdbcDriver</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmodbcdriver')">Install-sqmOdbcDriver</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmolamaintenancesolution')">Install-sqmOlaMaintenanceSolution</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmssrsreportserver')">Install-sqmSsrsReportServer</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmmonitoringkey')">Invoke-sqmMonitoringKey</span></li>
@@ -363,13 +387,7 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmrandomsapassword')">New-sqmRandomSaPassword</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmsqlpolicystate')">Set-sqmSqlPolicyState</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-showsqmtoolgui')">Show-sqmToolGui</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmdriverinstalled')">Test-sqmDriverInstalled</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmmaxdop')">Test-sqmMaxDop</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmmaxmemory')">Test-sqmMaxMemory</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmsqlinstanceinstalled')">Test-sqmSqlInstanceInstalled</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmdb2driver')">Uninstall-sqmDb2Driver</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmjdbcdriver')">Uninstall-sqmJdbcDriver</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmodbcdriver')">Uninstall-sqmOdbcDriver</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-writesqmsetupevent')">Write-sqmSetupEvent</span></li></ul>
 	</div>
 
@@ -377,7 +395,7 @@
 
 	<!-- CONTENT -->
 	<div class="psdb-st-content" id="psdb-st-content">
-						<section class="psdb-st-section" id="cat-alwayson">
+					<section class="psdb-st-section" id="cat-alwayson">
 	<h2 class="psdb-st-section-title">🔄 AlwaysOn</h2>
 
 	<div class="psdb-st-func-card" id="f-addsqmdatabasetoag">
@@ -555,25 +573,6 @@
 	<div class="psdb-st-example-label">Invoke-sqmFailover -SqlInstance &quot;SQL01&quot; -AvailabilityGroup &quot;AG_Prod&quot; `</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmFailover -SqlInstance &quot;SQL01&quot; -AvailabilityGroup &quot;AG_Prod&quot; `
         -TargetReplica &quot;SQL02&quot; -MaxRedoQueueMB 10</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-invokesqmservicebrokeralwayson">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Invoke-sqmServiceBrokerAlwaysOn</span>
-	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
-	</div>
-	<div class="psdb-st-func-desc">Enables Service Broker on all nodes of an AlwaysOn Availability Group with automatic failover orchestration.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Invoke-sqmServiceBrokerAlwaysOn -SqlInstances @(&quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot;) -AvailabilityGroupName &quot;MyAG&quot; -DatabaseName &quot;OperationsManager&quot;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmServiceBrokerAlwaysOn -SqlInstances @(&quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot;) -AvailabilityGroupName &quot;MyAG&quot; -DatabaseName &quot;OperationsManager&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Invoke-sqmServiceBrokerAlwaysOn -SqlInstances @(&quot;SQL01&quot;,&quot;SQL02&quot;) -AvailabilityGroupName &quot;MyAG&quot; -DatabaseName &quot;MyDB&quot; -Force -WaitBetweenFailovers 20</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmServiceBrokerAlwaysOn -SqlInstances @(&quot;SQL01&quot;,&quot;SQL02&quot;) -AvailabilityGroupName &quot;MyAG&quot; -DatabaseName &quot;MyDB&quot; -Force -WaitBetweenFailovers 20</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -879,8 +878,110 @@ Repair-sqmAlwaysOnDatabases -Force</pre><button class="psdb-st-copy-btn" onclick
 
 	</section>
 
+	<section class="psdb-st-section" id="cat-service-broker">
+	<h2 class="psdb-st-section-title">📨 Service Broker</h2>
+
+	<div class="psdb-st-func-card" id="f-enablesqmservicebroker">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Enable-sqmServiceBroker</span>
+	<span class="psdb-st-badge psdb-st-badge-monitoring">ServiceBroker</span>
+	</div>
+	<div class="psdb-st-func-desc">Enables Service Broker on a specified database and creates SSB endpoint.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Enable-sqmServiceBroker -DatabaseName &quot;OperationsManager&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Enable-sqmServiceBroker -DatabaseName &quot;OperationsManager&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Enable-sqmServiceBroker -SqlInstance &quot;SQL01&quot; -DatabaseName &quot;OperationsManager&quot; -Force</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Enable-sqmServiceBroker -SqlInstance &quot;SQL01&quot; -DatabaseName &quot;OperationsManager&quot; -Force</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-getsqmservicebrokerhealth">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Get-sqmServiceBrokerHealth</span>
+	<span class="psdb-st-badge psdb-st-badge-monitoring">ServiceBroker</span>
+	</div>
+	<div class="psdb-st-func-desc">Creates a health report for SQL Server Service Broker configuration and status.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmServiceBrokerHealth</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmServiceBrokerHealth</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmServiceBrokerHealth -SqlInstance &quot;SQL01&quot; -OutputPath &quot;D:\Reports&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmServiceBrokerHealth -SqlInstance &quot;SQL01&quot; -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-invokesqmservicebrokeralwayson">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Invoke-sqmServiceBrokerAlwaysOn</span>
+	<span class="psdb-st-badge psdb-st-badge-monitoring">ServiceBroker</span>
+	</div>
+	<div class="psdb-st-func-desc">Enables Service Broker on all nodes of an AlwaysOn Availability Group with automatic failover orchestration.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Invoke-sqmServiceBrokerAlwaysOn -SqlInstances @(&quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot;) -AvailabilityGroupName &quot;MyAG&quot; -DatabaseName &quot;OperationsManager&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmServiceBrokerAlwaysOn -SqlInstances @(&quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot;) -AvailabilityGroupName &quot;MyAG&quot; -DatabaseName &quot;OperationsManager&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Invoke-sqmServiceBrokerAlwaysOn -SqlInstances @(&quot;SQL01&quot;,&quot;SQL02&quot;) -AvailabilityGroupName &quot;MyAG&quot; -DatabaseName &quot;MyDB&quot; -Force -WaitBetweenFailovers 20</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmServiceBrokerAlwaysOn -SqlInstances @(&quot;SQL01&quot;,&quot;SQL02&quot;) -AvailabilityGroupName &quot;MyAG&quot; -DatabaseName &quot;MyDB&quot; -Force -WaitBetweenFailovers 20</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	</section>
+
 	<section class="psdb-st-section" id="cat-backup-&-restore">
 	<h2 class="psdb-st-section-title">💾 Backup & Restore</h2>
+
+	<div class="psdb-st-func-card" id="f-getsqmserversfromou">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Get-sqmServersFromOU</span>
+	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
+	</div>
+	<div class="psdb-st-func-desc">Queries Active Directory (ADSI, no module required) for all computers in a named OU and returns pipeable objects with SqlInstance property.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 5 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Alle SQL-Server ausgeben</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Alle SQL-Server ausgeben
+    Get-sqmServersFromOU</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Andere OU</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Andere OU
+    Get-sqmServersFromOU -OUName &#39;srvApp&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Expliziter Domain-Name</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Expliziter Domain-Name
+    Get-sqmServersFromOU -OUName &#39;srvDatabase&#39; -Domain &#39;contoso.com&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Direkt an sqmSQLTool-Funktion weiterleiten</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Direkt an sqmSQLTool-Funktion weiterleiten
+    Get-sqmServersFromOU | ForEach-Object {
+        Sync-sqmBackupExcludeTable -SqlInstance $_.SqlInstance
+    }</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Backup-Exclude-Trigger auf allen DB-Servern registrieren</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Backup-Exclude-Trigger auf allen DB-Servern registrieren
+    Get-sqmServersFromOU | ForEach-Object {
+        Register-sqmBackupExcludeTrigger -SqlInstance $_.SqlInstance
+    }</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
 
 	<div class="psdb-st-func-card" id="f-invokesqmlogshrink">
 	<div class="psdb-st-func-header">
@@ -1729,25 +1830,6 @@ Get-sqmOperationStatus -Continuous -RefreshSeconds 10</pre><button class="psdb-s
 	</div>
 	</div>
 
-	<div class="psdb-st-func-card" id="f-getsqmservicebrokerhealth">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Get-sqmServiceBrokerHealth</span>
-	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnostics</span>
-	</div>
-	<div class="psdb-st-func-desc">Creates a health report for SQL Server Service Broker configuration and status.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Get-sqmServiceBrokerHealth</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmServiceBrokerHealth</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Get-sqmServiceBrokerHealth -SqlInstance &quot;SQL01&quot; -OutputPath &quot;D:\Reports&quot;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmServiceBrokerHealth -SqlInstance &quot;SQL01&quot; -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
 	<div class="psdb-st-func-card" id="f-getsqmspnreport">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Get-sqmSpnReport</span>
@@ -2387,13 +2469,13 @@ Sets permissions only on the given directories for the given account.</pre><butt
 
 	</section>
 
-	<section class="psdb-st-section" id="cat-konfiguration">
-	<h2 class="psdb-st-section-title">⚙️ Configuration</h2>
+	<section class="psdb-st-section" id="cat-sql-konfiguration">
+	<h2 class="psdb-st-section-title">⚙️ SQL Configuration</h2>
 
 	<div class="psdb-st-func-card" id="f-comparesqmserverconfiguration">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Compare-sqmServerConfiguration</span>
-	<span class="psdb-st-badge psdb-st-badge-konfiguration">Configuration</span>
+	<span class="psdb-st-badge psdb-st-badge-konfiguration">SQL Config</span>
 	</div>
 	<div class="psdb-st-func-desc">Compares important configuration settings between two SQL Server instances.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 1 examples</div>
@@ -2405,48 +2487,10 @@ Sets permissions only on the given directories for the given account.</pre><butt
 	</div>
 	</div>
 
-	<div class="psdb-st-func-card" id="f-enablesqmservicebroker">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Enable-sqmServiceBroker</span>
-	<span class="psdb-st-badge psdb-st-badge-konfiguration">Configuration</span>
-	</div>
-	<div class="psdb-st-func-desc">Enables Service Broker on a specified database and creates SSB endpoint.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Enable-sqmServiceBroker -DatabaseName &quot;OperationsManager&quot;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Enable-sqmServiceBroker -DatabaseName &quot;OperationsManager&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Enable-sqmServiceBroker -SqlInstance &quot;SQL01&quot; -DatabaseName &quot;OperationsManager&quot; -Force</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Enable-sqmServiceBroker -SqlInstance &quot;SQL01&quot; -DatabaseName &quot;OperationsManager&quot; -Force</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-getsqmconfig">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Get-sqmConfig</span>
-	<span class="psdb-st-badge psdb-st-badge-konfiguration">Configuration</span>
-	</div>
-	<div class="psdb-st-func-desc">Returns the current module configuration.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Get-sqmConfig</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmConfig</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Get-sqmConfig -Key &#39;OutputPath&#39;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmConfig -Key &#39;OutputPath&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
 	<div class="psdb-st-func-card" id="f-getsqmserversetting">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Get-sqmServerSetting</span>
-	<span class="psdb-st-badge psdb-st-badge-konfiguration">Configuration</span>
+	<span class="psdb-st-badge psdb-st-badge-konfiguration">SQL Config</span>
 	</div>
 	<div class="psdb-st-func-desc">Reads one or all server properties from a SQL Server instance.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 3 examples</div>
@@ -2473,7 +2517,7 @@ Get-sqmServerSetting -SqlInstance &quot;SQL01&quot; -SqlCredential $cred -All</p
 	<div class="psdb-st-func-card" id="f-invokesqmcollationchange">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Invoke-sqmCollationChange</span>
-	<span class="psdb-st-badge psdb-st-badge-konfiguration">Configuration</span>
+	<span class="psdb-st-badge psdb-st-badge-konfiguration">SQL Config</span>
 	</div>
 	<div class="psdb-st-func-desc">Automatically changes the server collation of a SQL Server instance.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
@@ -2492,7 +2536,7 @@ Get-sqmServerSetting -SqlInstance &quot;SQL01&quot; -SqlCredential $cred -All</p
 	<div class="psdb-st-func-card" id="f-invokesqmsetdatabaserecoverymode">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Invoke-sqmSetDatabaseRecoveryMode</span>
-	<span class="psdb-st-badge psdb-st-badge-konfiguration">Configuration</span>
+	<span class="psdb-st-badge psdb-st-badge-konfiguration">SQL Config</span>
 	</div>
 	<div class="psdb-st-func-desc">Changes the recovery mode of one or more user databases.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
@@ -2513,7 +2557,7 @@ Invoke-sqmSetDatabaseRecoveryMode -Database &quot;SalesDB&quot; -RecoveryMode Si
 	<div class="psdb-st-func-card" id="f-invokesqmssisconfiguration">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Invoke-sqmSsisConfiguration</span>
-	<span class="psdb-st-badge psdb-st-badge-konfiguration">Configuration</span>
+	<span class="psdb-st-badge psdb-st-badge-konfiguration">SQL Config</span>
 	</div>
 	<div class="psdb-st-func-desc">Configures SQL Server Integration Services (SSIS) environment and catalog.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
@@ -2531,40 +2575,10 @@ Invoke-sqmSetDatabaseRecoveryMode -Database &quot;SalesDB&quot; -RecoveryMode Si
 	</div>
 	</div>
 
-	<div class="psdb-st-func-card" id="f-setsqmconfig">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Set-sqmConfig</span>
-	<span class="psdb-st-badge psdb-st-badge-konfiguration">Configuration</span>
-	</div>
-	<div class="psdb-st-func-desc">Sets one or more configuration values for the MSSQLTools module.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Set-sqmConfig -LogPath &quot;D:\Logs&quot; -OlaJobNameFull &quot;Prod-FULL&quot;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmConfig -LogPath &quot;D:\Logs&quot; -OlaJobNameFull &quot;Prod-FULL&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Set-sqmConfig -TsmManagementClasses @(&#39;MC_10&#39;,&#39;MC_30&#39;,&#39;MC_100&#39;)</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmConfig -TsmManagementClasses @(&#39;MC_10&#39;,&#39;MC_30&#39;,&#39;MC_100&#39;)</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Set-sqmConfig -HpuDomainGroupMap @(</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmConfig -HpuDomainGroupMap @(
-        [PSCustomObject]@{ DomainPattern = &#39;*.sfinance.net&#39;; GroupNamePattern = &#39;Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod&#39; },
-        [PSCustomObject]@{ DomainPattern = &#39;*&#39;;              GroupNamePattern = &#39;Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod&#39; }
-    )</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Set-sqmConfig -SsrsInstallerPath &#39;\\srv-share\Software\SSRS2022\SQLServerReportingServices.exe&#39;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmConfig -SsrsInstallerPath &#39;\\srv-share\Software\SSRS2022\SQLServerReportingServices.exe&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
 	<div class="psdb-st-func-card" id="f-setsqmmaxdop">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Set-sqmMaxDop</span>
-	<span class="psdb-st-badge psdb-st-badge-konfiguration">Configuration</span>
+	<span class="psdb-st-badge psdb-st-badge-konfiguration">SQL Config</span>
 	</div>
 	<div class="psdb-st-func-desc">Sets MAXDOP (max degree of parallelism) to the recommended (or an explicit) value, and optionally the matching &quot;cost threshold for parallelism&quot;.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 3 examples</div>
@@ -2590,7 +2604,7 @@ Invoke-sqmSetDatabaseRecoveryMode -Database &quot;SalesDB&quot; -RecoveryMode Si
 	<div class="psdb-st-func-card" id="f-setsqmmaxmemory">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Set-sqmMaxMemory</span>
-	<span class="psdb-st-badge psdb-st-badge-konfiguration">Configuration</span>
+	<span class="psdb-st-badge psdb-st-badge-konfiguration">SQL Config</span>
 	</div>
 	<div class="psdb-st-func-desc">Sets SQL Server &quot;max server memory (MB)&quot; to the recommended (or an explicit) value.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 3 examples</div>
@@ -2616,7 +2630,7 @@ Invoke-sqmSetDatabaseRecoveryMode -Database &quot;SalesDB&quot; -RecoveryMode Si
 	<div class="psdb-st-func-card" id="f-setsqmssrsconfiguration">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Set-sqmSsrsConfiguration</span>
-	<span class="psdb-st-badge psdb-st-badge-konfiguration">Configuration</span>
+	<span class="psdb-st-badge psdb-st-badge-konfiguration">SQL Config</span>
 	</div>
 	<div class="psdb-st-func-desc">Configures SQL Server Reporting Services (SSRS) fully automatically.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
@@ -2635,7 +2649,7 @@ Invoke-sqmSetDatabaseRecoveryMode -Database &quot;SalesDB&quot; -RecoveryMode Si
 	<div class="psdb-st-func-card" id="f-setsqmtcpport">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Set-sqmTcpPort</span>
-	<span class="psdb-st-badge psdb-st-badge-konfiguration">Configuration</span>
+	<span class="psdb-st-badge psdb-st-badge-konfiguration">SQL Config</span>
 	</div>
 	<div class="psdb-st-func-desc">Configures the TCP port of a SQL Server instance via the registry.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
@@ -2647,6 +2661,98 @@ Invoke-sqmSetDatabaseRecoveryMode -Database &quot;SalesDB&quot; -RecoveryMode Si
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Set-sqmTcpPort -SqlInstance &#39;INST01&#39; -BasePort 1433 -PortIncrement 10</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmTcpPort -SqlInstance &#39;INST01&#39; -BasePort 1433 -PortIncrement 10</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-testsqmmaxdop">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Test-sqmMaxDop</span>
+	<span class="psdb-st-badge psdb-st-badge-konfiguration">SQL Config</span>
+	</div>
+	<div class="psdb-st-func-desc">Checks whether MAXDOP (Max Degree of Parallelism) is configured correctly.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Test-sqmMaxDop -SqlInstance &#39;MSSQLSERVER&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmMaxDop -SqlInstance &#39;MSSQLSERVER&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Test-sqmMaxDop -SqlInstance &#39;SQL01\INST01&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmMaxDop -SqlInstance &#39;SQL01\INST01&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-testsqmmaxmemory">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Test-sqmMaxMemory</span>
+	<span class="psdb-st-badge psdb-st-badge-konfiguration">SQL Config</span>
+	</div>
+	<div class="psdb-st-func-desc">Checks whether SQL Server Max Server Memory is configured correctly.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Test-sqmMaxMemory -SqlInstance &#39;MSSQLSERVER&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmMaxMemory -SqlInstance &#39;MSSQLSERVER&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Test-sqmMaxMemory -SqlInstance &#39;SQL01\INST01&#39; | Where-Object { $_.Status -ne &#39;OK&#39; }</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmMaxMemory -SqlInstance &#39;SQL01\INST01&#39; | Where-Object { $_.Status -ne &#39;OK&#39; }</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	</section>
+
+	<section class="psdb-st-section" id="cat-sqmtool-config">
+	<h2 class="psdb-st-section-title">🔧 sqmTool Config</h2>
+
+	<div class="psdb-st-func-card" id="f-getsqmconfig">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Get-sqmConfig</span>
+	<span class="psdb-st-badge psdb-st-badge-restore">sqmTool</span>
+	</div>
+	<div class="psdb-st-func-desc">Returns the current module configuration.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmConfig</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmConfig</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmConfig -Key &#39;OutputPath&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmConfig -Key &#39;OutputPath&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-setsqmconfig">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Set-sqmConfig</span>
+	<span class="psdb-st-badge psdb-st-badge-restore">sqmTool</span>
+	</div>
+	<div class="psdb-st-func-desc">Sets one or more configuration values for the MSSQLTools module.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Set-sqmConfig -LogPath &quot;D:\Logs&quot; -OlaJobNameFull &quot;Prod-FULL&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmConfig -LogPath &quot;D:\Logs&quot; -OlaJobNameFull &quot;Prod-FULL&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Set-sqmConfig -TsmManagementClasses @(&#39;MC_10&#39;,&#39;MC_30&#39;,&#39;MC_100&#39;)</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmConfig -TsmManagementClasses @(&#39;MC_10&#39;,&#39;MC_30&#39;,&#39;MC_100&#39;)</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Set-sqmConfig -HpuDomainGroupMap @(</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmConfig -HpuDomainGroupMap @(
+        [PSCustomObject]@{ DomainPattern = &#39;*.sfinance.net&#39;; GroupNamePattern = &#39;Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod&#39; },
+        [PSCustomObject]@{ DomainPattern = &#39;*&#39;;              GroupNamePattern = &#39;Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod&#39; }
+    )</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Set-sqmConfig -SsrsInstallerPath &#39;\\srv-share\Software\SSRS2022\SQLServerReportingServices.exe&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmConfig -SsrsInstallerPath &#39;\\srv-share\Software\SSRS2022\SQLServerReportingServices.exe&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -2745,46 +2851,6 @@ Export-sqmServerConfiguration -SqlInstance &quot;SQL01&quot; `
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Get-sqmLinkedServerUsage -SqlInstance &quot;SQL01&quot; -LinkedServer &quot;PROD_SRV&quot;</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmLinkedServerUsage -SqlInstance &quot;SQL01&quot; -LinkedServer &quot;PROD_SRV&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-getsqmserversfromou">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Get-sqmServersFromOU</span>
-	<span class="psdb-st-badge psdb-st-badge-inventar">Inventory</span>
-	</div>
-	<div class="psdb-st-func-desc">Queries Active Directory (ADSI, no module required) for all computers in a named OU and returns pipeable objects with SqlInstance property.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 5 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Alle SQL-Server ausgeben</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Alle SQL-Server ausgeben
-    Get-sqmServersFromOU</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Andere OU</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Andere OU
-    Get-sqmServersFromOU -OUName &#39;srvApp&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Expliziter Domain-Name</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Expliziter Domain-Name
-    Get-sqmServersFromOU -OUName &#39;srvDatabase&#39; -Domain &#39;contoso.com&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Direkt an sqmSQLTool-Funktion weiterleiten</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Direkt an sqmSQLTool-Funktion weiterleiten
-    Get-sqmServersFromOU | ForEach-Object {
-        Sync-sqmBackupExcludeTable -SqlInstance $_.SqlInstance
-    }</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Backup-Exclude-Trigger auf allen DB-Servern registrieren</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Backup-Exclude-Trigger auf allen DB-Servern registrieren
-    Get-sqmServersFromOU | ForEach-Object {
-        Register-sqmBackupExcludeTrigger -SqlInstance $_.SqlInstance
-    }</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -3273,6 +3339,148 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 
 	</section>
 
+	<section class="psdb-st-section" id="cat-driver">
+	<h2 class="psdb-st-section-title">🔌 Driver Install/Uninstall</h2>
+
+	<div class="psdb-st-func-card" id="f-installsqmdb2driver">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Install-sqmDb2Driver</span>
+	<span class="psdb-st-badge psdb-st-badge-kapazitaet">Driver</span>
+	</div>
+	<div class="psdb-st-func-desc">Installs the IBM DB2 ODBC/CLI driver.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Install-sqmDb2Driver -SourcePath &#39;\\srv\Treiber\DB2&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Install-sqmDb2Driver -SourcePath &#39;\\srv\Treiber\DB2&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Install-sqmDb2Driver -SourcePath &#39;C:\Downloads\db2_odbc_cli_64.exe&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Install-sqmDb2Driver -SourcePath &#39;C:\Downloads\db2_odbc_cli_64.exe&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-installsqmjdbcdriver">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Install-sqmJdbcDriver</span>
+	<span class="psdb-st-badge psdb-st-badge-kapazitaet">Driver</span>
+	</div>
+	<div class="psdb-st-func-desc">Installs the Microsoft JDBC Driver for SQL Server.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Install-sqmJdbcDriver -SourcePath &#39;\\srv\Treiber\JDBC&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Install-sqmJdbcDriver -SourcePath &#39;\\srv\Treiber\JDBC&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Install-sqmJdbcDriver -SourcePath &#39;C:\Downloads\jdbc&#39; -UpdateClassPath $true</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Install-sqmJdbcDriver -SourcePath &#39;C:\Downloads\jdbc&#39; -UpdateClassPath $true</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-installsqmodbcdriver">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Install-sqmOdbcDriver</span>
+	<span class="psdb-st-badge psdb-st-badge-kapazitaet">Driver</span>
+	</div>
+	<div class="psdb-st-func-desc">Installs the Microsoft ODBC Driver for SQL Server.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Install-sqmOdbcDriver -SourcePath &#39;\\srv\Treiber\ODBC&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Install-sqmOdbcDriver -SourcePath &#39;\\srv\Treiber\ODBC&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Install-sqmOdbcDriver -SourcePath &#39;C:\Setup\msodbcsql18.msi&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Install-sqmOdbcDriver -SourcePath &#39;C:\Setup\msodbcsql18.msi&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-testsqmdriverinstalled">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Test-sqmDriverInstalled</span>
+	<span class="psdb-st-badge psdb-st-badge-kapazitaet">Driver</span>
+	</div>
+	<div class="psdb-st-func-desc">Checks whether a JDBC, ODBC or DB2 driver is installed on the system.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Test-sqmDriverInstalled -DriverType ODBC</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmDriverInstalled -DriverType ODBC</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Test-sqmDriverInstalled -DriverType ODBC -DriverName &#39;ODBC Driver 18 for SQL Server&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmDriverInstalled -DriverType ODBC -DriverName &#39;ODBC Driver 18 for SQL Server&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Test-sqmDriverInstalled -DriverType JDBC</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmDriverInstalled -DriverType JDBC</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Test-sqmDriverInstalled -DriverType DB2</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmDriverInstalled -DriverType DB2</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-uninstallsqmdb2driver">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Uninstall-sqmDb2Driver</span>
+	<span class="psdb-st-badge psdb-st-badge-kapazitaet">Driver</span>
+	</div>
+	<div class="psdb-st-func-desc">Uninstalls the IBM DB2 ODBC/CLI driver.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 1 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Uninstall-sqmDb2Driver</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">        Uninstall-sqmDb2Driver</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-uninstallsqmjdbcdriver">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Uninstall-sqmJdbcDriver</span>
+	<span class="psdb-st-badge psdb-st-badge-kapazitaet">Driver</span>
+	</div>
+	<div class="psdb-st-func-desc">Uninstalls the Microsoft JDBC Driver for SQL Server.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Uninstall-sqmJdbcDriver</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">        Uninstall-sqmJdbcDriver</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Uninstall-sqmJdbcDriver -RemoveClassPath</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">        Uninstall-sqmJdbcDriver -RemoveClassPath</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-uninstallsqmodbcdriver">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Uninstall-sqmOdbcDriver</span>
+	<span class="psdb-st-badge psdb-st-badge-kapazitaet">Driver</span>
+	</div>
+	<div class="psdb-st-func-desc">Uninstalls the Microsoft ODBC Driver for SQL Server.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Uninstall-sqmOdbcDriver</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">        Uninstall-sqmOdbcDriver</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Uninstall-sqmOdbcDriver -DriverName &#39;Microsoft ODBC Driver 17 for SQL Server&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">        Uninstall-sqmOdbcDriver -DriverName &#39;Microsoft ODBC Driver 17 for SQL Server&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	</section>
+
 	<section class="psdb-st-section" id="cat-deployment">
 	<h2 class="psdb-st-section-title">🚀 Deployment</h2>
 
@@ -3554,63 +3762,6 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	</div>
 	</div>
 
-	<div class="psdb-st-func-card" id="f-installsqmdb2driver">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Install-sqmDb2Driver</span>
-	<span class="psdb-st-badge psdb-st-badge-sonstige">Other</span>
-	</div>
-	<div class="psdb-st-func-desc">Installs the IBM DB2 ODBC/CLI driver.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Install-sqmDb2Driver -SourcePath &#39;\\srv\Treiber\DB2&#39;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Install-sqmDb2Driver -SourcePath &#39;\\srv\Treiber\DB2&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Install-sqmDb2Driver -SourcePath &#39;C:\Downloads\db2_odbc_cli_64.exe&#39;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Install-sqmDb2Driver -SourcePath &#39;C:\Downloads\db2_odbc_cli_64.exe&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-installsqmjdbcdriver">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Install-sqmJdbcDriver</span>
-	<span class="psdb-st-badge psdb-st-badge-sonstige">Other</span>
-	</div>
-	<div class="psdb-st-func-desc">Installs the Microsoft JDBC Driver for SQL Server.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Install-sqmJdbcDriver -SourcePath &#39;\\srv\Treiber\JDBC&#39;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Install-sqmJdbcDriver -SourcePath &#39;\\srv\Treiber\JDBC&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Install-sqmJdbcDriver -SourcePath &#39;C:\Downloads\jdbc&#39; -UpdateClassPath $true</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Install-sqmJdbcDriver -SourcePath &#39;C:\Downloads\jdbc&#39; -UpdateClassPath $true</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-installsqmodbcdriver">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Install-sqmOdbcDriver</span>
-	<span class="psdb-st-badge psdb-st-badge-sonstige">Other</span>
-	</div>
-	<div class="psdb-st-func-desc">Installs the Microsoft ODBC Driver for SQL Server.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Install-sqmOdbcDriver -SourcePath &#39;\\srv\Treiber\ODBC&#39;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Install-sqmOdbcDriver -SourcePath &#39;\\srv\Treiber\ODBC&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Install-sqmOdbcDriver -SourcePath &#39;C:\Setup\msodbcsql18.msi&#39;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Install-sqmOdbcDriver -SourcePath &#39;C:\Setup\msodbcsql18.msi&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
 	<div class="psdb-st-func-card" id="f-installsqmolamaintenancesolution">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Install-sqmOlaMaintenanceSolution</span>
@@ -3773,71 +3924,6 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	</div>
 	</div>
 
-	<div class="psdb-st-func-card" id="f-testsqmdriverinstalled">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Test-sqmDriverInstalled</span>
-	<span class="psdb-st-badge psdb-st-badge-sonstige">Other</span>
-	</div>
-	<div class="psdb-st-func-desc">Checks whether a JDBC, ODBC or DB2 driver is installed on the system.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmDriverInstalled -DriverType ODBC</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmDriverInstalled -DriverType ODBC</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmDriverInstalled -DriverType ODBC -DriverName &#39;ODBC Driver 18 for SQL Server&#39;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmDriverInstalled -DriverType ODBC -DriverName &#39;ODBC Driver 18 for SQL Server&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmDriverInstalled -DriverType JDBC</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmDriverInstalled -DriverType JDBC</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmDriverInstalled -DriverType DB2</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmDriverInstalled -DriverType DB2</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-testsqmmaxdop">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Test-sqmMaxDop</span>
-	<span class="psdb-st-badge psdb-st-badge-sonstige">Other</span>
-	</div>
-	<div class="psdb-st-func-desc">Checks whether MAXDOP (Max Degree of Parallelism) is configured correctly.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmMaxDop -SqlInstance &#39;MSSQLSERVER&#39;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmMaxDop -SqlInstance &#39;MSSQLSERVER&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmMaxDop -SqlInstance &#39;SQL01\INST01&#39;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmMaxDop -SqlInstance &#39;SQL01\INST01&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-testsqmmaxmemory">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Test-sqmMaxMemory</span>
-	<span class="psdb-st-badge psdb-st-badge-sonstige">Other</span>
-	</div>
-	<div class="psdb-st-func-desc">Checks whether SQL Server Max Server Memory is configured correctly.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmMaxMemory -SqlInstance &#39;MSSQLSERVER&#39;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmMaxMemory -SqlInstance &#39;MSSQLSERVER&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmMaxMemory -SqlInstance &#39;SQL01\INST01&#39; | Where-Object { $_.Status -ne &#39;OK&#39; }</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmMaxMemory -SqlInstance &#39;SQL01\INST01&#39; | Where-Object { $_.Status -ne &#39;OK&#39; }</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
 	<div class="psdb-st-func-card" id="f-testsqmsqlinstanceinstalled">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Test-sqmSqlInstanceInstalled</span>
@@ -3858,59 +3944,6 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">if ((Test-sqmSqlInstanceInstalled).IsInstalled) { Write-Host &quot;SQL installiert&quot; }</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    if ((Test-sqmSqlInstanceInstalled).IsInstalled) { Write-Host &quot;SQL installiert&quot; }</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-uninstallsqmdb2driver">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Uninstall-sqmDb2Driver</span>
-	<span class="psdb-st-badge psdb-st-badge-sonstige">Other</span>
-	</div>
-	<div class="psdb-st-func-desc">Uninstalls the IBM DB2 ODBC/CLI driver.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 1 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Uninstall-sqmDb2Driver</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">        Uninstall-sqmDb2Driver</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-uninstallsqmjdbcdriver">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Uninstall-sqmJdbcDriver</span>
-	<span class="psdb-st-badge psdb-st-badge-sonstige">Other</span>
-	</div>
-	<div class="psdb-st-func-desc">Uninstalls the Microsoft JDBC Driver for SQL Server.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Uninstall-sqmJdbcDriver</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">        Uninstall-sqmJdbcDriver</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Uninstall-sqmJdbcDriver -RemoveClassPath</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">        Uninstall-sqmJdbcDriver -RemoveClassPath</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-uninstallsqmodbcdriver">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Uninstall-sqmOdbcDriver</span>
-	<span class="psdb-st-badge psdb-st-badge-sonstige">Other</span>
-	</div>
-	<div class="psdb-st-func-desc">Uninstalls the Microsoft ODBC Driver for SQL Server.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Uninstall-sqmOdbcDriver</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">        Uninstall-sqmOdbcDriver</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Uninstall-sqmOdbcDriver -DriverName &#39;Microsoft ODBC Driver 17 for SQL Server&#39;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">        Uninstall-sqmOdbcDriver -DriverName &#39;Microsoft ODBC Driver 17 for SQL Server&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
