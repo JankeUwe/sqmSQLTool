@@ -1,5 +1,27 @@
 # sqmSQLTool — Changelog
 
+## [1.8.0.0] — 2026-06-26
+
+### ✨ Quellenbewusstes Auto-Update beim Import
+
+Das Auto-Update (`AutoUpdate=$true`) erkennt eine neue Version und aktualisiert jetzt
+**automatisch von der zuletzt verwendeten Installationsquelle** — für **alle** Quellen
+(bisher nur UNC automatisch, PSGallery/GitHub nur Hinweis):
+
+- **Quelle wird gemerkt**: `Install.ps1` speichert nach der Installation Typ + Pfad der Quelle
+  (`Set-sqmConfig -InstallSourceType/-InstallSourcePath`). PSGallery-Installs werden zur Laufzeit
+  via `Get-InstalledModule` erkannt (neue private `Get-sqmInstallSource`).
+- **Quellenlogik „letzte Quelle, sonst Fallback"**: `Test-sqmModuleUpdate` prüft zuerst die letzte
+  Quelle; ist sie unbekannt/nicht erreichbar, greift die Kette PSGallery→GitHub→UNC.
+- **Automatisches Update je Quelle**: `Update-sqmModule` ist ein Dispatcher —
+  PSGallery → `Install-Module -Force` (Scope automatisch AllUsers/CurrentUser),
+  GitHub → Release-ZIP laden + entpacken (neue `Update-sqmFromGitHub`),
+  UNC/LocalDir → Datei-Copy mit Backup (gemeinsame `Copy-sqmModuleFiles`).
+- **Throttle**: On-Import-Check max. alle `UpdateCheckIntervalHours` (Default 24) via Marker-Datei —
+  keine Netz-Calls bei jedem Import. Skip weiterhin über `SQMSQLTOOL_SKIP_AUTO_UPDATE=1`.
+- Robust: Fehler beim Update (z. B. AllUsers ohne Adminrechte) brechen den Import **nie** ab.
+- Neue Config-Keys: `InstallSourceType`, `InstallSourcePath`, `UpdateCheckIntervalHours`.
+
 ## [1.7.9.0] — 2026-06-26
 
 ### ✨ Get-sqmADGroupMembersRecursive — echter Anzeigename

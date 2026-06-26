@@ -59,6 +59,15 @@
     Used by Install-sqmSsrsReportServer when -InstallerPath is not specified.
     Example: '\\srv-share\Software\SSRS2022\SQLServerReportingServices.exe'
 
+.PARAMETER InstallSourceType
+    Typ der zuletzt verwendeten Installationsquelle fuer das Auto-Update:
+    'PSGallery' | 'UNC' | 'GitHub' | 'LocalDir'. Wird normalerweise von Install.ps1
+    automatisch gesetzt. Das quellenbewusste Auto-Update bevorzugt diese Quelle.
+
+.PARAMETER InstallSourcePath
+    Locator zur Installationsquelle: Repository-Name (PSGallery), UNC-Pfad,
+    'owner/repo' (GitHub) bzw. lokaler Pfad (LocalDir).
+
 .PARAMETER CheckProfile
     Check-Profil fuer Invoke-sqmSetupReport und verwandte Checks.
     Auto  = FI-TS-Checks nur wenn sqmIsFitsEnvironment erkannt (Standard)
@@ -130,6 +139,11 @@ function Set-sqmConfig
 		[bool]$AutoUpdate,
 		[Parameter(Mandatory = $false)]
 		[string]$UpdateRepository,
+		[Parameter(Mandatory = $false)]
+		[ValidateSet('PSGallery', 'UNC', 'GitHub', 'LocalDir')]
+		[string]$InstallSourceType,
+		[Parameter(Mandatory = $false)]
+		[string]$InstallSourcePath,
 		[Parameter(Mandatory = $false)]
 		[string]$DefaultPolicy,
 		[Parameter(Mandatory = $false)]
@@ -324,6 +338,16 @@ function Set-sqmConfig
 	if ($PSBoundParameters.ContainsKey('UpdateRepository'))
 	{
 		$globalConfig['UpdateRepository'] = $UpdateRepository
+		$updated = $true
+	}
+	if ($PSBoundParameters.ContainsKey('InstallSourceType'))
+	{
+		$globalConfig['InstallSourceType'] = $InstallSourceType
+		$updated = $true
+	}
+	if ($PSBoundParameters.ContainsKey('InstallSourcePath'))
+	{
+		$globalConfig['InstallSourcePath'] = $InstallSourcePath
 		$updated = $true
 	}
 	

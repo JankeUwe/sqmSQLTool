@@ -219,6 +219,27 @@ try {
 }
 
 # ---------------------------------------------------------------------------
+# 6a. Installationsquelle merken (fuer quellenbewusstes Auto-Update)
+#     Install.ps1 installiert aus $Source -> Typ aus dem Pfad ableiten:
+#     UNC-Pfad (\\...) -> 'UNC' (zusaetzlich UpdateRepository setzen), sonst 'LocalDir'.
+#     (PSGallery-Installs laufen ueber Install-Module, nicht hier; die werden zur
+#      Laufzeit automatisch erkannt.)
+# ---------------------------------------------------------------------------
+if ($importOk) {
+    try {
+        $srcType = if ($Source -like '\\*') { 'UNC' } else { 'LocalDir' }
+        if ($srcType -eq 'UNC') {
+            Set-sqmConfig -InstallSourceType $srcType -InstallSourcePath $Source -UpdateRepository $Source -ErrorAction Stop
+        } else {
+            Set-sqmConfig -InstallSourceType $srcType -InstallSourcePath $Source -ErrorAction Stop
+        }
+        Write-Host "Installationsquelle gemerkt: $srcType ($Source)" -ForegroundColor Gray
+    } catch {
+        Write-Warning "Installationsquelle konnte nicht gespeichert werden: $_"
+    }
+}
+
+# ---------------------------------------------------------------------------
 # 6b. Windows Event Log Source registrieren (fuer Splunk-Integration)
 #     Die Agent-Jobs (Sync/Compare) schreiben bei Fehler/Drift in das Application
 #     Log unter der Source 'sqmSQLTool'. Das Anlegen der Source erfordert Adminrechte
