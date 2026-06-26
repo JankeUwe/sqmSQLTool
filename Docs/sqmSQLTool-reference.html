@@ -146,7 +146,7 @@
 	<!-- SIDEBAR -->
 	<div class="psdb-st-sidebar">
 	<input class="psdb-st-sidebar-search" type="text" placeholder="Funktion suchen…" oninput="psstSearch(this.value)">
-					<div class="psdb-st-nav-group" id="nav-alwayson">
+						<div class="psdb-st-nav-group" id="nav-alwayson">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-alwayson-list')">
 	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">18</span>
 	</div>
@@ -377,7 +377,7 @@
 
 	<!-- CONTENT -->
 	<div class="psdb-st-content" id="psdb-st-content">
-					<section class="psdb-st-section" id="cat-alwayson">
+						<section class="psdb-st-section" id="cat-alwayson">
 	<h2 class="psdb-st-section-title">🔄 AlwaysOn</h2>
 
 	<div class="psdb-st-func-card" id="f-addsqmdatabasetoag">
@@ -3204,6 +3204,19 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	<span class="psdb-st-badge psdb-st-badge-tsm">TSM</span>
 	</div>
 	<div class="psdb-st-func-desc">Reads and displays the IBM Spectrum Protect (TSM) client configuration.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmTsmConfiguration -ComputerName SQL01</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmTsmConfiguration -ComputerName SQL01
+    # Reads the TSM configuration from SQL01 (password as SecureString).</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmTsmConfiguration -DsmOptPath &#39;C:\Program Files\Tivoli\TSM\baclient\dsm.opt&#39; -IncludePasswordPlain</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmTsmConfiguration -DsmOptPath &#39;C:\Program Files\Tivoli\TSM\baclient\dsm.opt&#39; -IncludePasswordPlain
+    # Uses an explicit dsm.opt path and also returns the plain-text password.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
 	</div>
 
 	<div class="psdb-st-func-card" id="f-invokesqmtsmconfiguration">

@@ -1,4 +1,4 @@
-﻿# sqmSQLTool - Complete Function Reference
+# sqmSQLTool - Complete Function Reference
 
 ## Installation
 
@@ -127,6 +127,96 @@ Remove-sqmAdOrphanLogin -SqlInstance "SQL01"
 ```powershell
 Remove-sqmAdOrphanLogin -SqlInstance "SQL01" -ExcludeLogin 'DOMAIN\KeepThis*' -Confirm:$false
     Removes confirmed orphans (except the excluded pattern) without interactive confirmation.
+
+### Get-sqmADGroupMembersRecursive
+
+Lists all members of an Active Directory group with controlled recursion depth.
+
+    Enhanced version of Get-sqmADGroupMembers with support for limiting nesting depth.
+    Recursively resolves nested groups up to the specified depth level.
+
+    For user accounts the real AD 'displayName' attribute is resolved (via Get-ADUser),
+    so the DisplayName column shows the person's name instead of just the login/CN.
+    Fallback chain: displayName -> CN/Name -> sAMAccountName.
+
+**Parameters:**
+
+- **-GroupName** - Name of the AD group. Pipeline-capable.
+- **-Domain** - Optional: AD domain (e.g., "FITS.LOCAL", "corp.de") If not specified, auto-detects current domain.
+- **-Depth** - Maximum nesting depth for group expansion (default: 2)
+- **-OutputPath** - Optional: Output directory for TXT/CSV reports Default: C:\System\WinSrvLog\MSSQL
+
+**Examples (1):**
+
+```powershell
+    Get-sqmADGroupMembersRecursive -GroupName "DL_SQL_Admins" -Depth 2
+
+### Get-sqmADMemberGroups
+
+Finds all Active Directory groups that contain a specified user, group, or computer.
+
+    Inverse operation to Get-sqmADGroupMembers.
+    Lists all groups (direct and nested) that contain the specified member.
+
+**Parameters:**
+
+- **-Identity** - Identity of the user, group, or computer. Can be: SamAccountName, UPN, or DistinguishedName Pipeline-capable.
+- **-Domain** - Optional: AD domain
+- **-Depth** - Maximum nesting depth for group expansion (default: 2)
+- **-OutputPath** - Optional: Output directory for TXT/CSV reports Default: C:\System\WinSrvLog\MSSQL
+
+**Examples (1):**
+
+```powershell
+    Get-sqmADMemberGroups -Identity "john.doe" -Depth 2
+
+### Get-sqmServersFromOU
+
+Ermittelt alle Computer-Objekte aus einer bestimmten AD-OU und gibt sie als pipefaehige Objekte aus.
+
+    Durchsucht Active Directory (via ADSI, kein ActiveDirectory-Modul erforderlich)
+    nach allen Computer-Objekten unterhalb einer OU mit dem angegebenen Namen.
+
+    Die Ausgabe-Objekte enthalten eine SqlInstance-Eigenschaft und koennen direkt
+    an beliebige sqmSQLTool-Funktionen weitergeleitet werden:
+
+        Get-sqmServersFromOU | ForEach-Object {
+            Sync-sqmBackupExcludeTable -SqlInstance $_.SqlInstance
+        }
+
+**Parameters:**
+
+- **-OUName** - Name der OU (nicht der vollstaendige LDAP-Pfad). Beispiel: 'srvDatabase' Standard: 'srvDatabase'
+- **-Domain** - FQDN der Domain. Standard: aktuelle Domain des ausfuehrenden Benutzers.
+- **-SearchBase** - Expliziter LDAP-Suchpfad (DistinguishedName der OU). Wenn angegeben, wird OUName ignoriert. Beispiel: 'OU=srvDatabase,OU=Server,DC=contoso,DC=com'
+- **-Recurse** - Sucht auch in untergeordneten OUs (Standard: $true).
+- **-EnableException** - Loest bei Fehlern sofort eine Exception aus.
+
+**Examples (5):**
+
+```powershell
+    # Alle SQL-Server ausgeben
+    Get-sqmServersFromOU
+
+```powershell
+    # Andere OU
+    Get-sqmServersFromOU -OUName 'srvApp'
+
+```powershell
+    # Expliziter Domain-Name
+    Get-sqmServersFromOU -OUName 'srvDatabase' -Domain 'contoso.com'
+
+```powershell
+    # Direkt an sqmSQLTool-Funktion weiterleiten
+    Get-sqmServersFromOU | ForEach-Object {
+        Sync-sqmBackupExcludeTable -SqlInstance $_.SqlInstance
+    }
+
+```powershell
+    # Backup-Exclude-Trigger auf allen DB-Servern registrieren
+    Get-sqmServersFromOU | ForEach-Object {
+        Register-sqmBackupExcludeTrigger -SqlInstance $_.SqlInstance
+    }
 
 ## 10. Reporting & Analysis
 
@@ -320,6 +410,69 @@ Comprehensive setup report including:
 
 ```powershell
 Invoke-sqmSetupReport -SqlInstance "SQL01"
+
+### Get-sqmLinkedServerUsage
+
+Analyzes which database objects (procedures, functions, views, triggers, SQL Agent jobs) access linked servers.
+
+    Searches the definitions of all user databases for references to linked servers.
+    Shows the referenced linked server, the object and the database. Optionally includes dependent jobs.
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance (default: current computer name).
+- **-SqlCredential** - PSCredential for the connection.
+- **-LinkedServer** - Name of the linked server (or wildcard). Default: all.
+- **-IncludeJobs** - Also checks SQL Agent job steps for T-SQL using the linked server.
+- **-EnableException** - Throw exceptions immediately.
+
+**Examples (1):**
+
+```powershell
+    Get-sqmLinkedServerUsage -SqlInstance "SQL01" -LinkedServer "PROD_SRV"
+
+### New-sqmSetupReport
+
+Builds a self-contained animated HTML replay from a setup event JSON-Lines file.
+
+    Internal helper for the optional setup progress report. Reads the JSON-Lines stream produced by
+    Write-sqmSetupEvent and writes ONE standalone .html file that animates the timeline: a phase
+    pipeline, per-step visualizations (running-arrow copy, disk format, gears, node restart, AG
+    replication, listener) and play/pause/scrub controls.
+
+    The output is fully offline (no CDN, no external resources) so it opens by double-click or from a
+    share. Returns the path of the written HTML file, or $null when no usable events were found.
+
+**Parameters:**
+
+- **-EventPath** - Path to the JSON-Lines event file written by Write-sqmSetupEvent.
+- **-OutputPath** - Path of the HTML file to write. Default: the event file with extension .html.
+- **-Title** - Report title. Default: 'SQL Server Setup'.
+- **-Server** - Server/instance label shown in the header. Default: $env:COMPUTERNAME.
+
+### Write-sqmSetupEvent
+
+Appends a single structured setup event as one JSON line (JSON-Lines) to a file.
+
+    Internal, side-effect-free helper for the optional animated setup replay report. Each call writes
+    exactly one compact JSON object terminated by a newline, so the file is a JSON-Lines stream that
+    New-sqmSetupReport replays as an animated HTML timeline.
+
+    The whole body is wrapped in try/catch: a logging/serialization failure must NEVER affect the
+    installation. When -Path is empty or $null the function is a no-op, so callers can invoke it
+    unconditionally (the report is opt-in via the orchestrator's -ProgressReport switch).
+
+**Parameters:**
+
+- **-Path** - Target JSON-Lines file. Empty/$null -> no-op.
+- **-Phase** - Coarse pipeline station (copy, preinstall, dirs, install, components, drivers, postinstall, alwayson).
+- **-Step** - Stable step identifier within the phase (e.g. copy-sources, hadr, node-restart, listener).
+- **-State** - start | progress | done | warn | error.
+- **-Title** - Short human-readable label shown in the report.
+- **-Detail** - Optional detail line (e.g. instance, path).
+- **-Pct** - Optional progress percentage (0-100); -1 = not applicable.
+- **-Node** - Optional node/instance the event relates to (for the AlwaysOn visuals).
+- **-Viz** - Visualization hint for the front-end: flow-arrows | disk-format | gears | bar | node-restart | node-fetch | data-replicate | listener | check. Defaults to a sensible value per phase.
 
 ## 3. Backup & Recovery
 
@@ -899,6 +1052,85 @@ Executes RESTORE VERIFYONLY on a backup file (local or optionally remote).
 ```powershell
 Test-sqmBackupIntegrity -SqlInstance "SQL01" -BackupPath "D:\Backup\AdventureWorks.bak"
 
+### Register-sqmBackupExcludeTrigger
+
+Registriert oder entfernt den DDL-Trigger, der master.dbo.sqm_BackupExclude automatisch bei CREATE_DATABASE und DROP_DATABASE aktuell haelt.
+
+    Legt einen server-weiten DDL-Trigger (ON ALL SERVER) an, der feuert bei:
+      CREATE_DATABASE — fuegt neue Datenbank in sqm_BackupExclude ein (IsActive=1, IsOrphaned=0).
+                        Reaktiviert einen ggf. bereits als verwaist markierten Eintrag.
+      DROP_DATABASE   — markiert die Datenbank in sqm_BackupExclude als IsOrphaned=1.
+
+    Damit entfaellt die Notwendigkeit, nach Datenbank-Anlage oder -Loeschung manuell
+    Sync-sqmBackupExcludeTable aufzurufen — die Tabelle ist immer aktuell.
+
+    Verhalten:
+      - tempdb wird immer uebersprungen.
+      - Systemdatenbanken (master, model, msdb) werden uebersprungen, ausser
+        -IncludeSystemDatabases ist gesetzt.
+      - Fehler im Trigger brechen CREATE DATABASE / DROP DATABASE nie ab;
+        sie werden ins SQL Server Error Log geschrieben.
+      - Existiert master.dbo.sqm_BackupExclude noch nicht, protokolliert der
+        Trigger eine Warnung und beendet sich sauber.
+
+    In AlwaysOn-Umgebungen wird der Trigger automatisch auf allen Secondary-Repliken
+    registriert, sofern -SkipAlwaysOnPropagation nicht gesetzt ist.
+
+    Mit -Remove wird der Trigger geloescht (inkl. Secondaries).
+
+    Triggername: trg_sqm_BackupExclude_AutoSync
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server-Instanz. Standard: $env:COMPUTERNAME.
+- **-SqlCredential** - PSCredential fuer SQL-Authentifizierung. Standard: Windows-Auth.
+- **-IncludeSystemDatabases** - Wenn gesetzt, werden auch master, model und msdb automatisch verwaltet. Fuer Standardinstallationen nicht empfohlen.
+- **-Remove** - Entfernt den Trigger (auf Primary und ggf. Secondaries).
+- **-SkipAlwaysOnPropagation** - Verhindert die automatische Propagierung auf AlwaysOn-Secondaries.
+- **-EnableException** - Loest bei Fehlern sofort eine Exception aus statt Write-Error.
+
+**Examples (4):**
+
+```powershell
+    Register-sqmBackupExcludeTrigger
+
+```powershell
+    Register-sqmBackupExcludeTrigger -SqlInstance "SQL01"
+
+```powershell
+    Register-sqmBackupExcludeTrigger -SqlInstance "SQL01" -Remove
+    Register-sqmBackupExcludeTrigger -SqlInstance "SQL01"
+
+```powershell
+    Register-sqmBackupExcludeTrigger -SqlInstance "SQL01" -WhatIf
+
+### Show-sqmBackupExcludeForm
+
+WinForms-Dialog zur Verwaltung der Backup-Ausschlusstabelle (master.dbo.sqm_BackupExclude).
+
+    Zeigt alle Eintraege aus master.dbo.sqm_BackupExclude in einem Grid an.
+    Der Anwender kann IsActive per Checkbox an- oder abwaehlen und den Reason-Text
+    aendern. Verwaiste Eintraege (IsOrphaned=1) werden farblich hervorgehoben.
+
+    Ablauf:
+      1. SqlInstance eingeben (Standard: $env:COMPUTERNAME).
+      2. "Sync & Laden" — fuehrt Sync-sqmBackupExcludeTable aus und laedt das Grid.
+      3. IsActive-Haken setzen/entfernen, ggf. Reason anpassen.
+      4. "Speichern" — schreibt nur geaenderte Zeilen per UPDATE zurueck.
+
+**Parameters:**
+
+- **-SqlInstance** - SQL-Instanz, die beim Oeffnen des Dialogs vorbelegt wird.
+- **-SqlCredential** - Optionale Anmeldedaten (PSCredential). Ohne Angabe: Windows-Authentifizierung.
+
+**Examples (2):**
+
+```powershell
+    Show-sqmBackupExcludeForm
+
+```powershell
+    Show-sqmBackupExcludeForm -SqlInstance "SQL01\INST1"
+
 ## 7. Configuration Management
 
 ### Compare-sqmServerConfiguration
@@ -1169,6 +1401,70 @@ Invoke-sqmCollationChange -NewCollation "Latin1_General_CI_AS"
 
 ```powershell
 Invoke-sqmCollationChange -SqlInstance "SQL01\INST2" -NewCollation "German_CI_AS" -IncludeUserDatabases -BackupBeforeChange
+
+### Set-sqmMaxDop
+
+Sets MAXDOP (max degree of parallelism) to the recommended (or an explicit) value, and optionally the matching "cost threshold for parallelism".
+
+    Companion to Test-sqmMaxDop: instead of only reporting, this applies the value.
+    By default MAXDOP is set to the Microsoft recommendation min(8, logical CPUs); pass
+    -MaxDop to set an exact value. The recommended "cost threshold for parallelism" (50)
+    is set alongside unless -SkipCostThreshold is used. Uses dbatools and is fully
+    ShouldProcess-aware (-WhatIf / -Confirm).
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance (default: $env:COMPUTERNAME).
+- **-SqlCredential** - Optional SQL authentication credential (PSCredential).
+- **-MaxDop** - Explicit MAXDOP value. When omitted, min(8, logical CPUs) is used.
+- **-CostThreshold** - Value for "cost threshold for parallelism". Default: 50. Ignored with -SkipCostThreshold.
+- **-SkipCostThreshold** - Do not change the cost threshold; only set MAXDOP.
+- **-EnableException** - Throw on error instead of logging a warning and returning a failed result.
+
+**Examples (3):**
+
+```powershell
+    Set-sqmMaxDop -SqlInstance SQL01
+    Sets MAXDOP to min(8, CPUs) and cost threshold to 50.
+
+```powershell
+    Set-sqmMaxDop -SqlInstance SQL01 -MaxDop 4 -SkipCostThreshold
+    Sets MAXDOP to 4, leaves the cost threshold unchanged.
+
+```powershell
+    Set-sqmMaxDop -SqlInstance SQL01 -WhatIf
+    Shows the planned MAXDOP/cost-threshold change without applying it.
+
+### Set-sqmMaxMemory
+
+Sets SQL Server "max server memory (MB)" to the recommended (or an explicit) value.
+
+    Companion to Test-sqmMaxMemory: instead of only reporting, this applies the value.
+    By default it sets max server memory to a percentage of physical RAM (90% by default);
+    pass -MaxMemoryMB to set an exact value. Uses dbatools (Set-DbaMaxMemory) and is fully
+    ShouldProcess-aware (-WhatIf / -Confirm).
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance (default: $env:COMPUTERNAME).
+- **-SqlCredential** - Optional SQL authentication credential (PSCredential).
+- **-RecommendedPct** - Percentage of physical RAM to assign when -MaxMemoryMB is not given. Default: 90.
+- **-MaxMemoryMB** - Explicit value in MB. Overrides -RecommendedPct.
+- **-EnableException** - Throw on error instead of logging a warning and returning a failed result.
+
+**Examples (3):**
+
+```powershell
+    Set-sqmMaxMemory -SqlInstance SQL01
+    Sets max server memory to 90% of physical RAM.
+
+```powershell
+    Set-sqmMaxMemory -SqlInstance SQL01 -MaxMemoryMB 24576
+    Sets max server memory to exactly 24 GB.
+
+```powershell
+    Set-sqmMaxMemory -SqlInstance SQL01 -RecommendedPct 80 -WhatIf
+    Shows what would be set (80% of RAM) without changing anything.
 
 ## 17. SSRS Configuration
 
@@ -1815,6 +2111,72 @@ Invoke-sqmTempSysadminAction -SqlInstance SQL01 -Login 'DOM\u.maier' -Action Rev
 ```powershell
 # Early manual revoke including removal of a self-created login:
     Invoke-sqmTempSysadminAction -Login 'DOM\u.maier' -Action Revoke -RemoveLogin
+
+### New-sqmRandomSaPassword
+
+Generiert ein zufaelliges, richtlinienkonformes SA-Passwort.
+
+    Erstellt ein kryptografisch sicheres Passwort das die SQL Server
+    Passwort-Richtlinie erfuellt:
+        - Mindestlaenge konfigurierbar (Standard: 20 Zeichen)
+        - Mindestens 1 Grossbuchstabe (A-Z)
+        - Mindestens 1 Kleinbuchstabe (a-z)
+        - Mindestens 1 Ziffer (0-9)
+        - Mindestens 1 Sonderzeichen aus dem definierten Set
+
+    Optionaler Datei-Export: Passwort wird DPAPI-verschluesselt in eine
+    Textdatei geschrieben (ConvertFrom-SecureString).
+    Nur der Benutzer/Computer der exportiert hat kann die Datei wieder lesen.
+
+**Parameters:**
+
+- **-Length** - Laenge des Passworts. Standard: 20. Minimum: 12.
+- **-ExportPath** - Optionaler Pfad fuer die verschluesselte Passwort-Datei. Z.B.: C:\System\Passwords\sa_password.txt Wenn leer: kein Export.
+
+**Examples (3):**
+
+```powershell
+    $pwd = New-sqmRandomSaPassword
+    # Gibt SecureString zurueck
+
+```powershell
+    $pwd = New-sqmRandomSaPassword -Length 24 -ExportPath 'C:\System\Passwords\sa.txt'
+    # SecureString + DPAPI-Export nach C:\System\Passwords\sa.txt
+
+```powershell
+    # Klartext anzeigen (nur fuer Debugging):
+    $pwd = New-sqmRandomSaPassword
+    $cred = New-Object PSCredential('sa', $pwd)
+    $cred.GetNetworkCredential().Password
+
+### Set-sqmSqlPolicyState
+
+Enables or disables a single Policy-Based Management policy on a SQL Server instance.
+
+    Uses dbatools (Get-DbaPbmPolicy) to check whether the specified policy exists on
+    the target instance, and then toggles only that policy via its SMO object.
+
+    Unlike older scripts, this does not change the global PBM engine state,
+    but only the explicitly named policy.
+
+**Parameters:**
+
+- **-SqlInstance** - Target SQL Server instance(s). Pipeline-capable. Default: current computer name.
+- **-SqlCredential** - Optional PSCredential for the connection.
+- **-Policy** - Name of the policy to toggle. Default: from module configuration (DefaultPolicy).
+- **-State** - Target state: 'Enable' or 'Disable'.
+- **-ContinueOnError** - Continue with the next instance on error.
+- **-EnableException** - Throw exceptions immediately (overrides ContinueOnError).
+- **-Confirm** - Prompts for confirmation before toggling.
+- **-WhatIf** - Shows what would happen without making any changes.
+
+**Examples (2):**
+
+```powershell
+    Set-sqmSqlPolicyState -SqlInstance "SQL01" -Policy "xp_cmdshell must be disabled" -State Disable
+
+```powershell
+    "SQL01","SQL02" | Set-sqmSqlPolicyState -Policy "Password Policy" -State Enable
 
 ## 12. Server Configuration Testing
 
@@ -2564,6 +2926,100 @@ Invoke-sqmFormatDrive64k -DriveLetter D -WhatIf
 
     Simulates the entire process without making any changes.
 
+### Get-sqmDiskPartitionMap
+
+Zeigt die Zuordnung physischer Datentraeger zu logischen Laufwerksbuchstaben.
+
+    Ermittelt fuer jeden physischen Datentraeger (Win32_DiskDrive) alle zugeordneten
+    logischen Laufwerksbuchstaben via CIM-Assoziationen:
+
+        Win32_DiskDrive
+          └─ Win32_DiskDriveToDiskPartition
+               └─ Win32_DiskPartition
+                    └─ Win32_LogicalDiskToPartition
+                         └─ Win32_LogicalDisk  (Laufwerksbuchstabe)
+
+    Ob eine physische Disk "geteilt" ist (mehrere Laufwerksbuchstaben auf einer Disk),
+    wird im Property IsShared angezeigt. Das ist besonders relevant, wenn eine Disk
+    partitioniert wurde und unterschiedliche Laufwerksbuchstaben auf derselben
+    physischen Disk liegen - in diesem Fall sind SerienNummern nicht eindeutig einem
+    einzelnen Laufwerk zuzuordnen.
+
+    Unterstuetzt lokale und Remote-Abfragen via CIM (DCOM/WMI, kein WinRM noetig).
+
+**Parameters:**
+
+- **-ComputerName** - Zielrechner (ein oder mehrere). Standard: lokaler Computer. Aliase: SqlInstance, ServerName
+- **-NoClipboard** - Ergebnis NICHT in die Zwischenablage kopieren.
+
+**Examples (4):**
+
+```powershell
+    Get-sqmDiskPartitionMap
+
+    Zeigt die Partitions-Zuordnung des lokalen Rechners.
+
+```powershell
+    Get-sqmDiskPartitionMap -ComputerName "SQL01"
+
+    Remote-Abfrage gegen SQL01 via CIM/DCOM.
+
+```powershell
+    Get-sqmDiskPartitionMap | Where-Object IsShared | Select-Object DiskIndex, DriveLetters
+
+    Zeigt nur die geteilten Disks (mehrere Laufwerksbuchstaben).
+
+```powershell
+    "SQL01","SQL02" | Get-sqmDiskPartitionMap
+
+    Partitions-Map mehrerer Server per Pipeline.
+
+### Invoke-sqmNtfsSetup
+
+Grants the SQL Server service accounts NTFS permissions on the instance's data, log, TempDB and backup directories (with an ACL backup beforehand).
+
+Reproduces the manual "set NTFS permissions after install" step in an auditable way:
+
+  1. Determines the SQL Server service accounts (Engine + Agent) for the instance via
+     Get-DbaService (or uses -Account when supplied).
+  2. Determines the relevant directories automatically: the instance default Data/Log/Backup
+     paths (Get-DbaDefaultPath) plus every directory that currently holds a database file
+     (sys.master_files, which covers Data, Log and TempDB) - or uses -Directory when supplied.
+  3. Writes a backup of the current ACLs (SDDL per directory) to a timestamped JSON file under
+     -BackupPath, unless -SkipBackup is set. This allows manual rollback.
+  4. Grants each service account the requested rights (FullControl by default, inherited to
+     sub-folders and files) on each directory.
+
+Filesystem changes are applied locally, so this is intended to run on the SQL Server itself
+(as the SQL Setup tool does). Every change honours -WhatIf / -Confirm.
+
+If SqlInstance is not specified, the current computer name ($env:COMPUTERNAME) is used.
+
+**Parameters:**
+
+- **-SqlInstance** - The target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE"). Default: current computer name.
+- **-SqlCredential** - Alternative credentials (PSCredential) for the SQL connection. Default: Windows authentication.
+- **-Account** - One or more accounts to grant permissions to. Default: auto-discovered SQL Engine/Agent service accounts.
+- **-Directory** - One or more directories to set permissions on. Default: auto-discovered Data/Log/TempDB/Backup directories.
+- **-Permission** - NTFS rights to grant: 'FullControl' (default) or 'Modify'.
+- **-BackupPath** - Directory for the ACL backup file. Default: the configured OutputPath (Get-sqmConfig).
+- **-SkipBackup** - Skip writing the ACL backup file. Not recommended.
+- **-EnableException** - Propagate exceptions immediately instead of logging them as warnings and returning a status object.
+
+**Examples (3):**
+
+```powershell
+Invoke-sqmNtfsSetup -SqlInstance "SQL01"
+Auto-discovers the service accounts and SQL directories and grants FullControl.
+
+```powershell
+Invoke-sqmNtfsSetup -SqlInstance "SQL01\INST01" -Permission Modify -WhatIf
+Shows which accounts would get Modify on which directories, without changing anything.
+
+```powershell
+Invoke-sqmNtfsSetup -Directory 'E:\MSSQL\DATA','F:\MSSQL\LOG' -Account 'NT SERVICE\MSSQLSERVER'
+Sets permissions only on the given directories for the given account.
+
 ## 11. Module & Update Management
 
 ### Install-sqmAdModule
@@ -2755,6 +3211,36 @@ Update-sqmModule -Source GitHub -Force
 ```powershell
 Update-sqmModule -Source UNC -RepositoryPath "\\fileserver\dba\sqmSQLTool"
 
+### Show-sqmToolGui
+
+Launches a small graphical interface (WinForms) for all sqmSQLTool functions.
+
+    Shows every exported module function grouped by category in a tree. After selecting a
+    function its parameters are generated automatically as input fields. The user can fill in
+    values, see a live command preview and run the command directly, copy it to the clipboard
+    or display its help.
+
+    The grouping comes from Public\category-map.ps1. Functions without an entry land under
+    "Other". Read-only functions (Get-/Test-) are safe to run; state-changing functions that
+    support -WhatIf get a "WhatIf (simulation)" option. It is OFF by default, so "Run" actually
+    executes - enable the checkbox deliberately to only simulate.
+
+    The interface uses a Visual Studio "Dark" colour scheme.
+
+**Parameters:**
+
+- **-Filter** - Optional initial filter for the function list (wildcards allowed).
+
+**Examples (2):**
+
+```powershell
+    Show-sqmToolGui
+    Opens the graphical interface with all functions.
+
+```powershell
+    Show-sqmToolGui -Filter '*AlwaysOn*'
+    Opens the interface filtered directly to Always-On functions.
+
 ## 16. SQL Drivers & Tools Installation
 
 ### Install-sqmDb2Driver
@@ -2886,6 +3372,46 @@ Uninstall-sqmOdbcDriver
 ```powershell
 Uninstall-sqmOdbcDriver -DriverName 'Microsoft ODBC Driver 17 for SQL Server'
 
+### Test-sqmDriverInstalled
+
+Prueft ob ein JDBC-, ODBC- oder DB2-Treiber auf dem System installiert ist.
+
+    Treiber-Erkennung je nach Typ:
+
+    ODBC:
+        - Get-OdbcDriver (Windows PowerShell / CIM)
+        - Registry: HKLM:\SOFTWARE\ODBC\ODBCINST.INI\<TreiberName>
+
+    JDBC:
+        - Suche nach Microsoft JDBC Driver .jar-Dateien in bekannten Pfaden:
+          %ProgramFiles%\Microsoft JDBC Driver*\sqljdbc_*\
+          %ProgramFiles(x86)%\Microsoft JDBC Driver*\
+          Tomcat-Lib, JBoss-Lib, WildFly-Lib (falls vorhanden)
+
+    DB2:
+        - Registry: HKLM:\SOFTWARE\IBM\DB2
+        - Get-OdbcDriver fuer IBM DB2 ODBC DRIVER
+        - db2cli.exe im PATH oder %ProgramFiles%\IBM\SQLLIB\BIN\
+
+**Parameters:**
+
+- **-DriverType** - Art des Treibers: JDBC | ODBC | DB2. Mandatory.
+- **-DriverName** - Optionaler spezifischer Treibername fuer die Suche. ODBC: z.B. "ODBC Driver 17 for SQL Server" JDBC: z.B. "mssql-jdbc-12.4.0.jre11.jar" DB2: z.B. "IBM DB2 ODBC DRIVER"
+
+**Examples (4):**
+
+```powershell
+    Test-sqmDriverInstalled -DriverType ODBC
+
+```powershell
+    Test-sqmDriverInstalled -DriverType ODBC -DriverName 'ODBC Driver 18 for SQL Server'
+
+```powershell
+    Test-sqmDriverInstalled -DriverType JDBC
+
+```powershell
+    Test-sqmDriverInstalled -DriverType DB2
+
 ## 19. External Systems Integration
 
 ### Invoke-sqmSplunkConfiguration
@@ -2998,6 +3524,41 @@ Test-sqmTsmConnection
 
 ```powershell
 Test-sqmTsmConnection -ComputerName "SQL01" -UserName "tsm_admin" -Password (Read-Host -AsSecureString)
+
+### Get-sqmTsmConfiguration
+
+Reads the IBM TSM / Spectrum Protect client configuration (dsm.opt) and returns server, user and password settings.
+
+    Locates the dsm.opt option file (locally or on a remote computer), parses it and
+    returns the relevant TSM client settings as an object.
+
+    Steps:
+      1. Determine the dsm.opt path (auto-detected via _FindDsmOptPath, or -DsmOptPath).
+      2. Read the file (UNC/remote-capable via _ReadRemoteFile).
+      3. Parse all non-comment options into a hashtable.
+      4. Extract TCPServeraddress, USERID and PASSWORD.
+
+    The password is returned as a SecureString; the plain-text value is only included
+    when -IncludePasswordPlain is set. On error a result object with Success = $false is
+    returned (or an exception is thrown when -EnableException is set).
+
+**Parameters:**
+
+- **-ComputerName** - Target computer. Default: local computer name.
+- **-DsmOptPath** - Optional explicit path to the dsm.opt file. If omitted, it is auto-detected.
+- **-IncludePasswordPlain** - Also return the password in plain text (PasswordPlain). Off by default.
+- **-Credential** - Optional PSCredential for accessing a remote dsm.opt file.
+- **-EnableException** - Throw exceptions immediately instead of returning a result object with Success = $false.
+
+**Examples (2):**
+
+```powershell
+    Get-sqmTsmConfiguration -ComputerName SQL01
+    # Reads the TSM configuration from SQL01 (password as SecureString).
+
+```powershell
+    Get-sqmTsmConfiguration -DsmOptPath 'C:\Program Files\Tivoli\TSM\baclient\dsm.opt' -IncludePasswordPlain
+    # Uses an explicit dsm.opt path and also returns the plain-text password.
 
 ## 13. SQL Agent & Proxy Jobs
 
@@ -3128,6 +3689,37 @@ Creates a SQL Agent job that runs Sync-Job.ps1 (AutoSync).
 
 ```powershell
 New-sqmAutoLoginSyncJob -SqlInstance "SQL01"
+
+### Get-sqmAgentJobScheduleReport
+
+Generates a comprehensive SQL Agent Job Schedule Report.
+
+    Creates an HTML report showing all SQL Agent jobs with detailed schedule information,
+    execution history, and performance metrics.
+
+    Report includes:
+    - Job Name (enabled/disabled status)
+    - Schedule (start time, interval, frequency)
+    - Last Execution (time, status, duration)
+    - Next Scheduled Execution
+    - Average Job Duration
+    - Last Error Message (if failed)
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance name. Default: current computer.
+- **-SqlCredential** - PSCredential for the SQL Server connection.
+- **-OutputPath** - Folder path for HTML report output. Default: C:\System\WinSrvLog\MSSQL Creates filename: AgentJobSchedule_<instance>_<timestamp>.html
+- **-OutputCsv** - Also export data as CSV file.
+- **-EnableException** - Throw exceptions immediately instead of logging.
+
+**Examples (2):**
+
+```powershell
+    Get-sqmAgentJobScheduleReport -SqlInstance "SQL-Server1"
+
+```powershell
+    Get-sqmAgentJobScheduleReport -SqlInstance "SQL-Server1" -OutputPath "C:\Reports" -OutputCsv
 
 ## 1. Always On & Availability Groups
 
@@ -3835,6 +4427,164 @@ Validates:
 ```powershell
 Test-sqmDistributedAgReadiness -SqlInstance "SQL01" -TargetInstance "DR-SQL01"
 
+### Invoke-sqmAlwaysOnSetup
+
+End-to-end CLI AlwaysOn setup: reads the WSFC, creates the Availability Group and synchronises logins.
+
+    Headless orchestration wrapper around New-sqmAvailabilityGroup. Replaces the GUI of AlwaysOnSetup.ps1.
+
+    Flow:
+      1. Discover the Windows Server Failover Cluster (Get-Cluster / Get-ClusterNode) and, if not
+         explicitly given, the listener role (name / IP / port from the cluster network-name resource).
+      2. Discover the SQL Server engine instance + service account on each cluster node (WMI).
+      3. Test connectivity: Windows auth (Kerberos) is preferred. If -SqlCredential is supplied it is
+         used directly. If Windows auth fails on any node and no credential was given, the function
+         stops with a clear message (the GUI tool created a temporary SQL login here - in headless
+         mode you pass -SqlCredential instead, or fix the SPNs first).
+      4. (Optional) Back up the current cluster settings to a text file before making changes.
+      5. Create the AG via New-sqmAvailabilityGroup (HADR, endpoints, AG, secondaries, listener).
+      6. Post-creation: Sync-sqmLoginsToAlwaysOn (logins to all secondaries) and
+         Invoke-sqmSqlAlwaysOnAutoseeding (ensure SEEDING_MODE = AUTOMATIC on all replicas).
+      7. (Optional) Generate an SPN request file for the AD team (setspn commands for the service
+         account covering each node and the listener).
+
+    This wrapper requires the FailoverClusters module on the executing node (run on a cluster member).
+
+**Parameters:**
+
+- **-AvailabilityGroupName** - Name of the AG to create. Default: the discovered listener (cluster role) name.
+- **-Database** - Database(s) to seed into the AG (created on the primary, RECOVERY FULL, auto-seeded).
+- **-PrimaryReplica** - Override the primary replica instance. Default: the SQL instance on the first cluster node.
+- **-EndpointPort** - Database-mirroring endpoint port. Default: 5022.
+- **-FailoverMode** - 'Automatic' (sync + automatic failover) or 'Manual' (async). Default: 'Automatic'.
+- **-BackupPreference** - 'Primary' / 'Secondary' / 'PreferSecondary' / 'None'. Default: 'Primary'.
+- **-ServiceAccount** - SQL service account for the endpoint CONNECT grant. Default: discovered from the SQL service.
+- **-SqlCredential** - PSCredential for SQL authentication on all replicas (use when Kerberos SPNs are missing). Omit for Windows authentication.
+- **-BackupClusterSettings** - Write a cluster-settings backup file before changes. Default: $true.
+- **-GenerateSpnReport** - Write an SPN request file for the AD team. Default: $true.
+- **-OutputPath** - Directory for the cluster-settings backup and SPN report. Default: configured output path (Get-sqmDefaultOutputPath), i.e. C:\System\WinSrvLog\MSSQL unless overridden.
+- **-SkipLoginSync** - Skip the post-creation Sync-sqmLoginsToAlwaysOn step.
+- **-EnableException** - Throw on error instead of logging and returning a failed result.
+
+**Examples (2):**
+
+```powershell
+    Invoke-sqmAlwaysOnSetup -AvailabilityGroupName ProdAG -Database AppDb
+
+    Reads the local cluster, creates ProdAG across all nodes using the discovered listener and
+    service account, then syncs logins and enables automatic seeding.
+
+```powershell
+    Invoke-sqmAlwaysOnSetup -AvailabilityGroupName ProdAG -Database AppDb `
+        -SqlCredential (Get-Credential sa) -WhatIf
+
+    Dry-run using SQL authentication; shows the planned actions without changing anything.
+
+### New-sqmAvailabilityGroup
+
+Creates an AlwaysOn Availability Group on an existing Windows Server Failover Cluster (WSFC).
+
+    Headless port of the AlwaysOnSetup.ps1 automation (no GUI). Drives the complete AG creation
+    purely from parameters using dbatools (Invoke-DbaQuery / Connect-DbaInstance) and raw T-SQL.
+
+    Process (each step is idempotent and skips work that is already in place):
+      1. Enable HADR on every replica (sp_configure 'hadr enabled', 1) and restart the SQL service
+         where HADR was not yet active (HADR requires a service restart to take effect).
+      2. Create the database-mirroring endpoint (default 'HADR_Endpoint') on every replica.
+      3. (Optional) Create the service-account login and GRANT CONNECT ON ENDPOINT so the replicas
+         can authenticate to each other (Windows auth / Kerberos). Falls back to the UPN form for
+         cross-domain accounts; on failure it logs that certificate auth must be configured manually.
+      4. (Optional) Create the seed database(s) on the primary, set RECOVERY FULL.
+      5. (Optional) Clean up an orphaned WSFC group left over from a failed previous attempt.
+      6. CREATE AVAILABILITY GROUP on the primary (CLUSTER_TYPE = WSFC, SEEDING_MODE = AUTOMATIC),
+         then JOIN + GRANT CREATE ANY DATABASE on each secondary, and MODIFY REPLICA to pin the
+         configured failover/availability mode.
+      7. (Optional) Add the listener (ADD LISTENER ... WITH IP ((ip, mask)), PORT = ...).
+
+    Authentication strategy: pass -SqlCredential for SQL authentication (e.g. when Kerberos SPNs are
+    missing), otherwise the current Windows identity is used on all replicas. This function does NOT
+    create temporary logins or request SPNs - that orchestration lives in Invoke-sqmAlwaysOnSetup.
+
+**Parameters:**
+
+- **-SqlInstance** - The primary replica instance (e.g. "SQL01" or "SQL01\INST"). Default: $env:COMPUTERNAME.
+- **-SecondaryReplica** - One or more secondary replica instance names. Together with -SqlInstance these form the AG (max. 3 replicas total, matching the tested topology).
+- **-AvailabilityGroupName** - Name of the Availability Group to create (mandatory).
+- **-Database** - One or more databases to seed into the AG. Created on the primary if missing and set to RECOVERY FULL. If omitted, the AG is created empty (databases can be added later with Add-sqmDatabaseToAG).
+- **-ReplicaHostMap** - Optional hashtable mapping replica instance name -> host FQDN used in the endpoint URL (TCP://<host>:<port>). When a replica is not present in the map the host part of the instance name (before the backslash) is used.
+- **-EndpointName** - Name of the database-mirroring endpoint. Default: 'HADR_Endpoint'.
+- **-EndpointPort** - TCP port of the database-mirroring endpoint. Default: 5022.
+- **-FailoverMode** - 'Automatic' (synchronous-commit + automatic failover) or 'Manual' (asynchronous-commit + manual failover). Default: 'Automatic'. Drives AVAILABILITY_MODE unless -AvailabilityMode is set.
+- **-AvailabilityMode** - Optional explicit override: 'SynchronousCommit' or 'AsynchronousCommit'. When omitted it is derived from -FailoverMode (Automatic -> SynchronousCommit, Manual -> AsynchronousCommit).
+- **-BackupPreference** - AUTOMATED_BACKUP_PREFERENCE: 'Primary', 'Secondary', 'PreferSecondary' or 'None'. Default: 'Primary'.
+- **-SeedingMode** - 'Automatic' (automatic seeding, no manual backup/restore) or 'Manual'. Default: 'Automatic'.
+- **-ListenerName** - Optional AG listener (network) name. When set together with -ListenerIPAddress and -ListenerPort the listener is created after the AG.
+- **-ListenerIPAddress** - One or more static IPv4 addresses for the listener.
+- **-ListenerSubnetMask** - Subnet mask for the listener IP(s). Default: '255.255.255.0'.
+- **-ListenerPort** - TCP port of the listener. Default: 1433.
+- **-ServiceAccount** - SQL Server service account (DOMAIN\User or UPN). When supplied the login is created on each replica (if missing) and granted CONNECT on the endpoint.
+- **-RestartService** - Restart the SQL Server service on a replica after enabling HADR. Default: $true. HADR only takes effect after a restart, so disabling this requires you to restart the services yourself.
+- **-CleanupOrphanedWsfcGroup** - When set, an orphaned WSFC group named like the AG (a remnant of a failed previous attempt, with no matching SQL AG) is removed before CREATE AVAILABILITY GROUP. Requires the FailoverClusters module on the executing node.
+- **-SqlCredential** - PSCredential for SQL authentication on all replicas. Omit for Windows authentication.
+- **-EnableException** - Throw on error instead of logging a warning and returning a failed result object.
+
+**Examples (2):**
+
+```powershell
+    New-sqmAvailabilityGroup -SqlInstance SQL01 -SecondaryReplica SQL02 `
+        -AvailabilityGroupName ProdAG -Database AppDb `
+        -ListenerName ProdAGL -ListenerIPAddress 10.0.0.50 -ListenerPort 1433 `
+        -ServiceAccount 'CONTOSO\svcSql'
+
+    Creates a two-node synchronous AG with automatic seeding and a listener.
+
+```powershell
+    New-sqmAvailabilityGroup -SqlInstance SQL01 -SecondaryReplica SQL02,SQL03 `
+        -AvailabilityGroupName ProdAG -FailoverMode Manual -BackupPreference PreferSecondary -WhatIf
+
+    Dry-run of a three-node asynchronous AG; no changes are made.
+
+### Sync-sqmAgNode
+
+Synchronizes SQL Server objects from the primary replica to all secondary replicas of an Availability Group.
+
+    Automatically detects the current primary and all Availability Groups of the
+    specified instance. All AGs are processed individually.
+
+    Synchronizes the following object types from primary to all secondaries:
+        Logins        - SQL and Windows logins including SID/password transfer,
+                        followed by Repair-DbaDbOrphanUser on all AG databases
+                        on the secondaries (orphaned user cleanup).
+        Jobs          - SQL Agent jobs including job steps, schedules, and proxies.
+        LinkedServers - Linked Server definitions including login mappings.
+        Operators     - SQL Agent operators.
+        Alerts        - SQL Agent alerts.
+
+    Use -ExcludeType to exclude individual types.
+    Use -ObjectName to target specific logins and jobs by name.
+    Use -IncludeSystemObjects to also synchronize system logins (sa, ##MS_*) and system jobs.
+
+**Parameters:**
+
+- **-SqlInstance** - Name of any SQL Server instance in the AG cluster (default: current computer name).
+- **-SqlCredential** - Optional PSCredential for all SQL connections.
+- **-AvailabilityGroup** - Optional: Name of a specific AG. Otherwise all AGs on the instance are processed.
+- **-ExcludeType** - Object types that should NOT be synchronized. Valid values: Logins, Jobs, LinkedServers, Operators, Alerts.
+- **-ObjectName** - Optional: Filters logins and jobs by name (wildcards allowed).
+- **-IncludeSystemObjects** - When set, system objects (sa, ##MS_*, internal jobs) are synchronized. Default: $false (system objects are excluded).
+- **-ContinueOnError** - Continue with the next object type on error (otherwise aborts).
+- **-EnableException** - Throw exceptions immediately (overrides ContinueOnError).
+- **-Confirm** - Prompts for confirmation before critical actions (overwriting jobs/logins).
+- **-WhatIf** - Shows all planned actions without executing them.
+
+**Examples (2):**
+
+```powershell
+    Sync-sqmAgNode
+
+```powershell
+    Sync-sqmAgNode -SqlInstance "SQL01" -AvailabilityGroup "AG_Prod" -ObjectName "AppLogin_*"
+
 ## 18. SSIS Configuration
 
 ### Invoke-sqmSsisConfiguration
@@ -4292,6 +5042,33 @@ Test-sqmTempDbFileCount -SqlInstance "SQL01"
 
 ```powershell
 Test-sqmTempDbFileCount -SqlInstance "SQL01\INST1" -MaxFiles 4
+
+### Get-sqmServerUtilization
+
+Collects SQL Server CPU and memory utilization trends over time.
+
+    Captures multiple snapshots of SQL Server memory and CPU metrics from DMVs,
+    calculates Min/Max/Avg trends, and generates reports (TXT, CSV, HTML).
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance. Default: local computer name.
+- **-SqlCredential** - PSCredential for the connection.
+- **-SampleCount** - Number of snapshots to collect. Default: 6.
+- **-SampleIntervalSeconds** - Interval between snapshots in seconds. Default: 10. (Total sampling time = SampleCount * SampleIntervalSeconds)
+- **-OutputPath** - Directory for report output. Default: from module config.
+- **-NoOpen** - Suppress automatic report opening.
+- **-EnableException** - Throw exceptions immediately.
+
+**Examples (2):**
+
+```powershell
+    Get-sqmServerUtilization -SqlInstance "SQL01"
+    # Collects 6 snapshots (60 seconds) and generates HTML report
+
+```powershell
+    Get-sqmServerUtilization -SqlInstance "SQL01" -SampleCount 12 -SampleIntervalSeconds 5
+    # Collects 12 snapshots (60 seconds total)
 
 ## 6. Certificates & TLS Security
 
@@ -5087,6 +5864,58 @@ Checks and corrects the database owner on one or more SQL Server instances.
 # WhatIf - only show what would be changed
     Set-sqmDatabaseOwner -SqlInstance "SQL01" -WhatIf
 
+### Install-sqmOlaMaintenanceSolution
+
+Installs or updates Ola Hallengren's Maintenance Solution on a SQL Server instance.
+
+    Downloads the latest version of the Maintenance Solution from GitHub
+    (https://github.com/olahallengren/sql-server-maintenance-solution/archive/refs/heads/main.zip),
+    extracts the required scripts and executes them in the following order:
+    1. CommandExecute.sql
+    2. CommandLog.sql
+    3. DatabaseBackup.sql
+    4. DatabaseIntegrityCheck.sql
+    5. IndexOptimize.sql
+
+    The installation creates only the database objects (tables, procedures),
+    but no SQL Agent jobs. Jobs are created later using the dedicated functions
+    (e.g. New-sqmOlaBackupJobs).
+
+    Existing installations are overwritten with -Force / -Update.
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance (default: current computer name).
+- **-SqlCredential** - PSCredential for the connection.
+- **-SourcePath** - Alternative source for the ZIP archive. Default: GitHub ZIP.
+- **-Force** - Ignore existing installation and reinstall.
+- **-Update** - Alias for -Force.
+- **-ContinueOnError** - Continue with the next instance on error.
+- **-EnableException** - Throw exceptions immediately.
+- **-Confirm** - Request confirmation before installation.
+- **-WhatIf** - Shows what would happen without making changes.
+
+**Examples (2):**
+
+```powershell
+    Install-sqmOlaMaintenanceSolution -SqlInstance "SQL01"
+
+```powershell
+    Install-sqmOlaMaintenanceSolution -SqlInstance "SQL01" -Force
+
+### Test-sqmOlaInstallation
+
+Checks whether Ola Hallengren's Maintenance Solution is installed on a SQL Server instance.
+
+    Tests for the presence of the stored procedure 'DatabaseBackup' in the 'master' schema.
+    Optionally checks whether the 'CommandLog' table and 'DatabaseIntegrityCheck' etc. are also present.
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance.
+- **-SqlCredential** - Credentials.
+- **-RequiredSet** - Which components are required at minimum: 'Backup', 'Integrity', 'Index' (Default: 'Backup').
+
 ## 22. Monitoring & Registry
 
 ### Enable-sqmMonitoringAccess
@@ -5328,3 +6157,112 @@ If no CentralPath is configured, the function exits without error.
 
 - **-Path** - Path(s) of the file(s) to copy.
 
+## 23. Service Broker
+
+### Enable-sqmServiceBroker
+
+Enables Service Broker on a specified database and creates SSB endpoint.
+
+    Performs the following operations:
+    1. Sets database to SINGLE_USER mode with ROLLBACK IMMEDIATE (forces user disconnections)
+    2. Enables Service Broker (SET ENABLE_BROKER)
+    3. Returns database to MULTI_USER mode
+    4. Creates SSBEndpoint on port 4022 with WINDOWS authentication (if not exists)
+    5. Grants CONNECT permission to PUBLIC
+
+    This function is designed for both single-instance and AlwaysOn configurations.
+    For AlwaysOn, the endpoint is created server-wide and applies to all replicas.
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance. Default: current computer name.
+- **-DatabaseName** - Name of the database to enable Service Broker on. Required.
+- **-SqlCredential** - Optional PSCredential for the connection.
+- **-Force** - Skip confirmation prompt and proceed directly.
+- **-OutputPath** - Output directory for log file. Default: C:\System\WinSrvLog\MSSQL
+- **-ContinueOnError** - Continue on error (otherwise the error is thrown).
+- **-EnableException** - Throw exceptions immediately (overrides ContinueOnError).
+
+**Examples (2):**
+
+```powershell
+    Enable-sqmServiceBroker -DatabaseName "OperationsManager"
+
+```powershell
+    Enable-sqmServiceBroker -SqlInstance "SQL01" -DatabaseName "OperationsManager" -Force
+
+### Get-sqmServiceBrokerHealth
+
+Creates a health report for SQL Server Service Broker configuration and status.
+
+    Retrieves Service Broker information from a SQL Server instance:
+    - Service Broker status (enabled/disabled per database)
+    - Endpoints on port 4022 (SSBEndpoint)
+    - Queue status and message counts
+    - Undeliverable messages in transmission queue
+    - Service pairs and their contracts
+    - Replica status (if AlwaysOn AG is configured)
+
+    Results are saved as a TXT report in the specified directory.
+    The function automatically detects single-instance or AlwaysOn configurations.
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance. Default: current computer name.
+- **-SqlCredential** - Optional PSCredential for the connection.
+- **-OutputPath** - Output directory for report files. Default: C:\System\WinSrvLog\MSSQL
+- **-ContinueOnError** - Continue on error (otherwise the error is thrown).
+- **-EnableException** - Throw exceptions immediately (overrides ContinueOnError).
+
+**Examples (2):**
+
+```powershell
+    Get-sqmServiceBrokerHealth
+
+```powershell
+    Get-sqmServiceBrokerHealth -SqlInstance "SQL01" -OutputPath "D:\Reports"
+
+### Invoke-sqmServiceBrokerAlwaysOn
+
+Enables Service Broker on all nodes of an AlwaysOn Availability Group with automatic failover orchestration.
+
+    Orchestrates the complete workflow to enable Service Broker on all nodes of an AlwaysOn AG.
+    Supports two modes:
+
+    MODE 1 (AG with database): Automatic failover orchestration
+    1. Identifies the current Primary replica
+    2. Iterates through each replica:
+       - Fails over to that replica (makes it Primary)
+       - Executes Enable-sqmServiceBroker on the new Primary
+       - Validates Service Broker status
+    3. Fails back to the original Primary
+
+    MODE 2 (Database removed from AG / Broker already enabled): Direct endpoint creation
+    - Creates SSBEndpoint on all instances independently
+    - No failovers required
+    - Useful when: database was removed from AG after Enable-Broker
+
+    This ensures:
+    - Service Broker is enabled on ALL databases (via SET ENABLE_BROKER on Primary, replicated to Secondaries)
+    - SSBEndpoint exists on EVERY physical server (via CREATE ENDPOINT on each node)
+    - Minimal downtime (only brief failovers if AG is present, none if Broker already enabled)
+
+**Parameters:**
+
+- **-SqlInstances** - Array of SQL Server instances (e.g. @("SQL01","SQL02","SQL03")). Must be at least 2 instances. Required.
+- **-AvailabilityGroupName** - Name of the Availability Group. Required.
+- **-DatabaseName** - Name of the database to enable Service Broker on. Required.
+- **-SqlCredential** - Optional PSCredential for the connection.
+- **-Force** - Skip confirmation prompt and proceed directly.
+- **-OutputPath** - Output directory for log file. Default: C:\System\WinSrvLog\MSSQL
+- **-WaitBetweenFailovers** - Wait time (seconds) after each failover to allow health checks. Default: 15 seconds.
+- **-ContinueOnError** - Continue on error (otherwise the error is thrown).
+- **-EnableException** - Throw exceptions immediately (overrides ContinueOnError).
+
+**Examples (2):**
+
+```powershell
+    Invoke-sqmServiceBrokerAlwaysOn -SqlInstances @("SQL01","SQL02","SQL03") -AvailabilityGroupName "MyAG" -DatabaseName "OperationsManager"
+
+```powershell
+    Invoke-sqmServiceBrokerAlwaysOn -SqlInstances @("SQL01","SQL02") -AvailabilityGroupName "MyAG" -DatabaseName "MyDB" -Force -WaitBetweenFailovers 20
