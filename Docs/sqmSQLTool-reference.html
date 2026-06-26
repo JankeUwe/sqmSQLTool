@@ -146,9 +146,9 @@
 	<!-- SIDEBAR -->
 	<div class="psdb-st-sidebar">
 	<input class="psdb-st-sidebar-search" type="text" placeholder="Funktion suchen…" oninput="psstSearch(this.value)">
-				<div class="psdb-st-nav-group" id="nav-alwayson">
+					<div class="psdb-st-nav-group" id="nav-alwayson">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-alwayson-list')">
-	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">16</span>
+	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">18</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-alwayson-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-addsqmdatabasetoag')">Add-sqmDatabaseToAG</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-comparesqmalwaysonlogins')">Compare-sqmAlwaysOnLogins</span></li>
@@ -156,12 +156,14 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-exportsqmalwaysonconfiguration')">Export-sqmAlwaysOnConfiguration</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmalwaysonfailoverhistory')">Get-sqmAlwaysOnFailoverHistory</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmalwaysonhealthreport')">Get-sqmAlwaysOnHealthReport</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmalwaysonsetup')">Invoke-sqmAlwaysOnSetup</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmfailover')">Invoke-sqmFailover</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmservicebrokeralwayson')">Invoke-sqmServiceBrokerAlwaysOn</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmsqlalwaysonautoseeding')">Invoke-sqmSqlAlwaysOnAutoseeding</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-movesqmalwaysonlistener')">Move-sqmAlwaysOnListener</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmalwaysonrepairjob')">New-sqmAlwaysOnRepairJob</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmautologincomparejob')">New-sqmAutoLoginCompareJob</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmautologinsyncjob')">New-sqmAutoLoginSyncJob</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmavailabilitygroup')">New-sqmAvailabilityGroup</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-removesqmdatabasefromag')">Remove-sqmDatabaseFromAG</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-repairsqmalwaysondatabases')">Repair-sqmAlwaysOnDatabases</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-syncsqmagnode')">Sync-sqmAgNode</span></li>
@@ -181,7 +183,7 @@
 
 	<div class="psdb-st-nav-group" id="nav-backup-&-restore">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-backup-&-restore-list')">
-	<span>💾 Backup & Restore</span><span class="psdb-st-nav-count">12</span>
+	<span>💾 Backup & Restore</span><span class="psdb-st-nav-count">11</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-backup-&-restore-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmlogshrink')">Invoke-sqmLogShrink</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmrestoredatabase')">Invoke-sqmRestoreDatabase</span></li>
@@ -189,53 +191,60 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmbackupmaintenancejob')">New-sqmBackupMaintenanceJob</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmolasysdbbackupjob')">New-sqmOlaSysDbBackupJob</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmolausrdbbackupjob')">New-sqmOlaUsrDbBackupJob</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmbackupexcludepermission')">Set-sqmBackupExcludePermission</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-syncsqmbackupexcludetable')">Sync-sqmBackupExcludeTable</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmbackupintegrity')">Test-sqmBackupIntegrity</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmserversfromou')">Get-sqmServersFromOU</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-registersqmbackupexcludetrigger')">Register-sqmBackupExcludeTrigger</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-showsqmbackupexcludeform')">Show-sqmBackupExcludeForm</span></li></ul>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmbackupexcludepermission')">Set-sqmBackupExcludePermission</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-showsqmbackupexcludeform')">Show-sqmBackupExcludeForm</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-syncsqmbackupexcludetable')">Sync-sqmBackupExcludeTable</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmbackupintegrity')">Test-sqmBackupIntegrity</span></li></ul>
 	</div>
 
 	<div class="psdb-st-nav-group" id="nav-sicherheit">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-sicherheit-list')">
-	<span>🔒 Security</span><span class="psdb-st-nav-count">9</span>
+	<span>🔒 Security</span><span class="psdb-st-nav-count">13</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-sicherheit-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-enablesqmmonitoringaccess')">Enable-sqmMonitoringAccess</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmadaccountstatus')">Get-sqmADAccountStatus</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmadgroupmembers')">Get-sqmADGroupMembers</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmadgroupmembersrecursive')">Get-sqmADGroupMembersRecursive</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmadmembergroups')">Get-sqmADMemberGroups</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmloginsettings')">Get-sqmLoginSettings</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmsysadminaccounts')">Get-sqmSysadminAccounts</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-grantsqmtemporarysysadmin')">Grant-sqmTemporarySysadmin</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmloginaudit')">Invoke-sqmLoginAudit</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmsaobfuscation')">Invoke-sqmSaObfuscation</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmtempsysadminaction')">Invoke-sqmTempSysadminAction</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-removesqmadorphanlogin')">Remove-sqmAdOrphanLogin</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmdatabaseowner')">Set-sqmDatabaseOwner</span></li></ul>
 	</div>
 
 	<div class="psdb-st-nav-group" id="nav-diagnose-&-health">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-diagnose-&-health-list')">
-	<span>🩺 Diagnostics & Health</span><span class="psdb-st-nav-count">15</span>
+	<span>🩺 Diagnostics & Health</span><span class="psdb-st-nav-count">19</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-diagnose-&-health-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-copysqmntfspermissions')">Copy-sqmNTFSPermissions</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmagentjobschedulereport')">Get-sqmAgentJobScheduleReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmconnectionstats')">Get-sqmConnectionStats</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmdatabasehealth')">Get-sqmDatabaseHealth</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmdiskinfobydriveletter')">Get-sqmDiskInfoByDriveLetter</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmdiskpartitionmap')">Get-sqmDiskPartitionMap</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmdiskspacereport')">Get-sqmDiskSpaceReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmoperationstatus')">Get-sqmOperationStatus</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmorphanedfiles')">Get-sqmOrphanedFiles</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmservicebrokerhealth')">Get-sqmServiceBrokerHealth</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmspnreport')">Get-sqmSpnReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmsqlinstancecheck')">Get-sqmSQLInstanceCheck</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmtempdbrecommendation')">Get-sqmTempDbRecommendation</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmpatchanalysis')">Invoke-sqmPatchAnalysis</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmsetupreport')">Invoke-sqmSetupReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmagentproxy')">New-sqmAgentProxy</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmsetupreport')">New-sqmSetupReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmcostthreshold')">Test-sqmCostThreshold</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmtempdbfilecount')">Test-sqmTempDbFileCount</span></li></ul>
 	</div>
 
 	<div class="psdb-st-nav-group" id="nav-performance">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-performance-list')">
-	<span>⚡ Performance</span><span class="psdb-st-nav-count">12</span>
+	<span>⚡ Performance</span><span class="psdb-st-nav-count">13</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-performance-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmautogrowthreport')">Get-sqmAutoGrowthReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmblockingreport')">Get-sqmBlockingReport</span></li>
@@ -244,6 +253,7 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmlongrunningqueries')">Get-sqmLongRunningQueries</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmmissingindexes')">Get-sqmMissingIndexes</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmperfcounters')">Get-sqmPerfCounters</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmserverutilization')">Get-sqmServerUtilization</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmwaitstatistics')">Get-sqmWaitStatistics</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmextendedevents')">Invoke-sqmExtendedEvents</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmperfbaseline')">Invoke-sqmPerfBaseline</span></li>
@@ -253,42 +263,41 @@
 
 	<div class="psdb-st-nav-group" id="nav-wartung">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-wartung-list')">
-	<span>🔧 Maintenance</span><span class="psdb-st-nav-count">3</span>
+	<span>🔧 Maintenance</span><span class="psdb-st-nav-count">4</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-wartung-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmformatdrive64k')">Invoke-sqmFormatDrive64k</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmntfssetup')">Invoke-sqmNtfsSetup</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmolainstallation')">Test-sqmOlaInstallation</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmsqlfirewall')">Test-sqmSQLFirewall</span></li></ul>
 	</div>
 
 	<div class="psdb-st-nav-group" id="nav-konfiguration">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-konfiguration-list')">
-	<span>⚙️ Configuration</span><span class="psdb-st-nav-count">7</span>
+	<span>⚙️ Configuration</span><span class="psdb-st-nav-count">12</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-konfiguration-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-comparesqmserverconfiguration')">Compare-sqmServerConfiguration</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-enablesqmservicebroker')">Enable-sqmServiceBroker</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmconfig')">Get-sqmConfig</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmserversetting')">Get-sqmServerSetting</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmcollationchange')">Invoke-sqmCollationChange</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmsetdatabaserecoverymode')">Invoke-sqmSetDatabaseRecoveryMode</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmssisconfiguration')">Invoke-sqmSsisConfiguration</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmconfig')">Set-sqmConfig</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmmaxdop')">Set-sqmMaxDop</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmmaxmemory')">Set-sqmMaxMemory</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmssrsconfiguration')">Set-sqmSsrsConfiguration</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmtcpport')">Set-sqmTcpPort</span></li></ul>
 	</div>
 
-	<div class="psdb-st-nav-group" id="nav-sqmtool-config">
-	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-sqmtool-config-list')">
-	<span>🔧 sqmTool Config</span><span class="psdb-st-nav-count">2</span>
-	</div>
-	<ul class="psdb-st-nav-funcs" id="nav-sqmtool-config-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmconfig')">Get-sqmConfig</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmconfig')">Set-sqmConfig</span></li></ul>
-	</div>
-
 	<div class="psdb-st-nav-group" id="nav-inventar-&-suche">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-inventar-&-suche-list')">
-	<span>📋 Inventory & Search</span><span class="psdb-st-nav-count">6</span>
+	<span>📋 Inventory & Search</span><span class="psdb-st-nav-count">7</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-inventar-&-suche-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-exportsqmdatabasedocumentation')">Export-sqmDatabaseDocumentation</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-exportsqmserverconfiguration')">Export-sqmServerConfiguration</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-findsqmdatabaseobject')">Find-sqmDatabaseObject</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmlinkedserverusage')">Get-sqmLinkedServerUsage</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmserversfromou')">Get-sqmServersFromOU</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmconfigrollback')">Invoke-sqmConfigRollback</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqminstanceinventory')">Invoke-sqmInstanceInventory</span></li></ul>
 	</div>
@@ -325,19 +334,6 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmtsmconnection')">Test-sqmTsmConnection</span></li></ul>
 	</div>
 
-	<div class="psdb-st-nav-group" id="nav-driver">
-	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-driver-list')">
-	<span>🔌 Driver Install/Uninstall</span><span class="psdb-st-nav-count">7</span>
-	</div>
-	<ul class="psdb-st-nav-funcs" id="nav-driver-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmdb2driver')">Install-sqmDb2Driver</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmjdbcdriver')">Install-sqmJdbcDriver</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmodbcdriver')">Install-sqmOdbcDriver</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmdriverinstalled')">Test-sqmDriverInstalled</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmdb2driver')">Uninstall-sqmDb2Driver</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmjdbcdriver')">Uninstall-sqmJdbcDriver</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmodbcdriver')">Uninstall-sqmOdbcDriver</span></li></ul>
-	</div>
-
 	<div class="psdb-st-nav-group" id="nav-deployment">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-deployment-list')">
 	<span>🚀 Deployment</span><span class="psdb-st-nav-count">2</span>
@@ -348,7 +344,7 @@
 
 	<div class="psdb-st-nav-group" id="nav-sonstige">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-sonstige-list')">
-	<span>🔹 Other</span><span class="psdb-st-nav-count">22</span>
+	<span>🔹 Other</span><span class="psdb-st-nav-count">25</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-sonstige-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-copysqmlogins')">Copy-sqmLogins</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-copysqmtocentralpath')">Copy-sqmToCentralPath</span></li>
@@ -357,6 +353,9 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmhpuallowgroup')">Get-sqmHpuAllowGroup</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmserverhardwarereport')">Get-sqmServerHardwareReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmadmodule')">Install-sqmAdModule</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmdb2driver')">Install-sqmDb2Driver</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmjdbcdriver')">Install-sqmJdbcDriver</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmodbcdriver')">Install-sqmOdbcDriver</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmolamaintenancesolution')">Install-sqmOlaMaintenanceSolution</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmssrsreportserver')">Install-sqmSsrsReportServer</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmmonitoringkey')">Invoke-sqmMonitoringKey</span></li>
@@ -364,21 +363,21 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmrandomsapassword')">New-sqmRandomSaPassword</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmsqlpolicystate')">Set-sqmSqlPolicyState</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-showsqmtoolgui')">Show-sqmToolGui</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmdriverinstalled')">Test-sqmDriverInstalled</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmmaxdop')">Test-sqmMaxDop</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmmaxmemory')">Test-sqmMaxMemory</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmmoduleupdate')">Test-sqmModuleUpdate</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmsqlinstanceinstalled')">Test-sqmSqlInstanceInstalled</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmupdateviagithub')">Test-sqmUpdateViaGitHub</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmupdateviapsgallery')">Test-sqmUpdateViaPSGallery</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmupdateviaunc')">Test-sqmUpdateViaUNC</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-updatesqmmodule')">Update-sqmModule</span></li></ul>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmdb2driver')">Uninstall-sqmDb2Driver</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmjdbcdriver')">Uninstall-sqmJdbcDriver</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-uninstallsqmodbcdriver')">Uninstall-sqmOdbcDriver</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-writesqmsetupevent')">Write-sqmSetupEvent</span></li></ul>
 	</div>
 
 	</div><!-- /sidebar -->
 
 	<!-- CONTENT -->
 	<div class="psdb-st-content" id="psdb-st-content">
-				<section class="psdb-st-section" id="cat-alwayson">
+					<section class="psdb-st-section" id="cat-alwayson">
 	<h2 class="psdb-st-section-title">🔄 AlwaysOn</h2>
 
 	<div class="psdb-st-func-card" id="f-addsqmdatabasetoag">
@@ -515,6 +514,31 @@
 	</div>
 	</div>
 
+	<div class="psdb-st-func-card" id="f-invokesqmalwaysonsetup">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Invoke-sqmAlwaysOnSetup</span>
+	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
+	</div>
+	<div class="psdb-st-func-desc">End-to-end CLI AlwaysOn setup: reads the WSFC, creates the Availability Group and synchronises logins.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Invoke-sqmAlwaysOnSetup -AvailabilityGroupName ProdAG -Database AppDb</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmAlwaysOnSetup -AvailabilityGroupName ProdAG -Database AppDb
+
+    Reads the local cluster, creates ProdAG across all nodes using the discovered listener and
+    service account, then syncs logins and enables automatic seeding.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Invoke-sqmAlwaysOnSetup -AvailabilityGroupName ProdAG -Database AppDb `</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmAlwaysOnSetup -AvailabilityGroupName ProdAG -Database AppDb `
+        -SqlCredential (Get-Credential sa) -WhatIf
+
+    Dry-run using SQL authentication; shows the planned actions without changing anything.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
 	<div class="psdb-st-func-card" id="f-invokesqmfailover">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Invoke-sqmFailover</span>
@@ -531,6 +555,25 @@
 	<div class="psdb-st-example-label">Invoke-sqmFailover -SqlInstance &quot;SQL01&quot; -AvailabilityGroup &quot;AG_Prod&quot; `</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmFailover -SqlInstance &quot;SQL01&quot; -AvailabilityGroup &quot;AG_Prod&quot; `
         -TargetReplica &quot;SQL02&quot; -MaxRedoQueueMB 10</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-invokesqmservicebrokeralwayson">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Invoke-sqmServiceBrokerAlwaysOn</span>
+	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
+	</div>
+	<div class="psdb-st-func-desc">Enables Service Broker on all nodes of an AlwaysOn Availability Group with automatic failover orchestration.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Invoke-sqmServiceBrokerAlwaysOn -SqlInstances @(&quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot;) -AvailabilityGroupName &quot;MyAG&quot; -DatabaseName &quot;OperationsManager&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmServiceBrokerAlwaysOn -SqlInstances @(&quot;SQL01&quot;,&quot;SQL02&quot;,&quot;SQL03&quot;) -AvailabilityGroupName &quot;MyAG&quot; -DatabaseName &quot;OperationsManager&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Invoke-sqmServiceBrokerAlwaysOn -SqlInstances @(&quot;SQL01&quot;,&quot;SQL02&quot;) -AvailabilityGroupName &quot;MyAG&quot; -DatabaseName &quot;MyDB&quot; -Force -WaitBetweenFailovers 20</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmServiceBrokerAlwaysOn -SqlInstances @(&quot;SQL01&quot;,&quot;SQL02&quot;) -AvailabilityGroupName &quot;MyAG&quot; -DatabaseName &quot;MyDB&quot; -Force -WaitBetweenFailovers 20</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -584,40 +627,11 @@ Invoke-sqmSqlAlwaysOnAutoseeding -All</pre><button class="psdb-st-copy-btn" oncl
 	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
 	</div>
 	<div class="psdb-st-func-desc">Creates a SQL Server Agent job that regularly runs Repair-sqmAlwaysOnDatabases.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 1 examples</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Creates an hourly job</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Creates an hourly job
-New-sqmAlwaysOnRepairJob</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Daily job at 2 AM</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Daily job at 2 AM
-New-sqmAlwaysOnRepairJob -Schedule &quot;FREQ=DAILY;INTERVAL=1&quot; -StartTime &quot;02:00:00&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-newsqmautologincomparejob">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">New-sqmAutoLoginCompareJob</span>
-	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
-	</div>
-	<div class="psdb-st-func-desc">Creates a SQL Agent job that periodically compares logins across AlwaysOn replicas.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">New-sqmAutoLoginCompareJob -SqlInstance &quot;PRIMARY01&quot; -AvailabilityGroupName &quot;AG_Prod&quot;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    New-sqmAutoLoginCompareJob -SqlInstance &quot;PRIMARY01&quot; -AvailabilityGroupName &quot;AG_Prod&quot;
-    Creates a weekly comparison job (Sunday 03:00).</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">New-sqmAutoLoginCompareJob -SqlInstance &quot;PRIMARY01&quot; -AvailabilityGroupName &quot;AG_Prod&quot; `</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    New-sqmAutoLoginCompareJob -SqlInstance &quot;PRIMARY01&quot; -AvailabilityGroupName &quot;AG_Prod&quot; `
-        -Schedule Weekly -DayOfWeek Sunday -TimeOfDay &quot;03:00&quot; `
-        -NotificationOperator &quot;DBA-Team&quot; -OnlyDifferences -Overwrite
-    Weekly check with email alert on drift, report contains only differing logins.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example-label">New-sqmAlwaysOnRepairJob -SqlInstance &quot;SQL01&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">New-sqmAlwaysOnRepairJob -SqlInstance &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -628,32 +642,38 @@ New-sqmAlwaysOnRepairJob -Schedule &quot;FREQ=DAILY;INTERVAL=1&quot; -StartTime 
 	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
 	</div>
 	<div class="psdb-st-func-desc">Creates a SQL Agent job to automatically synchronize logins in an AlwaysOn Availability Group.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 5 examples</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 1 examples</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">New-sqmAutoLoginSyncJob -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -Schedule Daily -TimeOfDay &quot;02:00&quot;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    New-sqmAutoLoginSyncJob -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -Schedule Daily -TimeOfDay &quot;02:00&quot;
-    Creates a daily login sync job at 2:00 AM.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example-label">New-sqmAutoLoginSyncJob -SqlInstance &quot;SQL01&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">New-sqmAutoLoginSyncJob -SqlInstance &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-newsqmavailabilitygroup">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">New-sqmAvailabilityGroup</span>
+	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
+	</div>
+	<div class="psdb-st-func-desc">Creates an AlwaysOn Availability Group on an existing Windows Server Failover Cluster (WSFC).</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">New-sqmAvailabilityGroup -SqlInstance SQL01 -SecondaryReplica SQL02 `</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    New-sqmAvailabilityGroup -SqlInstance SQL01 -SecondaryReplica SQL02 `
+        -AvailabilityGroupName ProdAG -Database AppDb `
+        -ListenerName ProdAGL -ListenerIPAddress 10.0.0.50 -ListenerPort 1433 `
+        -ServiceAccount &#39;CONTOSO\svcSql&#39;
+
+    Creates a two-node synchronous AG with automatic seeding and a listener.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">New-sqmAutoLoginSyncJob -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -Schedule Weekly -DayOfWeek Sunday -TimeOfDay &quot;03:00&quot; -IncludeSystemLogins</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    New-sqmAutoLoginSyncJob -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -Schedule Weekly -DayOfWeek Sunday -TimeOfDay &quot;03:00&quot; -IncludeSystemLogins
-    Creates a weekly job (Sunday 3:00 AM) including system logins.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">New-sqmAutoLoginSyncJob -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -Schedule Custom -CustomScheduleFrequency Hourly -CustomScheduleInterval 4</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    New-sqmAutoLoginSyncJob -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -Schedule Custom -CustomScheduleFrequency Hourly -CustomScheduleInterval 4
-    Creates a job that runs every 4 hours (Force and BackupLogins are on by default).</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">New-sqmAutoLoginSyncJob -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -Force:$false</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    New-sqmAutoLoginSyncJob -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -Force:$false
-    Creates a job that only adds NEW logins - password/language drift is NOT corrected (legacy behaviour).</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">New-sqmAutoLoginSyncJob -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -AuditAdOrphans</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    New-sqmAutoLoginSyncJob -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -AuditAdOrphans
-    Daily sync that additionally reports AD-orphaned Windows logins after each run (no auto-delete).</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example-label">New-sqmAvailabilityGroup -SqlInstance SQL01 -SecondaryReplica SQL02,SQL03 `</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    New-sqmAvailabilityGroup -SqlInstance SQL01 -SecondaryReplica SQL02,SQL03 `
+        -AvailabilityGroupName ProdAG -FailoverMode Manual -BackupPreference PreferSecondary -WhatIf
+
+    Dry-run of a three-node asynchronous AG; no changes are made.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -1090,6 +1110,34 @@ Invoke-sqmUserDatabaseBackup -SqlInstance &quot;SQL01&quot; -All -UseExcludeTabl
 	</div>
 	</div>
 
+	<div class="psdb-st-func-card" id="f-registersqmbackupexcludetrigger">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Register-sqmBackupExcludeTrigger</span>
+	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
+	</div>
+	<div class="psdb-st-func-desc">Registers or removes the DDL trigger trg_sqm_BackupExclude_AutoSync that keeps master.dbo.sqm_BackupExclude in sync on CREATE_DATABASE and DROP_DATABASE.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Register-sqmBackupExcludeTrigger</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Register-sqmBackupExcludeTrigger</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Register-sqmBackupExcludeTrigger -SqlInstance &quot;SQL01&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Register-sqmBackupExcludeTrigger -SqlInstance &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Register-sqmBackupExcludeTrigger -SqlInstance &quot;SQL01&quot; -Remove</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Register-sqmBackupExcludeTrigger -SqlInstance &quot;SQL01&quot; -Remove
+    Register-sqmBackupExcludeTrigger -SqlInstance &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Register-sqmBackupExcludeTrigger -SqlInstance &quot;SQL01&quot; -WhatIf</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Register-sqmBackupExcludeTrigger -SqlInstance &quot;SQL01&quot; -WhatIf</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
 	<div class="psdb-st-func-card" id="f-setsqmbackupexcludepermission">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Set-sqmBackupExcludePermission</span>
@@ -1112,6 +1160,25 @@ Set-sqmBackupExcludePermission -SqlInstance &quot;SQL01&quot; -LoginName &quot;s
 	<div class="psdb-st-example-label"># Preview what would happen without making any changes</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code"># Preview what would happen without making any changes
 Set-sqmBackupExcludePermission -SqlInstance &quot;SQL01&quot; -LoginName &quot;CONTOSO\DBA-Team&quot; -WhatIf</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-showsqmbackupexcludeform">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Show-sqmBackupExcludeForm</span>
+	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
+	</div>
+	<div class="psdb-st-func-desc">WinForms dialog for viewing and editing master.dbo.sqm_BackupExclude — toggle IsActive, edit Reason, orphaned entries highlighted.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Show-sqmBackupExcludeForm</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Show-sqmBackupExcludeForm</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Show-sqmBackupExcludeForm -SqlInstance &quot;SQL01\INST1&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Show-sqmBackupExcludeForm -SqlInstance &quot;SQL01\INST1&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -1158,83 +1225,6 @@ Sync-sqmBackupExcludeTable -SqlInstance &quot;SQL01\INST1&quot;</pre><button cla
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Test-sqmBackupIntegrity -SqlInstance &quot;SQL01&quot; -BackupPath &quot;D:\Backup\AdventureWorks.bak&quot;</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmBackupIntegrity -SqlInstance &quot;SQL01&quot; -BackupPath &quot;D:\Backup\AdventureWorks.bak&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-getsqmserversfromou">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Get-sqmServersFromOU</span>
-	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
-	</div>
-	<div class="psdb-st-func-desc">Queries Active Directory (via ADSI, no AD module required) for all computer objects in a specified OU and returns pipeable objects with a SqlInstance property — ready to feed into any sqmSQLTool function.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># List all SQL servers in the default OU 'srvDatabase'</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmServersFromOU</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Different OU</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmServersFromOU -OUName 'srvApp'</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Register the DDL trigger on all DB servers</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmServersFromOU | ForEach-Object {
-    Register-sqmBackupExcludeTrigger -SqlInstance $_.SqlInstance
-}</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Sync backup exclude table on all DB servers</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Get-sqmServersFromOU | ForEach-Object {
-    Sync-sqmBackupExcludeTable -SqlInstance $_.SqlInstance
-}</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-showsqmbackupexcludeform">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Show-sqmBackupExcludeForm</span>
-	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
-	</div>
-	<div class="psdb-st-func-desc">WinForms dialog for managing master.dbo.sqm_BackupExclude. Loads all entries into a grid, lets you toggle IsActive and edit Reason, and writes back only changed rows. Orphaned entries (IsOrphaned=1) are highlighted in colour.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Open on local instance</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Show-sqmBackupExcludeForm</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Open pre-connected to a named instance</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Show-sqmBackupExcludeForm -SqlInstance 'SQL01\INST1'</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-registersqmbackupexcludetrigger">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Register-sqmBackupExcludeTrigger</span>
-	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
-	</div>
-	<div class="psdb-st-func-desc">Registers (or removes) a server-level DDL trigger (trg_sqm_BackupExclude_AutoSync) that fires on CREATE_DATABASE and DROP_DATABASE to keep master.dbo.sqm_BackupExclude automatically in sync. In AlwaysOn environments the trigger is propagated to all secondary replicas automatically.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Register trigger on local instance</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Register-sqmBackupExcludeTrigger</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Register on a remote instance</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Register-sqmBackupExcludeTrigger -SqlInstance 'SQL01'</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Remove trigger (incl. AlwaysOn secondaries)</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Register-sqmBackupExcludeTrigger -SqlInstance 'SQL01' -Remove</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Preview without changes</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Register-sqmBackupExcludeTrigger -SqlInstance 'SQL01' -WhatIf</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -1307,6 +1297,36 @@ Sync-sqmBackupExcludeTable -SqlInstance &quot;SQL01\INST1&quot;</pre><button cla
 	</div>
 	</div>
 
+	<div class="psdb-st-func-card" id="f-getsqmadgroupmembersrecursive">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Get-sqmADGroupMembersRecursive</span>
+	<span class="psdb-st-badge psdb-st-badge-sicherheit">Security</span>
+	</div>
+	<div class="psdb-st-func-desc">Lists all members of an Active Directory group with controlled recursion depth.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 1 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmADGroupMembersRecursive -GroupName &quot;DL_SQL_Admins&quot; -Depth 2</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmADGroupMembersRecursive -GroupName &quot;DL_SQL_Admins&quot; -Depth 2</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-getsqmadmembergroups">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Get-sqmADMemberGroups</span>
+	<span class="psdb-st-badge psdb-st-badge-sicherheit">Security</span>
+	</div>
+	<div class="psdb-st-func-desc">Finds all Active Directory groups that contain a specified user, group, or computer.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 1 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmADMemberGroups -Identity &quot;john.doe&quot; -Depth 2</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmADMemberGroups -Identity &quot;john.doe&quot; -Depth 2</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
 	<div class="psdb-st-func-card" id="f-getsqmloginsettings">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Get-sqmLoginSettings</span>
@@ -1353,6 +1373,32 @@ Sync-sqmBackupExcludeTable -SqlInstance &quot;SQL01\INST1&quot;</pre><button cla
 	</div>
 	</div>
 
+	<div class="psdb-st-func-card" id="f-grantsqmtemporarysysadmin">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Grant-sqmTemporarySysadmin</span>
+	<span class="psdb-st-badge psdb-st-badge-sicherheit">Security</span>
+	</div>
+	<div class="psdb-st-func-desc">Vergibt einem AD-Login temporaer sysadmin-Rechte fuer X Tage und entzieht sie danach automatisch ueber einen selbstloeschenden SQL-Agent-Job - bei AlwaysOn failover-robust auf allen Replicas.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 3 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Grant-sqmTemporarySysadmin -SqlInstance SQL01 -Login &#39;DOM\u.maier&#39; -Days 3 -TicketNumber &#39;INC0012345&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Grant-sqmTemporarySysadmin -SqlInstance SQL01 -Login &#39;DOM\u.maier&#39; -Days 3 -TicketNumber &#39;INC0012345&#39;
+    # Sofort sysadmin fuer 3 Tage (auf allen AG-Replicas), danach automatischer Entzug.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Grant-sqmTemporarySysadmin -Login &#39;DOM\u.maier&#39; -Days 1 -StartDate &#39;2026-07-01 08:00&#39; -TicketNumber &#39;CHG7788&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Grant-sqmTemporarySysadmin -Login &#39;DOM\u.maier&#39; -Days 1 -StartDate &#39;2026-07-01 08:00&#39; -TicketNumber &#39;CHG7788&#39;
+    # Aktivierung am 01.07. 08:00, Entzug am 02.07. 08:00.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Grant-sqmTemporarySysadmin -SqlInstance SQL01 -Login &#39;DOM\u.maier&#39; -Days 2 -PrimaryOnly -WhatIf</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Grant-sqmTemporarySysadmin -SqlInstance SQL01 -Login &#39;DOM\u.maier&#39; -Days 2 -PrimaryOnly -WhatIf
+    # Zeigt nur, was passieren wuerde - nur auf SQL01, ohne Replicas.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
 	<div class="psdb-st-func-card" id="f-invokesqmloginaudit">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Invoke-sqmLoginAudit</span>
@@ -1387,6 +1433,26 @@ Sync-sqmBackupExcludeTable -SqlInstance &quot;SQL01\INST1&quot;</pre><button cla
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Invoke-sqmSaObfuscation -SqlInstance &quot;SQL01&quot; -NewName &quot;hidden_sa&quot; -PasswordLength 24</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmSaObfuscation -SqlInstance &quot;SQL01&quot; -NewName &quot;hidden_sa&quot; -PasswordLength 24</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-invokesqmtempsysadminaction">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Invoke-sqmTempSysadminAction</span>
+	<span class="psdb-st-badge psdb-st-badge-sicherheit">Security</span>
+	</div>
+	<div class="psdb-st-func-desc">Fuehrt die eigentliche sysadmin-Vergabe bzw. -Entziehung auf EINER Instanz aus, legt dabei optional einen fehlenden AD-Login an, entfernt ihn beim Entzug wieder und loescht optional den aufrufenden SQL-Agent-Job nach Erfolg (selbstloeschender Job).</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Invoke-sqmTempSysadminAction -SqlInstance SQL01 -Login &#39;DOM\u.maier&#39; -Action Revoke</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmTempSysadminAction -SqlInstance SQL01 -Login &#39;DOM\u.maier&#39; -Action Revoke</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Vorzeitiger manueller Entzug inkl. Entfernen eines selbst angelegten Logins:</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Vorzeitiger manueller Entzug inkl. Entfernen eines selbst angelegten Logins:
+    Invoke-sqmTempSysadminAction -Login &#39;DOM\u.maier&#39; -Action Revoke -RemoveLogin</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -1474,6 +1540,25 @@ Sync-sqmBackupExcludeTable -SqlInstance &quot;SQL01\INST1&quot;</pre><button cla
 	</div>
 	</div>
 
+	<div class="psdb-st-func-card" id="f-getsqmagentjobschedulereport">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Get-sqmAgentJobScheduleReport</span>
+	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnostics</span>
+	</div>
+	<div class="psdb-st-func-desc">Generates a comprehensive SQL Agent Job Schedule Report.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmAgentJobScheduleReport -SqlInstance &quot;SQL-Server1&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmAgentJobScheduleReport -SqlInstance &quot;SQL-Server1&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmAgentJobScheduleReport -SqlInstance &quot;SQL-Server1&quot; -OutputPath &quot;C:\Reports&quot; -OutputCsv</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmAgentJobScheduleReport -SqlInstance &quot;SQL-Server1&quot; -OutputPath &quot;C:\Reports&quot; -OutputCsv</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
 	<div class="psdb-st-func-card" id="f-getsqmconnectionstats">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Get-sqmConnectionStats</span>
@@ -1545,6 +1630,41 @@ Sync-sqmBackupExcludeTable -SqlInstance &quot;SQL01\INST1&quot;</pre><button cla
 	</div>
 	</div>
 
+	<div class="psdb-st-func-card" id="f-getsqmdiskpartitionmap">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Get-sqmDiskPartitionMap</span>
+	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnostics</span>
+	</div>
+	<div class="psdb-st-func-desc">Zeigt die Zuordnung physischer Datentraeger zu logischen Laufwerksbuchstaben.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmDiskPartitionMap</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmDiskPartitionMap
+
+    Zeigt die Partitions-Zuordnung des lokalen Rechners.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmDiskPartitionMap -ComputerName &quot;SQL01&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmDiskPartitionMap -ComputerName &quot;SQL01&quot;
+
+    Remote-Abfrage gegen SQL01 via CIM/DCOM.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmDiskPartitionMap | Where-Object IsShared | Select-Object DiskIndex, DriveLetters</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmDiskPartitionMap | Where-Object IsShared | Select-Object DiskIndex, DriveLetters
+
+    Zeigt nur die geteilten Disks (mehrere Laufwerksbuchstaben).</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">&quot;SQL01&quot;,&quot;SQL02&quot; | Get-sqmDiskPartitionMap</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    &quot;SQL01&quot;,&quot;SQL02&quot; | Get-sqmDiskPartitionMap
+
+    Partitions-Map mehrerer Server per Pipeline.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
 	<div class="psdb-st-func-card" id="f-getsqmdiskspacereport">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Get-sqmDiskSpaceReport</span>
@@ -1605,6 +1725,25 @@ Get-sqmOperationStatus -Continuous -RefreshSeconds 10</pre><button class="psdb-s
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Get-sqmOrphanedFiles -SqlInstance &quot;SQL01&quot; -SearchPath &quot;D:\SQLData&quot;,&quot;E:\SQLLog&quot; -Recurse</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmOrphanedFiles -SqlInstance &quot;SQL01&quot; -SearchPath &quot;D:\SQLData&quot;,&quot;E:\SQLLog&quot; -Recurse</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-getsqmservicebrokerhealth">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Get-sqmServiceBrokerHealth</span>
+	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnostics</span>
+	</div>
+	<div class="psdb-st-func-desc">Creates a health report for SQL Server Service Broker configuration and status.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmServiceBrokerHealth</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmServiceBrokerHealth</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmServiceBrokerHealth -SqlInstance &quot;SQL01&quot; -OutputPath &quot;D:\Reports&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmServiceBrokerHealth -SqlInstance &quot;SQL01&quot; -OutputPath &quot;D:\Reports&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -1766,6 +1905,14 @@ Get-sqmOperationStatus -Continuous -RefreshSeconds 10</pre><button class="psdb-s
         -WindowsCredential $winCred -Force</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-newsqmsetupreport">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">New-sqmSetupReport</span>
+	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnostics</span>
+	</div>
+	<div class="psdb-st-func-desc">Builds a self-contained animated HTML replay from a setup event JSON-Lines file.</div>
 	</div>
 
 	<div class="psdb-st-func-card" id="f-testsqmcostthreshold">
@@ -1988,6 +2135,27 @@ Get-sqmOperationStatus -Continuous -RefreshSeconds 10</pre><button class="psdb-s
 	</div>
 	</div>
 
+	<div class="psdb-st-func-card" id="f-getsqmserverutilization">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Get-sqmServerUtilization</span>
+	<span class="psdb-st-badge psdb-st-badge-performance">Performance</span>
+	</div>
+	<div class="psdb-st-func-desc">Collects SQL Server CPU and memory utilization trends over time.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmServerUtilization -SqlInstance &quot;SQL01&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmServerUtilization -SqlInstance &quot;SQL01&quot;
+    # Collects 6 snapshots (60 seconds) and generates HTML report</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmServerUtilization -SqlInstance &quot;SQL01&quot; -SampleCount 12 -SampleIntervalSeconds 5</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmServerUtilization -SqlInstance &quot;SQL01&quot; -SampleCount 12 -SampleIntervalSeconds 5
+    # Collects 12 snapshots (60 seconds total)</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
 	<div class="psdb-st-func-card" id="f-getsqmwaitstatistics">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Get-sqmWaitStatistics</span>
@@ -2147,6 +2315,32 @@ Get-sqmOperationStatus -Continuous -RefreshSeconds 10</pre><button class="psdb-s
 	</div>
 	</div>
 
+	<div class="psdb-st-func-card" id="f-invokesqmntfssetup">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Invoke-sqmNtfsSetup</span>
+	<span class="psdb-st-badge psdb-st-badge-wartung">Maintenance</span>
+	</div>
+	<div class="psdb-st-func-desc">Grants the SQL Server service accounts NTFS permissions on the instance&#39;s data, log, TempDB and backup directories (with an ACL backup beforehand).</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 3 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Invoke-sqmNtfsSetup -SqlInstance &quot;SQL01&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmNtfsSetup -SqlInstance &quot;SQL01&quot;
+Auto-discovers the service accounts and SQL directories and grants FullControl.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Invoke-sqmNtfsSetup -SqlInstance &quot;SQL01\INST01&quot; -Permission Modify -WhatIf</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmNtfsSetup -SqlInstance &quot;SQL01\INST01&quot; -Permission Modify -WhatIf
+Shows which accounts would get Modify on which directories, without changing anything.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Invoke-sqmNtfsSetup -Directory &#39;E:\MSSQL\DATA&#39;,&#39;F:\MSSQL\LOG&#39; -Account &#39;NT SERVICE\MSSQLSERVER&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Invoke-sqmNtfsSetup -Directory &#39;E:\MSSQL\DATA&#39;,&#39;F:\MSSQL\LOG&#39; -Account &#39;NT SERVICE\MSSQLSERVER&#39;
+Sets permissions only on the given directories for the given account.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
 	<div class="psdb-st-func-card" id="f-testsqmolainstallation">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Test-sqmOlaInstallation</span>
@@ -2207,6 +2401,25 @@ Get-sqmOperationStatus -Continuous -RefreshSeconds 10</pre><button class="psdb-s
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Compare-sqmServerConfiguration -SourceInstance &quot;SQL01&quot; -TargetInstance &quot;SQL02&quot;</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Compare-sqmServerConfiguration -SourceInstance &quot;SQL01&quot; -TargetInstance &quot;SQL02&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-enablesqmservicebroker">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Enable-sqmServiceBroker</span>
+	<span class="psdb-st-badge psdb-st-badge-konfiguration">Configuration</span>
+	</div>
+	<div class="psdb-st-func-desc">Enables Service Broker on a specified database and creates SSB endpoint.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Enable-sqmServiceBroker -DatabaseName &quot;OperationsManager&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Enable-sqmServiceBroker -DatabaseName &quot;OperationsManager&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Enable-sqmServiceBroker -SqlInstance &quot;SQL01&quot; -DatabaseName &quot;OperationsManager&quot; -Force</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Enable-sqmServiceBroker -SqlInstance &quot;SQL01&quot; -DatabaseName &quot;OperationsManager&quot; -Force</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -2348,6 +2561,58 @@ Invoke-sqmSetDatabaseRecoveryMode -Database &quot;SalesDB&quot; -RecoveryMode Si
 	</div>
 	</div>
 
+	<div class="psdb-st-func-card" id="f-setsqmmaxdop">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Set-sqmMaxDop</span>
+	<span class="psdb-st-badge psdb-st-badge-konfiguration">Configuration</span>
+	</div>
+	<div class="psdb-st-func-desc">Sets MAXDOP (max degree of parallelism) to the recommended (or an explicit) value, and optionally the matching &quot;cost threshold for parallelism&quot;.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 3 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Set-sqmMaxDop -SqlInstance SQL01</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmMaxDop -SqlInstance SQL01
+    Sets MAXDOP to min(8, CPUs) and cost threshold to 50.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Set-sqmMaxDop -SqlInstance SQL01 -MaxDop 4 -SkipCostThreshold</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmMaxDop -SqlInstance SQL01 -MaxDop 4 -SkipCostThreshold
+    Sets MAXDOP to 4, leaves the cost threshold unchanged.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Set-sqmMaxDop -SqlInstance SQL01 -WhatIf</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmMaxDop -SqlInstance SQL01 -WhatIf
+    Shows the planned MAXDOP/cost-threshold change without applying it.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-setsqmmaxmemory">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Set-sqmMaxMemory</span>
+	<span class="psdb-st-badge psdb-st-badge-konfiguration">Configuration</span>
+	</div>
+	<div class="psdb-st-func-desc">Sets SQL Server &quot;max server memory (MB)&quot; to the recommended (or an explicit) value.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 3 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Set-sqmMaxMemory -SqlInstance SQL01</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmMaxMemory -SqlInstance SQL01
+    Sets max server memory to 90% of physical RAM.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Set-sqmMaxMemory -SqlInstance SQL01 -MaxMemoryMB 24576</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmMaxMemory -SqlInstance SQL01 -MaxMemoryMB 24576
+    Sets max server memory to exactly 24 GB.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Set-sqmMaxMemory -SqlInstance SQL01 -RecommendedPct 80 -WhatIf</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmMaxMemory -SqlInstance SQL01 -RecommendedPct 80 -WhatIf
+    Shows what would be set (80% of RAM) without changing anything.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
 	<div class="psdb-st-func-card" id="f-setsqmssrsconfiguration">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Set-sqmSsrsConfiguration</span>
@@ -2480,6 +2745,46 @@ Export-sqmServerConfiguration -SqlInstance &quot;SQL01&quot; `
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Get-sqmLinkedServerUsage -SqlInstance &quot;SQL01&quot; -LinkedServer &quot;PROD_SRV&quot;</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmLinkedServerUsage -SqlInstance &quot;SQL01&quot; -LinkedServer &quot;PROD_SRV&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-getsqmserversfromou">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Get-sqmServersFromOU</span>
+	<span class="psdb-st-badge psdb-st-badge-inventar">Inventory</span>
+	</div>
+	<div class="psdb-st-func-desc">Queries Active Directory (ADSI, no module required) for all computers in a named OU and returns pipeable objects with SqlInstance property.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 5 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Alle SQL-Server ausgeben</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Alle SQL-Server ausgeben
+    Get-sqmServersFromOU</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Andere OU</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Andere OU
+    Get-sqmServersFromOU -OUName &#39;srvApp&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Expliziter Domain-Name</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Expliziter Domain-Name
+    Get-sqmServersFromOU -OUName &#39;srvDatabase&#39; -Domain &#39;contoso.com&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Direkt an sqmSQLTool-Funktion weiterleiten</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Direkt an sqmSQLTool-Funktion weiterleiten
+    Get-sqmServersFromOU | ForEach-Object {
+        Sync-sqmBackupExcludeTable -SqlInstance $_.SqlInstance
+    }</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Backup-Exclude-Trigger auf allen DB-Servern registrieren</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Backup-Exclude-Trigger auf allen DB-Servern registrieren
+    Get-sqmServersFromOU | ForEach-Object {
+        Register-sqmBackupExcludeTrigger -SqlInstance $_.SqlInstance
+    }</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -2907,7 +3212,7 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	<span class="psdb-st-badge psdb-st-badge-tsm">TSM</span>
 	</div>
 	<div class="psdb-st-func-desc">Configures the IBM Spectrum Protect (TSM) client for SQL Server backup.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 3 examples</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Invoke-sqmTsmConfiguration -ManagementClass MC_B_NL.NL_42.42.NA</div>
@@ -2920,6 +3225,16 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Invoke-sqmTsmConfiguration -ComputerName &quot;SQL01&quot; -AdditionalIncludePaths &quot;E:\Archive&quot;</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmTsmConfiguration -ComputerName &quot;SQL01&quot; -AdditionalIncludePaths &quot;E:\Archive&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Write into the INCLEXCL-referenced ie file, with custom excludes and per-path classes</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Write into the INCLEXCL-referenced ie file, with custom excludes and per-path classes
+    Invoke-sqmTsmConfiguration -ComputerName &quot;SQL01&quot; -UseInclExclFile `
+        -ExcludePatterns &#39;S:\...\*&#39;, &#39;*:\...\*.ldf&#39;, &#39;*:\...\*.mdf&#39;, &#39;*:\...\*.ndf&#39; `
+        -IncludeRule @(
+            @{ Path = &#39;F:\Daten\SQL\Backup\...\*&#39;;   ManagementClass = &#39;MC_B_NL.NL_35.35.NA&#39; },
+            @{ Path = &#39;F:\Daten\SQL\Backup\01Year\*&#39;; ManagementClass = &#39;MC_B_NL_NL_365.365.NA&#39; }
+        )</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -3424,6 +3739,27 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	</div>
 	</div>
 
+	<div class="psdb-st-func-card" id="f-showsqmtoolgui">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Show-sqmToolGui</span>
+	<span class="psdb-st-badge psdb-st-badge-sonstige">Other</span>
+	</div>
+	<div class="psdb-st-func-desc">WinForms GUI listing all sqmSQLTool functions grouped by category (category-map.ps1) with auto-generated input fields, live preview, and direct execution.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Show-sqmToolGui</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Show-sqmToolGui
+    Opens the graphical interface with all functions.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Show-sqmToolGui -Filter &#39;*AlwaysOn*&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Show-sqmToolGui -Filter &#39;*AlwaysOn*&#39;
+    Opens the interface filtered directly to Always-On functions.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
 	<div class="psdb-st-func-card" id="f-testsqmdriverinstalled">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Test-sqmDriverInstalled</span>
@@ -3489,29 +3825,6 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	</div>
 	</div>
 
-	<div class="psdb-st-func-card" id="f-testsqmmoduleupdate">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Test-sqmModuleUpdate</span>
-	<span class="psdb-st-badge psdb-st-badge-sonstige">Other</span>
-	</div>
-	<div class="psdb-st-func-desc">Checks all configured update sources for a newer sqmSQLTool version.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 3 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmModuleUpdate</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmModuleUpdate</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmModuleUpdate -Source GitHub</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmModuleUpdate -Source GitHub</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmModuleUpdate -Source UNC -RepositoryPath &quot;\\fileserver\dba\sqmSQLTool&quot;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmModuleUpdate -Source UNC -RepositoryPath &quot;\\fileserver\dba\sqmSQLTool&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
 	<div class="psdb-st-func-card" id="f-testsqmsqlinstanceinstalled">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Test-sqmSqlInstanceInstalled</span>
@@ -3532,65 +3845,6 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">if ((Test-sqmSqlInstanceInstalled).IsInstalled) { Write-Host &quot;SQL installiert&quot; }</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    if ((Test-sqmSqlInstanceInstalled).IsInstalled) { Write-Host &quot;SQL installiert&quot; }</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-testsqmupdateviagithub">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Test-sqmUpdateViaGitHub</span>
-	<span class="psdb-st-badge psdb-st-badge-sonstige">Other</span>
-	</div>
-	<div class="psdb-st-func-desc">Checks if a newer version of sqmSQLTool is available on GitHub.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmUpdateViaGitHub</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmUpdateViaGitHub</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">$result = Test-sqmUpdateViaGitHub</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    $result = Test-sqmUpdateViaGitHub
-    if ($result.UpdateAvailable) { Write-Host &quot;Update available: $($result.RemoteVersion)&quot; }</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-testsqmupdateviapsgallery">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Test-sqmUpdateViaPSGallery</span>
-	<span class="psdb-st-badge psdb-st-badge-sonstige">Other</span>
-	</div>
-	<div class="psdb-st-func-desc">Checks if a newer version of sqmSQLTool is available on PowerShell Gallery.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmUpdateViaPSGallery</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmUpdateViaPSGallery</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">$result = Test-sqmUpdateViaPSGallery</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    $result = Test-sqmUpdateViaPSGallery
-    if ($result.UpdateAvailable) { Update-sqmModule -Source PSGallery }</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-testsqmupdateviaunc">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Test-sqmUpdateViaUNC</span>
-	<span class="psdb-st-badge psdb-st-badge-sonstige">Other</span>
-	</div>
-	<div class="psdb-st-func-desc">Checks if a newer version of sqmSQLTool is available on a UNC share.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmUpdateViaUNC</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmUpdateViaUNC</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Test-sqmUpdateViaUNC -RepositoryPath &quot;\\fileserver\dba\sqmSQLTool&quot;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Test-sqmUpdateViaUNC -RepositoryPath &quot;\\fileserver\dba\sqmSQLTool&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -3648,46 +3902,12 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	</div>
 	</div>
 
-	<div class="psdb-st-func-card" id="f-updatesqmmodule">
+	<div class="psdb-st-func-card" id="f-writesqmsetupevent">
 	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Update-sqmModule</span>
+	<span class="psdb-st-func-name">Write-sqmSetupEvent</span>
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Other</span>
 	</div>
-	<div class="psdb-st-func-desc">Updates the sqmSQLTool module from GitHub, PSGallery or a UNC share.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 3 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Update-sqmModule</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Update-sqmModule</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Update-sqmModule -Source GitHub -Force</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Update-sqmModule -Source GitHub -Force</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Update-sqmModule -Source UNC -RepositoryPath &quot;\\fileserver\dba\sqmSQLTool&quot;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Update-sqmModule -Source UNC -RepositoryPath &quot;\\fileserver\dba\sqmSQLTool&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
-	</div>
-
-	<div class="psdb-st-func-card" id="f-showsqmtoolgui">
-	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">Show-sqmToolGui</span>
-	<span class="psdb-st-badge psdb-st-badge-monitoring">GUI</span>
-	</div>
-	<div class="psdb-st-func-desc">Launches a WinForms GUI that lists all exported sqmSQLTool functions grouped by category (loaded from Public\category-map.ps1). Select a function to get auto-generated input fields, a live command preview, clipboard copy, and direct execution. Read-only functions (Get-/Test-) are safe to run; functions that support -WhatIf get a simulation checkbox.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
-	<div class="psdb-st-examples">
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Open with all functions</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Show-sqmToolGui</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Open pre-filtered to AlwaysOn functions</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">Show-sqmToolGui -Filter '*AlwaysOn*'</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
-	</div>
-	</div>
+	<div class="psdb-st-func-desc">Appends a single structured setup event as one JSON line (JSON-Lines) to a file.</div>
 	</div>
 
 	</section>
@@ -3699,7 +3919,7 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	<div id="tab-quick" class="psdb-st-panel">
 <div class="psdb-st-content">
 <h2 class="psdb-st-section-title">🚀 Quick Start</h2>
-<div class="psdb-st-info">sqmSQLTool is a modular PowerShell toolset for SQL Server administration with 132 functions zur Verwaltung von AlwaysOn, Backup/Restore, Performance, Sicherheit und mehr.</div>
+<div class="psdb-st-info">sqmSQLTool is a modular PowerShell toolset for SQL Server administration with 143 functions for managing AlwaysOn, backup/restore, performance, security and more.</div>
 <div class="psdb-st-section" style="margin-top:20px;">
 <div class="psdb-st-qs-step"><div class="psdb-st-qs-num">1</div><div class="psdb-st-qs-body"><div class="psdb-st-qs-title">Import module</div><pre class="psdb-st-code" style="margin-top:6px;">Import-Module sqmSQLTool</pre></div></div>
 <div class="psdb-st-qs-step"><div class="psdb-st-qs-num">2</div><div class="psdb-st-qs-body"><div class="psdb-st-qs-title">Set configuration</div><pre class="psdb-st-code" style="margin-top:6px;">Set-sqmConfig -LogPath "C:\System\WinSrvLog\MSSQL" -OutputPath "C:\System\WinSrvLog\MSSQL"</pre></div></div>
@@ -3786,7 +4006,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 </div>
 <div id="tab-overview" class="psdb-st-panel">
 	<div style="padding:24px;">
-	<h2 class="psdb-st-section-title">&#128202; All Functions (132)</h2>
+	<h2 class="psdb-st-section-title">&#128202; All Functions (143)</h2>
 	<input type="text" id="psdb-st-ov-search" placeholder="Search function..." oninput="psstOvSearch(this.value)"
 	  style="width:100%;max-width:400px;padding:7px 12px;margin-bottom:16px;background:rgba(255,255,255,0.07);border:1px solid rgba(46,134,193,0.3);border-radius:6px;color:#e2e8f0;font-size:.85rem;font-family:inherit;">
 
@@ -3802,13 +4022,17 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Copy-sqmNTFSPermissions</td><td>Copies NTFS permissions (ACLs) from a source path to a destination path.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Copy-sqmToCentralPath</td><td>Copies one or more files to the configured CentralPath.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Enable-sqmMonitoringAccess</td><td>Sets up a monitoring account on all SQL Server instances of a computer.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Enable-sqmServiceBroker</td><td>Enables Service Broker on a specified database and creates SSB endpoint.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Export-sqmAlwaysOnConfiguration</td><td>Exports the complete AlwaysOn AG configuration for one or more SQL Server instances.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Export-sqmDatabaseDocumentation</td><td>Creates structured HTML and CSV documentation for all databases on a SQL Server instance.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Export-sqmServerConfiguration</td><td>Exports all SQL Server configuration settings to a JSON snapshot file.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Find-sqmDatabaseObject</td><td>Searches all (or selected) databases on an instance for an object name.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmADAccountStatus</td><td>Checks the status of an Active Directory user account.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmADGroupMembers</td><td>Lists all members of an Active Directory group.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Get-sqmADGroupMembersRecursive</td><td>Lists all members of an Active Directory group with controlled recursion depth.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Get-sqmADMemberGroups</td><td>Finds all Active Directory groups that contain a specified user, group, or computer.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmAgentJobHistory</td><td>Displays the execution history of SQL Agent jobs.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Get-sqmAgentJobScheduleReport</td><td>Generates a comprehensive SQL Agent Job Schedule Report.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmAlwaysOnFailoverHistory</td><td>Retrieves AlwaysOn failover events from the Windows Event Log.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmAlwaysOnHealthReport</td><td>Creates a detailed health report for all Always On availability groups on an instance.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmAutoGrowthReport</td><td>Creates an AutoGrowth configuration report for all database files on a SQL Server instance.</td></tr>
@@ -3821,6 +4045,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Get-sqmDeadlockReport</td><td>Reads and analyzes deadlock events from the System Health Extended Event session.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmDiskBlockSize</td><td>Prueft die NTFS-Blockgroesse (Cluster-Groesse) von Laufwerken auf 64KB.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmDiskInfoByDriveLetter</td><td>Returns disk information for a given drive letter.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Get-sqmDiskPartitionMap</td><td>Zeigt die Zuordnung physischer Datentraeger zu logischen Laufwerksbuchstaben.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmDiskSpaceReport</td><td>Reports disk space usage on one or more Windows servers.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmDistributedAgHealth</td><td>Creates a detailed health report for Distributed AlwaysOn Availability Groups.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmHpuAllowGroup</td><td>Searches for the HPU allow group in Active Directory based on configurable domain/group mappings.</td></tr>
@@ -3835,6 +4060,8 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Get-sqmServerHardwareReport</td><td>Creates an HTML hardware configuration report for one or more servers.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmServerSetting</td><td>Reads one or all server properties from a SQL Server instance.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmServersFromOU</td><td>Queries Active Directory (ADSI, no module required) for all computers in a named OU and returns pipeable objects with SqlInstance property.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Get-sqmServerUtilization</td><td>Collects SQL Server CPU and memory utilization trends over time.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Get-sqmServiceBrokerHealth</td><td>Creates a health report for SQL Server Service Broker configuration and status.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmSpnReport</td><td>Checks the registered SPNs for SQL Server instances (default and named instances).</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmSQLInstanceCheck</td><td>Checks a SQL Server instance against best practices.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmSysadminAccounts</td><td>Retrieves all logins with sysadmin rights on a SQL Server instance.</td></tr>
@@ -3842,6 +4069,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Get-sqmTlsStatus</td><td>Audits TLS/SSL configuration and certificate status for all SQL Server instances on one or more computers.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmTsmConfiguration</td><td>Reads and displays the IBM Spectrum Protect (TSM) client configuration.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmWaitStatistics</td><td>Reads and analyzes SQL Server wait statistics from sys.dm_os_wait_stats.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Grant-sqmTemporarySysadmin</td><td>Vergibt einem AD-Login temporaer sysadmin-Rechte fuer X Tage und entzieht sie danach automatisch ueber einen selbstloeschenden SQL-Agent-Job - bei AlwaysOn failover-robust auf allen Replicas.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Install-sqmAdModule</td><td>Ensures that the ActiveDirectory PowerShell module (RSAT) is installed.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Install-sqmCertificate</td><td>Imports a certificate file (.pfx or .cer) into the Windows certificate store.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Install-sqmCertificateToStore</td><td>Imports a certificate into a specified Windows certificate store.</td></tr>
@@ -3850,6 +4078,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Install-sqmOdbcDriver</td><td>Installs the Microsoft ODBC Driver for SQL Server.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Install-sqmOlaMaintenanceSolution</td><td>Installs or updates Ola Hallengren's Maintenance Solution on a SQL Server instance.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Install-sqmSsrsReportServer</td><td>Installs and configures SQL Server Reporting Services (SSRS).</td></tr>
+	<tr><td class="psdb-st-ov-fn">Invoke-sqmAlwaysOnSetup</td><td>End-to-end CLI AlwaysOn setup: reads the WSFC, creates the Availability Group and synchronises logins.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmCollationChange</td><td>Automatically changes the server collation of a SQL Server instance.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmConfigRollback</td><td>Restores SQL Server configuration from a previously exported snapshot.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmDeployScripts</td><td>Executes numbered SQL scripts from a directory sequentially against a SQL Server database.</td></tr>
@@ -3861,24 +4090,27 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmLoginAudit</td><td>Comprehensive audit of all SQL Server logins on one or more instances.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmLogShrink</td><td>Shrinks the transaction log file (LDF) of one or more databases.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmMonitoringKey</td><td>Gets or sets monitoring registry values for the sqmSQLTool on one or more computers.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Invoke-sqmNtfsSetup</td><td>Grants the SQL Server service accounts NTFS permissions on the instance&#39;s data, log, TempDB and backup directories (with an ACL backup beforehand).</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmPatchAnalysis</td><td>Compares the installed SQL Server version with known CU/SP builds.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmPerfBaseline</td><td>Creates, compares or lists performance baselines (wait stats + perf counters).</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmQueryStore</td><td>Configures the Query Store, reads from it, detects issues and saves reports.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmRestoreDatabase</td><td>Restores a database from a backup file, with support for single-server and AlwaysOn environments.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmSaObfuscation</td><td>Obfuscates the SA account on a SQL Server instance by renaming it, disabling it, and setting a random password.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Invoke-sqmServiceBrokerAlwaysOn</td><td>Enables Service Broker on all nodes of an AlwaysOn Availability Group with automatic failover orchestration.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmSetDatabaseRecoveryMode</td><td>Changes the recovery mode of one or more user databases.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmSetupReport</td><td>Professional SQL Server Setup Report with critical issues, security, and database overview.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmSignModule</td><td>Signs all PowerShell script files in a module directory using Set-AuthenticodeSignature.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmSqlAlwaysOnAutoseeding</td><td>Enables Automatic Seeding on all replicas of an Always On Availability Group.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmSsisConfiguration</td><td>Configures SQL Server Integration Services (SSIS) environment and catalog.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Invoke-sqmTempSysadminAction</td><td>Fuehrt die eigentliche sysadmin-Vergabe bzw. -Entziehung auf EINER Instanz aus, legt dabei optional einen fehlenden AD-Login an, entfernt ihn beim Entzug wieder und loescht optional den aufrufenden SQL-Agent-Job nach Erfolg (selbstloeschender Job).</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmTsmConfiguration</td><td>Configures the IBM Spectrum Protect (TSM) client for SQL Server backup.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmUpdateStatistics</td><td>Updates statistics in one or more databases.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmUserDatabaseBackup</td><td>Backs up user databases on a SQL Server instance.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Move-sqmAlwaysOnListener</td><td>Migrates an AG Listener from one Availability Group to another.</td></tr>
 	<tr><td class="psdb-st-ov-fn">New-sqmAgentProxy</td><td>Creates a SQL Server credential and a SQL Agent proxy and links them together.</td></tr>
 	<tr><td class="psdb-st-ov-fn">New-sqmAlwaysOnRepairJob</td><td>Creates a SQL Server Agent job that regularly runs Repair-sqmAlwaysOnDatabases.</td></tr>
-	<tr><td class="psdb-st-ov-fn">New-sqmAutoLoginCompareJob</td><td>Creates a SQL Agent job that periodically compares logins across AlwaysOn replicas.</td></tr>
 	<tr><td class="psdb-st-ov-fn">New-sqmAutoLoginSyncJob</td><td>Creates a SQL Agent job to automatically synchronize logins in an AlwaysOn Availability Group.</td></tr>
+	<tr><td class="psdb-st-ov-fn">New-sqmAvailabilityGroup</td><td>Creates an AlwaysOn Availability Group on an existing Windows Server Failover Cluster (WSFC).</td></tr>
 	<tr><td class="psdb-st-ov-fn">New-sqmBackupMaintenanceJob</td><td>Creates a SQL Agent job with two steps that implement the full dynamic backup maintenance workflow.</td></tr>
 	<tr><td class="psdb-st-ov-fn">New-sqmCertificateRequest</td><td>Creates a new certificate signing request (CSR) for SQL Server TLS.</td></tr>
 	<tr><td class="psdb-st-ov-fn">New-sqmDistributedAvailabilityGroup</td><td>Creates a new Distributed AlwaysOn Availability Group.</td></tr>
@@ -3886,6 +4118,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">New-sqmOlaSysDbBackupJob</td><td>Creates a SQL Agent backup job for system databases using Ola Hallengren solution.</td></tr>
 	<tr><td class="psdb-st-ov-fn">New-sqmOlaUsrDbBackupJob</td><td>Creates SQL Agent backup jobs for user databases using Ola Hallengren solution.</td></tr>
 	<tr><td class="psdb-st-ov-fn">New-sqmRandomSaPassword</td><td>Generates a random, policy-compliant SA password.</td></tr>
+	<tr><td class="psdb-st-ov-fn">New-sqmSetupReport</td><td>Builds a self-contained animated HTML replay from a setup event JSON-Lines file.</td></tr>
 	<tr><td class="psdb-st-ov-fn">New-sqmSqlCertificate</td><td>Creates a new self-signed SQL Server certificate as a renewal of an existing one.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Register-sqmBackupExcludeTrigger</td><td>Registers or removes the DDL trigger trg_sqm_BackupExclude_AutoSync that keeps master.dbo.sqm_BackupExclude in sync on CREATE_DATABASE and DROP_DATABASE.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Remove-sqmAdOrphanLogin</td><td>Removes Windows logins whose Active Directory account no longer exists (AD orphans).</td></tr>
@@ -3894,6 +4127,8 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Set-sqmBackupExcludePermission</td><td>Grants SELECT, INSERT, and UPDATE permissions on master.dbo.sqm_BackupExclude to a login.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Set-sqmConfig</td><td>Sets one or more configuration values for the MSSQLTools module.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Set-sqmDatabaseOwner</td><td>Sets the owner of one or more databases to a uniform login.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Set-sqmMaxDop</td><td>Sets MAXDOP (max degree of parallelism) to the recommended (or an explicit) value, and optionally the matching &quot;cost threshold for parallelism&quot;.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Set-sqmMaxMemory</td><td>Sets SQL Server &quot;max server memory (MB)&quot; to the recommended (or an explicit) value.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Set-sqmSqlPolicyState</td><td>Enables or disables a single Policy-Based Management policy on a SQL Server instance.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Set-sqmSqlTlsCertificate</td><td>Binds a Windows certificate from the Machine store to SQL Server as the TLS certificate.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Set-sqmSsrsConfiguration</td><td>Configures SQL Server Reporting Services (SSRS) fully automatically.</td></tr>
@@ -3910,7 +4145,6 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Test-sqmDriverInstalled</td><td>Checks whether a JDBC, ODBC or DB2 driver is installed on the system.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Test-sqmMaxDop</td><td>Checks whether MAXDOP (Max Degree of Parallelism) is configured correctly.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Test-sqmMaxMemory</td><td>Checks whether SQL Server Max Server Memory is configured correctly.</td></tr>
-	<tr><td class="psdb-st-ov-fn">Test-sqmModuleUpdate</td><td>Checks all configured update sources for a newer sqmSQLTool version.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Test-sqmOlaInstallation</td><td>Checks whether Ola Hallengren's Maintenance Solution is installed on a SQL Server instance.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Test-sqmSQLFirewall</td><td>Tests whether the firewall and network allow a TCP connection to SQL Server.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Test-sqmSqlInstanceInstalled</td><td>Checks whether a SQL Server instance is installed on the local system.</td></tr>
@@ -3918,13 +4152,10 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Test-sqmSSISPackageCompatibility</td><td>Validates SSIS package compatibility for SQL Server upgrades (2016 - 2025).</td></tr>
 	<tr><td class="psdb-st-ov-fn">Test-sqmTempDbFileCount</td><td>Prueft ob die Anzahl der TempDB-Datendateien der empfohlenen CPU-Anzahl entspricht.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Test-sqmTsmConnection</td><td>Tests the connection to an IBM Spectrum Protect (TSM) server using dsmadmc.</td></tr>
-	<tr><td class="psdb-st-ov-fn">Test-sqmUpdateViaGitHub</td><td>Checks if a newer version of sqmSQLTool is available on GitHub.</td></tr>
-	<tr><td class="psdb-st-ov-fn">Test-sqmUpdateViaPSGallery</td><td>Checks if a newer version of sqmSQLTool is available on PowerShell Gallery.</td></tr>
-	<tr><td class="psdb-st-ov-fn">Test-sqmUpdateViaUNC</td><td>Checks if a newer version of sqmSQLTool is available on a UNC share.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Uninstall-sqmDb2Driver</td><td>Uninstalls the IBM DB2 ODBC/CLI driver.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Uninstall-sqmJdbcDriver</td><td>Uninstalls the Microsoft JDBC Driver for SQL Server.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Uninstall-sqmOdbcDriver</td><td>Uninstalls the Microsoft ODBC Driver for SQL Server.</td></tr>
-	<tr><td class="psdb-st-ov-fn">Update-sqmModule</td><td>Updates the sqmSQLTool module from GitHub, PSGallery or a UNC share.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Write-sqmSetupEvent</td><td>Appends a single structured setup event as one JSON line (JSON-Lines) to a file.</td></tr>
 	</tbody>
 	</table>
 

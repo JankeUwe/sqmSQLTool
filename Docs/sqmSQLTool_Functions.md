@@ -1737,6 +1737,85 @@ Checks and corrects the database owner on one or more SQL Server instances.
 # WhatIf - only show what would be changed
     Set-sqmDatabaseOwner -SqlInstance "SQL01" -WhatIf
 
+### Grant-sqmTemporarySysadmin
+
+Grants an AD login temporary sysadmin rights for X days and revokes them automatically via a self-deleting SQL Agent job — failover-robust across all AlwaysOn replicas.
+
+For patch/installation situations: make an AD user (or AD group) a sysadmin for a limited time.
+    Without -StartDate the rights are granted immediately (inline) plus a revoke job on today+X;
+    with -StartDate a grant job on the start date and a revoke job on start date+X are created.
+
+    Only Windows/AD logins (DOMAIN\account or AD group) are supported; SQL-auth logins are rejected.
+    If the login does not exist it is created (CREATE LOGIN ... FROM WINDOWS); a configured PBM policy
+    (DefaultPolicy) is briefly disabled for the creation and re-enabled afterwards. A login created by
+    this tool is removed again on revoke (only if it is not a member of any other server role).
+
+    AlwaysOn (default): if the instance is part of an availability group, login creation, the sysadmin
+    grant and the revoke/cleanup are performed on ALL replicas, each with its own locally running,
+    self-deleting jobs. Use -PrimaryOnly to limit to the given instance.
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance. Default: current computer name.
+- **-SqlCredential** - PSCredential for the immediate grant (SQL auth). The agent jobs run under the SQL Agent service account and use no stored credentials.
+- **-Login** - AD login / group (DOMAIN\account) to become sysadmin temporarily.
+- **-Days** - Duration of the sysadmin rights in days.
+- **-StartDate** - Optional activation time. If omitted (or in the past), the grant happens immediately.
+- **-PrimaryOnly** - Only handle the given instance, ignore AlwaysOn replicas.
+- **-SkipSecondaryServers** - List of replica instance names to skip.
+- **-TicketNumber** - Optional ticket/order number for logging.
+- **-Force** - Overwrites existing grant/revoke jobs of the same name.
+
+**Examples (3):**
+
+```powershell
+Grant-sqmTemporarySysadmin -SqlInstance SQL01 -Login 'DOM\u.maier' -Days 3 -TicketNumber 'INC0012345'
+    # Immediate sysadmin for 3 days (on all AG replicas), then automatic revoke.
+
+```powershell
+Grant-sqmTemporarySysadmin -Login 'DOM\u.maier' -Days 1 -StartDate '2026-07-01 08:00' -TicketNumber 'CHG7788'
+    # Activation 2026-07-01 08:00, revoke 2026-07-02 08:00.
+
+```powershell
+Grant-sqmTemporarySysadmin -SqlInstance SQL01 -Login 'DOM\u.maier' -Days 2 -PrimaryOnly -WhatIf
+    # Shows only what would happen - on SQL01 only, without replicas.
+
+### Invoke-sqmTempSysadminAction
+
+Performs the actual sysadmin grant/revoke on one instance, optionally creating a missing AD login, removing it again on revoke, and self-deleting the calling SQL Agent job after success.
+
+Called by the agent jobs created by Grant-sqmTemporarySysadmin, but can also be used manually
+    (e.g. for an early revoke).
+
+    Grant  -> (optional CREATE LOGIN ... FROM WINDOWS) + ALTER SERVER ROLE [sysadmin] ADD MEMBER
+    Revoke -> ALTER SERVER ROLE [sysadmin] DROP MEMBER + (optional DROP LOGIN)
+
+    -RemoveLogin drops the login on revoke only as a safety net: when the login is not a member of any
+    further fixed server role besides 'public'. Otherwise it is kept and a warning is logged, so a
+    login used elsewhere is never deleted by accident. Every action is written to the module log file
+    and the Windows Application event log (source 'sqmSQLTool', incl. ticket number).
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance. Default: current computer name.
+- **-SqlCredential** - PSCredential for the SQL connection (SQL authentication).
+- **-Login** - Affected Windows/AD login (DOMAIN\account or AD group).
+- **-Action** - 'Grant' or 'Revoke'.
+- **-CreateLoginIfMissing** - Grant only: creates a missing AD login via CREATE LOGIN ... FROM WINDOWS.
+- **-RemoveLogin** - Revoke only: removes the login after the revoke (DROP LOGIN), if it is not attached to any further server role.
+- **-DisablePolicy** - Disable the configured PBM policy (DefaultPolicy) before creating a login and re-enable it afterwards. Default: $true.
+- **-TicketNumber** - Optional ticket/order number for logging.
+- **-JobName** - Optional: name of the calling agent job. Deleted after a successful action (self-deletion).
+
+**Examples (2):**
+
+```powershell
+Invoke-sqmTempSysadminAction -SqlInstance SQL01 -Login 'DOM\u.maier' -Action Revoke
+
+```powershell
+# Early manual revoke including removal of a self-created login:
+    Invoke-sqmTempSysadminAction -Login 'DOM\u.maier' -Action Revoke -RemoveLogin
+
 ## 12. Server Configuration Testing
 
 ### Get-sqmClusterInfo
