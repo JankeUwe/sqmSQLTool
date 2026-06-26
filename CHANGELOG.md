@@ -1,5 +1,23 @@
 # sqmSQLTool — Changelog
 
+## [1.8.1.0] — 2026-06-26
+
+### ✨ Temporäre Sysadmin-Rechte mit automatischem Entzug
+
+Für Patch-/Installationssituationen: ein Login zeitlich befristet zum **sysadmin** machen,
+danach automatischer Entzug über einen **selbstlöschenden SQL-Agent-Job**.
+
+- **`Grant-sqmTemporarySysadmin`** — vergibt sysadmin für `-Days` Tage. Ohne `-StartDate`
+  **sofort** (inline) + Revoke-Job auf heute+X; mit `-StartDate` ein Grant-Job auf das Startdatum
+  und ein Revoke-Job auf Startdatum+X. Optionale **`-TicketNumber`** (Auftragsnummer) fürs Log.
+  `ConfirmImpact='High'` + `-WhatIf`.
+- **`Invoke-sqmTempSysadminAction`** — führt `ALTER SERVER ROLE [sysadmin] ADD|DROP MEMBER`
+  aus, protokolliert in **Modul-Logfile + Windows Event Log** (Source `sqmSQLTool`, inkl.
+  Auftragsnummer) und **löscht bei Erfolg den aufrufenden Job** (`sp_delete_job`). Bei Fehler
+  bleibt der Job (als fehlgeschlagen) erhalten. Auch für **manuellen vorzeitigen Entzug** nutzbar.
+- One-Time-Jobs (`sp_add_schedule @freq_type=1`); Job-Steps rufen das Modul per `Import-Module sqmSQLTool`
+  (Modulname, kein hardcodierter Pfad) auf. Revoke-Job läuft unter dem SQL-Agent-Dienstkonto.
+
 ## [1.8.0.0] — 2026-06-26
 
 ### ✨ Quellenbewusstes Auto-Update beim Import
