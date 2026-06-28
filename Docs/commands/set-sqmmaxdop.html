@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+
+    <!-- SEO Meta Tags -->
+    <title>Set-sqmMaxDop - sqmSQLTool PowerShell Cmdlet Documentation</title>
+    <meta name="description" content="Sets MAXDOP (max degree of parallelism) to the recommended (or an explicit) value, and optionally the matching &quot;cost threshold for parallelism&quot;. Learn how to use Set-sqmMaxDop in sqmSQLTool for SQL Server administration with PowerShell.">
+    <meta name="keywords" content="sqmSQLTool, PowerShell, SQL Server, SQL Config, Set-sqmMaxDop, dbatools">
+    <meta name="author" content="dtcSoftware">
+    <meta name="language" content="English">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="Set-sqmMaxDop - sqmSQLTool Documentation">
+    <meta property="og:description" content="Sets MAXDOP (max degree of parallelism) to the recommended (or an explicit) value, and optionally the matching &quot;cost threshold for parallelism&quot;.">
+    <meta property="og:url" content="https://powershelldba.de/commands/set-sqmmaxdop.html">
+    <meta property="og:site_name" content="powershelldba.de">
+    <meta property="og:image" content="https://powershelldba.de/img/sqmsqltool-og.png">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Set-sqmMaxDop - sqmSQLTool">
+    <meta name="twitter:description" content="Sets MAXDOP (max degree of parallelism) to the recommended (or an explicit) value, and optionally the matching &quot;cost threshold for parallelism&quot;.">
+    <meta name="twitter:image" content="https://powershelldba.de/img/sqmsqltool-og.png">
+
+    <!-- Schema.org Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "Set-sqmMaxDop - sqmSQLTool PowerShell Cmdlet",
+        "description": "Sets MAXDOP (max degree of parallelism) to the recommended (or an explicit) value, and optionally the matching &quot;cost threshold for parallelism&quot;.",
+        "image": "https://powershelldba.de/img/sqmsqltool-og.png",
+        "author": {
+            "@type": "Organization",
+            "name": "dtcSoftware"
+        },
+        "datePublished": "2026-01-01",
+        "keywords": "PowerShell, SQL Server, SQL Config"
+    }
+    </script>
+
+    <style>
+        :root {
+            --ps-navy: #1a1a2e;
+            --ps-blue: #5dade2;
+            --ps-cyan: #00c8e8;
+            --ps-purple: #7c3aed;
+            --ps-bg: #060f20;
+            --ps-surface: rgba(255,255,255,0.04);
+            --ps-border: rgba(46,134,193,0.25);
+            --ps-text: #e2e8f0;
+            --ps-muted: #94a8c0;
+            --ps-code-bg: #012456;
+            --ps-code-text: #e8e8e8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+            background-color: var(--ps-bg);
+            color: var(--ps-text);
+            line-height: 1.6;
+        }
+
+        /* Header & Navigation */
+        header {
+            background: linear-gradient(135deg, var(--ps-navy) 0%, var(--ps-blue) 100%);
+            padding: 20px 0;
+            border-bottom: 2px solid var(--ps-cyan);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .header-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.2rem;
+            font-weight: 900;
+            color: #fff;
+            text-decoration: none;
+        }
+
+        .breadcrumb {
+            font-size: 0.9rem;
+            color: var(--ps-muted);
+        }
+
+        .breadcrumb a {
+            color: var(--ps-cyan);
+            text-decoration: none;
+            margin: 0 4px;
+        }
+
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        /* Main Content */
+        main {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        /* Command Header */
+        .cmd-header {
+            margin-bottom: 32px;
+        }
+
+        .cmd-name {
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            font-size: 2.2rem;
+            font-weight: 900;
+            color: var(--ps-cyan);
+            margin-bottom: 12px;
+            letter-spacing: -0.5px;
+        }
+
+        .cmd-meta {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .badge {
+            background: var(--ps-blue);
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        /* Description Section */
+        .description {
+            background: var(--ps-surface);
+            border: 1px solid var(--ps-border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 32px;
+            font-size: 1.05rem;
+            line-height: 1.8;
+            color: var(--ps-muted);
+        }
+
+        /* Examples Section */
+        .examples-section {
+            margin-bottom: 40px;
+        }
+
+        .section-title {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--ps-cyan);
+            border-bottom: 2px solid var(--ps-purple);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .example {
+            background: var(--ps-surface);
+            border: 1px solid var(--ps-border);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+
+        .example-label {
+            background: rgba(46,134,193,0.2);
+            padding: 12px 16px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--ps-cyan);
+            border-bottom: 1px solid var(--ps-border);
+            font-family: 'Cascadia Code', monospace;
+            word-break: break-all;
+        }
+
+        .code-wrapper {
+            position: relative;
+            padding: 16px;
+        }
+
+        .code-block {
+            background-color: var(--ps-code-bg);
+            color: var(--ps-code-text);
+            padding: 12px 14px;
+            border-radius: 4px;
+            font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #94a3b8;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .copy-btn:hover {
+            background: rgba(0,200,232,0.2);
+            color: var(--ps-cyan);
+            border-color: var(--ps-cyan);
+        }
+
+        .copy-btn.copied {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            border-color: #4caf50;
+        }
+
+        /* Navigation */
+        .nav-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 60px;
+            padding-top: 40px;
+            border-top: 1px solid var(--ps-border);
+        }
+
+        .nav-link {
+            display: block;
+            padding: 20px;
+            background: var(--ps-surface);
+            border: 1px solid var(--ps-border);
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .nav-link:hover {
+            background: rgba(0,200,232,0.1);
+            border-color: var(--ps-cyan);
+            transform: translateX(4px);
+        }
+
+        .nav-link-label {
+            font-size: 0.8rem;
+            color: var(--ps-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .nav-link-text {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--ps-cyan);
+            font-family: 'Cascadia Code', monospace;
+        }
+
+        /* Footer */
+        footer {
+            background: var(--ps-surface);
+            border-top: 1px solid var(--ps-border);
+            padding: 40px 24px;
+            margin-top: 60px;
+            text-align: center;
+            color: var(--ps-muted);
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: var(--ps-cyan);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .cmd-name {
+                font-size: 1.6rem;
+            }
+
+            .header-container {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+
+            .nav-container {
+                grid-template-columns: 1fr;
+            }
+
+            main {
+                padding: 24px 16px;
+            }
+
+            .copy-btn {
+                top: 12px;
+                right: 12px;
+                padding: 4px 8px;
+                font-size: 0.7rem;
+            }
+        }
+
+        /* Utilities */
+        .text-center {
+            text-align: center;
+        }
+
+        .text-muted {
+            color: var(--ps-muted);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <a href="https://powershelldba.de/commands/" class="logo">🛢 sqmSQLTool</a>
+            <div class="breadcrumb">
+                <a href="https://powershelldba.de/">Home</a> /
+                <a href="https://powershelldba.de/commands/">Commands</a> /
+                <span>Set-sqmMaxDop</span>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Command Header -->
+        <section class="cmd-header">
+            <div class="cmd-name">Set-sqmMaxDop</div>
+            <div class="cmd-meta">
+                <span class="badge">SQL Config</span>
+                <span class="text-muted">sqmSQLTool v1.8.2+</span>
+            </div>
+        </section>
+
+        <!-- Description -->
+        <section class="description">
+            Sets MAXDOP (max degree of parallelism) to the recommended (or an explicit) value, and optionally the matching &quot;cost threshold for parallelism&quot;.
+        </section>
+
+        <!-- Examples -->
+        <section class="examples-section"><h2 class="section-title">Examples</h2>            <div class="example">
+                <div class="example-label">Set-sqmMaxDop -SqlInstance SQL01</div>
+                <div class="code-wrapper">
+                    <pre class="code-block">Set-sqmMaxDop -SqlInstance SQL01
+    Sets MAXDOP to min(8, CPUs) and cost threshold to 50.</pre>
+                    <button class="copy-btn">copy</button>
+                </div>
+            </div>            <div class="example">
+                <div class="example-label">Set-sqmMaxDop -SqlInstance SQL01 -MaxDop 4 -SkipCostThreshold</div>
+                <div class="code-wrapper">
+                    <pre class="code-block">Set-sqmMaxDop -SqlInstance SQL01 -MaxDop 4 -SkipCostThreshold
+    Sets MAXDOP to 4, leaves the cost threshold unchanged.</pre>
+                    <button class="copy-btn">copy</button>
+                </div>
+            </div>            <div class="example">
+                <div class="example-label">Set-sqmMaxDop -SqlInstance SQL01 -WhatIf</div>
+                <div class="code-wrapper">
+                    <pre class="code-block">Set-sqmMaxDop -SqlInstance SQL01 -WhatIf
+    Shows the planned MAXDOP/cost-threshold change without applying it.</pre>
+                    <button class="copy-btn">copy</button>
+                </div>
+            </div></section>
+
+        <!-- Navigation -->
+        <section class="nav-container">
+                        <a href="invoke-sqmssisconfiguration.html" class="nav-link">
+                <div class="nav-link-label">← Previous Command</div>
+                <div class="nav-link-text">Invoke-sqmSsisConfiguration</div>
+            </a>
+                        <a href="set-sqmmaxmemory.html" class="nav-link">
+                <div class="nav-link-label">Next Command →</div>
+                <div class="nav-link-text">Set-sqmMaxMemory</div>
+            </a>
+        </section>
+    </main>
+
+    <footer>
+        <p>sqmSQLTool Documentation · <a href="https://github.com/uwejanke/sqmSQLTool">GitHub</a> · <a href="https://powershelldba.de/">powershelldba.de</a></p>
+        <p style="margin-top: 12px; font-size: 0.85rem;">PowerShell SQL Server Administration Toolset by dtcSoftware</p>
+    </footer>
+
+    <script>
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const code = this.previousElementSibling.textContent;
+                navigator.clipboard.writeText(code).then(() => {
+                    const original = this.textContent;
+                    this.textContent = '✓ Copied!';
+                    this.classList.add('copied');
+                    setTimeout(() => {
+                        this.textContent = original;
+                        this.classList.remove('copied');
+                    }, 2000);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
+
