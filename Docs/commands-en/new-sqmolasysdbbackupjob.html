@@ -44,7 +44,7 @@
 <tr><td>-ContinueOnError</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td></tr>
 </tbody></table></section>
 <section><h2 class="st">Execution Flow</h2>
-<div class="fw"><svg viewBox="0 0 760 524" xmlns="http://www.w3.org/2000/svg" font-family="'Cascadia Code','Consolas',monospace" font-size="12" fill="#e2e8f0">
+<div class="fw"><svg viewBox="0 0 760 860" xmlns="http://www.w3.org/2000/svg" font-family="'Cascadia Code','Consolas',monospace" font-size="12" fill="#e2e8f0">
 <defs>
 <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#5dade2"/></marker>
 <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ef4444"/></marker>
@@ -62,23 +62,43 @@
 <text x="93" y="130" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Show plan, exit</text>
 <text x="394" y="178" fill="#22c55e" font-size="11">YES</text>
 <line x1="380" y1="164" x2="380" y2="186" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
-<rect x="230" y="188" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
-<text x="380" y="214" text-anchor="middle" fill="#7c3aed" font-weight="bold">Validate Prerequisites</text>
-<line x1="380" y1="230" x2="380" y2="248" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
-<rect x="230" y="250" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
-<text x="380" y="276" text-anchor="middle" fill="#7c3aed" font-weight="bold">Create Resource</text>
-<line x1="380" y1="292" x2="380" y2="310" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
-<polygon points="380,312 485,344 380,376 275,344" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
-<text x="380" y="348" text-anchor="middle" fill="#f59e0b" font-weight="bold">Result OK?</text>
-<line x1="275" y1="344" x2="165" y2="344" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
-<text x="265" y="338" text-anchor="end" fill="#ef4444" font-size="11">NO</text>
-<rect x="20" y="324" width="145" height="38" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1.5"/>
-<text x="93" y="342" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">Error</text>
-<text x="394" y="390" fill="#22c55e" font-size="11">YES</text>
-<line x1="380" y1="376" x2="380" y2="398" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
-<text x="394" y="386" fill="#22c55e" font-size="11">YES ✓</text>
-<ellipse cx="380" cy="400" rx="80" ry="24" fill="#1a1a2e" stroke="#22c55e" stroke-width="2"/>
-<text x="380" y="405" text-anchor="middle" fill="#22c55e" font-weight="bold">DONE</text>
+<polygon points="380,188 485,220 380,252 275,220" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="380" y="224" text-anchor="middle" fill="#f59e0b" font-weight="bold">Verification OK?</text>
+<line x1="275" y1="220" x2="165" y2="220" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="265" y="214" text-anchor="end" fill="#ef4444" font-size="11">NO</text>
+<rect x="20" y="200" width="145" height="38" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1.5"/>
+<text x="93" y="218" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">Error / Rollback</text>
+<text x="394" y="266" fill="#22c55e" font-size="11">YES</text>
+<line x1="380" y1="252" x2="380" y2="274" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<polygon points="380,276 485,308 380,340 275,308" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="380" y="312" text-anchor="middle" fill="#f59e0b" font-weight="bold">-BackupBefore set?</text>
+<line x1="275" y1="308" x2="165" y2="308" stroke="#94a8c0" stroke-width="1.5" marker-end="url(#ao)"/>
+<text x="265" y="302" text-anchor="end" fill="#94a8c0" font-size="11">NO</text>
+<rect x="20" y="288" width="145" height="38" rx="6" fill="rgba(148,168,192,0.15)" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="93" y="306" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Skip</text>
+<text x="394" y="354" fill="#22c55e" font-size="11">YES</text>
+<line x1="380" y1="340" x2="380" y2="362" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="364" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#2563eb" stroke-width="1.5"/>
+<text x="380" y="390" text-anchor="middle" fill="#2563eb" font-weight="bold">Backup-Verzeichnis ermitteln</text>
+<line x1="380" y1="406" x2="380" y2="424" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="426" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="452" text-anchor="middle" fill="#7c3aed" font-weight="bold">SA-Login und Job-Kategorie</text>
+<line x1="380" y1="468" x2="380" y2="486" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="488" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="514" text-anchor="middle" fill="#7c3aed" font-weight="bold">Vorhandenen Job behandeln</text>
+<line x1="380" y1="530" x2="380" y2="548" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="550" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="576" text-anchor="middle" fill="#7c3aed" font-weight="bold">Ola-Aufruf vorbereiten</text>
+<line x1="380" y1="592" x2="380" y2="610" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="612" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="638" text-anchor="middle" fill="#7c3aed" font-weight="bold">Job erstellen</text>
+<line x1="380" y1="654" x2="380" y2="672" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="674" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="700" text-anchor="middle" fill="#7c3aed" font-weight="bold">Konfigurationsbericht schreiben</text>
+<line x1="380" y1="716" x2="380" y2="734" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<text x="394" y="722" fill="#22c55e" font-size="11">YES ✓</text>
+<ellipse cx="380" cy="736" rx="80" ry="24" fill="#1a1a2e" stroke="#22c55e" stroke-width="2"/>
+<text x="380" y="741" text-anchor="middle" fill="#22c55e" font-weight="bold">DONE</text>
 </svg>
 </div></section>
 <section><h2 class="st">Examples</h2>

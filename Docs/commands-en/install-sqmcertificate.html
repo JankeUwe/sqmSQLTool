@@ -44,7 +44,7 @@
 <tr><td>-OutputPath</td><td>string</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td></tr>
 </tbody></table></section>
 <section><h2 class="st">Execution Flow</h2>
-<div class="fw"><svg viewBox="0 0 760 762" xmlns="http://www.w3.org/2000/svg" font-family="'Cascadia Code','Consolas',monospace" font-size="12" fill="#e2e8f0">
+<div class="fw"><svg viewBox="0 0 760 948" xmlns="http://www.w3.org/2000/svg" font-family="'Cascadia Code','Consolas',monospace" font-size="12" fill="#e2e8f0">
 <defs>
 <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#5dade2"/></marker>
 <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ef4444"/></marker>
@@ -70,34 +70,43 @@
 <text x="93" y="218" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">Abort</text>
 <text x="394" y="266" fill="#22c55e" font-size="11">YES</text>
 <line x1="380" y1="252" x2="380" y2="274" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
-<rect x="230" y="276" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
-<text x="380" y="302" text-anchor="middle" fill="#7c3aed" font-weight="bold">Check Prerequisites</text>
-<line x1="380" y1="318" x2="380" y2="336" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
-<rect x="230" y="338" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
-<text x="380" y="364" text-anchor="middle" fill="#7c3aed" font-weight="bold">Run Installer</text>
-<line x1="380" y1="380" x2="380" y2="398" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
-<polygon points="380,400 485,432 380,464 275,432" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
-<text x="380" y="436" text-anchor="middle" fill="#f59e0b" font-weight="bold">Result OK?</text>
-<line x1="275" y1="432" x2="165" y2="432" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
-<text x="265" y="426" text-anchor="end" fill="#ef4444" font-size="11">NO</text>
-<rect x="20" y="412" width="145" height="38" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1.5"/>
-<text x="93" y="430" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">Error</text>
-<text x="394" y="478" fill="#22c55e" font-size="11">YES</text>
-<line x1="380" y1="464" x2="380" y2="486" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
-<polygon points="380,488 485,520 380,552 275,520" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
-<text x="380" y="524" text-anchor="middle" fill="#f59e0b" font-weight="bold">-OutputPath set?</text>
-<line x1="275" y1="520" x2="165" y2="520" stroke="#94a8c0" stroke-width="1.5" marker-end="url(#ao)"/>
-<text x="265" y="514" text-anchor="end" fill="#94a8c0" font-size="11">NO</text>
-<rect x="20" y="500" width="145" height="38" rx="6" fill="rgba(148,168,192,0.15)" stroke="#94a8c0" stroke-width="1.5"/>
-<text x="93" y="518" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Console only</text>
-<text x="394" y="566" fill="#22c55e" font-size="11">YES</text>
-<line x1="380" y1="552" x2="380" y2="574" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
-<rect x="230" y="576" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#0891b2" stroke-width="1.5"/>
-<text x="380" y="602" text-anchor="middle" fill="#0891b2" font-weight="bold">Write Report File</text>
+<polygon points="380,276 485,308 380,340 275,308" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="380" y="312" text-anchor="middle" fill="#f59e0b" font-weight="bold">Verification OK?</text>
+<line x1="275" y1="308" x2="165" y2="308" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="265" y="302" text-anchor="end" fill="#ef4444" font-size="11">NO</text>
+<rect x="20" y="288" width="145" height="38" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1.5"/>
+<text x="93" y="306" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">Error / Rollback</text>
+<text x="394" y="354" fill="#22c55e" font-size="11">YES</text>
+<line x1="380" y1="340" x2="380" y2="362" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<polygon points="380,364 485,396 380,428 275,396" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="380" y="400" text-anchor="middle" fill="#f59e0b" font-weight="bold">Verification OK?</text>
+<line x1="275" y1="396" x2="165" y2="396" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="265" y="390" text-anchor="end" fill="#ef4444" font-size="11">NO</text>
+<rect x="20" y="376" width="145" height="38" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1.5"/>
+<text x="93" y="394" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">Error / Rollback</text>
+<text x="394" y="442" fill="#22c55e" font-size="11">YES</text>
+<line x1="380" y1="428" x2="380" y2="450" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="452" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="478" text-anchor="middle" fill="#7c3aed" font-weight="bold">ShouldProcess</text>
+<line x1="380" y1="494" x2="380" y2="512" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="514" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="540" text-anchor="middle" fill="#7c3aed" font-weight="bold">Zertifikat in SQL Server importieren</text>
+<line x1="380" y1="556" x2="380" y2="574" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="576" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="602" text-anchor="middle" fill="#7c3aed" font-weight="bold">Windows-Maschinen-Store importieren</text>
 <line x1="380" y1="618" x2="380" y2="636" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
-<text x="394" y="624" fill="#22c55e" font-size="11">YES ✓</text>
-<ellipse cx="380" cy="638" rx="80" ry="24" fill="#1a1a2e" stroke="#22c55e" stroke-width="2"/>
-<text x="380" y="643" text-anchor="middle" fill="#22c55e" font-weight="bold">DONE</text>
+<rect x="230" y="638" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="664" text-anchor="middle" fill="#7c3aed" font-weight="bold">SQL Server Netzwerkkonfiguration</text>
+<line x1="380" y1="680" x2="380" y2="698" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="700" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="726" text-anchor="middle" fill="#7c3aed" font-weight="bold">Endpoint-Bindung</text>
+<line x1="380" y1="742" x2="380" y2="760" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="762" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="788" text-anchor="middle" fill="#7c3aed" font-weight="bold">TDE-Bindung</text>
+<line x1="380" y1="804" x2="380" y2="822" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<text x="394" y="810" fill="#22c55e" font-size="11">YES ✓</text>
+<ellipse cx="380" cy="824" rx="80" ry="24" fill="#1a1a2e" stroke="#22c55e" stroke-width="2"/>
+<text x="380" y="829" text-anchor="middle" fill="#22c55e" font-weight="bold">DONE</text>
 </svg>
 </div></section>
 <section><h2 class="st">Examples</h2>

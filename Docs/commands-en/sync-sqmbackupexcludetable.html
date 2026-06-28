@@ -34,7 +34,7 @@
 <tr><td>-SkipAlwaysOnPropagation</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td></tr>
 </tbody></table></section>
 <section><h2 class="st">Execution Flow</h2>
-<div class="fw"><svg viewBox="0 0 760 498" xmlns="http://www.w3.org/2000/svg" font-family="'Cascadia Code','Consolas',monospace" font-size="12" fill="#e2e8f0">
+<div class="fw"><svg viewBox="0 0 760 746" xmlns="http://www.w3.org/2000/svg" font-family="'Cascadia Code','Consolas',monospace" font-size="12" fill="#e2e8f0">
 <defs>
 <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#5dade2"/></marker>
 <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ef4444"/></marker>
@@ -53,17 +53,33 @@
 <text x="394" y="178" fill="#22c55e" font-size="11">YES</text>
 <line x1="380" y1="164" x2="380" y2="186" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
 <rect x="230" y="188" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
-<text x="380" y="214" text-anchor="middle" fill="#7c3aed" font-weight="bold">Connect to SQL Server</text>
+<text x="380" y="214" text-anchor="middle" fill="#7c3aed" font-weight="bold">Verbindung aufbauen</text>
 <line x1="380" y1="230" x2="380" y2="248" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
 <rect x="230" y="250" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
-<text x="380" y="276" text-anchor="middle" fill="#7c3aed" font-weight="bold">Detect Differences</text>
+<text x="380" y="264" text-anchor="middle" fill="#7c3aed" font-weight="bold" font-size="11">Tabelle erstellen</text>
+<text x="380" y="279" text-anchor="middle" fill="#7c3aed" font-size="11">falls nicht vorhan…</text>
 <line x1="380" y1="292" x2="380" y2="310" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
 <rect x="230" y="312" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
-<text x="380" y="338" text-anchor="middle" fill="#7c3aed" font-weight="bold">Sync Changes</text>
+<text x="380" y="326" text-anchor="middle" fill="#7c3aed" font-weight="bold" font-size="11">Aktuelle</text>
+<text x="380" y="341" text-anchor="middle" fill="#7c3aed" font-size="11">Datenbanken vom Server laden</text>
 <line x1="380" y1="354" x2="380" y2="372" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
-<text x="394" y="360" fill="#22c55e" font-size="11">YES ✓</text>
-<ellipse cx="380" cy="374" rx="80" ry="24" fill="#1a1a2e" stroke="#22c55e" stroke-width="2"/>
-<text x="380" y="379" text-anchor="middle" fill="#22c55e" font-weight="bold">DONE</text>
+<rect x="230" y="374" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="388" text-anchor="middle" fill="#7c3aed" font-weight="bold" font-size="11">Bestehende</text>
+<text x="380" y="403" text-anchor="middle" fill="#7c3aed" font-size="11">Eintraege aus der Tabelle…</text>
+<line x1="380" y1="416" x2="380" y2="434" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="436" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="462" text-anchor="middle" fill="#7c3aed" font-weight="bold">Neue Datenbanken einfuegen</text>
+<line x1="380" y1="478" x2="380" y2="496" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="498" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="524" text-anchor="middle" fill="#7c3aed" font-weight="bold">Verwaiste Eintraege markieren</text>
+<line x1="380" y1="540" x2="380" y2="558" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="560" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="574" text-anchor="middle" fill="#7c3aed" font-weight="bold" font-size="11">Verwaiste</text>
+<text x="380" y="589" text-anchor="middle" fill="#7c3aed" font-size="11">Eintraege reaktivieren wen…</text>
+<line x1="380" y1="602" x2="380" y2="620" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<text x="394" y="608" fill="#22c55e" font-size="11">YES ✓</text>
+<ellipse cx="380" cy="622" rx="80" ry="24" fill="#1a1a2e" stroke="#22c55e" stroke-width="2"/>
+<text x="380" y="627" text-anchor="middle" fill="#22c55e" font-weight="bold">DONE</text>
 </svg>
 </div></section>
 <section><h2 class="st">Examples</h2>

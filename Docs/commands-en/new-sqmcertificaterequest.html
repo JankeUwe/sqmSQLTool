@@ -44,7 +44,7 @@
 <tr><td>-Country</td><td>string</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td></tr>
 </tbody></table></section>
 <section><h2 class="st">Execution Flow</h2>
-<div class="fw"><svg viewBox="0 0 760 674" xmlns="http://www.w3.org/2000/svg" font-family="'Cascadia Code','Consolas',monospace" font-size="12" fill="#e2e8f0">
+<div class="fw"><svg viewBox="0 0 760 808" xmlns="http://www.w3.org/2000/svg" font-family="'Cascadia Code','Consolas',monospace" font-size="12" fill="#e2e8f0">
 <defs>
 <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#5dade2"/></marker>
 <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ef4444"/></marker>
@@ -63,33 +63,32 @@
 <text x="394" y="178" fill="#22c55e" font-size="11">YES</text>
 <line x1="380" y1="164" x2="380" y2="186" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
 <rect x="230" y="188" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
-<text x="380" y="214" text-anchor="middle" fill="#7c3aed" font-weight="bold">Validate Prerequisites</text>
+<text x="380" y="214" text-anchor="middle" fill="#7c3aed" font-weight="bold">Bestandszertifikat lesen</text>
 <line x1="380" y1="230" x2="380" y2="248" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
 <rect x="230" y="250" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
-<text x="380" y="276" text-anchor="middle" fill="#7c3aed" font-weight="bold">Create Resource</text>
+<text x="380" y="276" text-anchor="middle" fill="#7c3aed" font-weight="bold">Subject zusammenbauen</text>
 <line x1="380" y1="292" x2="380" y2="310" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
-<polygon points="380,312 485,344 380,376 275,344" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
-<text x="380" y="348" text-anchor="middle" fill="#f59e0b" font-weight="bold">Result OK?</text>
-<line x1="275" y1="344" x2="165" y2="344" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
-<text x="265" y="338" text-anchor="end" fill="#ef4444" font-size="11">NO</text>
-<rect x="20" y="324" width="145" height="38" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1.5"/>
-<text x="93" y="342" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">Error</text>
-<text x="394" y="390" fill="#22c55e" font-size="11">YES</text>
-<line x1="380" y1="376" x2="380" y2="398" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
-<polygon points="380,400 485,432 380,464 275,432" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
-<text x="380" y="436" text-anchor="middle" fill="#f59e0b" font-weight="bold">-OutputPath set?</text>
-<line x1="275" y1="432" x2="165" y2="432" stroke="#94a8c0" stroke-width="1.5" marker-end="url(#ao)"/>
-<text x="265" y="426" text-anchor="end" fill="#94a8c0" font-size="11">NO</text>
-<rect x="20" y="412" width="145" height="38" rx="6" fill="rgba(148,168,192,0.15)" stroke="#94a8c0" stroke-width="1.5"/>
-<text x="93" y="430" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Console only</text>
-<text x="394" y="478" fill="#22c55e" font-size="11">YES</text>
-<line x1="380" y1="464" x2="380" y2="486" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
-<rect x="230" y="488" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#0891b2" stroke-width="1.5"/>
-<text x="380" y="514" text-anchor="middle" fill="#0891b2" font-weight="bold">Write Report File</text>
-<line x1="380" y1="530" x2="380" y2="548" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
-<text x="394" y="536" fill="#22c55e" font-size="11">YES ✓</text>
-<ellipse cx="380" cy="550" rx="80" ry="24" fill="#1a1a2e" stroke="#22c55e" stroke-width="2"/>
-<text x="380" y="555" text-anchor="middle" fill="#22c55e" font-weight="bold">DONE</text>
+<rect x="230" y="312" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="338" text-anchor="middle" fill="#7c3aed" font-weight="bold">SANs zusammenstellen</text>
+<line x1="380" y1="354" x2="380" y2="372" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="374" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="400" text-anchor="middle" fill="#7c3aed" font-weight="bold">Key Usage und EKU je nach Purpose</text>
+<line x1="380" y1="416" x2="380" y2="434" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="436" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="462" text-anchor="middle" fill="#7c3aed" font-weight="bold">Ausgabeverzeichnis</text>
+<line x1="380" y1="478" x2="380" y2="496" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="498" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="524" text-anchor="middle" fill="#7c3aed" font-weight="bold">INF-Datei fuer certreq.exe erstellen</text>
+<line x1="380" y1="540" x2="380" y2="558" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="560" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="586" text-anchor="middle" fill="#7c3aed" font-weight="bold">CSR via certreq.exe generieren</text>
+<line x1="380" y1="602" x2="380" y2="620" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="230" y="622" width="300" height="42" rx="6" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="648" text-anchor="middle" fill="#7c3aed" font-weight="bold">Bestelldatenblatt schreiben</text>
+<line x1="380" y1="664" x2="380" y2="682" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<text x="394" y="670" fill="#22c55e" font-size="11">YES ✓</text>
+<ellipse cx="380" cy="684" rx="80" ry="24" fill="#1a1a2e" stroke="#22c55e" stroke-width="2"/>
+<text x="380" y="689" text-anchor="middle" fill="#22c55e" font-weight="bold">DONE</text>
 </svg>
 </div></section>
 <section><h2 class="st">Examples</h2>
