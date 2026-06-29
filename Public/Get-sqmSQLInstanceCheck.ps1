@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Checks a SQL Server instance against best practices.
 

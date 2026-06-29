@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Automatically changes the server collation of a SQL Server instance.
 

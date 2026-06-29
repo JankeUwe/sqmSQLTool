@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Compares important configuration settings between two SQL Server instances.
 
