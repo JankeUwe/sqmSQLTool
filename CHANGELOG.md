@@ -1,5 +1,33 @@
 # sqmSQLTool — Changelog
 
+## [1.8.3.0] — 2026-06-29
+
+### Bugfixes & Erweiterungen
+
+**`Sync-sqmLoginsToAlwaysOn`**
+- Fix: Primary-Replica-Erkennung schlaegt auf Secondary-Instanzen nicht mehr fehl.
+  `sys.dm_hadr_availability_replica_states.role_desc` liefert NULL/RESOLVING wenn von
+  einer Secondary abgefragt — Umstieg auf `sys.dm_hadr_availability_group_states.primary_replica`,
+  das auf jeder Replica den aktuellen Primary enthaelt.
+- Fix: `Write-EventLog`-Fehler (AccessDenied) leckte auf die Konsole, weil der Setter eine
+  non-terminating Exception wirft, die `catch { }` nicht abfaengt.
+  `-ErrorAction SilentlyContinue` ergaenzt (EventId 9002 / 9003).
+
+**`Invoke-sqmCollationChange`**
+- Fix: `PropertyAssignmentException` bei `ProcessStartInfo.CreateNoNewWindow = $true` entfernt.
+  Die Property kann nicht gesetzt werden wenn `UseShellExecute` noch nicht evaluiert wurde.
+  Redundant: bei `UseShellExecute = $false` + `RedirectStandard* = $true` entsteht ohnehin
+  kein Konsolenfenster.
+
+**`Get-sqmSQLInstanceCheck`**
+- Neu: Check **Instance Collation** (Status `Info`) — meldet `server.Collation` in jedem Lauf.
+- Neu: Check **Database Collation vs. Instance** (nur mit `-Detailed`) — listet alle
+  Benutzerdatenbanken, deren Collation von der Instanz-Collation abweicht, als `Warning`.
+
+**`Compare-sqmServerConfiguration`**
+- Neu: **Collation (Instance)** wird jetzt immer im Report ausgegeben (`Category = "Collation"`),
+  nicht nur bei Abweichung — wichtig fuer Migrationschecks.
+
 ## [1.8.2.0] — 2026-06-26
 
 ### ✨ Temporäre Sysadmin-Rechte: AD-Login-Anlage, Cleanup & AlwaysOn

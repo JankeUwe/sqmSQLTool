@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Compares important configuration settings between two SQL Server instances.
 
@@ -92,6 +92,7 @@ function Compare-sqmServerConfiguration
 			$targetProps = Get-ServerProps $TargetInstance
 			foreach ($key in $sourceProps.Keys)
 			{
+				if ($key -eq 'Collation') { continue }
 				if ($sourceProps[$key] -ne $targetProps[$key])
 				{
 					$results.Add([PSCustomObject]@{
@@ -102,6 +103,15 @@ function Compare-sqmServerConfiguration
 						})
 				}
 			}
+
+			# Collation always reported (not just on difference)
+			$results.Add([PSCustomObject]@{
+				Setting     = "Collation (Instance)"
+				SourceValue = $sourceProps['Collation']
+				TargetValue = $targetProps['Collation']
+				Category    = "Collation"
+			})
+
 			if ($CompareDatabases)
 			{
 				$sourceDbs = Get-DatabaseSimple $SourceInstance | Where-Object { -not $_.IsSystemObject }

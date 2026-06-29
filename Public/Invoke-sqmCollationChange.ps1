@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Automatically changes the server collation of a SQL Server instance.
 
@@ -325,10 +325,8 @@ function Invoke-sqmCollationChange
 			Write-Host "  Starte sqlservr.exe im Minimal-Modus mit neuer Collation..." -ForegroundColor Gray
 			$startInfo = [System.Diagnostics.ProcessStartInfo]::new()
 			$startInfo.FileName = $sqlBinPath
-			$sFlag = if ($instanceRegName -ne 'MSSQLSERVER') { " -s`"$instanceRegName`"" } else { '' }
-			$startInfo.Arguments = "-m -T4022 -T3659$sFlag -q `"$NewCollation`""
+			$startInfo.Arguments = "-m -T4022 -T3659 -q `"$NewCollation`""
 			$startInfo.UseShellExecute = $false
-			$startInfo.CreateNoNewWindow = $true
 			$startInfo.RedirectStandardOutput = $true
 			$startInfo.RedirectStandardError = $true
 			$sqlProc = [System.Diagnostics.Process]::Start($startInfo)

@@ -278,15 +278,17 @@ ORDER BY name ASC
 SELECT
     ar.replica_server_name,
     ar.availability_mode_desc,
-    drs.role_desc
+    ISNULL(
+        CASE WHEN ar.replica_server_name = ags.primary_replica THEN 'PRIMARY' ELSE 'SECONDARY' END,
+        'RESOLVING'
+    ) AS role_desc
 FROM sys.availability_replicas ar
-INNER JOIN sys.dm_hadr_availability_replica_states drs
-    ON ar.replica_id = drs.replica_id
-WHERE ar.group_id IN (
-    SELECT group_id FROM sys.availability_groups
-    WHERE name = N'$AvailabilityGroupName'
-)
-ORDER BY drs.role ASC
+INNER JOIN sys.availability_groups ag
+    ON ar.group_id = ag.group_id
+LEFT JOIN sys.dm_hadr_availability_group_states ags
+    ON ag.group_id = ags.group_id
+WHERE ag.name = N'$AvailabilityGroupName'
+ORDER BY role_desc ASC
 "@
 
 			$replicas = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $srcCred -Query $query -ErrorAction Stop
@@ -598,7 +600,8 @@ ORDER BY sp.name
 				$evtSrc = 'sqmSQLTool'
 				if (-not [System.Diagnostics.EventLog]::SourceExists($evtSrc)) { New-EventLog -LogName Application -Source $evtSrc -ErrorAction Stop }
 				Write-EventLog -LogName Application -Source $evtSrc -EntryType Error -EventId 9002 `
-					-Message "sqmSQLTool: Login-Sync fehlgeschlagen AG '$AvailabilityGroupName' auf '$SqlInstance' - Failed=$failedCount"
+					-Message "sqmSQLTool: Login-Sync fehlgeschlagen AG '$AvailabilityGroupName' auf '$SqlInstance' - Failed=$failedCount" `
+					-ErrorAction SilentlyContinue
 			}
 			catch { }
 		}
@@ -622,7 +625,8 @@ ORDER BY sp.name
 						$evtSrc = 'sqmSQLTool'
 						if (-not [System.Diagnostics.EventLog]::SourceExists($evtSrc)) { New-EventLog -LogName Application -Source $evtSrc -ErrorAction Stop }
 						Write-EventLog -LogName Application -Source $evtSrc -EntryType Warning -EventId 9003 `
-							-Message "sqmSQLTool: AD-verwaiste Logins auf '$SqlInstance' AG '$AvailabilityGroupName' - Count=$($adOrphans.Count): $orphanNames"
+							-Message "sqmSQLTool: AD-verwaiste Logins auf '$SqlInstance' AG '$AvailabilityGroupName' - Count=$($adOrphans.Count): $orphanNames" `
+							-ErrorAction SilentlyContinue
 					}
 					catch { }
 				}

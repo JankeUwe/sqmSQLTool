@@ -1,4 +1,4 @@
-﻿<#	
+<#	
 	===========================================================================
 	 Created with: 	SAPIEN Technologies, Inc., PowerShell Studio 2021 v5.8.183
 	 Created on:   	21.04.2026 15:37
@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.8.2.0'
+	ModuleVersion		   = '1.8.3.0'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'

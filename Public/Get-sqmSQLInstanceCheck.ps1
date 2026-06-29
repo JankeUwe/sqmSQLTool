@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
 Checks a SQL Server instance against best practices.
 
@@ -321,6 +321,29 @@ function Get-sqmSQLInstanceCheck
 				Recommended  = "Aktuelle Version + neuestes Service Pack / CU"
 				Status	     = if ($isOld) { "Warning" } else { "OK" }
 				Message	     = if ($isOld) { "Die Version $version ist veraltet. Upgrade empfohlen." } else { "OK." }
+			}
+
+			# 10. Instance Collation
+			$instanceCollation = $server.Collation
+			$results += [PSCustomObject]@{
+				Check       = "Instance Collation"
+				CurrentValue = $instanceCollation
+				Recommended  = "Unternehmensstandard sicherstellen (z.B. Latin1_General_CI_AS)"
+				Status      = "Info"
+				Message     = "Instanz-Collation: $instanceCollation"
+			}
+
+			if ($Detailed)
+			{
+				$allDbs = Get-DbaDatabase -SqlInstance $server -ExcludeSystem -ErrorAction SilentlyContinue
+				$collationMismatch = @($allDbs | Where-Object { $_.Collation -ne $instanceCollation } | ForEach-Object { "$($_.Name): $($_.Collation)" })
+				$results += [PSCustomObject]@{
+					Check       = "Database Collation (vs. Instance)"
+					CurrentValue = if ($collationMismatch.Count -gt 0) { "$($collationMismatch.Count) DB(s) abweichend" } else { "Alle gleich" }
+					Recommended  = "Alle Benutzerdatenbanken sollten Instanz-Collation verwenden ($instanceCollation)"
+					Status      = if ($collationMismatch.Count -gt 0) { "Warning" } else { "OK" }
+					Message     = if ($collationMismatch.Count -gt 0) { "Abweichende Collation: $($collationMismatch -join '; ')" } else { "Alle Benutzerdatenbanken nutzen die Instanz-Collation." }
+				}
 			}
 		}
 		catch
