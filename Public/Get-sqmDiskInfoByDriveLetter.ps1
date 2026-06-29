@@ -101,24 +101,17 @@ function Get-sqmDiskInfoByDriveLetter
 			}
 
 			# Pruefen ob weitere Laufwerksbuchstaben auf derselben physischen Disk liegen
+			# Get-Disk liefert MSFT_Disk (kein DeviceID) – Get-Partition direkt nutzen
 			$isPartitioned = $false
 			$sharedWith    = ''
 			try
 			{
-				$disk2Part  = @(Get-CimInstance -ClassName Win32_DiskDriveToDiskPartition -ErrorAction Stop)
-				$part2Log   = @(Get-CimInstance -ClassName Win32_LogicalDiskToPartition  -ErrorAction Stop)
-
-				# Partitions-IDs dieser Disk
-				$myPartIds = @($disk2Part |
-					Where-Object { $_.Antecedent.DeviceID -eq $disk.DeviceID } |
-					ForEach-Object { $_.Dependent.DeviceID })
-
-				# Alle Laufwerksbuchstaben auf diesen Partitionen ausser dem aktuellen
-				$otherLetters = @($part2Log |
-					Where-Object { $_.Antecedent.DeviceID -in $myPartIds } |
-					ForEach-Object { $_.Dependent.DeviceID } |
-					Where-Object   { $_ -ne "${Letter}:" } |
-					Sort-Object)
+				$otherLetters = @(
+					Get-Partition -DiskNumber $diskNumber -ErrorAction Stop |
+					Where-Object  { $_.DriveLetter -and $_.DriveLetter -ne $Letter } |
+					ForEach-Object { "$($_.DriveLetter):" } |
+					Sort-Object
+				)
 
 				if ($otherLetters.Count -gt 0)
 				{

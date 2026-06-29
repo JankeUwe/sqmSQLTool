@@ -237,8 +237,8 @@ function _Get-sqmHardwareData
     $physDisks = _CIM 'Win32_DiskDrive'
     $netAdapt  = _CIM 'Win32_NetworkAdapterConfiguration' 'IPEnabled=True'
     $sqlSvcs   = _CIM 'Win32_Service'        "Name LIKE 'MSSQL%'"
-    $disk2Part = _CIM 'Win32_DiskDriveToDiskPartition'
-    $part2Log  = _CIM 'Win32_LogicalDiskToPartition'
+    $part2Log       = _CIM 'Win32_LogicalDiskToPartition'
+    $diskPartitions = _CIM 'Win32_DiskPartition'
 
     # Optionaler SSD-Check (nur Win8+ / Server 2012+, kann fehlen)
     $physDiskTypes = @{}
@@ -254,26 +254,30 @@ function _Get-sqmHardwareData
     }
     catch { }
 
-    # Disk → Laufwerksbuchstaben Mapping (fuer Partitions-Erkennung im Report)
+    # Disk → Laufwerksbuchstaben Mapping über Win32_DiskPartition.DiskIndex
+    # (Win32_DiskDriveToDiskPartition-Assoziationsklasse liefert .DeviceID auf manchen Systemen als $null)
     $diskToLetters = @{}
     try
     {
         $partToLetters = @{}
         foreach ($assoc in $part2Log)
         {
-            $partId = $assoc.Antecedent.DeviceID
-            $letter = $assoc.Dependent.DeviceID
-            if (-not $partToLetters.ContainsKey($partId)) { $partToLetters[$partId] = [System.Collections.Generic.List[string]]::new() }
-            $partToLetters[$partId].Add($letter)
-        }
-        foreach ($assoc in $disk2Part)
-        {
-            $diskId = $assoc.Antecedent.DeviceID
-            $partId = $assoc.Dependent.DeviceID
-            if (-not $diskToLetters.ContainsKey($diskId)) { $diskToLetters[$diskId] = [System.Collections.Generic.List[string]]::new() }
-            if ($partToLetters.ContainsKey($partId))
+            $partId = [string]$assoc.Antecedent.DeviceID
+            $letter = [string]$assoc.Dependent.DeviceID
+            if ($partId -and $letter)
             {
-                foreach ($letter in $partToLetters[$partId]) { $diskToLetters[$diskId].Add($letter) }
+                if (-not $partToLetters.ContainsKey($partId)) { $partToLetters[$partId] = [System.Collections.Generic.List[string]]::new() }
+                $partToLetters[$partId].Add($letter)
+            }
+        }
+        foreach ($part in $diskPartitions)
+        {
+            $partId  = [string]$part.DeviceID
+            $diskIdx = [string]$part.DiskIndex
+            if ($partId -and $diskIdx -ne $null -and $partToLetters.ContainsKey($partId))
+            {
+                if (-not $diskToLetters.ContainsKey($diskIdx)) { $diskToLetters[$diskIdx] = [System.Collections.Generic.List[string]]::new() }
+                foreach ($letter in $partToLetters[$partId]) { $diskToLetters[$diskIdx].Add($letter) }
             }
         }
     }
@@ -500,16 +504,16 @@ function _Build-sqmHardwareReportHtml
         $pdIface   = if ($pd.InterfaceType){ [string]$pd.InterfaceType } else { '' }
         $pdDevId   = if ($pd.DeviceID)     { [string]$pd.DeviceID }     else { '' }
         $pdDevNum  = $pdDevId -replace '^\\\\\.\\PHYSICALDRIVE', ''
-        $pdIndex   = if ($pd.Index) { [string]$pd.Index } else { 'n/a' }
+        $pdIndex   = if ($pd.Index -ne $null) { [string]$pd.Index } else { 'n/a' }
         $pdSerial  = if ($pd.SerialNumber) { [string]$pd.SerialNumber } else { 'n/a' }
         # SSD-Info aus MSFT_PhysicalDisk wenn verfuegbar
         $ssdType   = if ($d.PhysicalDiskTypes.ContainsKey($pdDevNum)) { $d.PhysicalDiskTypes[$pdDevNum] } else { '' }
         $typeDisp  = if ($ssdType) { $ssdType } elseif ($pdMedia -match 'SSD|Solid') { 'SSD' } else { $pdMedia }
         $parts     = if ($pd.Partitions) { [string]$pd.Partitions } else { 'n/a' }
 
-        # Laufwerksbuchstaben und Geteilt-Badge
-        $pdLetters = if ($d.DiskToLetters -and $d.DiskToLetters.ContainsKey($pdDevId)) {
-            @($d.DiskToLetters[$pdDevId] | Sort-Object)
+        # Laufwerksbuchstaben und Geteilt-Badge (Schlüssel = DiskIndex, wie im Mapping gebaut)
+        $pdLetters = if ($pdIndex -ne 'n/a' -and $d.DiskToLetters -and $d.DiskToLetters.ContainsKey($pdIndex)) {
+            @($d.DiskToLetters[$pdIndex] | Sort-Object)
         } else { @() }
         $letterStr    = if ($pdLetters.Count -gt 0) { $pdLetters -join ', ' } else { '&ndash;' }
         $sharedBadge  = if ($pdLetters.Count -gt 1) {
@@ -923,16 +927,15 @@ function _Build-sqmHardwareReportTxt
         $lines += "  [PHYSIKALISCHE DISKS]"
         foreach ($pd in ($Data.PhysicalDisks | Sort-Object Index))
         {
-            $pdIndex  = if ($pd.Index) { [string]$pd.Index } else { 'n/a' }
+            $pdIndex  = if ($pd.Index -ne $null) { [string]$pd.Index } else { 'n/a' }
             $pdModel  = if ($pd.Model) { [string]$pd.Model } else { 'n/a' }
             $pdSize   = if ($pd.Size) { '{0:N0}' -f ([double]$pd.Size / 1GB) + ' GB' } else { 'n/a' }
             $pdSerial = if ($pd.SerialNumber) { [string]$pd.SerialNumber } else { 'n/a' }
-            $pdDevId  = if ($pd.DeviceID) { [string]$pd.DeviceID } else { '' }
-            $pdLetters = if ($Data.DiskToLetters -and $Data.DiskToLetters.ContainsKey($pdDevId)) {
-                ($Data.DiskToLetters[$pdDevId] | Sort-Object) -join ', '
+            $pdLetters = if ($pdIndex -ne 'n/a' -and $Data.DiskToLetters -and $Data.DiskToLetters.ContainsKey($pdIndex)) {
+                ($Data.DiskToLetters[$pdIndex] | Sort-Object) -join ', '
             } else { '(keine)' }
-            $sharedTag = if ($Data.DiskToLetters -and $Data.DiskToLetters.ContainsKey($pdDevId) -and
-                            $Data.DiskToLetters[$pdDevId].Count -gt 1) { ' [GETEILT]' } else { '' }
+            $sharedTag = if ($pdIndex -ne 'n/a' -and $Data.DiskToLetters -and $Data.DiskToLetters.ContainsKey($pdIndex) -and
+                            $Data.DiskToLetters[$pdIndex].Count -gt 1) { ' [GETEILT]' } else { '' }
             $lines += "    Disk $pdIndex : $pdModel ($pdSize, S/N: $pdSerial, Laufwerke: $pdLetters)$sharedTag"
         }
     }
