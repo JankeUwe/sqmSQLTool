@@ -168,8 +168,27 @@ else
 	}
 	catch
 	{
-		# dbatools nicht ladbar  - nur warnen, Modul laedt trotzdem
-		$script:dbatoolsAvailable = $false
+		# dbatools nicht via PSModulePath gefunden - FITS-Fallback: lokaler Modulpfad
+		$fitsFallback = 'W:\75084-Datenbanken\MSSQL\SQLSources\Modules'
+		if (Test-Path $fitsFallback)
+		{
+			$dbaDirs = @(Get-ChildItem -Path $fitsFallback -Directory -Filter 'dbatools*' -ErrorAction SilentlyContinue)
+			if ($dbaDirs.Count -gt 0)
+			{
+				# Neueste Version bevorzugen (nach Name absteigend, bei semver-Verzeichnissen)
+				$dbaDir = ($dbaDirs | Sort-Object Name -Descending | Select-Object -First 1).FullName
+				try
+				{
+					Import-Module $dbaDir -ErrorAction Stop
+					$script:dbatoolsAvailable = $true
+				}
+				catch
+				{
+					$script:dbatoolsAvailable = $false
+				}
+			}
+		}
+		if (-not $script:dbatoolsAvailable) { $script:dbatoolsAvailable = $false }
 	}
 }
 

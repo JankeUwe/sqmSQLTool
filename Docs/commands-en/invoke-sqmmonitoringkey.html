@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoke-sqmMonitoringKey – sqmSQLTool</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
+.hero{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-bottom:1px solid #334155;padding:2rem 2rem 1.5rem}
+.hero-inner{max-width:960px;margin:0 auto}
+.breadcrumb{font-size:.75rem;color:#64748b;margin-bottom:.75rem}
+.breadcrumb a{color:#64748b;text-decoration:none}
+.breadcrumb a:hover{color:#94a3b8}
+h1{font-size:1.75rem;font-weight:700;color:#f1f5f9;font-family:'Cascadia Code','Consolas',monospace}
+.badge{display:inline-block;font-size:.7rem;font-weight:600;padding:.2rem .6rem;border-radius:9999px;margin-left:.75rem;vertical-align:middle;background:#0369a1;color:#fff;letter-spacing:.04em}
+.synopsis{color:#94a3b8;margin-top:.5rem;font-size:.95rem;max-width:720px}
+.content{max-width:960px;margin:0 auto;padding:2rem}
+section{margin-bottom:2rem}
+h2{font-size:1.1rem;font-weight:600;color:#7dd3fc;border-bottom:1px solid #1e3a5f;padding-bottom:.4rem;margin-bottom:1rem;text-transform:uppercase;letter-spacing:.06em}
+p{color:#cbd5e1;margin-bottom:.75rem;font-size:.9rem}
+.param-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.param-table th{background:#1e293b;color:#7dd3fc;text-align:left;padding:.5rem .75rem;font-weight:600;border-bottom:1px solid #334155}
+.param-table td{padding:.45rem .75rem;border-bottom:1px solid #1e293b;color:#cbd5e1;vertical-align:top}
+.param-table tr:hover td{background:#1e293b55}
+.param-name{font-family:'Cascadia Code','Consolas',monospace;color:#f0abfc;font-weight:600}
+.param-type{font-family:'Cascadia Code','Consolas',monospace;color:#6ee7b7;font-size:.78rem}
+.param-default{font-family:'Cascadia Code','Consolas',monospace;color:#fbbf24;font-size:.78rem}
+pre{background:#1e293b;border:1px solid #334155;border-radius:.5rem;padding:1rem;overflow-x:auto;font-size:.82rem;font-family:'Cascadia Code','Consolas',monospace;line-height:1.5}
+.comment{color:#64748b}.keyword{color:#c084fc}.string{color:#86efac}.cmdlet{color:#67e8f9}.param{color:#fbbf24}
+.note-box{background:#1e293b;border-left:3px solid #0ea5e9;border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin:.75rem 0;font-size:.85rem;color:#94a3b8}
+.warn-box{background:#1c1a0f;border-left:3px solid #f59e0b;border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin:.75rem 0;font-size:.85rem;color:#fcd34d}
+.diagram-wrap{background:#1e293b;border:1px solid #334155;border-radius:.75rem;padding:1.5rem;text-align:center;overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="hero-inner">
+    <div class="breadcrumb"><a href="../index.html">sqmSQLTool</a> › <a href="index.html">Commands</a> › Invoke-sqmMonitoringKey</div>
+    <h1>Invoke-sqmMonitoringKey <span class="badge">Configuration</span></h1>
+    <p class="synopsis">Reads or writes monitoring registry values (SQL level, SQLFreeSpaceVersion, TSM) under HKLM:\System\dtcSoftware\sqmSQLTool on one or more computers. Remote access via WinRM; pipeline-capable.</p>
+  </div>
+</div>
+
+<div class="content">
+
+<section>
+<h2>Execution Flow</h2>
+<div class="diagram-wrap">
+<svg viewBox="0 0 760 920" xmlns="http://www.w3.org/2000/svg" style="max-width:760px;width:100%;font-family:'Segoe UI',Arial,sans-serif;font-size:12px">
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#5dade2"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#ef4444"/></marker>
+    <marker id="aa" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#f59e0b"/></marker>
+  </defs>
+
+  <!-- START -->
+  <ellipse cx="380" cy="30" rx="60" ry="18" fill="#00c8e8" opacity=".9"/>
+  <text x="380" y="34" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">START</text>
+
+  <!-- begin: regPath -->
+  <line x1="380" y1="48" x2="380" y2="73" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="215" y="73" width="330" height="28" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="380" y="91" text-anchor="middle" fill="#94a3b8" font-size="10.5">Build regPath: HKLM:\$RegistryBase\dtcSoftware\sqmSQLTool</text>
+
+  <!-- foreach computer loop -->
+  <line x1="380" y1="101" x2="380" y2="126" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="130" y="126" width="500" height="690" rx="8" fill="none" stroke="#334155" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="145" y="141" fill="#64748b" font-size="10">foreach $computer in $ComputerName  [pipeline-capable]</text>
+
+  <!-- AutoDetect -->
+  <line x1="380" y1="126" x2="380" y2="160" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="155" y="160" width="450" height="60" rx="6" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="170" y="175" fill="#64748b" font-size="9.5">if $Operation='Set' &amp;&amp; $AutoDetectSQLFreeSpaceVersion</text>
+  <rect x="255" y="180" width="250" height="20" rx="4" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="194" text-anchor="middle" fill="#94a3b8" font-size="10">Get-DbaAvailabilityGroup → Cluster / Standard</text>
+
+  <!-- Set block -->
+  <line x1="380" y1="220" x2="380" y2="245" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <polygon points="380,245 435,265 380,285 325,265" fill="#1e293b" stroke="#5dade2" stroke-width="1.5"/>
+  <text x="380" y="263" text-anchor="middle" fill="#bfdbfe" font-size="10">Operation</text>
+  <text x="380" y="276" text-anchor="middle" fill="#bfdbfe" font-size="10">= 'Set'?</text>
+
+  <!-- YES → check values supplied -->
+  <line x1="380" y1="285" x2="380" y2="310" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#aa)"/>
+  <rect x="155" y="310" width="450" height="170" rx="6" fill="none" stroke="#f59e0b" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="170" y="325" fill="#fcd34d" font-size="9.5">if Operation='Set'</text>
+  <!-- no values supplied -->
+  <polygon points="380,330 435,350 380,370 325,350" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="380" y="347" text-anchor="middle" fill="#fcd34d" font-size="10">Any values</text>
+  <text x="380" y="360" text-anchor="middle" fill="#fcd34d" font-size="10">supplied?</text>
+  <line x1="435" y1="350" x2="555" y2="350" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#aa)"/>
+  <rect x="555" y="335" width="80" height="30" rx="4" fill="#451a03"/>
+  <text x="595" y="353" text-anchor="middle" fill="#fcd34d" font-size="10">WARNING</text>
+  <text x="443" y="347" fill="#f59e0b" font-size="10">NO</text>
+  <!-- ShouldProcess -->
+  <line x1="380" y1="370" x2="380" y2="395" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#aa)"/>
+  <polygon points="380,395 435,415 380,435 325,415" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="380" y="413" text-anchor="middle" fill="#fcd34d" font-size="10">ShouldProcess</text>
+  <text x="380" y="426" text-anchor="middle" fill="#fcd34d" font-size="10">None</text>
+  <!-- ensure key exists + set values -->
+  <rect x="240" y="440" width="280" height="20" rx="4" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="454" text-anchor="middle" fill="#94a3b8" font-size="10">Ensure key exists (local: Test-Path / remote: Invoke-Command)</text>
+  <rect x="240" y="464" width="280" height="20" rx="4" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="477" text-anchor="middle" fill="#94a3b8" font-size="10">Set-ItemProperty SQL(DWORD) / SQLFreeSpaceVersion / TSM</text>
+
+  <!-- Read always -->
+  <line x1="380" y1="480" x2="380" y2="510" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="175" y="510" width="410" height="70" rx="6" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="190" y="525" fill="#64748b" font-size="9.5">Always: read current values</text>
+  <rect x="240" y="530" width="280" height="20" rx="4" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="544" text-anchor="middle" fill="#94a3b8" font-size="10">Local: Get-ItemProperty HKLM:\…</text>
+  <rect x="240" y="554" width="280" height="20" rx="4" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="567" text-anchor="middle" fill="#94a3b8" font-size="10">Remote: Invoke-Command (ScriptBlock)</text>
+
+  <!-- Build result object -->
+  <line x1="380" y1="580" x2="380" y2="610" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="215" y="610" width="330" height="50" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="380" y="630" text-anchor="middle" fill="#94a3b8" font-size="10.5">Build result: SQL / SQL_Description / SQLFreeSpaceVersion</text>
+  <text x="380" y="648" text-anchor="middle" fill="#94a3b8" font-size="10.5">TSM / TSM_Description / Status / Message</text>
+
+  <!-- error handling -->
+  <rect x="155" y="675" width="450" height="40" rx="6" fill="none" stroke="#ef4444" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="170" y="693" fill="#fca5a5" font-size="9.5">catch: add Failed result; if EnableException → throw; if !ContinueOnError → throw</text>
+
+  <!-- Return all results -->
+  <line x1="380" y1="816" x2="380" y2="836" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="265" y="836" width="230" height="28" rx="5" fill="#1e3a5f" stroke="#5dade2" stroke-width="1"/>
+  <text x="380" y="854" text-anchor="middle" fill="#bfdbfe" font-size="11">Return $allResults[]</text>
+
+  <!-- DONE -->
+  <line x1="380" y1="864" x2="380" y2="880" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <ellipse cx="380" cy="898" rx="60" ry="18" fill="#22c55e" opacity=".9"/>
+  <text x="380" y="902" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">DONE</text>
+</svg>
+</div>
+</section>
+
+<section>
+<h2>Synopsis</h2>
+<p>Reads or writes the sqmSQLTool monitoring registry key <code>HKLM:\System\dtcSoftware\sqmSQLTool</code> on one or more computers. Controls SQL monitoring level (None/Standard/Full), free-space monitoring variant (Standard/Cluster for AlwaysOn), and TSM backup monitoring (0/1). With <code>-AutoDetectSQLFreeSpaceVersion</code>, the function automatically checks for AlwaysOn AGs via dbatools and sets the value accordingly. Remote computers are accessed via <code>Invoke-Command</code> (WinRM).</p>
+<div class="note-box">The registry key is created automatically if it does not exist during a Set operation. Read operations never create the key.</div>
+</section>
+
+<section>
+<h2>Syntax</h2>
+<pre><span class="cmdlet">Invoke-sqmMonitoringKey</span>
+    [<span class="param">-ComputerName</span> &lt;String[]&gt;]        <span class="comment"># pipeline-capable</span>
+    [<span class="param">-Operation</span> &lt;Get|Set&gt;]
+    [<span class="param">-SQL</span> &lt;None|Standard|Full&gt;]
+    [<span class="param">-SQLFreeSpaceVersion</span> &lt;Standard|Cluster&gt;]
+    [<span class="param">-TSM</span> &lt;0|1&gt;]
+    [<span class="param">-RegistryBase</span> &lt;String&gt;]
+    [<span class="param">-AutoDetectSQLFreeSpaceVersion</span>]
+    [<span class="param">-Credential</span> &lt;PSCredential&gt;]
+    [<span class="param">-ContinueOnError</span>]
+    [<span class="param">-EnableException</span>]</pre>
+</section>
+
+<section>
+<h2>Parameters</h2>
+<table class="param-table">
+<tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+<tr><td class="param-name">-ComputerName</td><td class="param-type">String[]</td><td class="param-default">$env:COMPUTERNAME</td><td>One or more target computers. Accepts pipeline input.</td></tr>
+<tr><td class="param-name">-Operation</td><td class="param-type">String</td><td class="param-default">Get</td><td>Get: read current values. Set: write the supplied values.</td></tr>
+<tr><td class="param-name">-SQL</td><td class="param-type">String</td><td class="param-default">—</td><td>SQL monitoring level: None (DWORD 0), Standard (1), Full (2).</td></tr>
+<tr><td class="param-name">-SQLFreeSpaceVersion</td><td class="param-type">String</td><td class="param-default">—</td><td>Standard (standalone instance) or Cluster (AlwaysOn AG).</td></tr>
+<tr><td class="param-name">-TSM</td><td class="param-type">Int</td><td class="param-default">—</td><td>TSM backup monitoring: 0 = inactive, 1 = active.</td></tr>
+<tr><td class="param-name">-RegistryBase</td><td class="param-type">String</td><td class="param-default">System</td><td>Registry hive path base under HKLM (e.g. System, Software).</td></tr>
+<tr><td class="param-name">-AutoDetectSQLFreeSpaceVersion</td><td class="param-type">Switch</td><td class="param-default">false</td><td>When set with -Operation Set, auto-detect via Get-DbaAvailabilityGroup and set Cluster or Standard.</td></tr>
+<tr><td class="param-name">-Credential</td><td class="param-type">PSCredential</td><td class="param-default">—</td><td>Windows credential for WinRM access to remote computers.</td></tr>
+<tr><td class="param-name">-ContinueOnError</td><td class="param-type">Switch</td><td class="param-default">false</td><td>Continue with the next computer on error instead of stopping.</td></tr>
+<tr><td class="param-name">-EnableException</td><td class="param-type">Switch</td><td class="param-default">false</td><td>Throw terminating exceptions (overrides ContinueOnError).</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Return Value</h2>
+<p>Array of <code>[PSCustomObject]</code> — one entry per computer:</p>
+<table class="param-table">
+<tr><th>Property</th><th>Description</th></tr>
+<tr><td class="param-name">ComputerName</td><td>Target computer name.</td></tr>
+<tr><td class="param-name">RegistryPath</td><td>Full registry path that was read/written.</td></tr>
+<tr><td class="param-name">SQL</td><td>Raw DWORD value (0/1/2) or null if not set.</td></tr>
+<tr><td class="param-name">SQL_Description</td><td>Decoded: NoMonitoring / ServiceMonitoring / FullMonitoring.</td></tr>
+<tr><td class="param-name">SQLFreeSpaceVersion</td><td>String value: Standard or Cluster.</td></tr>
+<tr><td class="param-name">TSM</td><td>Raw value 0/1 or null if not set.</td></tr>
+<tr><td class="param-name">TSM_Description</td><td>Inactive or Active.</td></tr>
+<tr><td class="param-name">Status</td><td>OK / Updated / Created / KeyNotFound / WhatIfSkipped / Failed.</td></tr>
+<tr><td class="param-name">Message</td><td>Human-readable status message.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Examples</h2>
+<pre><span class="comment"># Read monitoring key on local computer</span>
+<span class="cmdlet">Invoke-sqmMonitoringKey</span>
+
+<span class="comment"># Set Standard SQL monitoring with TSM active, auto-detect AG topology</span>
+<span class="cmdlet">Invoke-sqmMonitoringKey</span> <span class="param">-Operation</span> Set <span class="param">-SQL</span> Standard <span class="param">-TSM</span> 1 <span class="param">-AutoDetectSQLFreeSpaceVersion</span>
+
+<span class="comment"># Set Full monitoring on multiple servers via pipeline</span>
+<span class="string">"SQL01"</span>,<span class="string">"SQL02"</span>,<span class="string">"SQL03"</span> | <span class="cmdlet">Invoke-sqmMonitoringKey</span> <span class="param">-Operation</span> Set <span class="param">-SQL</span> Full <span class="param">-TSM</span> 1
+
+<span class="comment"># Read from a remote server with explicit credential</span>
+<span class="cmdlet">Invoke-sqmMonitoringKey</span> <span class="param">-ComputerName</span> <span class="string">"REMOTEDB"</span> <span class="param">-Credential</span> (<span class="cmdlet">Get-Credential</span>)</pre>
+</section>
+
+<section>
+<h2>Registry Value Mapping</h2>
+<table class="param-table">
+<tr><th>Value Name</th><th>Type</th><th>Values</th><th>Decoded As</th></tr>
+<tr><td class="param-name">SQL</td><td class="param-type">DWORD</td><td>0 / 1 / 2</td><td>NoMonitoring / ServiceMonitoring / FullMonitoring</td></tr>
+<tr><td class="param-name">SQLFreeSpaceVersion</td><td class="param-type">String</td><td>Standard / Cluster</td><td>Standalone instance / AlwaysOn AG</td></tr>
+<tr><td class="param-name">TSM</td><td class="param-type">DWORD</td><td>0 / 1</td><td>Inactive / Active</td></tr>
+</table>
+</section>
+
+</div>
+</body>
+</html>

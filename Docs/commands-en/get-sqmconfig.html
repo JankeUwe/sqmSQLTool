@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Get-sqmConfig — sqmSQLTool</title>
+<meta name="description" content="Returns the current sqmSQLTool module configuration. Without parameters, returns entire config hashtable. With -Key, returns the value of a specific configuration key.">
+<meta name="keywords" content="sqmSQLTool,PowerShell,configuration,Get-sqmConfig">
+<meta name="author" content="dtcSoftware">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Get-sqmConfig","description":"Query sqmSQLTool module configuration","author":{"@type":"Organization","name":"dtcSoftware"}}</script>
+<style>
+:root{--n:#1a1a2e;--b:#5dade2;--c:#00c8e8;--p:#7c3aed;--bg:#060f20;--sf:rgba(255,255,255,.04);--br:rgba(46,134,193,.25);--tx:#e2e8f0;--mu:#94a8c0;--cb:#012456;--ct:#e8e8e8}
+*{box-sizing:border-box;margin:0;padding:0}html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--tx);line-height:1.6}
+header{background:linear-gradient(135deg,var(--n),var(--b));padding:20px 0;border-bottom:2px solid var(--c);position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.hc{max-width:1000px;margin:0 auto;padding:0 24px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:1.2rem;font-weight:900;color:#fff;text-decoration:none}
+.bc{font-size:.9rem;color:var(--mu)}.bc a{color:var(--c);text-decoration:none;margin:0 4px}.bc a:hover{text-decoration:underline}
+main{max-width:960px;margin:0 auto;padding:40px 24px}
+.cn{font-family:"Cascadia Code","Consolas",monospace;font-size:1.9rem;font-weight:900;color:var(--c);margin-bottom:12px}
+.cm{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:24px}
+.badge{padding:6px 14px;border-radius:20px;font-size:.82rem;font-weight:700;text-transform:uppercase;color:#fff}
+.desc{background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:20px;margin-bottom:28px;font-size:1rem;line-height:1.8;color:var(--mu)}
+.st{font-size:1.3rem;font-weight:800;color:var(--c);border-bottom:2px solid var(--p);padding-bottom:8px;margin-bottom:16px}
+section{margin-bottom:32px}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th{background:rgba(46,134,193,.2);color:var(--c);padding:9px 14px;text-align:left;font-weight:700;border-bottom:2px solid var(--br)}
+td{padding:9px 14px;border-bottom:1px solid var(--br);color:var(--mu);vertical-align:top}
+tr:hover td{background:rgba(0,200,232,.04)}
+td:first-child{font-family:"Cascadia Code","Consolas",monospace;color:var(--c);font-size:.84rem;white-space:nowrap}
+.to{display:inline-block;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid #22c55e;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.dv{font-family:"Cascadia Code","Consolas",monospace;font-size:.8rem;color:#f59e0b}
+.example{background:var(--sf);border:1px solid var(--br);border-radius:8px;margin-bottom:14px;overflow:hidden}
+.exl{background:rgba(46,134,193,.2);padding:11px 16px;font-size:.86rem;font-weight:600;color:var(--c);border-bottom:1px solid var(--br);font-family:"Cascadia Code",monospace;word-break:break-all}
+.cw{position:relative;padding:14px}
+pre.cb{background:var(--cb);color:var(--ct);padding:12px 14px;border-radius:4px;font-family:"Cascadia Code","Consolas","Courier New",monospace;font-size:.88rem;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-wrap:break-word}
+.cp{position:absolute;top:18px;right:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#94a3b8;padding:5px 11px;border-radius:4px;font-size:.78rem;cursor:pointer;transition:all .2s;font-family:inherit}
+.cp:hover{background:rgba(0,200,232,.2);color:var(--c);border-color:var(--c)}.cp.ok{background:rgba(76,175,80,.2);color:#4caf50;border-color:#4caf50}
+.nav{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:50px;padding-top:32px;border-top:1px solid var(--br)}
+.nl{display:block;padding:18px;background:var(--sf);border:1px solid var(--br);border-radius:8px;text-decoration:none;transition:all .3s}
+.nl:hover{background:rgba(0,200,232,.08);border-color:var(--c)}
+.nll{font-size:.78rem;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.nlt{font-size:.95rem;font-weight:700;color:var(--c);font-family:"Cascadia Code",monospace}
+footer{background:var(--sf);border-top:1px solid var(--br);padding:36px 24px;margin-top:50px;text-align:center;color:var(--mu);font-size:.88rem}
+footer a{color:var(--c);text-decoration:none}
+@media(max-width:768px){.cn{font-size:1.4rem}.hc{flex-direction:column;gap:10px;text-align:center}.nav{grid-template-columns:1fr}main{padding:20px 14px}}
+</style>
+</head>
+<body>
+<header><div class="hc">
+<a href="https://powershelldba.de/" class="logo">&#128290; sqmSQLTool</a>
+<div class="bc"><a href="index.html">Commands</a> / <span>Get-sqmConfig</span></div>
+</div></header>
+<main>
+<div class="cn">Get-sqmConfig</div>
+<div class="cm">
+<span class="badge" style="background:#0369a1">Configuration</span>
+<span style="color:var(--mu)">sqmSQLTool v1.8.2+ &middot; Utility</span>
+</div>
+<section class="desc">
+Retrieves the current sqmSQLTool module configuration. Without parameters, returns the entire configuration hashtable. With <code>-Key</code>, returns the value of a specific configuration key (e.g., <code>OutputPath</code>, <code>LogPath</code>, <code>CentralPath</code>). If a key doesn't exist, a warning is issued and <code>$null</code> is returned.
+<br><br>
+Configuration is initialized once when the module loads and stored in <code>$script:sqmModuleConfig</code>.
+</section>
+
+<section><h2 class="st">Parameters</h2>
+<table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>-Key</td><td>string</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td><td>Name of a specific configuration key. If not provided, entire hashtable is returned.</td></tr>
+</tbody></table>
+</section>
+
+<section><h2 class="st">Usage</h2>
+<p style="background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:16px;color:var(--mu);font-size:.95rem;line-height:1.8">
+<strong>Return Value:</strong> Hashtable (all config) or scalar value (single key).<br><br>
+<strong>Non-existent key:</strong> Warning message listing available keys + returns <code>$null</code>.<br><br>
+Common configuration keys include: <code>LogPath</code>, <code>OutputPath</code>, <code>CentralPath</code>, <code>DefaultSqlCredential</code>, and others set during module initialization in <code>sqmSQLTool.psm1</code>.
+</p>
+</section>
+
+<section><h2 class="st">Examples</h2>
+
+<div class="example">
+<div class="exl">View entire module configuration</div>
+<div class="cw"><button class="cp" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText).then(()=>{this.textContent='Copied!';this.classList.add('ok');setTimeout(()=>{this.textContent='Copy';this.classList.remove('ok')},2000)})">Copy</button>
+<pre class="cb">Get-sqmConfig</pre>
+</div></div>
+
+<div class="example">
+<div class="exl">Get a specific configuration value</div>
+<div class="cw"><button class="cp" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText).then(()=>{this.textContent='Copied!';this.classList.add('ok');setTimeout(()=>{this.textContent='Copy';this.classList.remove('ok')},2000)})">Copy</button>
+<pre class="cb">$outputPath = Get-sqmConfig -Key 'OutputPath'</pre>
+</div></div>
+
+<div class="example">
+<div class="exl">Retrieve CentralPath configuration key</div>
+<div class="cw"><button class="cp" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText).then(()=>{this.textContent='Copied!';this.classList.add('ok');setTimeout(()=>{this.textContent='Copy';this.classList.remove('ok')},2000)})">Copy</button>
+<pre class="cb">Get-sqmConfig -Key 'CentralPath'</pre>
+</div></div>
+
+</section>
+
+<div class="nav">
+<a href="index.html" class="nl"><div class="nll">&#8592; Back</div><div class="nlt">Command Index</div></a>
+</div>
+</main>
+<footer>
+<p>sqmSQLTool &mdash; SQL Server DBA Automation &mdash; <a href="https://powershelldba.de/">powershelldba.de</a></p>
+<p style="margin-top:8px;font-size:.8rem">dtcSoftware &middot; Module v1.8.2+</p>
+</footer>
+<script>document.querySelectorAll('.cp').forEach(b=>{b.addEventListener('click',()=>{})});</script>
+</body>
+</html>

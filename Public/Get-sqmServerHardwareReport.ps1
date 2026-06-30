@@ -185,7 +185,7 @@ function Get-sqmServerHardwareReport
                 # Browser oeffnen (nur HTML)
                 if ($doHtml -and -not $NoOpen -and $htmlFile)
                 {
-                    Start-Process $htmlFile
+                    Invoke-Item $htmlFile
                 }
             }
             catch
@@ -541,6 +541,7 @@ function _Build-sqmHardwareReportHtml
     # ABSCHNITT: Logische Laufwerke
     # -------------------------------------------------------------------------
     $diskThreshold = [int](Get-sqmConfig -Key 'DiskFreeSpaceThresholdPct')
+    if ($diskThreshold -le 0) { $diskThreshold = 10 }
     $diskThresholdRatio = $diskThreshold / 100.0
 
     $logHtml = "<table class='itbl'><thead><tr>" +
@@ -670,6 +671,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: #060f20; color: #
 .cards { display: flex; gap: 16px; padding: 20px 32px; background: #0a1628; flex-wrap: wrap; }
 .card { flex: 1; min-width: 130px; border-radius: 8px; padding: 16px 20px;
         background: #0d1f38; border: 1px solid #1e3a5f; }
+.card .ccat { font-size: 10px; font-weight: 700; color: #2e86c1; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
 .card .cnum { font-size: 22px; font-weight: 700; color: #5dade2; white-space: nowrap; }
 .card .clbl { font-size: 11px; color: #94a8c0; margin-top: 4px; }
 .cbar { width: 100%; height: 5px; background: #1e3a5f; border-radius: 3px; margin-top: 8px; overflow: hidden; }
@@ -731,19 +733,23 @@ table.itbl tr:hover { background: rgba(45,134,193,0.05); }
 
 <div class="cards">
   <div class="card">
+    <div class="ccat">RAM</div>
     <div class="cnum">$(_H $totalRam)</div>
     <div class="clbl">Arbeitsspeicher gesamt</div>
     $ramCardBar
   </div>
   <div class="card">
+    <div class="ccat">CPU</div>
     <div class="cnum">$(_H $cpuSummary)</div>
     <div class="clbl">Kerne / Logisch</div>
   </div>
   <div class="card">
+    <div class="ccat">DISC</div>
     <div class="cnum">$diskCount</div>
     <div class="clbl">Phys. Datentraeger</div>
   </div>
   <div class="card">
+    <div class="ccat">SQL</div>
     <div class="cnum">$sqlCount</div>
     <div class="clbl">SQL Server Instanzen</div>
   </div>
@@ -960,6 +966,7 @@ function _Build-sqmHardwareReportTxt
 
     # Detaillierte Logical Disk-Infos mit Schwellwert-Warnung und Erweiterungsberechnung
     $txtThreshold      = [int](Get-sqmConfig -Key 'DiskFreeSpaceThresholdPct')
+    if ($txtThreshold -le 0) { $txtThreshold = 10 }
     $txtThresholdRatio = $txtThreshold / 100.0
     if ($Data.LogicalDisks.Count -gt 0)
     {

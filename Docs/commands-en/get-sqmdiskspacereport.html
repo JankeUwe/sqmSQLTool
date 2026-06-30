@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get-sqmDiskSpaceReport – sqmSQLTool</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
+.hero{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-bottom:1px solid #334155;padding:2rem 2rem 1.5rem}
+.hero-inner{max-width:960px;margin:0 auto}
+.breadcrumb{font-size:.75rem;color:#64748b;margin-bottom:.75rem}
+.breadcrumb a{color:#64748b;text-decoration:none}.breadcrumb a:hover{color:#94a3b8}
+h1{font-size:1.75rem;font-weight:700;color:#f1f5f9;font-family:'Cascadia Code','Consolas',monospace}
+.badge{display:inline-block;font-size:.7rem;font-weight:600;padding:.2rem .6rem;border-radius:9999px;margin-left:.75rem;vertical-align:middle;background:#0369a1;color:#fff;letter-spacing:.04em}
+.synopsis{color:#94a3b8;margin-top:.5rem;font-size:.95rem;max-width:720px}
+.content{max-width:960px;margin:0 auto;padding:2rem}
+section{margin-bottom:2rem}
+h2{font-size:1.1rem;font-weight:600;color:#7dd3fc;border-bottom:1px solid #1e3a5f;padding-bottom:.4rem;margin-bottom:1rem;text-transform:uppercase;letter-spacing:.06em}
+p{color:#cbd5e1;margin-bottom:.75rem;font-size:.9rem}
+.param-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.param-table th{background:#1e293b;color:#7dd3fc;text-align:left;padding:.5rem .75rem;font-weight:600;border-bottom:1px solid #334155}
+.param-table td{padding:.45rem .75rem;border-bottom:1px solid #1e293b;color:#cbd5e1;vertical-align:top}
+.param-table tr:hover td{background:#1e293b55}
+.param-name{font-family:'Cascadia Code','Consolas',monospace;color:#f0abfc;font-weight:600}
+.param-type{font-family:'Cascadia Code','Consolas',monospace;color:#6ee7b7;font-size:.78rem}
+.param-default{font-family:'Cascadia Code','Consolas',monospace;color:#fbbf24;font-size:.78rem}
+pre{background:#1e293b;border:1px solid #334155;border-radius:.5rem;padding:1rem;overflow-x:auto;font-size:.82rem;font-family:'Cascadia Code','Consolas',monospace;line-height:1.5}
+.comment{color:#64748b}.string{color:#86efac}.cmdlet{color:#67e8f9}.param{color:#fbbf24}
+.note-box{background:#1e293b;border-left:3px solid #0ea5e9;border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin:.75rem 0;font-size:.85rem;color:#94a3b8}
+.diagram-wrap{background:#1e293b;border:1px solid #334155;border-radius:.75rem;padding:1.5rem;text-align:center;overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="hero-inner">
+    <div class="breadcrumb"><a href="../index.html">sqmSQLTool</a> › <a href="index.html">Commands</a> › Get-sqmDiskSpaceReport</div>
+    <h1>Get-sqmDiskSpaceReport <span class="badge">Configuration</span></h1>
+    <p class="synopsis">Reports per-volume disk space for all SQL Server data/log volumes, with linear-regression growth forecast (Method B1) from JSON snapshot history and optional backup-history bootstrap (Method B2). Outputs color-coded TXT, CSV, and HTML reports. Warns on low free-space and projected fill dates within 30 days.</p>
+  </div>
+</div>
+<div class="content">
+
+<section>
+<h2>Execution Flow</h2>
+<div class="diagram-wrap">
+<svg viewBox="0 0 760 900" xmlns="http://www.w3.org/2000/svg" style="max-width:760px;width:100%;font-family:'Segoe UI',Arial,sans-serif;font-size:12px">
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#5dade2"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#ef4444"/></marker>
+  </defs>
+  <ellipse cx="380" cy="30" rx="60" ry="18" fill="#00c8e8" opacity=".9"/>
+  <text x="380" y="34" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">START</text>
+
+  <line x1="380" y1="48" x2="380" y2="68" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <polygon points="380,68 440,98 380,128 320,98" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="380" y="93" text-anchor="middle" fill="#fca5a5" font-size="10">dbatools</text>
+  <text x="380" y="106" text-anchor="middle" fill="#fca5a5" font-size="10">available?</text>
+  <line x1="320" y1="98" x2="205" y2="98" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+  <rect x="105" y="83" width="100" height="30" rx="4" fill="#7f1d1d"/>
+  <text x="155" y="101" text-anchor="middle" fill="#fca5a5" font-size="10">throw ERROR</text>
+
+  <line x1="380" y1="128" x2="380" y2="153" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="155" y="153" width="450" height="40" rx="6" fill="none" stroke="#334155" stroke-dasharray="6,3"/>
+  <text x="190" y="170" fill="#94a3b8" font-size="10">Invoke-DbaQuery: sys.dm_os_volume_stats CROSS APPLY sys.master_files</text>
+  <text x="190" y="185" fill="#94a3b8" font-size="10">→ MountPoint, TotalGB, FreeGB, FreePct per volume (deduped)</text>
+
+  <line x1="380" y1="193" x2="380" y2="218" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="155" y="218" width="450" height="160" rx="6" fill="none" stroke="#334155" stroke-dasharray="6,3"/>
+  <text x="170" y="233" fill="#64748b" font-size="9.5">Get-sqmVolumeForecast (private) — Method B1: snapshot history</text>
+  <rect x="190" y="238" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="251" text-anchor="middle" fill="#94a3b8" font-size="10">Load JSON: OutputPath\History\DiskHistory_&lt;safeInst&gt;.json</text>
+  <rect x="190" y="260" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="273" text-anchor="middle" fill="#94a3b8" font-size="10">Append today's snapshot (unless -NoHistory); atomic write via .tmp + Move-Item</text>
+  <rect x="190" y="282" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="295" text-anchor="middle" fill="#94a3b8" font-size="10">Retention: 400 days; linear least-squares regression on UsedGB/day</text>
+  <rect x="190" y="304" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="317" text-anchor="middle" fill="#94a3b8" font-size="10">DaysUntilFull = FreeGB / slope; Confidence: High (n≥7,R²≥0.8) / Medium / Low</text>
+  <rect x="190" y="326" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="339" text-anchor="middle" fill="#94a3b8" font-size="10">if -SeedFromBackupHistory → Method B2: Get-sqmBackupGrowthSeed (ForecastBasis=BackupHistory)</text>
+  <rect x="190" y="348" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="361" text-anchor="middle" fill="#94a3b8" font-size="10">msdb.dbo.backupset (type=D) → DB growth → map to volume via master_files path prefix</text>
+
+  <line x1="380" y1="378" x2="380" y2="403" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="155" y="403" width="450" height="60" rx="6" fill="none" stroke="#334155" stroke-dasharray="6,3"/>
+  <text x="170" y="418" fill="#64748b" font-size="9.5">foreach $vol — apply thresholds</text>
+  <rect x="190" y="423" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="436" text-anchor="middle" fill="#94a3b8" font-size="10">Critical: FreePct ≤ -CriticalThresholdPct (10%) or DaysUntilFull ≤ 30</text>
+  <rect x="190" y="445" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="458" text-anchor="middle" fill="#94a3b8" font-size="10">Warning: FreePct ≤ -WarnThresholdPct (20%) or DaysUntilFull ≤ 90</text>
+
+  <line x1="380" y1="463" x2="380" y2="488" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="488" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="506" text-anchor="middle" fill="#94a3b8" font-size="10.5">ShouldProcess → TXT + CSV + HTML (color-coded .crit/.warn/.ok)</text>
+
+  <line x1="380" y1="516" x2="380" y2="541" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="541" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="559" text-anchor="middle" fill="#94a3b8" font-size="10.5">Invoke-sqmOpenReport -HtmlFile</text>
+
+  <line x1="380" y1="569" x2="380" y2="594" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="250" y="594" width="260" height="28" rx="5" fill="#1e3a5f" stroke="#5dade2"/>
+  <text x="380" y="612" text-anchor="middle" fill="#bfdbfe" font-size="11">Return $allVolumes[]</text>
+
+  <line x1="380" y1="622" x2="380" y2="642" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <ellipse cx="380" cy="660" rx="60" ry="18" fill="#22c55e" opacity=".9"/>
+  <text x="380" y="664" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">DONE</text>
+</svg>
+</div>
+</section>
+
+<section>
+<h2>Synopsis</h2>
+<p>Uses <code>sys.dm_os_volume_stats CROSS APPLY sys.master_files</code> to enumerate every volume hosting a SQL data or log file. A JSON snapshot file accumulates daily readings; a linear least-squares regression over these points yields a per-volume growth rate (<code>GrowthPerDayGB</code>) and estimated days until full. When fewer than <code>MinDataPoints</code> (5) snapshots exist, the backup history bootstrap (Method B2) can seed the regression from <code>msdb.dbo.backupset</code>.</p>
+<div class="note-box">Requires dbatools. Snapshot history is appended atomically using a .tmp file and Move-Item. History older than 400 days is pruned automatically. The HTML report color-codes rows with CSS classes <code>.crit</code>, <code>.warn</code>, and <code>.ok</code>.</div>
+</section>
+
+<section>
+<h2>Forecast Confidence Levels</h2>
+<table class="param-table">
+<tr><th>Confidence</th><th>Criteria</th></tr>
+<tr><td class="param-name" style="color:#4ade80">High</td><td>≥ 7 data points AND R² ≥ 0.80</td></tr>
+<tr><td class="param-name" style="color:#fbbf24">Medium</td><td>≥ 5 data points AND R² ≥ 0.50</td></tr>
+<tr><td class="param-name" style="color:#94a3b8">Low</td><td>Fewer points, lower R², or bootstrapped from backup history.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Syntax</h2>
+<pre><span class="cmdlet">Get-sqmDiskSpaceReport</span>
+    [<span class="param">-SqlInstance</span> &lt;String&gt;]
+    [<span class="param">-SqlCredential</span> &lt;PSCredential&gt;]
+    [<span class="param">-OutputPath</span> &lt;String&gt;]
+    [<span class="param">-WarnThresholdPct</span> &lt;Int&gt;]       <span class="comment"># default 20</span>
+    [<span class="param">-CriticalThresholdPct</span> &lt;Int&gt;]   <span class="comment"># default 10</span>
+    [<span class="param">-SeedFromBackupHistory</span>]         <span class="comment"># Method B2 bootstrap</span>
+    [<span class="param">-NoHistory</span>]                     <span class="comment"># skip snapshot append</span>
+    [<span class="param">-EnableException</span>]</pre>
+</section>
+
+<section>
+<h2>Parameters</h2>
+<table class="param-table">
+<tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+<tr><td class="param-name">-SqlInstance</td><td class="param-type">String</td><td class="param-default">$env:COMPUTERNAME</td><td>SQL Server instance to query.</td></tr>
+<tr><td class="param-name">-SqlCredential</td><td class="param-type">PSCredential</td><td class="param-default">—</td><td>SQL connection credential.</td></tr>
+<tr><td class="param-name">-OutputPath</td><td class="param-type">String</td><td class="param-default">Get-sqmConfig 'OutputPath'</td><td>Directory for reports and JSON history subfolder.</td></tr>
+<tr><td class="param-name">-WarnThresholdPct</td><td class="param-type">Int</td><td class="param-default">20</td><td>Warning threshold: free space percent.</td></tr>
+<tr><td class="param-name">-CriticalThresholdPct</td><td class="param-type">Int</td><td class="param-default">10</td><td>Critical threshold: free space percent.</td></tr>
+<tr><td class="param-name">-SeedFromBackupHistory</td><td class="param-type">Switch</td><td class="param-default">false</td><td>Bootstrap forecast from msdb backup history when snapshot data is insufficient.</td></tr>
+<tr><td class="param-name">-NoHistory</td><td class="param-type">Switch</td><td class="param-default">false</td><td>Read-only mode — do not append today's snapshot to JSON history.</td></tr>
+<tr><td class="param-name">-EnableException</td><td class="param-type">Switch</td><td class="param-default">false</td><td>Throw terminating exceptions.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Return Value</h2>
+<table class="param-table">
+<tr><th>Property</th><th>Description</th></tr>
+<tr><td class="param-name">MountPoint</td><td>Volume mount point or drive letter.</td></tr>
+<tr><td class="param-name">TotalGB / FreeGB / FreePct</td><td>Current disk space values.</td></tr>
+<tr><td class="param-name">GrowthPerDayGB</td><td>Estimated daily growth in GB from regression.</td></tr>
+<tr><td class="param-name">DaysUntilFull</td><td>Projected days until volume is full.</td></tr>
+<tr><td class="param-name">HistoryDays / DataPoints</td><td>Age and count of snapshot history records used.</td></tr>
+<tr><td class="param-name">ForecastConfidence</td><td>High / Medium / Low.</td></tr>
+<tr><td class="param-name">ForecastBasis</td><td>SnapshotHistory or BackupHistory.</td></tr>
+<tr><td class="param-name">Status</td><td>OK / Warning / Critical.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Examples</h2>
+<pre><span class="comment"># Basic report, local instance</span>
+<span class="cmdlet">Get-sqmDiskSpaceReport</span>
+
+<span class="comment"># Bootstrap forecast from backup history (new server, no history yet)</span>
+<span class="cmdlet">Get-sqmDiskSpaceReport</span> <span class="param">-SqlInstance</span> <span class="string">"SQL01"</span> <span class="param">-SeedFromBackupHistory</span>
+
+<span class="comment"># Read-only: report without updating snapshot history</span>
+<span class="cmdlet">Get-sqmDiskSpaceReport</span> <span class="param">-NoHistory</span> | <span class="cmdlet">Where-Object</span> Status <span class="param">-ne</span> <span class="string">"OK"</span></pre>
+</section>
+</div>
+</body>
+</html>

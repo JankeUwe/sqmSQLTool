@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get-sqmADMemberGroups – sqmSQLTool</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
+.hero{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-bottom:1px solid #334155;padding:2rem 2rem 1.5rem}
+.hero-inner{max-width:960px;margin:0 auto}
+.breadcrumb{font-size:.75rem;color:#64748b;margin-bottom:.75rem}
+.breadcrumb a{color:#64748b;text-decoration:none}.breadcrumb a:hover{color:#94a3b8}
+h1{font-size:1.75rem;font-weight:700;color:#f1f5f9;font-family:'Cascadia Code','Consolas',monospace}
+.badge{display:inline-block;font-size:.7rem;font-weight:600;padding:.2rem .6rem;border-radius:9999px;margin-left:.75rem;vertical-align:middle;background:#0369a1;color:#fff;letter-spacing:.04em}
+.synopsis{color:#94a3b8;margin-top:.5rem;font-size:.95rem;max-width:720px}
+.content{max-width:960px;margin:0 auto;padding:2rem}
+section{margin-bottom:2rem}
+h2{font-size:1.1rem;font-weight:600;color:#7dd3fc;border-bottom:1px solid #1e3a5f;padding-bottom:.4rem;margin-bottom:1rem;text-transform:uppercase;letter-spacing:.06em}
+p{color:#cbd5e1;margin-bottom:.75rem;font-size:.9rem}
+.param-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.param-table th{background:#1e293b;color:#7dd3fc;text-align:left;padding:.5rem .75rem;font-weight:600;border-bottom:1px solid #334155}
+.param-table td{padding:.45rem .75rem;border-bottom:1px solid #1e293b;color:#cbd5e1;vertical-align:top}
+.param-table tr:hover td{background:#1e293b55}
+.param-name{font-family:'Cascadia Code','Consolas',monospace;color:#f0abfc;font-weight:600}
+.param-type{font-family:'Cascadia Code','Consolas',monospace;color:#6ee7b7;font-size:.78rem}
+.param-default{font-family:'Cascadia Code','Consolas',monospace;color:#fbbf24;font-size:.78rem}
+pre{background:#1e293b;border:1px solid #334155;border-radius:.5rem;padding:1rem;overflow-x:auto;font-size:.82rem;font-family:'Cascadia Code','Consolas',monospace;line-height:1.5}
+.comment{color:#64748b}.string{color:#86efac}.cmdlet{color:#67e8f9}.param{color:#fbbf24}
+.note-box{background:#1e293b;border-left:3px solid #0ea5e9;border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin:.75rem 0;font-size:.85rem;color:#94a3b8}
+.diagram-wrap{background:#1e293b;border:1px solid #334155;border-radius:.75rem;padding:1.5rem;text-align:center;overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="hero-inner">
+    <div class="breadcrumb"><a href="../index.html">sqmSQLTool</a> › <a href="index.html">Commands</a> › Get-sqmADMemberGroups</div>
+    <h1>Get-sqmADMemberGroups <span class="badge">Configuration</span></h1>
+    <p class="synopsis">Inverse of Get-sqmADGroupMembers — finds all AD groups that contain a specified user, group, or computer. Resolves parent groups up to a configurable depth. Falls back from Get-ADPrincipalGroupMembership to a LDAP DirectorySearcher query. Pipeline-capable.</p>
+  </div>
+</div>
+<div class="content">
+
+<section>
+<h2>Execution Flow</h2>
+<div class="diagram-wrap">
+<svg viewBox="0 0 760 800" xmlns="http://www.w3.org/2000/svg" style="max-width:760px;width:100%;font-family:'Segoe UI',Arial,sans-serif;font-size:12px">
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#5dade2"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#ef4444"/></marker>
+  </defs>
+  <ellipse cx="380" cy="30" rx="60" ry="18" fill="#00c8e8" opacity=".9"/>
+  <text x="380" y="34" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">START</text>
+
+  <line x1="380" y1="48" x2="380" y2="68" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="215" y="68" width="330" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="86" text-anchor="middle" fill="#94a3b8" font-size="10.5">ADSI RootDSE check</text>
+
+  <line x1="380" y1="96" x2="380" y2="116" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <polygon points="380,116 440,141 380,166 320,141" fill="#1e293b" stroke="#5dade2" stroke-width="1.5"/>
+  <text x="380" y="138" text-anchor="middle" fill="#bfdbfe" font-size="10">ADSI OK?</text>
+  <line x1="320" y1="141" x2="200" y2="141" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+  <rect x="100" y="126" width="100" height="30" rx="4" fill="#7f1d1d"/>
+  <text x="150" y="144" text-anchor="middle" fill="#fca5a5" font-size="10">throw ERROR</text>
+  <text x="286" y="138" fill="#ef4444" font-size="10">NO</text>
+
+  <line x1="380" y1="166" x2="380" y2="191" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="130" y="191" width="500" height="410" rx="8" fill="none" stroke="#334155" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="145" y="206" fill="#64748b" font-size="10">foreach $member in $Identity  [pipeline]</text>
+
+  <line x1="380" y1="191" x2="380" y2="225" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="215" y="225" width="330" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="243" text-anchor="middle" fill="#94a3b8" font-size="10.5">Resolve domain, clean identity</text>
+
+  <line x1="380" y1="253" x2="380" y2="278" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="145" y="278" width="470" height="215" rx="6" fill="none" stroke="#334155" stroke-dasharray="6,3"/>
+  <text x="160" y="293" fill="#64748b" font-size="9.5">Find-ParentGroups (recursive helper, Depth-limited, cycle-safe)</text>
+
+  <rect x="210" y="300" width="310" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="365" y="313" text-anchor="middle" fill="#94a3b8" font-size="9.5">Check $Visited → skip if already processed</text>
+  <rect x="210" y="322" width="310" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="365" y="335" text-anchor="middle" fill="#94a3b8" font-size="9.5">Try: Get-ADPrincipalGroupMembership → parent groups</text>
+  <rect x="210" y="344" width="310" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="365" y="357" text-anchor="middle" fill="#94a3b8" font-size="9.5">Skip "Domain Users"</text>
+  <rect x="210" y="366" width="310" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="365" y="379" text-anchor="middle" fill="#94a3b8" font-size="9.5">Catch: LDAP fallback → (objectClass=group)(member=DN)</text>
+  <rect x="210" y="388" width="310" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="365" y="401" text-anchor="middle" fill="#94a3b8" font-size="9.5">Recurse parent groups up to $MaxDepth</text>
+  <rect x="210" y="410" width="310" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="365" y="423" text-anchor="middle" fill="#94a3b8" font-size="9.5">Return groups[] with Depth + GroupScope</text>
+  <rect x="210" y="432" width="310" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="365" y="445" text-anchor="middle" fill="#94a3b8" font-size="9.5">Sort-Object -Unique by SamAccountName</text>
+
+  <line x1="380" y1="493" x2="380" y2="518" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="518" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="536" text-anchor="middle" fill="#94a3b8" font-size="10.5">ShouldProcess → write TXT + CSV</text>
+
+  <line x1="380" y1="546" x2="380" y2="571" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="215" y="571" width="330" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="589" text-anchor="middle" fill="#94a3b8" font-size="10.5">Build result: Identity/Depth/GroupCount/Groups[]</text>
+
+  <line x1="380" y1="601" x2="380" y2="640" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="250" y="640" width="260" height="28" rx="5" fill="#1e3a5f" stroke="#5dade2"/>
+  <text x="380" y="658" text-anchor="middle" fill="#bfdbfe" font-size="11">Return $allResults[]</text>
+
+  <line x1="380" y1="668" x2="380" y2="755" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <ellipse cx="380" cy="773" rx="60" ry="18" fill="#22c55e" opacity=".9"/>
+  <text x="380" y="777" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">DONE</text>
+</svg>
+</div>
+</section>
+
+<section>
+<h2>Synopsis</h2>
+<p>Finds all AD groups that a given identity (user, group, or computer) belongs to, optionally traversing parent groups up to <code>-Depth</code> levels. Inverse operation to <code>Get-sqmADGroupMembersRecursive</code>. Useful for auditing SQL Server access when a login is granted via nested group membership.</p>
+<div class="note-box">Does not require dbatools. Requires LDAP connectivity to a domain controller. "Domain Users" is always excluded from results.</div>
+</section>
+
+<section>
+<h2>Syntax</h2>
+<pre><span class="cmdlet">Get-sqmADMemberGroups</span>
+    <span class="param">-Identity</span> &lt;String[]&gt;    <span class="comment"># required, pipeline</span>
+    [<span class="param">-Domain</span> &lt;String&gt;]
+    [<span class="param">-Depth</span> &lt;Int&gt;]           <span class="comment"># 0-10, default 2</span>
+    [<span class="param">-OutputPath</span> &lt;String&gt;]</pre>
+</section>
+
+<section>
+<h2>Parameters</h2>
+<table class="param-table">
+<tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+<tr><td class="param-name">-Identity</td><td class="param-type">String[]</td><td class="param-default"><span style="color:#f87171">Required</span></td><td>SamAccountName, UPN, or DistinguishedName of the user/group/computer. Pipeline-capable.</td></tr>
+<tr><td class="param-name">-Domain</td><td class="param-type">String</td><td class="param-default">auto-detect</td><td>AD domain. Auto-detected from current domain if omitted.</td></tr>
+<tr><td class="param-name">-Depth</td><td class="param-type">Int</td><td class="param-default">2</td><td>Maximum nesting depth for parent group traversal (0–10).</td></tr>
+<tr><td class="param-name">-OutputPath</td><td class="param-type">String</td><td class="param-default">C:\System\WinSrvLog\MSSQL</td><td>Directory for TXT and CSV report files.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Return Value</h2>
+<table class="param-table">
+<tr><th>Property</th><th>Description</th></tr>
+<tr><td class="param-name">Identity</td><td>Resolved identity (domain prefix stripped).</td></tr>
+<tr><td class="param-name">Domain</td><td>AD domain used.</td></tr>
+<tr><td class="param-name">Depth</td><td>Maximum depth used for parent traversal.</td></tr>
+<tr><td class="param-name">GroupCount</td><td>Number of unique parent groups found.</td></tr>
+<tr><td class="param-name">Groups</td><td>List with SamAccountName, DisplayName, GroupScope, Depth.</td></tr>
+<tr><td class="param-name">TxtFile / CsvFile</td><td>Written report file paths.</td></tr>
+<tr><td class="param-name">Status</td><td>OK / NoGroups / Error.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Examples</h2>
+<pre><span class="comment"># Which groups does john.doe belong to? (up to 2 levels)</span>
+<span class="cmdlet">Get-sqmADMemberGroups</span> <span class="param">-Identity</span> <span class="string">"john.doe"</span> <span class="param">-Depth</span> 2
+
+<span class="comment"># Check group membership of a computer account</span>
+<span class="cmdlet">Get-sqmADMemberGroups</span> <span class="param">-Identity</span> <span class="string">"SQL01$"</span>
+
+<span class="comment"># Multiple identities via pipeline</span>
+<span class="string">"john.doe"</span>,<span class="string">"svc_sql"</span> | <span class="cmdlet">Get-sqmADMemberGroups</span> <span class="param">-Depth</span> 3</pre>
+</section>
+</div>
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get-sqmOperationStatus – sqmSQLTool</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
+.hero{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-bottom:1px solid #334155;padding:2rem 2rem 1.5rem}
+.hero-inner{max-width:960px;margin:0 auto}
+.breadcrumb{font-size:.75rem;color:#64748b;margin-bottom:.75rem}
+.breadcrumb a{color:#64748b;text-decoration:none}.breadcrumb a:hover{color:#94a3b8}
+h1{font-size:1.75rem;font-weight:700;color:#f1f5f9;font-family:'Cascadia Code','Consolas',monospace}
+.badge{display:inline-block;font-size:.7rem;font-weight:600;padding:.2rem .6rem;border-radius:9999px;margin-left:.75rem;vertical-align:middle;background:#1d4ed8;color:#fff;letter-spacing:.04em}
+.badge2{display:inline-block;font-size:.7rem;font-weight:600;padding:.2rem .6rem;border-radius:9999px;margin-left:.4rem;vertical-align:middle;background:#0369a1;color:#fff;letter-spacing:.04em}
+.synopsis{color:#94a3b8;margin-top:.5rem;font-size:.95rem;max-width:720px}
+.content{max-width:960px;margin:0 auto;padding:2rem}
+section{margin-bottom:2rem}
+h2{font-size:1.1rem;font-weight:600;color:#7dd3fc;border-bottom:1px solid #1e3a5f;padding-bottom:.4rem;margin-bottom:1rem;text-transform:uppercase;letter-spacing:.06em}
+p{color:#cbd5e1;margin-bottom:.75rem;font-size:.9rem}
+.param-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.param-table th{background:#1e293b;color:#7dd3fc;text-align:left;padding:.5rem .75rem;font-weight:600;border-bottom:1px solid #334155}
+.param-table td{padding:.45rem .75rem;border-bottom:1px solid #1e293b;color:#cbd5e1;vertical-align:top}
+.param-table tr:hover td{background:#1e293b55}
+.param-name{font-family:'Cascadia Code','Consolas',monospace;color:#f0abfc;font-weight:600}
+.param-type{font-family:'Cascadia Code','Consolas',monospace;color:#6ee7b7;font-size:.78rem}
+.param-default{font-family:'Cascadia Code','Consolas',monospace;color:#fbbf24;font-size:.78rem}
+pre{background:#1e293b;border:1px solid #334155;border-radius:.5rem;padding:1rem;overflow-x:auto;font-size:.82rem;font-family:'Cascadia Code','Consolas',monospace;line-height:1.5}
+.comment{color:#64748b}.string{color:#86efac}.cmdlet{color:#67e8f9}.param{color:#fbbf24}
+.note-box{background:#1e293b;border-left:3px solid #0ea5e9;border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin:.75rem 0;font-size:.85rem;color:#94a3b8}
+.diagram-wrap{background:#1e293b;border:1px solid #334155;border-radius:.75rem;padding:1.5rem;text-align:center;overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="hero-inner">
+    <div class="breadcrumb"><a href="../index.html">sqmSQLTool</a> › <a href="index.html">Commands</a> › Get-sqmOperationStatus</div>
+    <h1>Get-sqmOperationStatus <span class="badge">Always On</span><span class="badge2">Performance</span></h1>
+    <p class="synopsis">Monitors running SQL Server long-operations in real time: Backup, Restore (percent_complete from dm_exec_requests) and AlwaysOn AutoSeed operations (dm_hadr_physical_seeding_stats). Supports continuous refresh mode for watching active operations. Console output only — no file export.</p>
+  </div>
+</div>
+<div class="content">
+
+<section>
+<h2>Execution Flow</h2>
+<div class="diagram-wrap">
+<svg viewBox="0 0 760 800" xmlns="http://www.w3.org/2000/svg" style="max-width:760px;width:100%;font-family:'Segoe UI',Arial,sans-serif;font-size:12px">
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#5dade2"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#ef4444"/></marker>
+    <marker id="aa" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#f59e0b"/></marker>
+  </defs>
+  <ellipse cx="380" cy="30" rx="60" ry="18" fill="#00c8e8" opacity=".9"/>
+  <text x="380" y="34" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">START</text>
+
+  <line x1="380" y1="48" x2="380" y2="68" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <polygon points="380,68 440,98 380,128 320,98" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="380" y="93" text-anchor="middle" fill="#fca5a5" font-size="10">dbatools</text>
+  <text x="380" y="106" text-anchor="middle" fill="#fca5a5" font-size="10">available?</text>
+  <line x1="320" y1="98" x2="205" y2="98" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+  <rect x="105" y="83" width="100" height="30" rx="4" fill="#7f1d1d"/>
+  <text x="155" y="101" text-anchor="middle" fill="#fca5a5" font-size="10">throw ERROR</text>
+
+  <line x1="380" y1="128" x2="380" y2="148" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <polygon points="380,148 450,178 380,208 310,178" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="380" y="173" text-anchor="middle" fill="#fde68a" font-size="10">-Continuous</text>
+  <text x="380" y="186" text-anchor="middle" fill="#fde68a" font-size="10">switch?</text>
+
+  <rect x="130" y="218" width="500" height="400" rx="8" fill="none" stroke="#334155" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="145" y="233" fill="#64748b" font-size="10">do { ... } while ($Continuous)  — refreshes every $RefreshSeconds</text>
+
+  <line x1="380" y1="208" x2="380" y2="253" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#aa)"/>
+  <rect x="155" y="253" width="450" height="60" rx="6" fill="none" stroke="#334155" stroke-dasharray="6,3"/>
+  <text x="170" y="268" fill="#64748b" font-size="9.5">if OperationType ∈ (Backup, Restore) or All</text>
+  <rect x="190" y="273" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="286" text-anchor="middle" fill="#94a3b8" font-size="10">dm_exec_requests WHERE command IN ('BACKUP DATABASE','BACKUP LOG','RESTORE DATABASE','RESTORE LOG') AND percent_complete &gt; 0</text>
+
+  <line x1="380" y1="313" x2="380" y2="338" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="155" y="338" width="450" height="80" rx="6" fill="none" stroke="#334155" stroke-dasharray="6,3"/>
+  <text x="170" y="353" fill="#64748b" font-size="9.5">if OperationType ∈ (AutoSeed) or All</text>
+  <rect x="190" y="358" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="371" text-anchor="middle" fill="#94a3b8" font-size="10">dm_hadr_physical_seeding_stats WHERE internal_state_desc IN ('RUNNING','IN_PROGRESS')</text>
+  <rect x="190" y="380" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="393" text-anchor="middle" fill="#94a3b8" font-size="10">Graceful catch: "Invalid object name" → pre-SQL2016 (DMV not available)</text>
+
+  <line x1="380" y1="418" x2="380" y2="443" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="443" width="360" height="40" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="459" text-anchor="middle" fill="#94a3b8" font-size="10">Format-sqmTimeSpan → elapsed/remaining; Format-sqmFileSize → bytes</text>
+  <text x="380" y="473" text-anchor="middle" fill="#94a3b8" font-size="10">Clear-Host + Write-Host formatted table if -Continuous</text>
+
+  <line x1="380" y1="483" x2="380" y2="508" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="508" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="526" text-anchor="middle" fill="#94a3b8" font-size="10.5">Start-Sleep -Seconds $RefreshSeconds (if -Continuous)</text>
+
+  <line x1="380" y1="618" x2="380" y2="643" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="250" y="643" width="260" height="28" rx="5" fill="#1e3a5f" stroke="#5dade2"/>
+  <text x="380" y="661" text-anchor="middle" fill="#bfdbfe" font-size="11">Return $allOps[] via pipeline</text>
+
+  <line x1="380" y1="671" x2="380" y2="691" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <ellipse cx="380" cy="709" rx="60" ry="18" fill="#22c55e" opacity=".9"/>
+  <text x="380" y="713" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">DONE</text>
+</svg>
+</div>
+</section>
+
+<section>
+<h2>Synopsis</h2>
+<p>Two separate DMV queries collect active long-operations: <code>dm_exec_requests</code> for Backup/Restore (filtered by <code>percent_complete &gt; 0</code>) and <code>dm_hadr_physical_seeding_stats</code> for AutoSeed (SQL 2016+; gracefully skipped on older versions). Output is formatted for the console using <code>Format-sqmTimeSpan</code> and <code>Format-sqmFileSize</code>. There is no file export — results are returned via the pipeline.</p>
+<div class="note-box">Requires dbatools. AutoSeed monitoring requires SQL Server 2016+. With <code>-Continuous</code>, the function loops until interrupted (Ctrl+C), clearing the console on each refresh. No <code>-OutputPath</code> parameter; this function is console-only.</div>
+</section>
+
+<section>
+<h2>Syntax</h2>
+<pre><span class="cmdlet">Get-sqmOperationStatus</span>
+    [<span class="param">-SqlInstance</span> &lt;String&gt;]
+    [<span class="param">-SqlCredential</span> &lt;PSCredential&gt;]
+    [<span class="param">-OperationType</span> &lt;String&gt;]       <span class="comment"># Backup | Restore | AutoSeed | All (default: All)</span>
+    [<span class="param">-Continuous</span>]
+    [<span class="param">-RefreshSeconds</span> &lt;Int&gt;]          <span class="comment"># default 10</span>
+    [<span class="param">-EnableException</span>]</pre>
+</section>
+
+<section>
+<h2>Parameters</h2>
+<table class="param-table">
+<tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+<tr><td class="param-name">-SqlInstance</td><td class="param-type">String</td><td class="param-default">$env:COMPUTERNAME</td><td>SQL Server instance to monitor.</td></tr>
+<tr><td class="param-name">-SqlCredential</td><td class="param-type">PSCredential</td><td class="param-default">—</td><td>SQL connection credential.</td></tr>
+<tr><td class="param-name">-OperationType</td><td class="param-type">String</td><td class="param-default">All</td><td>Filter to Backup, Restore, AutoSeed, or All.</td></tr>
+<tr><td class="param-name">-Continuous</td><td class="param-type">Switch</td><td class="param-default">false</td><td>Loop with Clear-Host; press Ctrl+C to stop.</td></tr>
+<tr><td class="param-name">-RefreshSeconds</td><td class="param-type">Int</td><td class="param-default">10</td><td>Seconds between refreshes in Continuous mode.</td></tr>
+<tr><td class="param-name">-EnableException</td><td class="param-type">Switch</td><td class="param-default">false</td><td>Throw terminating exceptions.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Return Value</h2>
+<table class="param-table">
+<tr><th>Property</th><th>Description</th></tr>
+<tr><td class="param-name">OperationType</td><td>Backup, Restore, or AutoSeed.</td></tr>
+<tr><td class="param-name">DatabaseName</td><td>Target database name.</td></tr>
+<tr><td class="param-name">PercentComplete</td><td>Progress percentage (Backup/Restore). AutoSeed uses TransferRate instead.</td></tr>
+<tr><td class="param-name">ElapsedTime</td><td>Formatted elapsed time (Format-sqmTimeSpan).</td></tr>
+<tr><td class="param-name">EstimatedTimeRemaining</td><td>Formatted estimated time remaining.</td></tr>
+<tr><td class="param-name">TransferRate</td><td>AutoSeed: transfer_rate_bytes_per_second (formatted).</td></tr>
+<tr><td class="param-name">TransferredSize</td><td>AutoSeed: transferred_size_bytes (formatted).</td></tr>
+<tr><td class="param-name">Role</td><td>AutoSeed: role_desc (PRIMARY / SECONDARY).</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Examples</h2>
+<pre><span class="comment"># One-shot: show all active operations</span>
+<span class="cmdlet">Get-sqmOperationStatus</span> <span class="param">-SqlInstance</span> <span class="string">"SQL01"</span>
+
+<span class="comment"># Watch backup progress, refresh every 5 seconds</span>
+<span class="cmdlet">Get-sqmOperationStatus</span> <span class="param">-SqlInstance</span> <span class="string">"SQL01"</span> <span class="param">-OperationType</span> <span class="string">"Backup"</span> <span class="param">-Continuous</span> <span class="param">-RefreshSeconds</span> 5
+
+<span class="comment"># AutoSeed only (Always On Seeding)</span>
+<span class="cmdlet">Get-sqmOperationStatus</span> <span class="param">-OperationType</span> <span class="string">"AutoSeed"</span> <span class="param">-Continuous</span></pre>
+</section>
+</div>
+</body>
+</html>

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Export-sqmDatabaseDocumentation — sqmSQLTool</title>
+<meta name="description" content="Creates structured HTML and CSV documentation for all databases on a SQL Server instance: properties, sizes, backups, CHECKDB, VLF count, object summary, users.">
+<meta name="keywords" content="sqmSQLTool,PowerShell,SQL Server,database documentation,Export-sqmDatabaseDocumentation">
+<meta name="author" content="dtcSoftware">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Export-sqmDatabaseDocumentation","description":"Export per-database HTML + CSV documentation","author":{"@type":"Organization","name":"dtcSoftware"}}</script>
+<style>
+:root{--n:#1a1a2e;--b:#5dade2;--c:#00c8e8;--p:#7c3aed;--bg:#060f20;--sf:rgba(255,255,255,.04);--br:rgba(46,134,193,.25);--tx:#e2e8f0;--mu:#94a8c0;--cb:#012456;--ct:#e8e8e8}
+*{box-sizing:border-box;margin:0;padding:0}html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--tx);line-height:1.6}
+header{background:linear-gradient(135deg,var(--n),var(--b));padding:20px 0;border-bottom:2px solid var(--c);position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.hc{max-width:1000px;margin:0 auto;padding:0 24px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:1.2rem;font-weight:900;color:#fff;text-decoration:none}
+.bc{font-size:.9rem;color:var(--mu)}.bc a{color:var(--c);text-decoration:none;margin:0 4px}.bc a:hover{text-decoration:underline}
+main{max-width:960px;margin:0 auto;padding:40px 24px}
+.cn{font-family:"Cascadia Code","Consolas",monospace;font-size:1.9rem;font-weight:900;color:var(--c);margin-bottom:12px}
+.cm{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:24px}
+.badge{padding:6px 14px;border-radius:20px;font-size:.82rem;font-weight:700;text-transform:uppercase;color:#fff}
+.desc{background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:20px;margin-bottom:28px;font-size:1rem;line-height:1.8;color:var(--mu)}
+.st{font-size:1.3rem;font-weight:800;color:var(--c);border-bottom:2px solid var(--p);padding-bottom:8px;margin-bottom:16px}
+section{margin-bottom:32px}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th{background:rgba(46,134,193,.2);color:var(--c);padding:9px 14px;text-align:left;font-weight:700;border-bottom:2px solid var(--br)}
+td{padding:9px 14px;border-bottom:1px solid var(--br);color:var(--mu);vertical-align:top}
+tr:hover td{background:rgba(0,200,232,.04)}
+td:first-child{font-family:"Cascadia Code","Consolas",monospace;color:var(--c);font-size:.84rem;white-space:nowrap}
+.tr{display:inline-block;background:rgba(239,68,68,.2);color:#ef4444;border:1px solid #ef4444;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.to{display:inline-block;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid #22c55e;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.ts{display:inline-block;background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid #f59e0b;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.dv{font-family:"Cascadia Code","Consolas",monospace;font-size:.8rem;color:#f59e0b}
+.fw{background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:20px 12px;overflow-x:auto;text-align:center}
+.fw svg{max-width:100%;height:auto}
+.example{background:var(--sf);border:1px solid var(--br);border-radius:8px;margin-bottom:14px;overflow:hidden}
+.exl{background:rgba(46,134,193,.2);padding:11px 16px;font-size:.86rem;font-weight:600;color:var(--c);border-bottom:1px solid var(--br);font-family:"Cascadia Code",monospace;word-break:break-all}
+.cw{position:relative;padding:14px}
+pre.cb{background:var(--cb);color:var(--ct);padding:12px 14px;border-radius:4px;font-family:"Cascadia Code","Consolas","Courier New",monospace;font-size:.88rem;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-wrap:break-word}
+.cp{position:absolute;top:18px;right:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#94a3b8;padding:5px 11px;border-radius:4px;font-size:.78rem;cursor:pointer;transition:all .2s;font-family:inherit}
+.cp:hover{background:rgba(0,200,232,.2);color:var(--c);border-color:var(--c)}.cp.ok{background:rgba(76,175,80,.2);color:#4caf50;border-color:#4caf50}
+.nav{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:50px;padding-top:32px;border-top:1px solid var(--br)}
+.nl{display:block;padding:18px;background:var(--sf);border:1px solid var(--br);border-radius:8px;text-decoration:none;transition:all .3s}
+.nl:hover{background:rgba(0,200,232,.08);border-color:var(--c)}
+.nll{font-size:.78rem;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.nlt{font-size:.95rem;font-weight:700;color:var(--c);font-family:"Cascadia Code",monospace}
+footer{background:var(--sf);border-top:1px solid var(--br);padding:36px 24px;margin-top:50px;text-align:center;color:var(--mu);font-size:.88rem}
+footer a{color:var(--c);text-decoration:none}
+@media(max-width:768px){.cn{font-size:1.4rem}.hc{flex-direction:column;gap:10px;text-align:center}.nav{grid-template-columns:1fr}main{padding:20px 14px}}
+</style>
+</head>
+<body>
+<header><div class="hc">
+<a href="https://powershelldba.de/" class="logo">&#128290; sqmSQLTool</a>
+<div class="bc"><a href="index.html">Commands</a> / <span>Export-sqmDatabaseDocumentation</span></div>
+</div></header>
+<main>
+<div class="cn">Export-sqmDatabaseDocumentation</div>
+<div class="cm">
+<span class="badge" style="background:#0369a1">Configuration</span>
+<span style="color:var(--mu)">sqmSQLTool v1.8.2+ &middot; Export</span>
+<span style="color:var(--mu);font-size:.82rem">&#10003; -WhatIf supported &nbsp;&#128736; Pipeline</span>
+</div>
+<section class="desc">
+Creates <strong>self-contained HTML reports</strong> and <strong>CSV files</strong> documenting every database on one or more SQL Server instances.
+<br><br>
+For each database the report contains: general properties (recovery model, collation, owner, compatibility level, ReadOnly/AutoClose/AutoShrink), data and log size, last backup times (Full / Diff / Log), last DBCC CHECKDB date, VLF count (SQL&nbsp;Server&nbsp;2016+), optional filegroup/file details, object summary (tables, views, SPs, functions, triggers, synonyms), and database users.
+<br><br>
+Backup info, CHECKDB, and VLF data are pre-loaded with a single query per instance (not per database). Output files are additionally copied to the module-configured <code>CentralPath</code> via <code>Copy-sqmToCentralPath</code>.
+</section>
+
+<section><h2 class="st">Parameters</h2>
+<table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>-SqlInstance</td><td>string[]</td><td><span class="to">Optional</span></td><td><span class="dv">$env:COMPUTERNAME</span></td><td>One or more instances. Pipeline-capable.</td></tr>
+<tr><td>-SqlCredential</td><td>PSCredential</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td><td>Credentials for all SQL connections.</td></tr>
+<tr><td>-Database</td><td>string[]</td><td><span class="to">Optional</span></td><td><span class="dv">@() = all user DBs</span></td><td>Limit to specific databases. Wildcards allowed (<code>Sales*</code>).</td></tr>
+<tr><td>-IncludeSystemDatabases</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Include master, model, msdb. tempdb is always excluded.</td></tr>
+<tr><td>-IncludeFileDetails</td><td>bool</td><td><span class="to">Optional</span></td><td><span class="dv">$true</span></td><td>Include filegroup/file section in the HTML report.</td></tr>
+<tr><td>-IncludeUsers</td><td>bool</td><td><span class="to">Optional</span></td><td><span class="dv">$true</span></td><td>Include database users section.</td></tr>
+<tr><td>-IncludeObjectSummary</td><td>bool</td><td><span class="to">Optional</span></td><td><span class="dv">$true</span></td><td>Include object counts (tables, views, SPs, functions, triggers, synonyms).</td></tr>
+<tr><td>-OutputPath</td><td>string</td><td><span class="to">Optional</span></td><td><span class="dv">Get-sqmDefaultOutputPath</span></td><td>Output directory. Created if missing.</td></tr>
+<tr><td>-ContinueOnError</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Continue to the next database or instance on error instead of stopping.</td></tr>
+<tr><td>-EnableException</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Re-throw exceptions (overrides -ContinueOnError).</td></tr>
+<tr><td>-NoOpen</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Do not auto-open the HTML report after creation.</td></tr>
+<tr><td>-WhatIf / -Confirm</td><td>switch</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td><td>ShouldProcess (ConfirmImpact: None) guards the file-write step.</td></tr>
+</tbody></table>
+</section>
+
+<section><h2 class="st">Execution Flow</h2>
+<div class="fw">
+<svg viewBox="0 0 760 920" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="12">
+<defs>
+<marker id="a"  markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#5dade2"/></marker>
+<marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ef4444"/></marker>
+<marker id="ay" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#f59e0b"/></marker>
+</defs>
+
+<!-- START -->
+<ellipse cx="380" cy="30" rx="80" ry="22" fill="#1a1a2e" stroke="#00c8e8" stroke-width="2"/>
+<text x="380" y="35" text-anchor="middle" fill="#00c8e8" font-weight="bold">START</text>
+<line x1="380" y1="52" x2="380" y2="72" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- dbatools installed? -->
+<polygon points="380,73 480,105 380,137 280,105" fill="#0d1b2e" stroke="#ef4444" stroke-width="1.5"/>
+<text x="380" y="101" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">dbatools</text>
+<text x="380" y="115" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">installed?</text>
+<line x1="280" y1="105" x2="172" y2="105" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="268" y="99" text-anchor="end" fill="#ef4444" font-size="11">NO</text>
+<rect x="20" y="85" width="150" height="40" rx="5" fill="rgba(239,68,68,.15)" stroke="#ef4444" stroke-width="1.5"/>
+<text x="95" y="101" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="10">throw:</text>
+<text x="95" y="115" text-anchor="middle" fill="#ef4444" font-size="10">dbatools not found</text>
+<text x="394" y="148" fill="#22c55e" font-size="11">YES</text>
+<line x1="380" y1="137" x2="380" y2="157" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- SqlInstance default? -->
+<rect x="190" y="158" width="380" height="36" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="380" y="172" text-anchor="middle" fill="#94a8c0" font-weight="bold">-SqlInstance provided?</text>
+<text x="380" y="186" text-anchor="middle" fill="#f59e0b" font-size="10">NO → Default: $env:COMPUTERNAME</text>
+<line x1="380" y1="194" x2="380" y2="214" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- foreach instance loop [dashed] -->
+<rect x="55" y="215" width="650" height="660" rx="5" fill="rgba(0,200,232,.03)" stroke="#5dade2" stroke-width="1" stroke-dasharray="6,3"/>
+<text x="75" y="232" fill="#5dade2" font-size="10" font-style="italic">foreach $instance in $SqlInstance</text>
+
+<!-- Connect + load DBs -->
+<rect x="90" y="237" width="540" height="36" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="251" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Connect-DbaInstance → Get-DbaDatabase</text>
+<text x="360" y="265" text-anchor="middle" fill="#e2e8f0" font-size="10">Filter: exclude tempdb | system DBs (unless -IncludeSystemDatabases) | apply -Database wildcard filter</text>
+<line x1="380" y1="273" x2="380" y2="293" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- No DBs found? diamond -->
+<polygon points="380,294 480,326 380,358 280,326" fill="#0d1b2e" stroke="#5dade2" stroke-width="1.5"/>
+<text x="380" y="322" text-anchor="middle" fill="#e2e8f0" font-weight="bold" font-size="11">DBs found</text>
+<text x="380" y="336" text-anchor="middle" fill="#e2e8f0" font-weight="bold" font-size="11">after filter?</text>
+<!-- NO right -->
+<line x1="480" y1="326" x2="566" y2="326" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ay)"/>
+<text x="488" y="320" fill="#ef4444" font-size="11">NO</text>
+<rect x="566" y="308" width="118" height="36" rx="5" fill="rgba(245,158,11,.1)" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="625" y="322" text-anchor="middle" fill="#f59e0b" font-size="10">add Warning result</text>
+<text x="625" y="336" text-anchor="middle" fill="#f59e0b" font-size="10">continue</text>
+<!-- YES down -->
+<text x="394" y="369" fill="#22c55e" font-size="11">YES</text>
+<line x1="380" y1="358" x2="380" y2="378" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Pre-load batch queries -->
+<rect x="90" y="379" width="540" height="52" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="395" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Pre-load lookup tables (one query per topic per instance)</text>
+<text x="360" y="409" text-anchor="middle" fill="#e2e8f0" font-size="10">1) Backup times → msdb.dbo.backupset (Full/Diff/Log)</text>
+<text x="360" y="421" text-anchor="middle" fill="#e2e8f0" font-size="10">2) CHECKDB → DATABASEPROPERTYEX(name,'LastGoodCheckDbTime')</text>
+<text x="360" y="433" text-anchor="middle" fill="#f59e0b" font-size="10">3) VLF count → sys.dm_db_log_info (SQL 2016+ only; skipped on error)</text>
+<line x1="380" y1="431" x2="380" y2="451" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Build HTML head + TOC -->
+<rect x="90" y="452" width="540" height="36" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="466" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Build HTML: header + table of contents (sorted by DB name)</text>
+<text x="360" y="480" text-anchor="middle" fill="#e2e8f0" font-size="10">internal helpers: _HtmlHead, _HtmlEncode, _HtmlTable (no external CSS)</text>
+<line x1="380" y1="488" x2="380" y2="508" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Per-DB inner loop [dashed] -->
+<rect x="75" y="509" width="560" height="118" rx="5" fill="rgba(93,173,226,.04)" stroke="#5dade2" stroke-width="1" stroke-dasharray="6,3"/>
+<text x="95" y="525" fill="#5dade2" font-size="10" font-style="italic">foreach $db in $filteredDbs (sorted by Name)</text>
+<rect x="100" y="530" width="510" height="86" rx="4" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="355" y="547" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="10">Look up backup times + CHECKDB age + VLF count from pre-loaded lookups</text>
+<text x="355" y="561" text-anchor="middle" fill="#e2e8f0" font-size="10">Calc sizes: data (FileGroups.Files) + log (LogFiles) | Set status class (ok/warn/crit)</text>
+<text x="355" y="575" text-anchor="middle" fill="#e2e8f0" font-size="10">Append HTML: Props | Backups | CHECKDB | Files* | Object summary* | Users*</text>
+<text x="355" y="589" text-anchor="middle" fill="#f59e0b" font-size="10">(*if -IncludeFileDetails / -IncludeObjectSummary / -IncludeUsers) | add CSV row</text>
+<text x="355" y="603" text-anchor="middle" fill="#94a8c0" font-size="10">catch per-DB: log error + append error block in HTML (continue if -ContinueOnError)</text>
+<line x1="380" y1="627" x2="380" y2="647" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- ShouldProcess -->
+<polygon points="380,648 480,680 380,712 280,680" fill="#0d1b2e" stroke="#5dade2" stroke-width="1.5"/>
+<text x="380" y="676" text-anchor="middle" fill="#e2e8f0" font-weight="bold" font-size="11">ShouldProcess?</text>
+<text x="380" y="690" text-anchor="middle" fill="#e2e8f0" font-size="10">(ConfirmImpact: None)</text>
+<!-- NO right WhatIf -->
+<line x1="480" y1="680" x2="566" y2="680" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<text x="488" y="674" fill="#ef4444" font-size="11">NO</text>
+<rect x="566" y="662" width="118" height="36" rx="5" fill="rgba(0,0,0,.3)" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="625" y="676" text-anchor="middle" fill="#94a8c0" font-size="10">WhatIf: log</text>
+<text x="625" y="690" text-anchor="middle" fill="#94a8c0" font-size="10">files = $null</text>
+<line x1="625" y1="698" x2="625" y2="738" stroke="#5dade2" stroke-width="1.5"/>
+<line x1="625" y1="738" x2="482" y2="738" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<!-- YES down -->
+<text x="394" y="723" fill="#22c55e" font-size="11">YES</text>
+<line x1="380" y1="712" x2="380" y2="732" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Write files -->
+<rect x="90" y="733" width="380" height="44" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="280" y="749" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Ensure OutputPath → Write HTML + CSV</text>
+<text x="280" y="763" text-anchor="middle" fill="#e2e8f0" font-size="10">Copy-sqmToCentralPath | Open HTML (unless -NoOpen)</text>
+<line x1="380" y1="777" x2="380" y2="797" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Add result -->
+<rect x="90" y="798" width="540" height="36" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="812" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Add [PSCustomObject] to $allResults</text>
+<text x="360" y="826" text-anchor="middle" fill="#e2e8f0" font-size="10">SqlInstance, DatabaseCount, HtmlFile, CsvFile, Status, Timestamp</text>
+<line x1="380" y1="834" x2="380" y2="854" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Return -->
+<rect x="170" y="855" width="420" height="36" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="380" y="869" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Return $allResults</text>
+<text x="380" y="883" text-anchor="middle" fill="#e2e8f0" font-size="10">[PSCustomObject[]] — one entry per instance</text>
+<line x1="380" y1="891" x2="380" y2="898" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- DONE -->
+<ellipse cx="380" cy="912" rx="100" ry="22" fill="#1a1a2e" stroke="#22c55e" stroke-width="2"/>
+<text x="380" y="917" text-anchor="middle" fill="#22c55e" font-weight="bold">DONE</text>
+</svg>
+</div>
+</section>
+
+<section><h2 class="st">Examples</h2>
+
+<div class="example">
+<div class="exl">Document all user databases on the local instance</div>
+<div class="cw"><button class="cp" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText).then(()=>{this.textContent='Copied!';this.classList.add('ok');setTimeout(()=>{this.textContent='Copy';this.classList.remove('ok')},2000)})">Copy</button>
+<pre class="cb">Export-sqmDatabaseDocumentation</pre>
+</div></div>
+
+<div class="example">
+<div class="exl">Document specific databases on SQL01 to a custom path</div>
+<div class="cw"><button class="cp" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText).then(()=>{this.textContent='Copied!';this.classList.add('ok');setTimeout(()=>{this.textContent='Copy';this.classList.remove('ok')},2000)})">Copy</button>
+<pre class="cb">Export-sqmDatabaseDocumentation -SqlInstance "SQL01" -Database "SalesDB","HRApp" -OutputPath "D:\Reports"</pre>
+</div></div>
+
+<div class="example">
+<div class="exl">Multiple instances via pipeline, continue on error, include system databases</div>
+<div class="cw"><button class="cp" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText).then(()=>{this.textContent='Copied!';this.classList.add('ok');setTimeout(()=>{this.textContent='Copy';this.classList.remove('ok')},2000)})">Copy</button>
+<pre class="cb">"SQL01","SQL02","SQL03" | Export-sqmDatabaseDocumentation -IncludeSystemDatabases -ContinueOnError -NoOpen</pre>
+</div></div>
+
+</section>
+
+<div class="nav">
+<a href="index.html" class="nl"><div class="nll">&#8592; Back</div><div class="nlt">Command Index</div></a>
+<a href="export-sqmserverconfiguration.html" class="nl"><div class="nll">Related</div><div class="nlt">Export-sqmServerConfiguration</div></a>
+</div>
+</main>
+<footer>
+<p>sqmSQLTool &mdash; SQL Server DBA Automation &mdash; <a href="https://powershelldba.de/">powershelldba.de</a></p>
+<p style="margin-top:8px;font-size:.8rem">dtcSoftware &middot; Module v1.8.2+</p>
+</footer>
+<script>document.querySelectorAll('.cp').forEach(b=>{b.addEventListener('click',()=>{})});</script>
+</body>
+</html>

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Invoke-sqmRestoreDatabase — sqmSQLTool</title>
+<meta name="description" content="Restores a SQL Server database from backup, with full AlwaysOn AG support: auto-detects AG membership, removes from AG, restores, and optionally re-joins.">
+<meta name="keywords" content="sqmSQLTool,PowerShell,SQL Server,Restore,AlwaysOn,Invoke-sqmRestoreDatabase">
+<meta name="author" content="dtcSoftware">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Invoke-sqmRestoreDatabase","description":"Database restore with AlwaysOn AG support","author":{"@type":"Organization","name":"dtcSoftware"}}</script>
+<style>
+:root{--n:#1a1a2e;--b:#5dade2;--c:#00c8e8;--p:#7c3aed;--bg:#060f20;--sf:rgba(255,255,255,.04);--br:rgba(46,134,193,.25);--tx:#e2e8f0;--mu:#94a8c0;--cb:#012456;--ct:#e8e8e8}
+*{box-sizing:border-box;margin:0;padding:0}html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--tx);line-height:1.6}
+header{background:linear-gradient(135deg,var(--n),var(--b));padding:20px 0;border-bottom:2px solid var(--c);position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.hc{max-width:1000px;margin:0 auto;padding:0 24px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:1.2rem;font-weight:900;color:#fff;text-decoration:none}
+.bc{font-size:.9rem;color:var(--mu)}.bc a{color:var(--c);text-decoration:none;margin:0 4px}.bc a:hover{text-decoration:underline}
+main{max-width:960px;margin:0 auto;padding:40px 24px}
+.cn{font-family:"Cascadia Code","Consolas",monospace;font-size:1.9rem;font-weight:900;color:var(--c);margin-bottom:12px}
+.cm{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:24px}
+.badge{padding:6px 14px;border-radius:20px;font-size:.82rem;font-weight:700;text-transform:uppercase;color:#fff}
+.desc{background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:20px;margin-bottom:28px;font-size:1rem;line-height:1.8;color:var(--mu)}
+.st{font-size:1.3rem;font-weight:800;color:var(--c);border-bottom:2px solid var(--p);padding-bottom:8px;margin-bottom:16px}
+section{margin-bottom:32px}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th{background:rgba(46,134,193,.2);color:var(--c);padding:9px 14px;text-align:left;font-weight:700;border-bottom:2px solid var(--br)}
+td{padding:9px 14px;border-bottom:1px solid var(--br);color:var(--mu);vertical-align:top}
+tr:hover td{background:rgba(0,200,232,.04)}
+td:first-child{font-family:"Cascadia Code","Consolas",monospace;color:var(--c);font-size:.84rem;white-space:nowrap}
+.tr{display:inline-block;background:rgba(239,68,68,.2);color:#ef4444;border:1px solid #ef4444;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.to{display:inline-block;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid #22c55e;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.ts{display:inline-block;background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid #f59e0b;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.dv{font-family:"Cascadia Code","Consolas",monospace;font-size:.8rem;color:#f59e0b}
+.fw{background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:20px 12px;overflow-x:auto;text-align:center}
+.fw svg{max-width:100%;height:auto}
+.example{background:var(--sf);border:1px solid var(--br);border-radius:8px;margin-bottom:14px;overflow:hidden}
+.exl{background:rgba(46,134,193,.2);padding:11px 16px;font-size:.86rem;font-weight:600;color:var(--c);border-bottom:1px solid var(--br);font-family:"Cascadia Code",monospace;word-break:break-all}
+.cw{position:relative;padding:14px}
+pre.cb{background:var(--cb);color:var(--ct);padding:12px 14px;border-radius:4px;font-family:"Cascadia Code","Consolas","Courier New",monospace;font-size:.88rem;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-wrap:break-word}
+.cp{position:absolute;top:18px;right:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#94a3b8;padding:5px 11px;border-radius:4px;font-size:.78rem;cursor:pointer;transition:all .2s;font-family:inherit}
+.cp:hover{background:rgba(0,200,232,.2);color:var(--c);border-color:var(--c)}.cp.ok{background:rgba(76,175,80,.2);color:#4caf50;border-color:#4caf50}
+.callout{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.35);border-radius:6px;padding:12px 16px;margin-bottom:16px;font-size:.9rem;color:#f59e0b}
+.callout strong{color:#fbbf24}
+.nav{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:50px;padding-top:32px;border-top:1px solid var(--br)}
+.nl{display:block;padding:18px;background:var(--sf);border:1px solid var(--br);border-radius:8px;text-decoration:none;transition:all .3s}
+.nl:hover{background:rgba(0,200,232,.08);border-color:var(--c)}
+.nll{font-size:.78rem;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.nlt{font-size:.95rem;font-weight:700;color:var(--c);font-family:"Cascadia Code",monospace}
+footer{background:var(--sf);border-top:1px solid var(--br);padding:36px 24px;margin-top:50px;text-align:center;color:var(--mu);font-size:.88rem}
+footer a{color:var(--c);text-decoration:none}
+@media(max-width:768px){.cn{font-size:1.4rem}.hc{flex-direction:column;gap:10px;text-align:center}.nav{grid-template-columns:1fr}main{padding:20px 14px}}
+</style>
+</head>
+<body>
+<header><div class="hc">
+<a href="https://powershelldba.de/" class="logo">&#128290; sqmSQLTool</a>
+<div class="bc"><a href="index.html">Commands</a> / <span>Invoke-sqmRestoreDatabase</span></div>
+</div></header>
+<main>
+<div class="cn">Invoke-sqmRestoreDatabase</div>
+<div class="cm">
+<span class="badge" style="background:#0369a1">Backup &amp; Restore</span>
+<span style="color:var(--mu)">sqmSQLTool v1.8.2+ &middot; Invoke</span>
+<span style="color:var(--mu);font-size:.82rem">&#10003; -WhatIf supported</span>
+</div>
+<section class="desc">
+Restores a database from a backup file. Automatically detects AlwaysOn AG membership and removes the database from the AG before the restore (including deletion on all secondary replicas). Exports database users before the restore and re-imports them afterwards. Repairs orphaned users, removes missing Windows logins, and sets the database owner to the sa account (by SID 0x01). Optionally re-joins the AG after the restore.
+</section>
+
+<div class="callout"><strong>AlwaysOn:</strong> You can run this on any replica — if the database is in an AG, the function automatically detects the primary and routes all AG operations (remove, rejoin) through it. The only hard stop: if the database is in an AG <em>and</em> <code>-KeepAlwaysOn</code> is set, the function <strong>aborts</strong>, because a restore requires removing the database from the AG first.</div>
+
+<section><h2 class="st">Parameters</h2>
+<table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>-SqlInstance</td><td>string</td><td><span class="to">Optional</span></td><td><span class="dv">$env:COMPUTERNAME</span></td><td>Target instance. Default: local machine.</td></tr>
+<tr><td>-SqlCredential</td><td>PSCredential</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td><td>SQL login credentials.</td></tr>
+<tr><td>-BackupFile</td><td>string[]</td><td><span class="tr">Required*</span></td><td><span class="dv">—</span></td><td>Single .bak file or striped backup. Use <em>instead of</em> -BackupFiles.</td></tr>
+<tr><td>-BackupFiles</td><td>string[]</td><td><span class="tr">Required*</span></td><td><span class="dv">—</span></td><td>Ordered sequence: Full, [Diff], [Log1], [Log2]…</td></tr>
+<tr><td>-DatabaseName</td><td>string</td><td><span class="tr">Required</span></td><td><span class="dv">—</span></td><td>Name of the database in the backup.</td></tr>
+<tr><td>-NewDatabaseName</td><td>string</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td><td>Rename database after restore.</td></tr>
+<tr><td>-NewDatabaseFilePath</td><td>string</td><td><span class="to">Optional</span></td><td><span class="dv">Instance default data path</span></td><td>Target directory for .mdf / .ndf files.</td></tr>
+<tr><td>-NewLogFilePath</td><td>string</td><td><span class="to">Optional</span></td><td><span class="dv">Instance default log path</span></td><td>Target directory for .ldf file.</td></tr>
+<tr><td>-BackupBeforeRestore</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Full backup of existing DB before restore. Skipped if DB is in AG.</td></tr>
+<tr><td>-NoUserExport</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Skip user export/import. Users are exported by default.</td></tr>
+<tr><td>-KeepAlwaysOn</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Do NOT remove from AG. Only valid if DB is already outside AG — otherwise <strong>aborts</strong>.</td></tr>
+<tr><td>-WithNoRecovery</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>All restores with NORECOVERY. DB stays in restoring state.</td></tr>
+<tr><td>-ContinueWithNoRecovery</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Last restore in sequence also with NORECOVERY.</td></tr>
+<tr><td>-ForceSingleUser</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Force SINGLE_USER even if no active connections detected.</td></tr>
+<tr><td>-RejoinAvailabilityGroup</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Re-add to AG after restore (Automatic Seeding). Requires Automatic Seeding on the AG.</td></tr>
+</tbody></table>
+<p style="margin-top:10px;font-size:.82rem;color:var(--mu)">* Either <code>-BackupFile</code> or <code>-BackupFiles</code> is required (mutually exclusive parameter sets).</p>
+</section>
+
+<section><h2 class="st">Execution Flow</h2>
+<div class="fw">
+<svg viewBox="0 0 820 1020" xmlns="http://www.w3.org/2000/svg" font-family="'Cascadia Code','Consolas',monospace" font-size="12" fill="#e2e8f0">
+<defs>
+<marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#5dade2"/></marker>
+<marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ef4444"/></marker>
+<marker id="ag" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#22c55e"/></marker>
+<marker id="ao" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#94a8c0"/></marker>
+<marker id="ay" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#f59e0b"/></marker>
+</defs>
+
+<!-- START -->
+<ellipse cx="380" cy="30" rx="80" ry="22" fill="#1a1a2e" stroke="#00c8e8" stroke-width="2"/>
+<text x="380" y="35" text-anchor="middle" fill="#00c8e8" font-weight="bold">START</text>
+<line x1="380" y1="52" x2="380" y2="72" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- dbatools check -->
+<polygon points="380,73 490,105 380,137 270,105" fill="#0d1b2e" stroke="#ef4444" stroke-width="1.5"/>
+<text x="380" y="101" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">dbatools</text>
+<text x="380" y="115" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">installed?</text>
+<!-- NO left -->
+<line x1="270" y1="105" x2="160" y2="105" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="258" y="99" text-anchor="end" fill="#ef4444" font-size="11">NO</text>
+<rect x="20" y="85" width="140" height="40" rx="5" fill="rgba(239,68,68,.15)" stroke="#ef4444" stroke-width="1.5"/>
+<text x="90" y="101" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="10">throw:</text>
+<text x="90" y="116" text-anchor="middle" fill="#ef4444" font-size="10">Install dbatools</text>
+<!-- YES down -->
+<text x="394" y="148" fill="#22c55e" font-size="11">YES</text>
+<line x1="380" y1="137" x2="380" y2="157" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- SqlInstance -->
+<rect x="230" y="158" width="300" height="36" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="380" y="172" text-anchor="middle" fill="#94a8c0" font-weight="bold">-SqlInstance provided?</text>
+<text x="380" y="186" text-anchor="middle" fill="#f59e0b" font-size="10">NO → Default: $env:COMPUTERNAME</text>
+<line x1="380" y1="194" x2="380" y2="214" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- DB in AG? -->
+<polygon points="380,215 500,250 380,285 260,250" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="380" y="246" text-anchor="middle" fill="#f59e0b" font-weight="bold" font-size="11">DB in</text>
+<text x="380" y="260" text-anchor="middle" fill="#f59e0b" font-weight="bold" font-size="11">AlwaysOn AG?</text>
+
+<!-- YES → right to KeepAlwaysOn? -->
+<line x1="500" y1="250" x2="570" y2="250" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ay)"/>
+<text x="517" y="244" fill="#f59e0b" font-size="11">YES</text>
+<polygon points="635,220 740,250 635,280 530,250" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="635" y="246" text-anchor="middle" fill="#f59e0b" font-weight="bold" font-size="10">-KeepAlwaysOn</text>
+<text x="635" y="260" text-anchor="middle" fill="#f59e0b" font-weight="bold" font-size="10">set?</text>
+<!-- KeepAlwaysOn YES → ABORT top right -->
+<line x1="635" y1="220" x2="635" y2="190" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="649" y="210" fill="#ef4444" font-size="11">YES</text>
+<rect x="555" y="155" width="160" height="34" rx="5" fill="rgba(239,68,68,.15)" stroke="#ef4444" stroke-width="1.5"/>
+<text x="635" y="169" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="10">ABORT</text>
+<text x="635" y="183" text-anchor="middle" fill="#ef4444" font-size="10">Cannot restore AG DB</text>
+<!-- KeepAlwaysOn NO → down: Remove from AG -->
+<line x1="635" y1="280" x2="635" y2="300" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<text x="649" y="296" fill="#22c55e" font-size="11">NO</text>
+<rect x="540" y="301" width="190" height="36" rx="5" fill="rgba(220,38,38,.12)" stroke="#dc2626" stroke-width="1.5"/>
+<text x="635" y="315" text-anchor="middle" fill="#dc2626" font-weight="bold" font-size="10">Identify Primary replica</text>
+<text x="635" y="329" text-anchor="middle" fill="#dc2626" font-size="10">Remove DB from AG via Primary</text>
+<line x1="635" y1="337" x2="635" y2="357" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="540" y="358" width="190" height="36" rx="5" fill="rgba(220,38,38,.12)" stroke="#dc2626" stroke-width="1.5"/>
+<text x="635" y="372" text-anchor="middle" fill="#dc2626" font-weight="bold" font-size="10">Delete DB on each</text>
+<text x="635" y="386" text-anchor="middle" fill="#dc2626" font-size="10">secondary replica</text>
+<!-- rejoin main path at y=420 -->
+<line x1="540" y1="376" x2="450" y2="376" stroke="#5dade2" stroke-width="1.5"/>
+<line x1="450" y1="376" x2="450" y2="420" stroke="#5dade2" stroke-width="1.5"/>
+<line x1="450" y1="420" x2="412" y2="420" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- DB in AG NO path down -->
+<text x="264" y="295" text-anchor="end" fill="#94a8c0" font-size="11">NO</text>
+<line x1="260" y1="250" x2="180" y2="250" stroke="#94a8c0" stroke-width="1.5"/>
+<line x1="180" y1="250" x2="180" y2="420" stroke="#94a8c0" stroke-width="1.5"/>
+<line x1="180" y1="420" x2="350" y2="420" stroke="#94a8c0" stroke-width="1.5" marker-end="url(#ao)"/>
+
+<!-- Active connections? / ForceSingleUser -->
+<polygon points="380,421 490,453 380,485 270,453" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="380" y="449" text-anchor="middle" fill="#f59e0b" font-weight="bold" font-size="10">Active connections</text>
+<text x="380" y="463" text-anchor="middle" fill="#f59e0b" font-weight="bold" font-size="10">or -ForceSingleUser?</text>
+<!-- YES left -->
+<line x1="270" y1="453" x2="175" y2="453" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ay)"/>
+<text x="258" y="447" text-anchor="end" fill="#f59e0b" font-size="11">YES</text>
+<rect x="20" y="433" width="155" height="40" rx="5" fill="rgba(220,38,38,.12)" stroke="#dc2626" stroke-width="1.5"/>
+<text x="98" y="449" text-anchor="middle" fill="#dc2626" font-weight="bold" font-size="10">SET SINGLE_USER</text>
+<text x="98" y="463" text-anchor="middle" fill="#dc2626" font-size="10">WITH ROLLBACK IMMEDIATE</text>
+<!-- NO down -->
+<text x="394" y="495" fill="#22c55e" font-size="11">NO</text>
+<line x1="380" y1="485" x2="380" y2="505" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- BackupBeforeRestore? -->
+<polygon points="380,506 487,536 380,566 273,536" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="380" y="532" text-anchor="middle" fill="#f59e0b" font-weight="bold" font-size="10">-BackupBeforeRestore?</text>
+<text x="380" y="546" text-anchor="middle" fill="#94a8c0" font-size="10">(skipped if AG database)</text>
+<!-- YES left -->
+<line x1="273" y1="536" x2="175" y2="536" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ay)"/>
+<text x="261" y="530" text-anchor="end" fill="#f59e0b" font-size="11">YES</text>
+<rect x="20" y="518" width="155" height="36" rx="5" fill="rgba(37,99,235,.12)" stroke="#2563eb" stroke-width="1.5"/>
+<text x="98" y="532" text-anchor="middle" fill="#60a5fa" font-weight="bold" font-size="10">Full Backup</text>
+<text x="98" y="546" text-anchor="middle" fill="#60a5fa" font-size="10">DatabaseName_preRestore_*.bak</text>
+<!-- NO down -->
+<text x="394" y="576" fill="#22c55e" font-size="11">NO</text>
+<line x1="380" y1="566" x2="380" y2="586" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Export users -->
+<rect x="215" y="587" width="330" height="36" rx="5" fill="#0d1b2e" stroke="#0891b2" stroke-width="1.5"/>
+<text x="380" y="601" text-anchor="middle" fill="#0891b2" font-weight="bold">Export-DbaUser → %TEMP%</text>
+<text x="380" y="615" text-anchor="middle" fill="#94a8c0" font-size="10">skipped if -NoUserExport</text>
+<line x1="380" y1="623" x2="380" y2="643" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- FileMapping + Restore -->
+<rect x="180" y="644" width="400" height="40" rx="5" fill="#0d1b2e" stroke="#7c3aed" stroke-width="2"/>
+<text x="380" y="660" text-anchor="middle" fill="#a78bfa" font-weight="bold">RESTORE FILELISTONLY → build FileMapping</text>
+<text x="380" y="676" text-anchor="middle" fill="#94a8c0" font-size="10">auto-maps logical names to target paths</text>
+<line x1="380" y1="684" x2="380" y2="704" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<rect x="155" y="705" width="450" height="48" rx="5" fill="#0d1b2e" stroke="#7c3aed" stroke-width="2.5"/>
+<text x="380" y="723" text-anchor="middle" fill="#c4b5fd" font-weight="bold" font-size="13">Restore-DbaDatabase</text>
+<text x="380" y="739" text-anchor="middle" fill="#94a8c0" font-size="10">Full → [Diff] → [Log1 … LogN] &nbsp;|&nbsp; last step: RECOVERY (or NORECOVERY if -WithNoRecovery)</text>
+<line x1="380" y1="753" x2="380" y2="773" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Post-restore steps -->
+<rect x="155" y="774" width="450" height="52" rx="5" fill="#0d1b2e" stroke="#0891b2" stroke-width="1.5"/>
+<text x="380" y="790" text-anchor="middle" fill="#0891b2" font-weight="bold">Import users (from export file)</text>
+<text x="380" y="804" text-anchor="middle" fill="#94a8c0" font-size="10">Repair-DbaDbOrphanUser &nbsp;|&nbsp; Remove Windows logins missing from domain</text>
+<text x="380" y="818" text-anchor="middle" fill="#94a8c0" font-size="10">Set DB owner = sa (by SID 0x01, regardless of sa rename)</text>
+<line x1="380" y1="826" x2="380" y2="846" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- RejoinAG? -->
+<polygon points="380,847 490,877 380,907 270,877" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="380" y="873" text-anchor="middle" fill="#f59e0b" font-weight="bold" font-size="11">-RejoinAvailabilityGroup?</text>
+<text x="380" y="887" text-anchor="middle" fill="#94a8c0" font-size="10">only if DB was in AG</text>
+<!-- YES right -->
+<line x1="490" y1="877" x2="565" y2="877" stroke="#22c55e" stroke-width="1.5" marker-end="url(#ag)"/>
+<text x="508" y="871" fill="#22c55e" font-size="11">YES</text>
+<rect x="566" y="857" width="215" height="40" rx="5" fill="rgba(34,197,94,.08)" stroke="#22c55e" stroke-width="1.5"/>
+<text x="674" y="873" text-anchor="middle" fill="#22c55e" font-weight="bold" font-size="10">Set Automatic Seeding on secondaries</text>
+<text x="674" y="887" text-anchor="middle" fill="#22c55e" font-size="10">Add-DbaAgDatabase → sync starts</text>
+<!-- NO down -->
+<text x="264" y="921" text-anchor="end" fill="#94a8c0" font-size="11">NO</text>
+<line x1="380" y1="907" x2="380" y2="940" stroke="#5dade2" stroke-width="1.5"/>
+<!-- also merge from YES -->
+<line x1="674" y1="897" x2="674" y2="940" stroke="#5dade2" stroke-width="1.5"/>
+<line x1="380" y1="940" x2="674" y2="940" stroke="#5dade2" stroke-width="1.5"/>
+<line x1="527" y1="940" x2="527" y2="960" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- DONE -->
+<ellipse cx="527" cy="980" rx="120" ry="22" fill="#1a1a2e" stroke="#22c55e" stroke-width="2"/>
+<text x="527" y="985" text-anchor="middle" fill="#22c55e" font-weight="bold">DONE (MULTI_USER restored, Policy re-enabled)</text>
+</svg>
+</div></section>
+
+<section><h2 class="st">Examples</h2>
+<div class="example">
+<div class="exl">Simple restore — local instance, full backup</div>
+<div class="cw"><pre class="cb">Invoke-sqmRestoreDatabase -BackupFile "D:\Backup\AdventureWorks.bak" -DatabaseName "AdventureWorks"</pre><button class="cp">copy</button></div>
+</div>
+<div class="example">
+<div class="exl">AlwaysOn: restore and rejoin AG automatically</div>
+<div class="cw"><pre class="cb">Invoke-sqmRestoreDatabase `
+    -SqlInstance "SQL01" `
+    -BackupFile "D:\Backup\MyDB.bak" `
+    -DatabaseName "MyDB" `
+    -BackupBeforeRestore `
+    -RejoinAvailabilityGroup</pre><button class="cp">copy</button></div>
+</div>
+<div class="example">
+<div class="exl">Full + Diff + Log restore sequence (point-in-time)</div>
+<div class="cw"><pre class="cb">Invoke-sqmRestoreDatabase `
+    -SqlInstance "SQL01" `
+    -BackupFiles @(
+        "D:\Backup\MyDB_Full.bak",
+        "D:\Backup\MyDB_Diff.bak",
+        "D:\Backup\MyDB_Log1.trn",
+        "D:\Backup\MyDB_Log2.trn"
+    ) `
+    -DatabaseName "MyDB" `
+    -NewDatabaseName "MyDB_Test" `
+    -NewDatabaseFilePath "E:\SQLData" `
+    -NewLogFilePath "F:\SQLLog"</pre><button class="cp">copy</button></div>
+</div>
+<div class="example">
+<div class="exl">NORECOVERY — keep DB in restoring state for more logs</div>
+<div class="cw"><pre class="cb">Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\MyDB.bak" -DatabaseName "MyDB" -WithNoRecovery</pre><button class="cp">copy</button></div>
+</div>
+</section>
+
+<div class="nav">
+<a href="index.html" class="nl" style="grid-column:1/-1;text-align:center"><div class="nll">&#11014; Index</div><div class="nlt">All Commands</div></a>
+</div>
+</main>
+<footer>
+<p>sqmSQLTool Documentation &middot; <a href="https://github.com/JankeUwe/sqmSQLTool">GitHub</a> &middot; <a href="https://powershelldba.de/">powershelldba.de</a></p>
+<p style="margin-top:10px;font-size:.82rem">PowerShell SQL Server Administration Toolset by dtcSoftware</p>
+</footer>
+<script>document.querySelectorAll(".cp").forEach(b=>{b.addEventListener("click",function(){const c=this.previousElementSibling.textContent;navigator.clipboard.writeText(c).then(()=>{const o=this.textContent;this.textContent="✓ Copied!";this.classList.add("ok");setTimeout(()=>{this.textContent=o;this.classList.remove("ok")},2000)})})});</script>
+</body></html>

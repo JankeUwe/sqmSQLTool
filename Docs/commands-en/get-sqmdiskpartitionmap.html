@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get-sqmDiskPartitionMap – sqmSQLTool</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
+.hero{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-bottom:1px solid #334155;padding:2rem 2rem 1.5rem}
+.hero-inner{max-width:960px;margin:0 auto}
+.breadcrumb{font-size:.75rem;color:#64748b;margin-bottom:.75rem}
+.breadcrumb a{color:#64748b;text-decoration:none}.breadcrumb a:hover{color:#94a3b8}
+h1{font-size:1.75rem;font-weight:700;color:#f1f5f9;font-family:'Cascadia Code','Consolas',monospace}
+.badge{display:inline-block;font-size:.7rem;font-weight:600;padding:.2rem .6rem;border-radius:9999px;margin-left:.75rem;vertical-align:middle;background:#0369a1;color:#fff;letter-spacing:.04em}
+.synopsis{color:#94a3b8;margin-top:.5rem;font-size:.95rem;max-width:720px}
+.content{max-width:960px;margin:0 auto;padding:2rem}
+section{margin-bottom:2rem}
+h2{font-size:1.1rem;font-weight:600;color:#7dd3fc;border-bottom:1px solid #1e3a5f;padding-bottom:.4rem;margin-bottom:1rem;text-transform:uppercase;letter-spacing:.06em}
+p{color:#cbd5e1;margin-bottom:.75rem;font-size:.9rem}
+.param-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.param-table th{background:#1e293b;color:#7dd3fc;text-align:left;padding:.5rem .75rem;font-weight:600;border-bottom:1px solid #334155}
+.param-table td{padding:.45rem .75rem;border-bottom:1px solid #1e293b;color:#cbd5e1;vertical-align:top}
+.param-table tr:hover td{background:#1e293b55}
+.param-name{font-family:'Cascadia Code','Consolas',monospace;color:#f0abfc;font-weight:600}
+.param-type{font-family:'Cascadia Code','Consolas',monospace;color:#6ee7b7;font-size:.78rem}
+.param-default{font-family:'Cascadia Code','Consolas',monospace;color:#fbbf24;font-size:.78rem}
+pre{background:#1e293b;border:1px solid #334155;border-radius:.5rem;padding:1rem;overflow-x:auto;font-size:.82rem;font-family:'Cascadia Code','Consolas',monospace;line-height:1.5}
+.comment{color:#64748b}.string{color:#86efac}.cmdlet{color:#67e8f9}.param{color:#fbbf24}
+.note-box{background:#1e293b;border-left:3px solid #0ea5e9;border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin:.75rem 0;font-size:.85rem;color:#94a3b8}
+.chain-box{background:#1e293b;border:1px solid #334155;border-radius:.5rem;padding:.75rem 1rem;margin:.75rem 0;font-family:'Cascadia Code','Consolas',monospace;font-size:.8rem;color:#67e8f9;line-height:2}
+.diagram-wrap{background:#1e293b;border:1px solid #334155;border-radius:.75rem;padding:1.5rem;text-align:center;overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="hero-inner">
+    <div class="breadcrumb"><a href="../index.html">sqmSQLTool</a> › <a href="index.html">Commands</a> › Get-sqmDiskPartitionMap</div>
+    <h1>Get-sqmDiskPartitionMap <span class="badge">Configuration</span></h1>
+    <p class="synopsis">Maps physical disks to their logical drive letters by traversing the WMI CIM association chain Win32_DiskDrive → Win32_DiskDriveToDiskPartition → Win32_DiskPartition → Win32_LogicalDiskToPartition → Win32_LogicalDisk. Works locally and remotely via CIM/DCOM (no WinRM). Pipeline-capable on ComputerName. Detects shared physical disks (multiple drive letters).</p>
+  </div>
+</div>
+<div class="content">
+
+<section>
+<h2>Execution Flow</h2>
+<div class="diagram-wrap">
+<svg viewBox="0 0 760 800" xmlns="http://www.w3.org/2000/svg" style="max-width:760px;width:100%;font-family:'Segoe UI',Arial,sans-serif;font-size:12px">
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#5dade2"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#ef4444"/></marker>
+  </defs>
+  <ellipse cx="380" cy="30" rx="60" ry="18" fill="#00c8e8" opacity=".9"/>
+  <text x="380" y="34" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">START</text>
+
+  <line x1="380" y1="48" x2="380" y2="68" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="130" y="68" width="500" height="570" rx="8" fill="none" stroke="#334155" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="145" y="83" fill="#64748b" font-size="10">foreach $computer in $ComputerName  [pipeline; aliases: SqlInstance, ServerName]</text>
+
+  <line x1="380" y1="68" x2="380" y2="103" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <polygon points="380,103 430,123 380,143 330,123" fill="#1e293b" stroke="#5dade2" stroke-width="1.5"/>
+  <text x="380" y="121" text-anchor="middle" fill="#bfdbfe" font-size="10">isLocal?</text>
+  <line x1="430" y1="123" x2="550" y2="123" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="550" y="108" width="60" height="30" rx="4" fill="#1e293b" stroke="#334155"/>
+  <text x="580" y="126" text-anchor="middle" fill="#94a3b8" font-size="9.5">$cimParams = CIM/DCOM</text>
+  <text x="450" y="120" fill="#5dade2" font-size="10">NO</text>
+
+  <line x1="380" y1="143" x2="380" y2="168" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="155" y="168" width="450" height="220" rx="6" fill="none" stroke="#334155" stroke-dasharray="6,3"/>
+  <text x="170" y="183" fill="#64748b" font-size="9.5">CIM association chain</text>
+
+  <rect x="190" y="188" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="201" text-anchor="middle" fill="#67e8f9" font-size="10">Get-CimInstance Win32_DiskDrive  ($disks)</text>
+  <text x="380" y="216" text-anchor="middle" fill="#5dade2" font-size="12">↓</text>
+  <rect x="190" y="220" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="233" text-anchor="middle" fill="#67e8f9" font-size="10">Get-CimAssociatedInstance -ResultClassName Win32_DiskPartition ($partitions)</text>
+  <text x="380" y="248" text-anchor="middle" fill="#5dade2" font-size="12">↓</text>
+  <rect x="190" y="252" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="265" text-anchor="middle" fill="#67e8f9" font-size="10">Get-CimAssociatedInstance -ResultClassName Win32_LogicalDisk ($logicals)</text>
+  <text x="380" y="280" text-anchor="middle" fill="#5dade2" font-size="12">↓</text>
+  <rect x="190" y="284" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="297" text-anchor="middle" fill="#94a3b8" font-size="10">Build $partId→letters[] lookup hashtable</text>
+  <text x="380" y="312" text-anchor="middle" fill="#5dade2" font-size="12">↓</text>
+  <rect x="190" y="316" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="329" text-anchor="middle" fill="#94a3b8" font-size="10">Build $diskId→letters[] lookup (all partitions of disk)</text>
+  <rect x="190" y="338" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="351" text-anchor="middle" fill="#94a3b8" font-size="10">IsShared = DriveLetters.Count &gt; 1</text>
+
+  <line x1="380" y1="388" x2="380" y2="413" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="155" y="413" width="450" height="80" rx="6" fill="none" stroke="#334155" stroke-dasharray="6,3"/>
+  <text x="170" y="428" fill="#64748b" font-size="9.5">foreach $disk in $disks</text>
+  <rect x="190" y="433" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="446" text-anchor="middle" fill="#94a3b8" font-size="10">Build result: DiskIndex, Model, Serial, SizeGB, PartitionCount, DriveLetters[], IsShared</text>
+  <rect x="190" y="455" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="468" text-anchor="middle" fill="#94a3b8" font-size="10">MediaType, InterfaceType, ComputerName</text>
+
+  <line x1="380" y1="493" x2="380" y2="518" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <polygon points="380,518 430,538 380,558 330,538" fill="#1e293b" stroke="#5dade2" stroke-width="1.5"/>
+  <text x="380" y="536" text-anchor="middle" fill="#bfdbfe" font-size="10">-NoClipboard?</text>
+  <line x1="430" y1="538" x2="580" y2="538" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="580" y="523" width="70" height="30" rx="4" fill="#1e293b" stroke="#334155"/>
+  <text x="615" y="541" text-anchor="middle" fill="#94a3b8" font-size="10">skip</text>
+  <text x="450" y="535" fill="#5dade2" font-size="10">YES</text>
+  <line x1="380" y1="558" x2="380" y2="583" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="583" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="601" text-anchor="middle" fill="#94a3b8" font-size="10.5">$diskResults | ConvertTo-Json | Set-Clipboard</text>
+
+  <line x1="380" y1="638" x2="380" y2="663" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="250" y="663" width="260" height="28" rx="5" fill="#1e3a5f" stroke="#5dade2"/>
+  <text x="380" y="681" text-anchor="middle" fill="#bfdbfe" font-size="11">Return $allResults[]</text>
+
+  <line x1="380" y1="691" x2="380" y2="715" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <ellipse cx="380" cy="733" rx="60" ry="18" fill="#22c55e" opacity=".9"/>
+  <text x="380" y="737" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">DONE</text>
+</svg>
+</div>
+</section>
+
+<section>
+<h2>Synopsis</h2>
+<p>Traverses the WMI CIM class association chain to determine which drive letters belong to each physical disk. This is the only reliable way to detect that, for example, D: and E: reside on the same physical LUN on a SAN — a configuration where a single disk extension would affect both volumes. Remote queries use CIM/DCOM and do not require WinRM.</p>
+
+<div class="chain-box">
+Win32_DiskDrive
+  → <span style="color:#334155">[Win32_DiskDriveToDiskPartition]</span> →
+Win32_DiskPartition
+  → <span style="color:#334155">[Win32_LogicalDiskToPartition]</span> →
+Win32_LogicalDisk
+</div>
+
+<div class="note-box">No dbatools required. Remote connections via CIM-Instance with DCOM (no WinRM). Use the aliases <code>-SqlInstance</code> or <code>-ServerName</code> instead of <code>-ComputerName</code> when working within the sqmSQLTool pipeline.</div>
+</section>
+
+<section>
+<h2>Syntax</h2>
+<pre><span class="cmdlet">Get-sqmDiskPartitionMap</span>
+    [<span class="param">-ComputerName</span> &lt;String[]&gt;]    <span class="comment"># pipeline; aliases: SqlInstance, ServerName</span>
+    [<span class="param">-NoClipboard</span>]
+    [<span class="param">-EnableException</span>]</pre>
+</section>
+
+<section>
+<h2>Parameters</h2>
+<table class="param-table">
+<tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+<tr><td class="param-name">-ComputerName</td><td class="param-type">String[]</td><td class="param-default">$env:COMPUTERNAME</td><td>Target computer(s). Pipeline-capable. Also accepts -SqlInstance and -ServerName as aliases.</td></tr>
+<tr><td class="param-name">-NoClipboard</td><td class="param-type">Switch</td><td class="param-default">false</td><td>Suppress copying the result to the clipboard.</td></tr>
+<tr><td class="param-name">-EnableException</td><td class="param-type">Switch</td><td class="param-default">false</td><td>Throw terminating exceptions.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Return Value</h2>
+<p>Array of <code>[PSCustomObject]</code> — one entry per physical disk per computer:</p>
+<table class="param-table">
+<tr><th>Property</th><th>Description</th></tr>
+<tr><td class="param-name">ComputerName</td><td>Source computer.</td></tr>
+<tr><td class="param-name">DiskIndex</td><td>Physical disk index (Win32_DiskDrive.Index).</td></tr>
+<tr><td class="param-name">Model</td><td>Disk model string.</td></tr>
+<tr><td class="param-name">SerialNumber</td><td>Physical disk serial number.</td></tr>
+<tr><td class="param-name">SizeGB</td><td>Total disk size in GB.</td></tr>
+<tr><td class="param-name">PartitionCount</td><td>Number of partitions on this disk.</td></tr>
+<tr><td class="param-name">DriveLetters</td><td>Array of drive letters on this disk (e.g. ["D","E"]).</td></tr>
+<tr><td class="param-name">IsShared</td><td>Boolean — true if more than one drive letter is on this physical disk.</td></tr>
+<tr><td class="param-name">MediaType</td><td>Fixed / Removable / Unknown.</td></tr>
+<tr><td class="param-name">InterfaceType</td><td>SCSI / IDE / USB / etc.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Examples</h2>
+<pre><span class="comment"># Map all physical disks on the local machine</span>
+<span class="cmdlet">Get-sqmDiskPartitionMap</span>
+
+<span class="comment"># Show shared disks only</span>
+<span class="cmdlet">Get-sqmDiskPartitionMap</span> | <span class="cmdlet">Where-Object</span> IsShared
+
+<span class="comment"># Remote query via CIM/DCOM (no WinRM needed)</span>
+<span class="cmdlet">Get-sqmDiskPartitionMap</span> <span class="param">-ComputerName</span> <span class="string">"SQL01"</span>,<span class="string">"SQL02"</span>
+
+<span class="comment"># Pipeline from SqlInstance alias</span>
+<span class="string">"SQL01"</span>,<span class="string">"SQL02"</span> | <span class="cmdlet">Get-sqmDiskPartitionMap</span> <span class="param">-NoClipboard</span></pre>
+</section>
+</div>
+</body>
+</html>

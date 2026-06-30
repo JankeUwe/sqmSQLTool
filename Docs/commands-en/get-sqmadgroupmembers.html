@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get-sqmADGroupMembers – sqmSQLTool</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
+.hero{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-bottom:1px solid #334155;padding:2rem 2rem 1.5rem}
+.hero-inner{max-width:960px;margin:0 auto}
+.breadcrumb{font-size:.75rem;color:#64748b;margin-bottom:.75rem}
+.breadcrumb a{color:#64748b;text-decoration:none}.breadcrumb a:hover{color:#94a3b8}
+h1{font-size:1.75rem;font-weight:700;color:#f1f5f9;font-family:'Cascadia Code','Consolas',monospace}
+.badge{display:inline-block;font-size:.7rem;font-weight:600;padding:.2rem .6rem;border-radius:9999px;margin-left:.75rem;vertical-align:middle;background:#0369a1;color:#fff;letter-spacing:.04em}
+.synopsis{color:#94a3b8;margin-top:.5rem;font-size:.95rem;max-width:720px}
+.content{max-width:960px;margin:0 auto;padding:2rem}
+section{margin-bottom:2rem}
+h2{font-size:1.1rem;font-weight:600;color:#7dd3fc;border-bottom:1px solid #1e3a5f;padding-bottom:.4rem;margin-bottom:1rem;text-transform:uppercase;letter-spacing:.06em}
+p{color:#cbd5e1;margin-bottom:.75rem;font-size:.9rem}
+.param-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.param-table th{background:#1e293b;color:#7dd3fc;text-align:left;padding:.5rem .75rem;font-weight:600;border-bottom:1px solid #334155}
+.param-table td{padding:.45rem .75rem;border-bottom:1px solid #1e293b;color:#cbd5e1;vertical-align:top}
+.param-table tr:hover td{background:#1e293b55}
+.param-name{font-family:'Cascadia Code','Consolas',monospace;color:#f0abfc;font-weight:600}
+.param-type{font-family:'Cascadia Code','Consolas',monospace;color:#6ee7b7;font-size:.78rem}
+.param-default{font-family:'Cascadia Code','Consolas',monospace;color:#fbbf24;font-size:.78rem}
+pre{background:#1e293b;border:1px solid #334155;border-radius:.5rem;padding:1rem;overflow-x:auto;font-size:.82rem;font-family:'Cascadia Code','Consolas',monospace;line-height:1.5}
+.comment{color:#64748b}.string{color:#86efac}.cmdlet{color:#67e8f9}.param{color:#fbbf24}
+.note-box{background:#1e293b;border-left:3px solid #0ea5e9;border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin:.75rem 0;font-size:.85rem;color:#94a3b8}
+.diagram-wrap{background:#1e293b;border:1px solid #334155;border-radius:.75rem;padding:1.5rem;text-align:center;overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="hero-inner">
+    <div class="breadcrumb"><a href="../index.html">sqmSQLTool</a> › <a href="index.html">Commands</a> › Get-sqmADGroupMembers</div>
+    <h1>Get-sqmADGroupMembers <span class="badge">Configuration</span></h1>
+    <p class="synopsis">Lists all members of one or more Active Directory groups. Resolves nested groups recursively. Falls back from Get-ADGroupMember to a direct LDAP query when the ActiveDirectory module is unavailable. Saves TXT and CSV reports per group. Pipeline-capable.</p>
+  </div>
+</div>
+<div class="content">
+
+<section>
+<h2>Execution Flow</h2>
+<div class="diagram-wrap">
+<svg viewBox="0 0 760 780" xmlns="http://www.w3.org/2000/svg" style="max-width:760px;width:100%;font-family:'Segoe UI',Arial,sans-serif;font-size:12px">
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#5dade2"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#ef4444"/></marker>
+  </defs>
+  <ellipse cx="380" cy="30" rx="60" ry="18" fill="#00c8e8" opacity=".9"/>
+  <text x="380" y="34" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">START</text>
+
+  <line x1="380" y1="48" x2="380" y2="68" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="220" y="68" width="320" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="86" text-anchor="middle" fill="#94a3b8" font-size="10.5">ADSI RootDSE connectivity check</text>
+
+  <line x1="380" y1="96" x2="380" y2="116" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <polygon points="380,116 440,141 380,166 320,141" fill="#1e293b" stroke="#5dade2" stroke-width="1.5"/>
+  <text x="380" y="138" text-anchor="middle" fill="#bfdbfe" font-size="10">ADSI OK?</text>
+  <line x1="320" y1="141" x2="200" y2="141" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+  <rect x="100" y="126" width="100" height="30" rx="4" fill="#7f1d1d"/>
+  <text x="150" y="144" text-anchor="middle" fill="#fca5a5" font-size="10">throw ERROR</text>
+  <text x="286" y="138" fill="#ef4444" font-size="10">NO</text>
+
+  <line x1="380" y1="166" x2="380" y2="191" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="130" y="191" width="500" height="350" rx="8" fill="none" stroke="#334155" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="145" y="206" fill="#64748b" font-size="10">foreach $group in $GroupName  [pipeline]</text>
+
+  <line x1="380" y1="191" x2="380" y2="225" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="220" y="225" width="320" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="243" text-anchor="middle" fill="#94a3b8" font-size="10.5">Resolve domain (auto-detect / $Domain param)</text>
+
+  <line x1="380" y1="253" x2="380" y2="273" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <polygon points="380,273 440,293 380,313 320,293" fill="#1e293b" stroke="#5dade2" stroke-width="1.5"/>
+  <text x="380" y="291" text-anchor="middle" fill="#bfdbfe" font-size="10">ActiveDirectory</text>
+  <text x="380" y="304" text-anchor="middle" fill="#bfdbfe" font-size="10">module available?</text>
+
+  <line x1="380" y1="313" x2="380" y2="343" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="170" y="343" width="420" height="50" rx="6" fill="none" stroke="#334155" stroke-dasharray="6,3"/>
+  <text x="185" y="358" fill="#64748b" font-size="9.5">Method 1: ActiveDirectory module</text>
+  <rect x="230" y="363" width="300" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="376" text-anchor="middle" fill="#94a3b8" font-size="10">Get-ADGroupMember -Recursive → members[]</text>
+
+  <line x1="440" y1="293" x2="570" y2="293" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="455" y="343" width="215" height="50" rx="6" fill="none" stroke="#334155" stroke-dasharray="6,3"/>
+  <text x="463" y="358" fill="#64748b" font-size="9.5">Method 2: LDAP fallback</text>
+  <rect x="463" y="363" width="200" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="563" y="376" text-anchor="middle" fill="#94a3b8" font-size="9.5">DirectorySearcher → member DNs</text>
+  <text x="448" y="290" fill="#5dade2" font-size="10">NO</text>
+
+  <line x1="380" y1="393" x2="380" y2="418" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="418" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="436" text-anchor="middle" fill="#94a3b8" font-size="10.5">ShouldProcess → write TXT + CSV report</text>
+
+  <line x1="380" y1="446" x2="380" y2="471" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="220" y="471" width="320" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="489" text-anchor="middle" fill="#94a3b8" font-size="10.5">Build result: GroupName/MemberCount/Members[]/Status</text>
+
+  <line x1="380" y1="541" x2="380" y2="566" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="250" y="566" width="260" height="28" rx="5" fill="#1e3a5f" stroke="#5dade2"/>
+  <text x="380" y="584" text-anchor="middle" fill="#bfdbfe" font-size="11">Return $allResults[]</text>
+
+  <line x1="380" y1="594" x2="380" y2="720" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <ellipse cx="380" cy="738" rx="60" ry="18" fill="#22c55e" opacity=".9"/>
+  <text x="380" y="742" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">DONE</text>
+</svg>
+</div>
+</section>
+
+<section>
+<h2>Synopsis</h2>
+<p>Lists direct and nested members of one or more AD groups. Prefers the <code>ActiveDirectory</code> PowerShell module (<code>Get-ADGroupMember -Recursive</code>) and falls back to a LDAP DirectorySearcher query when the module is unavailable. Writes a formatted TXT and CSV file per group to <code>-OutputPath</code>.</p>
+<div class="note-box">Does not require dbatools. Requires LDAP connectivity to a domain controller (tested via <code>[ADSI]"LDAP://RootDSE"</code> at startup).</div>
+</section>
+
+<section>
+<h2>Syntax</h2>
+<pre><span class="cmdlet">Get-sqmADGroupMembers</span>
+    <span class="param">-GroupName</span> &lt;String[]&gt;    <span class="comment"># required, pipeline</span>
+    [<span class="param">-Domain</span> &lt;String&gt;]
+    [<span class="param">-OutputPath</span> &lt;String&gt;]</pre>
+</section>
+
+<section>
+<h2>Parameters</h2>
+<table class="param-table">
+<tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+<tr><td class="param-name">-GroupName</td><td class="param-type">String[]</td><td class="param-default"><span style="color:#f87171">Required</span></td><td>AD group name(s). Accepts pipeline input. Format: "GroupName" or "DOMAIN\GroupName".</td></tr>
+<tr><td class="param-name">-Domain</td><td class="param-type">String</td><td class="param-default">auto-detect</td><td>AD domain (e.g. "FITS.LOCAL"). Auto-detected from current domain if not supplied.</td></tr>
+<tr><td class="param-name">-OutputPath</td><td class="param-type">String</td><td class="param-default">C:\System\WinSrvLog\MSSQL</td><td>Directory for TXT and CSV report files.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Return Value</h2>
+<p>Array of <code>[PSCustomObject]</code> — one entry per group:</p>
+<table class="param-table">
+<tr><th>Property</th><th>Description</th></tr>
+<tr><td class="param-name">GroupName</td><td>Resolved group name (domain prefix stripped).</td></tr>
+<tr><td class="param-name">Domain</td><td>AD domain used for the query.</td></tr>
+<tr><td class="param-name">Method</td><td>Resolution method: Get-ADGroupMember or LDAP-Query.</td></tr>
+<tr><td class="param-name">MemberCount</td><td>Total number of members found.</td></tr>
+<tr><td class="param-name">Members</td><td>List of members (SamAccountName, DisplayName, ObjectClass).</td></tr>
+<tr><td class="param-name">TxtFile</td><td>Path to the written TXT report.</td></tr>
+<tr><td class="param-name">CsvFile</td><td>Path to the written CSV file.</td></tr>
+<tr><td class="param-name">Status</td><td>OK (members found) / Warning (no members) / Error.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Examples</h2>
+<pre><span class="comment"># List members of a single group</span>
+<span class="cmdlet">Get-sqmADGroupMembers</span> <span class="param">-GroupName</span> <span class="string">"DL_SQL_Admins"</span>
+
+<span class="comment"># Specify domain explicitly</span>
+<span class="cmdlet">Get-sqmADGroupMembers</span> <span class="param">-GroupName</span> <span class="string">"Administrators"</span> <span class="param">-Domain</span> <span class="string">"FITS"</span>
+
+<span class="comment"># Multiple groups via pipeline</span>
+<span class="string">"DL_SQL_Admins"</span>,<span class="string">"DL_SQL_Readers"</span> | <span class="cmdlet">Get-sqmADGroupMembers</span></pre>
+</section>
+</div>
+</body>
+</html>

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Get-sqmBlockingReport — sqmSQLTool</title>
+<meta name="description" content="Identifies active blocking chains on a SQL Server instance: head blockers, blocked sessions, wait types, and SQL statements.">
+<meta name="keywords" content="sqmSQLTool,PowerShell,SQL Server,Blocking,Lock,Get-sqmBlockingReport">
+<meta name="author" content="dtcSoftware">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Get-sqmBlockingReport","description":"Active blocking chain analysis via sys.dm_exec_requests","author":{"@type":"Organization","name":"dtcSoftware"}}</script>
+<style>
+:root{--n:#1a1a2e;--b:#5dade2;--c:#00c8e8;--p:#7c3aed;--bg:#060f20;--sf:rgba(255,255,255,.04);--br:rgba(46,134,193,.25);--tx:#e2e8f0;--mu:#94a8c0;--cb:#012456;--ct:#e8e8e8}
+*{box-sizing:border-box;margin:0;padding:0}html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--tx);line-height:1.6}
+header{background:linear-gradient(135deg,var(--n),var(--b));padding:20px 0;border-bottom:2px solid var(--c);position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.hc{max-width:1000px;margin:0 auto;padding:0 24px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:1.2rem;font-weight:900;color:#fff;text-decoration:none}
+.bc{font-size:.9rem;color:var(--mu)}.bc a{color:var(--c);text-decoration:none;margin:0 4px}.bc a:hover{text-decoration:underline}
+main{max-width:960px;margin:0 auto;padding:40px 24px}
+.cn{font-family:"Cascadia Code","Consolas",monospace;font-size:1.9rem;font-weight:900;color:var(--c);margin-bottom:12px}
+.cm{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:24px}
+.badge{padding:6px 14px;border-radius:20px;font-size:.82rem;font-weight:700;text-transform:uppercase;color:#fff}
+.desc{background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:20px;margin-bottom:28px;font-size:1rem;line-height:1.8;color:var(--mu)}
+.st{font-size:1.3rem;font-weight:800;color:var(--c);border-bottom:2px solid var(--p);padding-bottom:8px;margin-bottom:16px}
+section{margin-bottom:32px}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th{background:rgba(46,134,193,.2);color:var(--c);padding:9px 14px;text-align:left;font-weight:700;border-bottom:2px solid var(--br)}
+td{padding:9px 14px;border-bottom:1px solid var(--br);color:var(--mu);vertical-align:top}
+tr:hover td{background:rgba(0,200,232,.04)}
+td:first-child{font-family:"Cascadia Code","Consolas",monospace;color:var(--c);font-size:.84rem;white-space:nowrap}
+.tr{display:inline-block;background:rgba(239,68,68,.2);color:#ef4444;border:1px solid #ef4444;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.to{display:inline-block;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid #22c55e;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.ts{display:inline-block;background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid #f59e0b;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.dv{font-family:"Cascadia Code","Consolas",monospace;font-size:.8rem;color:#f59e0b}
+.fw{background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:20px 12px;overflow-x:auto;text-align:center}
+.fw svg{max-width:100%;height:auto}
+.example{background:var(--sf);border:1px solid var(--br);border-radius:8px;margin-bottom:14px;overflow:hidden}
+.exl{background:rgba(46,134,193,.2);padding:11px 16px;font-size:.86rem;font-weight:600;color:var(--c);border-bottom:1px solid var(--br);font-family:"Cascadia Code",monospace;word-break:break-all}
+.cw{position:relative;padding:14px}
+pre.cb{background:var(--cb);color:var(--ct);padding:12px 14px;border-radius:4px;font-family:"Cascadia Code","Consolas","Courier New",monospace;font-size:.88rem;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-wrap:break-word}
+.cp{position:absolute;top:18px;right:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#94a3b8;padding:5px 11px;border-radius:4px;font-size:.78rem;cursor:pointer;transition:all .2s;font-family:inherit}
+.cp:hover{background:rgba(0,200,232,.2);color:var(--c);border-color:var(--c)}.cp.ok{background:rgba(76,175,80,.2);color:#4caf50;border-color:#4caf50}
+.nav{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:50px;padding-top:32px;border-top:1px solid var(--br)}
+.nl{display:block;padding:18px;background:var(--sf);border:1px solid var(--br);border-radius:8px;text-decoration:none;transition:all .3s}
+.nl:hover{background:rgba(0,200,232,.08);border-color:var(--c)}
+.nll{font-size:.78rem;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.nlt{font-size:.95rem;font-weight:700;color:var(--c);font-family:"Cascadia Code",monospace}
+footer{background:var(--sf);border-top:1px solid var(--br);padding:36px 24px;margin-top:50px;text-align:center;color:var(--mu);font-size:.88rem}
+footer a{color:var(--c);text-decoration:none}
+@media(max-width:768px){.cn{font-size:1.4rem}.hc{flex-direction:column;gap:10px;text-align:center}.nav{grid-template-columns:1fr}main{padding:20px 14px}}
+</style>
+</head>
+<body>
+<header><div class="hc">
+<a href="https://powershelldba.de/" class="logo">&#128290; sqmSQLTool</a>
+<div class="bc"><a href="index.html">Commands</a> / <span>Get-sqmBlockingReport</span></div>
+</div></header>
+<main>
+<div class="cn">Get-sqmBlockingReport</div>
+<div class="cm">
+<span class="badge" style="background:#b91c1c">Blocking &amp; Locking</span>
+<span style="color:var(--mu)">sqmSQLTool v1.8.2+ &middot; Get</span>
+<span style="color:var(--mu);font-size:.82rem">&#128275; VIEW SERVER STATE required</span>
+</div>
+<section class="desc">
+Identifies active blocking chains on a SQL Server instance by querying <code>sys.dm_exec_requests</code>, <code>sys.dm_exec_sessions</code>, and <code>sys.dm_exec_sql_text</code>. Resolves the exact SQL statement for both the blocked and blocking session via <code>statement_start/end_offset</code>. Returns structured objects with <strong>BlockingChains</strong>, <strong>HeadBlockers</strong>, <strong>BlockedSessions</strong>, and a <strong>HasBlocking</strong> flag — suitable for Agent Job monitoring or pipeline-based alerting. Optionally writes a CSV snapshot per run.
+</section>
+
+<section><h2 class="st">Parameters</h2>
+<table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>-SqlInstance</td><td>string</td><td><span class="to">Optional</span></td><td><span class="dv">$env:COMPUTERNAME</span></td><td>Target SQL Server instance.</td></tr>
+<tr><td>-SqlCredential</td><td>PSCredential</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td><td>SQL or Windows credential for the connection.</td></tr>
+<tr><td>-MinWaitSeconds</td><td>int</td><td><span class="to">Optional</span></td><td><span class="dv">0</span></td><td>Only report sessions with a wait time &ge; this value. Applied in SQL as <code>wait_time / 1000.0 &ge; N</code>.</td></tr>
+<tr><td>-OutputPath</td><td>string</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td><td>When provided AND blocking exists, writes a CSV snapshot. Directory is created automatically if missing.</td></tr>
+<tr><td>-EnableException</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Throw on error instead of <code>Write-Error</code>.</td></tr>
+</tbody></table>
+</section>
+
+<section><h2 class="st">Execution Flow</h2>
+<div class="fw">
+<svg viewBox="0 0 760 810" xmlns="http://www.w3.org/2000/svg" font-family="'Cascadia Code','Consolas',monospace" font-size="12" fill="#e2e8f0">
+<defs>
+<marker id="a"  markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#5dade2"/></marker>
+<marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ef4444"/></marker>
+<marker id="ay" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#f59e0b"/></marker>
+</defs>
+
+<!-- START -->
+<ellipse cx="380" cy="30" rx="80" ry="22" fill="#1a1a2e" stroke="#00c8e8" stroke-width="2"/>
+<text x="380" y="35" text-anchor="middle" fill="#00c8e8" font-weight="bold">START</text>
+<line x1="380" y1="52" x2="380" y2="72" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- dbatools installed? -->
+<polygon points="380,73 480,105 380,137 280,105" fill="#0d1b2e" stroke="#ef4444" stroke-width="1.5"/>
+<text x="380" y="101" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">dbatools</text>
+<text x="380" y="115" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">installed?</text>
+<!-- NO → left -->
+<line x1="280" y1="105" x2="172" y2="105" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="268" y="99" text-anchor="end" fill="#ef4444" font-size="11">NO</text>
+<rect x="20" y="85" width="150" height="40" rx="5" fill="rgba(239,68,68,.15)" stroke="#ef4444" stroke-width="1.5"/>
+<text x="95" y="101" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="10">throw:</text>
+<text x="95" y="115" text-anchor="middle" fill="#ef4444" font-size="10">dbatools not found</text>
+<!-- YES → down -->
+<text x="394" y="148" fill="#22c55e" font-size="11">YES</text>
+<line x1="380" y1="137" x2="380" y2="157" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- SqlInstance default? -->
+<rect x="190" y="158" width="380" height="36" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="380" y="172" text-anchor="middle" fill="#94a8c0" font-weight="bold">-SqlInstance provided?</text>
+<text x="380" y="186" text-anchor="middle" fill="#f59e0b" font-size="10">NO → Default: $env:COMPUTERNAME</text>
+<line x1="380" y1="194" x2="380" y2="214" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- SQL blocking query -->
+<rect x="100" y="215" width="560" height="58" rx="5" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="233" text-anchor="middle" fill="#a78bfa" font-weight="bold">Invoke-DbaQuery — blocking query (master)</text>
+<text x="380" y="249" text-anchor="middle" fill="#94a8c0" font-size="10">dm_exec_requests JOIN dm_exec_sessions APPLY dm_exec_sql_text</text>
+<text x="380" y="263" text-anchor="middle" fill="#f59e0b" font-size="10">WHERE blocking_session_id &gt; 0  AND  wait_time/1000.0 &ge; MinWaitSeconds · ORDER BY wait_time DESC</text>
+<line x1="380" y1="273" x2="380" y2="293" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Build blocked sessions list -->
+<rect x="80" y="294" width="600" height="60" rx="5" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="312" text-anchor="middle" fill="#a78bfa" font-weight="bold">For each row → PSCustomObject (blocked session)</text>
+<text x="380" y="328" text-anchor="middle" fill="#94a8c0" font-size="10">BlockedSpid, BlockingSpid, WaitType, WaitSeconds, WaitResource, DatabaseName</text>
+<text x="380" y="344" text-anchor="middle" fill="#94a8c0" font-size="10">Login / Host / Program · BlockedStatement &amp; BlockingStatement (trimmed)</text>
+<line x1="380" y1="354" x2="380" y2="374" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Determine true head blockers -->
+<rect x="100" y="375" width="560" height="56" rx="5" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="380" y="393" text-anchor="middle" fill="#f59e0b" font-weight="bold">Determine true head blockers</text>
+<text x="380" y="409" text-anchor="middle" fill="#94a8c0" font-size="10">headBlockerSpids (HashSet) = all BlockingSpid values collected above</text>
+<text x="380" y="423" text-anchor="middle" fill="#94a8c0" font-size="10">trueHeadBlockers = headBlockerSpids NOT IN BlockedSpids</text>
+<line x1="380" y1="431" x2="380" y2="451" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Build blocking chains (recursive) -->
+<rect x="60" y="452" width="640" height="60" rx="5" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="470" text-anchor="middle" fill="#a78bfa" font-weight="bold">For each true head blocker → Get-sqmBlockingChain (recursive)</text>
+<text x="380" y="486" text-anchor="middle" fill="#94a8c0" font-size="10">Builds full chain: head → directly blocked → their blocked (depth-tracked)</text>
+<text x="380" y="500" text-anchor="middle" fill="#94a8c0" font-size="10">Per chain: HeadSpid · Login · Statement · BlockedSpids[] · MaxWaitSeconds</text>
+<line x1="380" y1="512" x2="380" y2="532" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- OutputPath AND HasBlocking? -->
+<polygon points="380,533 490,558 380,583 270,558" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="380" y="554" text-anchor="middle" fill="#f59e0b" font-weight="bold" font-size="11">-OutputPath AND</text>
+<text x="380" y="568" text-anchor="middle" fill="#f59e0b" font-weight="bold" font-size="11">HasBlocking?</text>
+<!-- YES → right to CSV -->
+<line x1="490" y1="558" x2="504" y2="558" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ay)"/>
+<text x="502" y="552" fill="#f59e0b" font-size="11">YES</text>
+<rect x="505" y="538" width="190" height="40" rx="5" fill="#0d1b2e" stroke="#0891b2" stroke-width="1.5"/>
+<text x="600" y="554" text-anchor="middle" fill="#0891b2" font-weight="bold" font-size="10">Export-Csv</text>
+<text x="600" y="568" text-anchor="middle" fill="#94a8c0" font-size="10">Blocking_Instance_timestamp.csv</text>
+<!-- YES path return to main axis -->
+<line x1="600" y1="578" x2="600" y2="610" stroke="#5dade2" stroke-width="1.5"/>
+<line x1="600" y1="610" x2="382" y2="610" stroke="#5dade2" stroke-width="1.5"/>
+<!-- NO path from diamond bottom -->
+<text x="268" y="578" text-anchor="end" fill="#22c55e" font-size="11">NO</text>
+<line x1="380" y1="583" x2="380" y2="610" stroke="#5dade2" stroke-width="1.5"/>
+<!-- Merge → continue down -->
+<line x1="380" y1="610" x2="380" y2="630" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Return [PSCustomObject] -->
+<rect x="100" y="631" width="560" height="56" rx="5" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="380" y="649" text-anchor="middle" fill="#a78bfa" font-weight="bold">Return [PSCustomObject]</text>
+<text x="380" y="665" text-anchor="middle" fill="#94a8c0" font-size="10">HasBlocking · BlockedCount · BlockingChains · HeadBlockers</text>
+<text x="380" y="679" text-anchor="middle" fill="#94a8c0" font-size="10">BlockedSessions · CaptureTime · SqlInstance</text>
+<line x1="380" y1="687" x2="380" y2="707" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Error handling -->
+<rect x="120" y="708" width="520" height="36" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="380" y="722" text-anchor="middle" fill="#94a8c0" font-weight="bold">Error handling</text>
+<text x="380" y="736" text-anchor="middle" fill="#94a8c0" font-size="10">-EnableException: throw  ·  else: Write-Error + return $null</text>
+<line x1="380" y1="744" x2="380" y2="764" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- DONE -->
+<ellipse cx="380" cy="786" rx="100" ry="22" fill="#1a1a2e" stroke="#22c55e" stroke-width="2"/>
+<text x="380" y="791" text-anchor="middle" fill="#22c55e" font-weight="bold">DONE</text>
+</svg>
+</div></section>
+
+<section><h2 class="st">Return Object</h2>
+<table><thead><tr><th>Property</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>.HasBlocking</td><td>bool</td><td><code>$true</code> if any blocking was found.</td></tr>
+<tr><td>.BlockedCount</td><td>int</td><td>Total number of blocked sessions.</td></tr>
+<tr><td>.BlockingChains</td><td>List</td><td>One entry per true head blocker: <code>HeadBlockerSpid</code>, <code>HeadLogin</code>, <code>HeadStatement</code>, <code>HeadStartTime</code>, <code>BlockedSpids[]</code>, <code>BlockedCount</code>, <code>MaxWaitSeconds</code>.</td></tr>
+<tr><td>.HeadBlockers</td><td>int[]</td><td>SPIDs that are blocking others but are not themselves blocked.</td></tr>
+<tr><td>.BlockedSessions</td><td>List</td><td>All blocked session records with full detail (login, host, statement, wait info, CPU, logical reads, ChainDepth).</td></tr>
+</tbody></table>
+</section>
+
+<section><h2 class="st">Examples</h2>
+<div class="example">
+<div class="exl">Check for blocking on the local instance</div>
+<div class="cw"><pre class="cb">Get-sqmBlockingReport</pre><button class="cp">copy</button></div>
+</div>
+<div class="example">
+<div class="exl">Only report sessions waiting longer than 30 seconds</div>
+<div class="cw"><pre class="cb">Get-sqmBlockingReport -SqlInstance "SQL01" -MinWaitSeconds 30</pre><button class="cp">copy</button></div>
+</div>
+<div class="example">
+<div class="exl">Use HasBlocking flag for conditional alerting</div>
+<div class="cw"><pre class="cb">if ((Get-sqmBlockingReport -SqlInstance "SQL01").HasBlocking) {
+    Write-Warning "Active blocking detected!"
+}</pre><button class="cp">copy</button></div>
+</div>
+<div class="example">
+<div class="exl">Agent Job: write CSV snapshot whenever blocking occurs</div>
+<div class="cw"><pre class="cb">Get-sqmBlockingReport -SqlInstance "SQL01" -OutputPath "C:\System\WinSrvLog\MSSQL\Blocking"</pre><button class="cp">copy</button></div>
+</div>
+</section>
+
+<div class="nav">
+<a href="index.html" class="nl" style="grid-column:1/-1;text-align:center"><div class="nll">&#11014; Index</div><div class="nlt">All Commands</div></a>
+</div>
+</main>
+<footer>
+<p>sqmSQLTool Documentation &middot; <a href="https://github.com/JankeUwe/sqmSQLTool">GitHub</a> &middot; <a href="https://powershelldba.de/">powershelldba.de</a></p>
+<p style="margin-top:10px;font-size:.82rem">PowerShell SQL Server Administration Toolset by dtcSoftware</p>
+</footer>
+<script>document.querySelectorAll(".cp").forEach(b=>{b.addEventListener("click",function(){const c=this.previousElementSibling.textContent;navigator.clipboard.writeText(c).then(()=>{const o=this.textContent;this.textContent="&#10003; Copied!";this.classList.add("ok");setTimeout(()=>{this.textContent=o;this.classList.remove("ok")},2000)})})});</script>
+</body></html>

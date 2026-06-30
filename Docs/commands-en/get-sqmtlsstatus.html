@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get-sqmTlsStatus – sqmSQLTool</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
+.hero{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-bottom:1px solid #334155;padding:2rem 2rem 1.5rem}
+.hero-inner{max-width:960px;margin:0 auto}
+.breadcrumb{font-size:.75rem;color:#64748b;margin-bottom:.75rem}
+.breadcrumb a{color:#64748b;text-decoration:none}.breadcrumb a:hover{color:#94a3b8}
+h1{font-size:1.75rem;font-weight:700;color:#f1f5f9;font-family:'Cascadia Code','Consolas',monospace}
+.badge{display:inline-block;font-size:.7rem;font-weight:600;padding:.2rem .6rem;border-radius:9999px;margin-left:.75rem;vertical-align:middle;background:#7c3aed;color:#fff;letter-spacing:.04em}
+.synopsis{color:#94a3b8;margin-top:.5rem;font-size:.95rem;max-width:720px}
+.content{max-width:960px;margin:0 auto;padding:2rem}
+section{margin-bottom:2rem}
+h2{font-size:1.1rem;font-weight:600;color:#7dd3fc;border-bottom:1px solid #1e3a5f;padding-bottom:.4rem;margin-bottom:1rem;text-transform:uppercase;letter-spacing:.06em}
+p{color:#cbd5e1;margin-bottom:.75rem;font-size:.9rem}
+.param-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.param-table th{background:#1e293b;color:#7dd3fc;text-align:left;padding:.5rem .75rem;font-weight:600;border-bottom:1px solid #334155}
+.param-table td{padding:.45rem .75rem;border-bottom:1px solid #1e293b;color:#cbd5e1;vertical-align:top}
+.param-table tr:hover td{background:#1e293b55}
+.param-name{font-family:'Cascadia Code','Consolas',monospace;color:#f0abfc;font-weight:600}
+.param-type{font-family:'Cascadia Code','Consolas',monospace;color:#6ee7b7;font-size:.78rem}
+.param-default{font-family:'Cascadia Code','Consolas',monospace;color:#fbbf24;font-size:.78rem}
+pre{background:#1e293b;border:1px solid #334155;border-radius:.5rem;padding:1rem;overflow-x:auto;font-size:.82rem;font-family:'Cascadia Code','Consolas',monospace;line-height:1.5}
+.comment{color:#64748b}.string{color:#86efac}.cmdlet{color:#67e8f9}.param{color:#fbbf24}
+.note-box{background:#1e293b;border-left:3px solid #0ea5e9;border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin:.75rem 0;font-size:.85rem;color:#94a3b8}
+.diagram-wrap{background:#1e293b;border:1px solid #334155;border-radius:.75rem;padding:1.5rem;text-align:center;overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="hero-inner">
+    <div class="breadcrumb"><a href="../index.html">sqmSQLTool</a> › <a href="index.html">Commands</a> › Get-sqmTlsStatus</div>
+    <h1>Get-sqmTlsStatus <span class="badge">Security</span></h1>
+    <p class="synopsis">Audits TLS/SSL configuration for all SQL Server instances on one or more computers: certificate thumbprint, ForceEncryption, cert expiry/trust/SAN, and SCHANNEL TLS 1.0–1.3 protocol state. Works locally and remotely via WinRM. No dbatools required.</p>
+  </div>
+</div>
+<div class="content">
+
+<section>
+<h2>Execution Flow</h2>
+<div class="diagram-wrap">
+<svg viewBox="0 0 760 900" xmlns="http://www.w3.org/2000/svg" style="max-width:760px;width:100%;font-family:'Segoe UI',Arial,sans-serif;font-size:12px">
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#5dade2"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#ef4444"/></marker>
+  </defs>
+  <ellipse cx="380" cy="30" rx="60" ry="18" fill="#00c8e8" opacity=".9"/>
+  <text x="380" y="34" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">START</text>
+
+  <line x1="380" y1="48" x2="380" y2="68" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="130" y="68" width="500" height="730" rx="8" fill="none" stroke="#334155" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="145" y="83" fill="#64748b" font-size="10">foreach $computer in $ComputerName  [pipeline]</text>
+
+  <line x1="380" y1="68" x2="380" y2="103" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="155" y="103" width="450" height="120" rx="6" fill="none" stroke="#334155" stroke-dasharray="6,3"/>
+  <text x="170" y="118" fill="#64748b" font-size="9.5">$remoteCollectBlock (local or Invoke-Command via WinRM)</text>
+  <rect x="190" y="123" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="136" text-anchor="middle" fill="#94a3b8" font-size="10">Read SQL instance names from HKLM:\...\Instance Names\SQL</text>
+  <rect x="190" y="145" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="158" text-anchor="middle" fill="#94a3b8" font-size="10">SCHANNEL registry: TLS 1.0/1.1/1.2/1.3 Server key → Enabled/Disabled/NotConfigured</text>
+  <rect x="190" y="167" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="180" text-anchor="middle" fill="#94a3b8" font-size="10">Per instance: SuperSocketNetLib → CertThumbprint, ForceEncryption</text>
+  <rect x="190" y="189" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="202" text-anchor="middle" fill="#94a3b8" font-size="10">Return $collected[] (hashtable per instance)</text>
+
+  <line x1="380" y1="223" x2="380" y2="248" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="155" y="248" width="450" height="130" rx="6" fill="none" stroke="#334155" stroke-dasharray="6,3"/>
+  <text x="170" y="263" fill="#64748b" font-size="9.5">foreach $entry in $rawData  — cert lookup (local or Invoke-Command)</text>
+  <rect x="190" y="268" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="281" text-anchor="middle" fill="#94a3b8" font-size="10">Cert:\LocalMachine\My\&lt;Thumbprint&gt; → Found/Subject/Expiry/SAN</text>
+  <rect x="190" y="290" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="303" text-anchor="middle" fill="#94a3b8" font-size="10">X509Chain.Build() (RevocationMode=NoCheck) → ChainValid/ChainStatus</text>
+  <rect x="190" y="312" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="325" text-anchor="middle" fill="#94a3b8" font-size="10">CertDaysLeft = (Expiry - Now).TotalDays</text>
+  <rect x="190" y="334" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="347" text-anchor="middle" fill="#94a3b8" font-size="10">HasPrivateKey, SANEntries (Subject Alternative Name extension)</text>
+  <rect x="190" y="356" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="369" text-anchor="middle" fill="#94a3b8" font-size="10">Status: Critical / Warning / OK per instance</text>
+
+  <line x1="380" y1="378" x2="380" y2="403" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="403" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="421" text-anchor="middle" fill="#94a3b8" font-size="10.5">Add to $allResults[]</text>
+
+  <line x1="380" y1="798" x2="380" y2="818" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="818" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="836" text-anchor="middle" fill="#94a3b8" font-size="10.5">Write CSV + TXT (summary + per-instance detail)</text>
+
+  <line x1="380" y1="846" x2="380" y2="861" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <ellipse cx="380" cy="879" rx="60" ry="18" fill="#22c55e" opacity=".9"/>
+  <text x="380" y="883" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">DONE</text>
+</svg>
+</div>
+</section>
+
+<section>
+<h2>Synopsis</h2>
+<p>Reads SQL Server TLS/SSL configuration entirely from the Windows Registry and certificate store — no SQL connection, no dbatools needed. For each instance, the certificate thumbprint bound in <code>SuperSocketNetLib</code> is resolved against <code>Cert:\LocalMachine\My</code>, chain-validated, and its expiry and SAN entries are recorded. SCHANNEL TLS protocol state (TLS 1.0–1.3) is read per computer. Remote execution uses <code>Invoke-Command</code> (WinRM).</p>
+<div class="note-box">No dbatools required. Remote access via WinRM (Invoke-Command). Use <code>-Credential</code> for non-default remote credentials. Certificate chain validation uses RevocationMode=NoCheck to avoid network dependency.</div>
+</section>
+
+<section>
+<h2>Status Logic</h2>
+<table class="param-table">
+<tr><th>Status</th><th>Condition</th></tr>
+<tr><td class="param-name" style="color:#f87171">Critical</td><td>Cert thumbprint set but not found in LocalMachine\My, OR cert chain not trusted, OR cert expired.</td></tr>
+<tr><td class="param-name" style="color:#fbbf24">Warning</td><td>Cert expires within WarnDaysBeforeExpiry days, OR ForceEncryption=0, OR TLS 1.0/1.1 Enabled, OR no cert bound (self-signed auto-cert).</td></tr>
+<tr><td class="param-name" style="color:#4ade80">OK</td><td>All checks passed.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Syntax</h2>
+<pre><span class="cmdlet">Get-sqmTlsStatus</span>
+    [<span class="param">-ComputerName</span> &lt;String[]&gt;]    <span class="comment"># pipeline</span>
+    [<span class="param">-Credential</span> &lt;PSCredential&gt;]
+    [<span class="param">-OutputPath</span> &lt;String&gt;]
+    [<span class="param">-WarnDaysBeforeExpiry</span> &lt;Int&gt;]
+    [<span class="param">-NoOpen</span>]</pre>
+</section>
+
+<section>
+<h2>Parameters</h2>
+<table class="param-table">
+<tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+<tr><td class="param-name">-ComputerName</td><td class="param-type">String[]</td><td class="param-default">$env:COMPUTERNAME</td><td>Target computer(s). Pipeline-capable. For remote: WinRM must be enabled.</td></tr>
+<tr><td class="param-name">-Credential</td><td class="param-type">PSCredential</td><td class="param-default">—</td><td>Credential for Invoke-Command on remote computers.</td></tr>
+<tr><td class="param-name">-OutputPath</td><td class="param-type">String</td><td class="param-default">C:\System\WinSrvLog\MSSQL</td><td>Directory for CSV and TXT report files.</td></tr>
+<tr><td class="param-name">-WarnDaysBeforeExpiry</td><td class="param-type">Int</td><td class="param-default">60</td><td>Certificate expiry warning threshold in days.</td></tr>
+<tr><td class="param-name">-NoOpen</td><td class="param-type">Switch</td><td class="param-default">false</td><td>Suppress automatic report opening.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Return Value</h2>
+<table class="param-table">
+<tr><th>Property</th><th>Description</th></tr>
+<tr><td class="param-name">ComputerName</td><td>Source computer.</td></tr>
+<tr><td class="param-name">InstanceName</td><td>SQL Server instance name (e.g. MSSQLSERVER or NAMED).</td></tr>
+<tr><td class="param-name">ForceEncryption</td><td>0 = optional, 1 = required.</td></tr>
+<tr><td class="param-name">CertThumbprint</td><td>Thumbprint from SuperSocketNetLib. Empty = auto self-signed.</td></tr>
+<tr><td class="param-name">CertSubject</td><td>Certificate Subject CN.</td></tr>
+<tr><td class="param-name">CertExpiry / CertDaysLeft</td><td>Expiry date and days remaining.</td></tr>
+<tr><td class="param-name">CertTrusted / CertInStore</td><td>Chain validation result; whether cert was found in store.</td></tr>
+<tr><td class="param-name">SANEntries</td><td>Subject Alternative Name extension text.</td></tr>
+<tr><td class="param-name">HasPrivateKey</td><td>Boolean — true if private key is present.</td></tr>
+<tr><td class="param-name">TLS10 / TLS11 / TLS12 / TLS13</td><td>Enabled / Disabled / NotConfigured per SCHANNEL Server key.</td></tr>
+<tr><td class="param-name">Status / StatusDetail</td><td>OK / Warning / Critical with pipe-separated detail text.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Examples</h2>
+<pre><span class="comment"># Audit local machine</span>
+<span class="cmdlet">Get-sqmTlsStatus</span>
+
+<span class="comment"># Multiple servers, save to custom path</span>
+<span class="cmdlet">Get-sqmTlsStatus</span> <span class="param">-ComputerName</span> <span class="string">"SQL01"</span>,<span class="string">"SQL02"</span> <span class="param">-OutputPath</span> <span class="string">"D:\Reports"</span>
+
+<span class="comment"># Filter non-OK results, remote with credentials</span>
+$cred = <span class="cmdlet">Get-Credential</span>
+<span class="cmdlet">Get-sqmTlsStatus</span> <span class="param">-ComputerName</span> <span class="string">"SQL01"</span> <span class="param">-Credential</span> $cred | <span class="cmdlet">Where-Object</span> Status <span class="param">-ne</span> <span class="string">"OK"</span></pre>
+</section>
+</div>
+</body>
+</html>

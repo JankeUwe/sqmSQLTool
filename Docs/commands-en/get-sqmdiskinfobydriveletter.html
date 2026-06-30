@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get-sqmDiskInfoByDriveLetter – sqmSQLTool</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
+.hero{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-bottom:1px solid #334155;padding:2rem 2rem 1.5rem}
+.hero-inner{max-width:960px;margin:0 auto}
+.breadcrumb{font-size:.75rem;color:#64748b;margin-bottom:.75rem}
+.breadcrumb a{color:#64748b;text-decoration:none}.breadcrumb a:hover{color:#94a3b8}
+h1{font-size:1.75rem;font-weight:700;color:#f1f5f9;font-family:'Cascadia Code','Consolas',monospace}
+.badge{display:inline-block;font-size:.7rem;font-weight:600;padding:.2rem .6rem;border-radius:9999px;margin-left:.75rem;vertical-align:middle;background:#0369a1;color:#fff;letter-spacing:.04em}
+.synopsis{color:#94a3b8;margin-top:.5rem;font-size:.95rem;max-width:720px}
+.content{max-width:960px;margin:0 auto;padding:2rem}
+section{margin-bottom:2rem}
+h2{font-size:1.1rem;font-weight:600;color:#7dd3fc;border-bottom:1px solid #1e3a5f;padding-bottom:.4rem;margin-bottom:1rem;text-transform:uppercase;letter-spacing:.06em}
+p{color:#cbd5e1;margin-bottom:.75rem;font-size:.9rem}
+.param-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.param-table th{background:#1e293b;color:#7dd3fc;text-align:left;padding:.5rem .75rem;font-weight:600;border-bottom:1px solid #334155}
+.param-table td{padding:.45rem .75rem;border-bottom:1px solid #1e293b;color:#cbd5e1;vertical-align:top}
+.param-table tr:hover td{background:#1e293b55}
+.param-name{font-family:'Cascadia Code','Consolas',monospace;color:#f0abfc;font-weight:600}
+.param-type{font-family:'Cascadia Code','Consolas',monospace;color:#6ee7b7;font-size:.78rem}
+.param-default{font-family:'Cascadia Code','Consolas',monospace;color:#fbbf24;font-size:.78rem}
+pre{background:#1e293b;border:1px solid #334155;border-radius:.5rem;padding:1rem;overflow-x:auto;font-size:.82rem;font-family:'Cascadia Code','Consolas',monospace;line-height:1.5}
+.comment{color:#64748b}.string{color:#86efac}.cmdlet{color:#67e8f9}.param{color:#fbbf24}
+.note-box{background:#1e293b;border-left:3px solid #0ea5e9;border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin:.75rem 0;font-size:.85rem;color:#94a3b8}
+.formula-box{background:#0f1f0f;border:1px solid #166534;border-radius:.5rem;padding:.75rem 1rem;margin:.75rem 0;font-family:'Cascadia Code','Consolas',monospace;font-size:.82rem;color:#86efac}
+.diagram-wrap{background:#1e293b;border:1px solid #334155;border-radius:.75rem;padding:1.5rem;text-align:center;overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="hero-inner">
+    <div class="breadcrumb"><a href="../index.html">sqmSQLTool</a> › <a href="index.html">Commands</a> › Get-sqmDiskInfoByDriveLetter</div>
+    <h1>Get-sqmDiskInfoByDriveLetter <span class="badge">Configuration</span></h1>
+    <p class="synopsis">Returns detailed disk information for a single drive letter: total/free space, free percent, disk serial number, VM detection, shared-disk detection, and the minimum extension size needed to reach the configured free-space threshold. Copies result to clipboard by default.</p>
+  </div>
+</div>
+<div class="content">
+
+<section>
+<h2>Execution Flow</h2>
+<div class="diagram-wrap">
+<svg viewBox="0 0 760 860" xmlns="http://www.w3.org/2000/svg" style="max-width:760px;width:100%;font-family:'Segoe UI',Arial,sans-serif;font-size:12px">
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#5dade2"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#ef4444"/></marker>
+    <marker id="aa" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#f59e0b"/></marker>
+  </defs>
+  <ellipse cx="380" cy="30" rx="60" ry="18" fill="#00c8e8" opacity=".9"/>
+  <text x="380" y="34" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">START</text>
+
+  <line x1="380" y1="48" x2="380" y2="73" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="73" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="91" text-anchor="middle" fill="#94a3b8" font-size="10.5">Read DiskFreeSpaceThresholdPct from Get-sqmConfig (default 10)</text>
+
+  <line x1="380" y1="101" x2="380" y2="126" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="126" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="144" text-anchor="middle" fill="#94a3b8" font-size="10.5">Get-Partition -DriveLetter $DriveLetter → $partition</text>
+
+  <line x1="380" y1="154" x2="380" y2="179" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="179" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="197" text-anchor="middle" fill="#94a3b8" font-size="10.5">Get-Disk -Number $partition.DiskNumber → $disk</text>
+
+  <line x1="380" y1="207" x2="380" y2="232" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="232" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="250" text-anchor="middle" fill="#94a3b8" font-size="10.5">Get-CimInstance Win32_LogicalDisk → TotalSize, FreeSpace</text>
+
+  <line x1="380" y1="260" x2="380" y2="285" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="285" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="303" text-anchor="middle" fill="#94a3b8" font-size="10.5">Calculate TotalGB, FreeGB, FreePercent</text>
+
+  <line x1="380" y1="313" x2="380" y2="333" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <polygon points="380,333 440,358 380,383 320,358" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="380" y="356" text-anchor="middle" fill="#fde68a" font-size="10">FreePercent &lt;</text>
+  <text x="380" y="369" text-anchor="middle" fill="#fde68a" font-size="10">ThresholdPct?</text>
+  <line x1="440" y1="358" x2="610" y2="358" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#aa)"/>
+  <rect x="610" y="343" width="120" height="30" rx="4" fill="#1c1a0f" stroke="#f59e0b"/>
+  <text x="670" y="357" text-anchor="middle" fill="#fcd34d" font-size="9.5">ExtendNeededGB =</text>
+  <text x="670" y="370" text-anchor="middle" fill="#fcd34d" font-size="9">ceil((thr×Tot-Free)</text>
+  <text x="670" y="382" text-anchor="middle" fill="#fcd34d" font-size="9">÷(1-thr))</text>
+  <text x="450" y="353" fill="#f59e0b" font-size="10">YES</text>
+
+  <line x1="380" y1="383" x2="380" y2="408" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="408" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="426" text-anchor="middle" fill="#94a3b8" font-size="10.5">Get-sqmMachineType → IsVM / MachineType</text>
+
+  <line x1="380" y1="436" x2="380" y2="461" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="461" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="479" text-anchor="middle" fill="#94a3b8" font-size="10.5">Get-Partition -DiskNumber → other drive letters → IsPartitionedDisk</text>
+
+  <line x1="380" y1="489" x2="380" y2="514" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="514" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="532" text-anchor="middle" fill="#94a3b8" font-size="10.5">Build result PSCustomObject</text>
+
+  <line x1="380" y1="542" x2="380" y2="567" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <polygon points="380,567 440,587 380,607 320,587" fill="#1e293b" stroke="#5dade2" stroke-width="1.5"/>
+  <text x="380" y="585" text-anchor="middle" fill="#bfdbfe" font-size="10">-NoClipboard?</text>
+  <line x1="440" y1="587" x2="610" y2="587" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="610" y="572" width="110" height="30" rx="4" fill="#1e293b" stroke="#334155"/>
+  <text x="665" y="590" text-anchor="middle" fill="#94a3b8" font-size="10">skip</text>
+  <text x="450" y="584" fill="#5dade2" font-size="10">YES</text>
+  <line x1="380" y1="607" x2="380" y2="632" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="632" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="650" text-anchor="middle" fill="#94a3b8" font-size="10.5">$result | ConvertTo-Json | Set-Clipboard</text>
+
+  <line x1="380" y1="660" x2="380" y2="680" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="250" y="680" width="260" height="28" rx="5" fill="#1e3a5f" stroke="#5dade2"/>
+  <text x="380" y="698" text-anchor="middle" fill="#bfdbfe" font-size="11">Return $result</text>
+
+  <line x1="380" y1="708" x2="380" y2="730" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <ellipse cx="380" cy="748" rx="60" ry="18" fill="#22c55e" opacity=".9"/>
+  <text x="380" y="752" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">DONE</text>
+</svg>
+</div>
+</section>
+
+<section>
+<h2>Synopsis</h2>
+<p>Combines <code>Get-Partition</code>, <code>Get-Disk</code>, and <code>Get-CimInstance Win32_LogicalDisk</code> to provide a complete picture of a single drive. The free-space threshold is read from <code>Get-sqmConfig -Key 'DiskFreeSpaceThresholdPct'</code>. When free space falls below the threshold, <code>ExtendNeededGB</code> is calculated to determine the minimum disk extension required. Shared-disk detection queries all partitions on the same physical disk for other drive letters.</p>
+
+<div class="formula-box">
+ExtendNeededGB = Ceil( (threshold × TotalGB − FreeGB) ÷ (1 − threshold) )
+<br><span style="color:#64748b"># threshold = DiskFreeSpaceThresholdPct / 100</span>
+</div>
+</section>
+
+<section>
+<h2>Syntax</h2>
+<pre><span class="cmdlet">Get-sqmDiskInfoByDriveLetter</span>
+    <span class="param">-DriveLetter</span> &lt;String&gt;    <span class="comment"># single letter A-Z</span>
+    [<span class="param">-NoClipboard</span>]
+    [<span class="param">-EnableException</span>]</pre>
+</section>
+
+<section>
+<h2>Parameters</h2>
+<table class="param-table">
+<tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+<tr><td class="param-name">-DriveLetter</td><td class="param-type">String</td><td class="param-default"><span style="color:#f87171">Required</span></td><td>Single drive letter (A–Z) to inspect. Do not include colon or backslash.</td></tr>
+<tr><td class="param-name">-NoClipboard</td><td class="param-type">Switch</td><td class="param-default">false</td><td>Suppress copying the result to the clipboard.</td></tr>
+<tr><td class="param-name">-EnableException</td><td class="param-type">Switch</td><td class="param-default">false</td><td>Throw terminating exceptions.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Return Value</h2>
+<table class="param-table">
+<tr><th>Property</th><th>Description</th></tr>
+<tr><td class="param-name">DriveLetter</td><td>Drive letter inspected.</td></tr>
+<tr><td class="param-name">DiskNumber</td><td>Physical disk number from Get-Partition.</td></tr>
+<tr><td class="param-name">TotalGB</td><td>Total volume capacity in GB (rounded to 2 decimal places).</td></tr>
+<tr><td class="param-name">FreeGB</td><td>Free space in GB (rounded to 2 decimal places).</td></tr>
+<tr><td class="param-name">FreePercent</td><td>Free space as percentage of TotalGB.</td></tr>
+<tr><td class="param-name">ThresholdPct</td><td>Configured threshold from DiskFreeSpaceThresholdPct.</td></tr>
+<tr><td class="param-name">ExtendNeededGB</td><td>Minimum extension size in GB to reach threshold. 0 when free space is sufficient.</td></tr>
+<tr><td class="param-name">SerialNumber</td><td>Physical disk serial number from Get-Disk.</td></tr>
+<tr><td class="param-name">IsVM</td><td>Boolean — true if running in a virtual machine (via Get-sqmMachineType).</td></tr>
+<tr><td class="param-name">MachineType</td><td>Physical / HyperV / VMware / etc.</td></tr>
+<tr><td class="param-name">IsPartitionedDisk</td><td>Boolean — true if this physical disk contains other drive letters.</td></tr>
+<tr><td class="param-name">SharedWith</td><td>List of other drive letters on the same physical disk.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Examples</h2>
+<pre><span class="comment"># Get info for drive D:</span>
+<span class="cmdlet">Get-sqmDiskInfoByDriveLetter</span> <span class="param">-DriveLetter</span> <span class="string">"D"</span>
+
+<span class="comment"># Suppress clipboard copy (e.g. in automated scripts)</span>
+<span class="cmdlet">Get-sqmDiskInfoByDriveLetter</span> <span class="param">-DriveLetter</span> <span class="string">"E"</span> <span class="param">-NoClipboard</span>
+
+<span class="comment"># Check if extension is needed</span>
+$info = <span class="cmdlet">Get-sqmDiskInfoByDriveLetter</span> <span class="param">-DriveLetter</span> <span class="string">"D"</span>
+<span class="cmdlet">if</span> ($info.ExtendNeededGB -gt 0) {
+    <span class="cmdlet">Write-Host</span> <span class="string">"Extend D: by at least $($info.ExtendNeededGB) GB"</span>
+}</pre>
+</section>
+</div>
+</body>
+</html>

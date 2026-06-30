@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Get-sqmOrphanedFiles — sqmSQLTool</title>
+<meta name="description" content="Finds MDF/LDF/NDF database files on disk that are not registered in sys.master_files. Searches directories from instance configuration and optional custom paths.">
+<meta name="keywords" content="sqmSQLTool,PowerShell,SQL Server,orphaned files,Get-sqmOrphanedFiles">
+<meta name="author" content="dtcSoftware">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Get-sqmOrphanedFiles","description":"Find unregistered SQL database files on disk","author":{"@type":"Organization","name":"dtcSoftware"}}</script>
+<style>
+:root{--n:#1a1a2e;--b:#5dade2;--c:#00c8e8;--p:#7c3aed;--bg:#060f20;--sf:rgba(255,255,255,.04);--br:rgba(46,134,193,.25);--tx:#e2e8f0;--mu:#94a8c0;--cb:#012456;--ct:#e8e8e8}
+*{box-sizing:border-box;margin:0;padding:0}html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--tx);line-height:1.6}
+header{background:linear-gradient(135deg,var(--n),var(--b));padding:20px 0;border-bottom:2px solid var(--c);position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.hc{max-width:1000px;margin:0 auto;padding:0 24px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:1.2rem;font-weight:900;color:#fff;text-decoration:none}
+.bc{font-size:.9rem;color:var(--mu)}.bc a{color:var(--c);text-decoration:none;margin:0 4px}.bc a:hover{text-decoration:underline}
+main{max-width:960px;margin:0 auto;padding:40px 24px}
+.cn{font-family:"Cascadia Code","Consolas",monospace;font-size:1.9rem;font-weight:900;color:var(--c);margin-bottom:12px}
+.cm{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:24px}
+.badge{padding:6px 14px;border-radius:20px;font-size:.82rem;font-weight:700;text-transform:uppercase;color:#fff}
+.desc{background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:20px;margin-bottom:28px;font-size:1rem;line-height:1.8;color:var(--mu)}
+.st{font-size:1.3rem;font-weight:800;color:var(--c);border-bottom:2px solid var(--p);padding-bottom:8px;margin-bottom:16px}
+section{margin-bottom:32px}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th{background:rgba(46,134,193,.2);color:var(--c);padding:9px 14px;text-align:left;font-weight:700;border-bottom:2px solid var(--br)}
+td{padding:9px 14px;border-bottom:1px solid var(--br);color:var(--mu);vertical-align:top}
+tr:hover td{background:rgba(0,200,232,.04)}
+td:first-child{font-family:"Cascadia Code","Consolas",monospace;color:var(--c);font-size:.84rem;white-space:nowrap}
+.to{display:inline-block;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid #22c55e;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.dv{font-family:"Cascadia Code","Consolas",monospace;font-size:.8rem;color:#f59e0b}
+.example{background:var(--sf);border:1px solid var(--br);border-radius:8px;margin-bottom:14px;overflow:hidden}
+.exl{background:rgba(46,134,193,.2);padding:11px 16px;font-size:.86rem;font-weight:600;color:var(--c);border-bottom:1px solid var(--br);font-family:"Cascadia Code",monospace;word-break:break-all}
+.cw{position:relative;padding:14px}
+pre.cb{background:var(--cb);color:var(--ct);padding:12px 14px;border-radius:4px;font-family:"Cascadia Code","Consolas","Courier New",monospace;font-size:.88rem;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-wrap:break-word}
+.cp{position:absolute;top:18px;right:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#94a3b8;padding:5px 11px;border-radius:4px;font-size:.78rem;cursor:pointer;transition:all .2s;font-family:inherit}
+.cp:hover{background:rgba(0,200,232,.2);color:var(--c);border-color:var(--c)}.cp.ok{background:rgba(76,175,80,.2);color:#4caf50;border-color:#4caf50}
+.nav{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:50px;padding-top:32px;border-top:1px solid var(--br)}
+.nl{display:block;padding:18px;background:var(--sf);border:1px solid var(--br);border-radius:8px;text-decoration:none;transition:all .3s}
+.nl:hover{background:rgba(0,200,232,.08);border-color:var(--c)}
+.nll{font-size:.78rem;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.nlt{font-size:.95rem;font-weight:700;color:var(--c);font-family:"Cascadia Code",monospace}
+footer{background:var(--sf);border-top:1px solid var(--br);padding:36px 24px;margin-top:50px;text-align:center;color:var(--mu);font-size:.88rem}
+footer a{color:var(--c);text-decoration:none}
+@media(max-width:768px){.cn{font-size:1.4rem}.hc{flex-direction:column;gap:10px;text-align:center}.nav{grid-template-columns:1fr}main{padding:20px 14px}}
+</style>
+</head>
+<body>
+<header><div class="hc">
+<a href="https://powershelldba.de/" class="logo">&#128290; sqmSQLTool</a>
+<div class="bc"><a href="index.html">Commands</a> / <span>Get-sqmOrphanedFiles</span></div>
+</div></header>
+<main>
+<div class="cn">Get-sqmOrphanedFiles</div>
+<div class="cm">
+<span class="badge" style="background:#0f766e">Filesystem</span>
+<span style="color:var(--mu)">sqmSQLTool v1.8.2+ &middot; Diagnostics</span>
+</div>
+<section class="desc">
+Finds MDF/LDF/NDF database files on the file system that are <strong>not registered</strong> in <code>sys.master_files</code>. Searches directories from instance configuration (DefaultData/DefaultLog) and optional custom paths.
+<br><br>
+Returns summary (scanned count, registered count, orphaned count, total size) plus detailed orphaned file list with paths and last-modified dates. Useful for cleanup after database removals or migrations.
+</section>
+
+<section><h2 class="st">Parameters</h2>
+<table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>-SqlInstance</td><td>string</td><td><span class="to">Optional</span></td><td><span class="dv">$env:COMPUTERNAME</span></td><td>Target SQL Server instance.</td></tr>
+<tr><td>-SqlCredential</td><td>PSCredential</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td><td>Credentials for the connection.</td></tr>
+<tr><td>-SearchPath</td><td>string[]</td><td><span class="to">Optional</span></td><td><span class="dv">Default + registry paths</span></td><td>Custom directories to scan (e.g., UNC paths for remote instances).</td></tr>
+<tr><td>-FileExtension</td><td>string[]</td><td><span class="to">Optional</span><td><span class="dv">.mdf, .ldf, .ndf</span></td><td>File extensions to search for.</td></tr>
+<tr><td>-Recurse</td><td>switch</td><td><span class="to">Optional</span></td><td><span class="dv">$false</span></td><td>Recursively search subdirectories.</td></tr>
+<tr><td>-EnableException</td><td>switch</td><td><span class="to">Optional</span></td><td><span class="dv">$false</span></td><td>Re-throw exceptions instead of logging.</td></tr>
+</tbody></table>
+</section>
+
+<section><h2 class="st">Execution Flow</h2>
+<div class="fw">
+<svg viewBox="0 0 760 680" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="12">
+<defs>
+<marker id="a"  markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#5dade2"/></marker>
+<marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ef4444"/></marker>
+</defs>
+
+<!-- START -->
+<ellipse cx="380" cy="30" rx="80" ry="22" fill="#1a1a2e" stroke="#00c8e8" stroke-width="2"/>
+<text x="380" y="35" text-anchor="middle" fill="#00c8e8" font-weight="bold">START</text>
+<line x1="380" y1="52" x2="380" y2="72" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Query registered files from master_files -->
+<rect x="90" y="73" width="540" height="44" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="90" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Query sys.master_files → get all registered file paths</text>
+<text x="360" y="104" text-anchor="middle" fill="#e2e8f0" font-size="10">Build HashSet of registered paths (case-insensitive)</text>
+<line x1="380" y1="117" x2="380" y2="137" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Build directory list -->
+<rect x="90" y="138" width="540" height="52" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="155" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Build directory list: -SearchPath provided → use custom dirs</text>
+<text x="360" y="169" text-anchor="middle" fill="#e2e8f0" font-size="10">Or extract dirs from registered files + registry (DefaultData, DefaultLog)</text>
+<text x="360" y="183" text-anchor="middle" fill="#f59e0b" font-size="10">Skip unreachable directories (log WARNING)</text>
+<line x1="380" y1="190" x2="380" y2="210" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Per-directory loop [dashed] -->
+<rect x="50" y="211" width="660" height="310" rx="5" fill="rgba(0,200,232,.03)" stroke="#5dade2" stroke-width="1" stroke-dasharray="6,3"/>
+<text x="70" y="228" fill="#5dade2" font-size="10" font-style="italic">foreach $dir in $dirsToSearch</text>
+
+<rect x="90" y="238" width="540" height="36" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="252" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Get-ChildItem -Path $dir (with -Recurse if specified)</text>
+<text x="360" y="266" text-anchor="middle" fill="#e2e8f0" font-size="10">Filter by FileExtension (.mdf, .ldf, .ndf)</text>
+<line x1="380" y1="274" x2="380" y2="294" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<rect x="90" y="295" width="540" height="44" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="312" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Per file: check if FullName in $registeredPaths</text>
+<text x="360" y="326" text-anchor="middle" fill="#e2e8f0" font-size="10">If NOT found → add to $orphaned list (FilePath, FileName, Size, LastModified)</text>
+<line x1="380" y1="339" x2="380" y2="495" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Return summary -->
+<rect x="90" y="496" width="540" height="60" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="513" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Return [PSCustomObject] summary + orphaned file list</text>
+<text x="360" y="527" text-anchor="middle" fill="#e2e8f0" font-size="10">SqlInstance, ScannedFiles, RegisteredFiles, OrphanedFiles, TotalOrphanedMB, Files[]</text>
+<text x="360" y="541" text-anchor="middle" fill="#e2e8f0" font-size="10">If no orphaned files found: log INFO</text>
+<line x1="380" y1="556" x2="380" y2="636" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- DONE -->
+<ellipse cx="380" cy="651" rx="100" ry="22" fill="#1a1a2e" stroke="#22c55e" stroke-width="2"/>
+<text x="380" y="656" text-anchor="middle" fill="#22c55e" font-weight="bold">DONE</text>
+</svg>
+</div>
+</section>
+
+<section><h2 class="st">Examples</h2>
+
+<div class="example">
+<div class="exl">Scan default directories for orphaned files on local instance</div>
+<div class="cw"><button class="cp" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText).then(()=>{this.textContent='Copied!';this.classList.add('ok');setTimeout(()=>{this.textContent='Copy';this.classList.remove('ok')},2000)})">Copy</button>
+<pre class="cb">Get-sqmOrphanedFiles -SqlInstance "SQL01"</pre>
+</div></div>
+
+<div class="example">
+<div class="exl">Search custom paths with recursion on remote instance</div>
+<div class="cw"><button class="cp" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText).then(()=>{this.textContent='Copied!';this.classList.add('ok');setTimeout(()=>{this.textContent='Copy';this.classList.remove('ok')},2000)})">Copy</button>
+<pre class="cb">Get-sqmOrphanedFiles -SqlInstance "SQL01" -SearchPath "D:\SQLData","E:\SQLLog" -Recurse</pre>
+</div></div>
+
+</section>
+
+<div class="nav">
+<a href="index.html" class="nl"><div class="nll">&#8592; Back</div><div class="nlt">Command Index</div></a>
+</div>
+</main>
+<footer>
+<p>sqmSQLTool &mdash; SQL Server DBA Automation &mdash; <a href="https://powershelldba.de/">powershelldba.de</a></p>
+<p style="margin-top:8px;font-size:.8rem">dtcSoftware &middot; Module v1.8.2+</p>
+</footer>
+<script>document.querySelectorAll('.cp').forEach(b=>{b.addEventListener('click',()=>{})});</script>
+</body>
+</html>

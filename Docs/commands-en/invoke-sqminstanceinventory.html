@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Invoke-sqmInstanceInventory — sqmSQLTool</title>
+<meta name="description" content="Creates a complete inventory of a SQL Server instance as TXT + CSV: instance, databases, logins, linked servers, jobs, Always On.">
+<meta name="keywords" content="sqmSQLTool,PowerShell,SQL Server,inventory,Invoke-sqmInstanceInventory">
+<meta name="author" content="dtcSoftware">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Invoke-sqmInstanceInventory","description":"Generate complete instance inventory report","author":{"@type":"Organization","name":"dtcSoftware"}}</script>
+<style>:root{--n:#1a1a2e;--b:#5dade2;--c:#00c8e8;--p:#7c3aed;--bg:#060f20;--sf:rgba(255,255,255,.04);--br:rgba(46,134,193,.25);--tx:#e2e8f0;--mu:#94a8c0;--cb:#012456;--ct:#e8e8e8}*{box-sizing:border-box;margin:0;padding:0}html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--tx);line-height:1.6}header{background:linear-gradient(135deg,var(--n),var(--b));padding:20px 0;border-bottom:2px solid var(--c);position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.3)}.hc{max-width:1000px;margin:0 auto;padding:0 24px;display:flex;justify-content:space-between;align-items:center}.logo{font-size:1.2rem;font-weight:900;color:#fff;text-decoration:none}.bc{font-size:.9rem;color:var(--mu)}.bc a{color:var(--c);text-decoration:none;margin:0 4px}.bc a:hover{text-decoration:underline}main{max-width:960px;margin:0 auto;padding:40px 24px}.cn{font-family:"Cascadia Code","Consolas",monospace;font-size:1.9rem;font-weight:900;color:var(--c);margin-bottom:12px}.cm{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:24px}.badge{padding:6px 14px;border-radius:20px;font-size:.82rem;font-weight:700;text-transform:uppercase;color:#fff}.desc{background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:20px;margin-bottom:28px;font-size:1rem;line-height:1.8;color:var(--mu)}.st{font-size:1.3rem;font-weight:800;color:var(--c);border-bottom:2px solid var(--p);padding-bottom:8px;margin-bottom:16px}section{margin-bottom:32px}table{width:100%;border-collapse:collapse;font-size:.88rem}th{background:rgba(46,134,193,.2);color:var(--c);padding:9px 14px;text-align:left;font-weight:700;border-bottom:2px solid var(--br)}td{padding:9px 14px;border-bottom:1px solid var(--br);color:var(--mu);vertical-align:top}tr:hover td{background:rgba(0,200,232,.04)}td:first-child{font-family:"Cascadia Code","Consolas",monospace;color:var(--c);font-size:.84rem;white-space:nowrap}.tr{display:inline-block;background:rgba(239,68,68,.2);color:#ef4444;border:1px solid #ef4444;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}.to{display:inline-block;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid #22c55e;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}.ts{display:inline-block;background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid #f59e0b;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}.dv{font-family:"Cascadia Code","Consolas",monospace;font-size:.8rem;color:#f59e0b}.fw{background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:20px 12px;overflow-x:auto;text-align:center}.fw svg{max-width:100%;height:auto}.example{background:var(--sf);border:1px solid var(--br);border-radius:8px;margin-bottom:14px;overflow:hidden}.exl{background:rgba(46,134,193,.2);padding:11px 16px;font-size:.86rem;font-weight:600;color:var(--c);border-bottom:1px solid var(--br);font-family:"Cascadia Code",monospace;word-break:break-all}.cw{position:relative;padding:14px}pre.cb{background:var(--cb);color:var(--ct);padding:12px 14px;border-radius:4px;font-family:"Cascadia Code","Consolas","Courier New",monospace;font-size:.88rem;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-wrap:break-word}.cp{position:absolute;top:18px;right:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#94a3b8;padding:5px 11px;border-radius:4px;font-size:.78rem;cursor:pointer;transition:all .2s;font-family:inherit}.cp:hover{background:rgba(0,200,232,.2);color:var(--c);border-color:var(--c)}.cp.ok{background:rgba(76,175,80,.2);color:#4caf50;border-color:#4caf50}.nav{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:50px;padding-top:32px;border-top:1px solid var(--br)}.nl{display:block;padding:18px;background:var(--sf);border:1px solid var(--br);border-radius:8px;text-decoration:none;transition:all .3s}.nl:hover{background:rgba(0,200,232,.08);border-color:var(--c)}.nll{font-size:.78rem;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}.nlt{font-size:.95rem;font-weight:700;color:var(--c);font-family:"Cascadia Code",monospace}footer{background:var(--sf);border-top:1px solid var(--br);padding:36px 24px;margin-top:50px;text-align:center;color:var(--mu);font-size:.88rem}footer a{color:var(--c);text-decoration:none}@media(max-width:768px){.cn{font-size:1.4rem}.hc{flex-direction:column;gap:10px;text-align:center}.nav{grid-template-columns:1fr}main{padding:20px 14px}}</style>
+</head>
+<body>
+<header><div class="hc"><a href="https://powershelldba.de/" class="logo">&#128290; sqmSQLTool</a><div class="bc"><a href="index.html">Commands</a> / <span>Invoke-sqmInstanceInventory</span></div></div></header>
+<main>
+<div class="cn">Invoke-sqmInstanceInventory</div>
+<div class="cm"><span class="badge" style="background:#0369a1">Performance</span><span style="color:var(--mu)">sqmSQLTool v1.8.2+ &middot; Reporting</span><span style="color:var(--mu);font-size:.82rem">&#128736; Pipeline &nbsp;&#10003; -WhatIf supported</span></div>
+<section class="desc">Creates a comprehensive inventory of a SQL Server instance and exports it as TXT (formatted report) and CSV (database list).<br><br>Covers: Instance properties (version, edition, collation, CPU, memory), Databases (name, status, size, recovery, backups), Logins, Linked Servers, SQL Agent Jobs, and Always On AG membership.<br><br>Output is copied to CentralPath if configured.</section>
+
+<section><h2 class="st">Parameters</h2>
+<table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>-SqlInstance</td><td>string[]</td><td><span class="to">Optional</span></td><td><span class="dv">$env:COMPUTERNAME</span></td><td>One or more instances. Pipeline-capable.</td></tr>
+<tr><td>-SqlCredential</td><td>PSCredential</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td><td>Credentials for all instances.</td></tr>
+<tr><td>-OutputPath</td><td>string</td><td><span class="to">Optional</span></td><td><span class="dv">Get-sqmDefaultOutputPath</span></td><td>Report output directory. Created if missing.</td></tr>
+<tr><td>-ContinueOnError</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Continue to next instance on error.</td></tr>
+<tr><td>-EnableException</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Re-throw exceptions.</td></tr>
+<tr><td>-WhatIf / -Confirm</td><td>switch</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td><td>ShouldProcess (ConfirmImpact: None).</td></tr>
+</tbody></table>
+</section>
+
+<section><h2 class="st">Execution Flow</h2>
+<div class="fw">
+<svg viewBox="0 0 760 1000" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="12">
+<defs>
+<marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#5dade2"/></marker>
+<marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ef4444"/></marker>
+<marker id="ay" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#f59e0b"/></marker>
+</defs>
+
+<!-- START -->
+<ellipse cx="380" cy="30" rx="80" ry="22" fill="#1a1a2e" stroke="#00c8e8" stroke-width="2"/>
+<text x="380" y="35" text-anchor="middle" fill="#00c8e8" font-weight="bold">START</text>
+<line x1="380" y1="52" x2="380" y2="72" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- dbatools check -->
+<polygon points="380,73 480,105 380,137 280,105" fill="#0d1b2e" stroke="#ef4444" stroke-width="1.5"/>
+<text x="380" y="101" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">dbatools</text>
+<text x="380" y="115" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">available?</text>
+<line x1="280" y1="105" x2="172" y2="105" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="268" y="99" text-anchor="end" fill="#ef4444" font-size="11">NO</text>
+<rect x="20" y="85" width="150" height="40" rx="5" fill="rgba(239,68,68,.15)" stroke="#ef4444" stroke-width="1.5"/>
+<text x="95" y="101" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="10">throw:</text>
+<text x="95" y="115" text-anchor="middle" fill="#ef4444" font-size="10">dbatools not found</text>
+<text x="394" y="148" fill="#22c55e" font-size="11">YES</text>
+<line x1="380" y1="137" x2="380" y2="157" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Per-Instance loop [dashed] -->
+<rect x="50" y="158" width="660" height="740" rx="5" fill="rgba(0,200,232,.03)" stroke="#5dade2" stroke-width="1" stroke-dasharray="6,3"/>
+<text x="70" y="175" fill="#5dade2" font-size="10" font-style="italic">foreach $instance in $SqlInstance</text>
+
+<!-- Connect -->
+<rect x="90" y="186" width="540" height="36" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="200" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Connect to instance with -SqlCredential</text>
+<text x="360" y="214" text-anchor="middle" fill="#e2e8f0" font-size="10">Verify instance is online</text>
+<line x1="380" y1="222" x2="380" y2="242" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Instance properties -->
+<rect x="90" y="243" width="540" height="60" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="260" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Get instance properties</text>
+<text x="360" y="274" text-anchor="middle" fill="#e2e8f0" font-size="10">Version, Edition, Collation, CPU, Memory, IsAlwaysOn, LastCULevel</text>
+<text x="360" y="288" text-anchor="middle" fill="#e2e8f0" font-size="10">ServiceAccount, InstallDate, LastBackup, LastDBCheck</text>
+<text x="360" y="302" text-anchor="middle" fill="#e2e8f0" font-size="10">via Get-DbaInstance + sys.master_files + backup metadata</text>
+<line x1="380" y1="303" x2="380" y2="323" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Databases -->
+<rect x="90" y="324" width="540" height="44" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="341" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Get-DbaDatabase + properties (status, recovery, size, backups)</text>
+<text x="360" y="355" text-anchor="middle" fill="#e2e8f0" font-size="10">Per-DB: last backup time, last CHECKDB, log usage, VLF count</text>
+<line x1="380" y1="368" x2="380" y2="388" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Logins -->
+<rect x="90" y="389" width="540" height="44" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="406" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Get-DbaLogin: AD logins, SQL logins, service account assignments</text>
+<text x="360" y="420" text-anchor="middle" fill="#e2e8f0" font-size="10">Exclude: sa, guest, sys, INFORMATION_SCHEMA</text>
+<line x1="380" y1="433" x2="380" y2="453" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Linked Servers -->
+<rect x="90" y="454" width="540" height="44" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="471" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Get-DbaLinkedServer: all remote connections</text>
+<text x="360" y="485" text-anchor="middle" fill="#e2e8f0" font-size="10">DataSource, Provider, IsConnected flag</text>
+<line x1="380" y1="498" x2="380" y2="518" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Agent Jobs -->
+<rect x="90" y="519" width="540" height="44" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="536" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Get-DbaAgentJob: all jobs with status, last run, schedule</text>
+<text x="360" y="550" text-anchor="middle" fill="#e2e8f0" font-size="10">Exclude: disabled or notification jobs</text>
+<line x1="380" y1="563" x2="380" y2="583" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Always On -->
+<rect x="90" y="584" width="540" height="44" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="601" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Get-DbaAvailabilityGroup (if IsAlwaysOn): AG name, role, health</text>
+<text x="360" y="615" text-anchor="middle" fill="#e2e8f0" font-size="10">Replicas, sync state, listener status</text>
+<line x1="380" y1="628" x2="380" y2="648" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- ShouldProcess -->
+<polygon points="380,649 480,681 380,713 280,681" fill="#0d1b2e" stroke="#5dade2" stroke-width="1.5"/>
+<text x="380" y="677" text-anchor="middle" fill="#e2e8f0" font-weight="bold" font-size="11">ShouldProcess?</text>
+<text x="380" y="691" text-anchor="middle" fill="#e2e8f0" font-size="10">(ConfirmImpact: None)</text>
+
+<!-- NO right -->
+<line x1="480" y1="681" x2="566" y2="681" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+<text x="488" y="675" fill="#ef4444" font-size="11">NO</text>
+<rect x="566" y="663" width="140" height="36" rx="5" fill="rgba(0,0,0,.3)" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="636" y="677" text-anchor="middle" fill="#94a8c0" font-size="10">WhatIf: skip file write</text>
+<text x="636" y="691" text-anchor="middle" fill="#94a8c0" font-size="10">continue</text>
+<line x1="636" y1="699" x2="636" y2="750" stroke="#5dade2" stroke-width="1.5"/>
+<line x1="636" y1="750" x2="482" y2="750" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- YES down -->
+<text x="394" y="724" fill="#22c55e" font-size="11">YES</text>
+<line x1="380" y1="713" x2="380" y2="733" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Write outputs -->
+<rect x="90" y="734" width="540" height="44" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="751" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Write TXT report + CSV database list to -OutputPath</text>
+<text x="360" y="765" text-anchor="middle" fill="#e2e8f0" font-size="10">Copy to CentralPath if Get-sqmConfig -CentralPath set</text>
+<line x1="380" y1="778" x2="380" y2="798" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Return object -->
+<rect x="100" y="799" width="560" height="44" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="380" y="816" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Return [PSCustomObject] per instance</text>
+<text x="380" y="830" text-anchor="middle" fill="#e2e8f0" font-size="10">Instance, DBCount, LoginCount, JobCount, ReportPath</text>
+<line x1="380" y1="843" x2="380" y2="863" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- DONE -->
+<ellipse cx="380" cy="878" rx="100" ry="22" fill="#1a1a2e" stroke="#22c55e" stroke-width="2"/>
+<text x="380" y="883" text-anchor="middle" fill="#22c55e" font-weight="bold">DONE</text>
+</svg>
+</div>
+</section>
+
+<section><h2 class="st">Examples</h2>
+
+<div class="example">
+<div class="exl">Generate inventory for local instance</div>
+<div class="cw"><button class="cp" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText).then(()=>{this.textContent='Copied!';this.classList.add('ok');setTimeout(()=>{this.textContent='Copy';this.classList.remove('ok')},2000)})">Copy</button>
+<pre class="cb">Invoke-sqmInstanceInventory</pre>
+</div></div>
+
+<div class="example">
+<div class="exl">Pipeline: multiple instances, continue on error</div>
+<div class="cw"><button class="cp" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText).then(()=>{this.textContent='Copied!';this.classList.add('ok');setTimeout(()=>{this.textContent='Copy';this.classList.remove('ok')},2000)})">Copy</button>
+<pre class="cb">"SQL01","SQL02","SQL03" | Invoke-sqmInstanceInventory -ContinueOnError</pre>
+</div></div>
+
+</section>
+
+<div class="nav"><a href="index.html" class="nl"><div class="nll">&#8592; Back</div><div class="nlt">Command Index</div></a></div>
+</main>
+<footer><p>sqmSQLTool &mdash; SQL Server DBA Automation &mdash; <a href="https://powershelldba.de/">powershelldba.de</a></p><p style="margin-top:8px;font-size:.8rem">dtcSoftware &middot; Module v1.8.2+</p></footer>
+<script>document.querySelectorAll('.cp').forEach(b=>{b.addEventListener('click',()=>{})});</script>
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Find-sqmDatabaseObject — sqmSQLTool</title>
+<meta name="description" content="Searches all (or selected) user databases for objects by name, type, or definition. Returns database, schema, object name, and type.">
+<meta name="keywords" content="sqmSQLTool,PowerShell,SQL Server,database search,Find-sqmDatabaseObject">
+<meta name="author" content="dtcSoftware">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Find-sqmDatabaseObject","description":"Search databases for objects by name, type, or definition","author":{"@type":"Organization","name":"dtcSoftware"}}</script>
+<style>
+:root{--n:#1a1a2e;--b:#5dade2;--c:#00c8e8;--p:#7c3aed;--bg:#060f20;--sf:rgba(255,255,255,.04);--br:rgba(46,134,193,.25);--tx:#e2e8f0;--mu:#94a8c0;--cb:#012456;--ct:#e8e8e8}
+*{box-sizing:border-box;margin:0;padding:0}html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--tx);line-height:1.6}
+header{background:linear-gradient(135deg,var(--n),var(--b));padding:20px 0;border-bottom:2px solid var(--c);position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.hc{max-width:1000px;margin:0 auto;padding:0 24px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:1.2rem;font-weight:900;color:#fff;text-decoration:none}
+.bc{font-size:.9rem;color:var(--mu)}.bc a{color:var(--c);text-decoration:none;margin:0 4px}.bc a:hover{text-decoration:underline}
+main{max-width:960px;margin:0 auto;padding:40px 24px}
+.cn{font-family:"Cascadia Code","Consolas",monospace;font-size:1.9rem;font-weight:900;color:var(--c);margin-bottom:12px}
+.cm{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:24px}
+.badge{padding:6px 14px;border-radius:20px;font-size:.82rem;font-weight:700;text-transform:uppercase;color:#fff}
+.desc{background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:20px;margin-bottom:28px;font-size:1rem;line-height:1.8;color:var(--mu)}
+.st{font-size:1.3rem;font-weight:800;color:var(--c);border-bottom:2px solid var(--p);padding-bottom:8px;margin-bottom:16px}
+section{margin-bottom:32px}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th{background:rgba(46,134,193,.2);color:var(--c);padding:9px 14px;text-align:left;font-weight:700;border-bottom:2px solid var(--br)}
+td{padding:9px 14px;border-bottom:1px solid var(--br);color:var(--mu);vertical-align:top}
+tr:hover td{background:rgba(0,200,232,.04)}
+td:first-child{font-family:"Cascadia Code","Consolas",monospace;color:var(--c);font-size:.84rem;white-space:nowrap}
+.tr{display:inline-block;background:rgba(239,68,68,.2);color:#ef4444;border:1px solid #ef4444;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.to{display:inline-block;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid #22c55e;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.ts{display:inline-block;background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid #f59e0b;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.dv{font-family:"Cascadia Code","Consolas",monospace;font-size:.8rem;color:#f59e0b}
+.fw{background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:20px 12px;overflow-x:auto;text-align:center}
+.fw svg{max-width:100%;height:auto}
+.example{background:var(--sf);border:1px solid var(--br);border-radius:8px;margin-bottom:14px;overflow:hidden}
+.exl{background:rgba(46,134,193,.2);padding:11px 16px;font-size:.86rem;font-weight:600;color:var(--c);border-bottom:1px solid var(--br);font-family:"Cascadia Code",monospace;word-break:break-all}
+.cw{position:relative;padding:14px}
+pre.cb{background:var(--cb);color:var(--ct);padding:12px 14px;border-radius:4px;font-family:"Cascadia Code","Consolas","Courier New",monospace;font-size:.88rem;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-wrap:break-word}
+.cp{position:absolute;top:18px;right:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#94a3b8;padding:5px 11px;border-radius:4px;font-size:.78rem;cursor:pointer;transition:all .2s;font-family:inherit}
+.cp:hover{background:rgba(0,200,232,.2);color:var(--c);border-color:var(--c)}.cp.ok{background:rgba(76,175,80,.2);color:#4caf50;border-color:#4caf50}
+.nav{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:50px;padding-top:32px;border-top:1px solid var(--br)}
+.nl{display:block;padding:18px;background:var(--sf);border:1px solid var(--br);border-radius:8px;text-decoration:none;transition:all .3s}
+.nl:hover{background:rgba(0,200,232,.08);border-color:var(--c)}
+.nll{font-size:.78rem;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.nlt{font-size:.95rem;font-weight:700;color:var(--c);font-family:"Cascadia Code",monospace}
+footer{background:var(--sf);border-top:1px solid var(--br);padding:36px 24px;margin-top:50px;text-align:center;color:var(--mu);font-size:.88rem}
+footer a{color:var(--c);text-decoration:none}
+@media(max-width:768px){.cn{font-size:1.4rem}.hc{flex-direction:column;gap:10px;text-align:center}.nav{grid-template-columns:1fr}main{padding:20px 14px}}
+</style>
+</head>
+<body>
+<header><div class="hc">
+<a href="https://powershelldba.de/" class="logo">&#128290; sqmSQLTool</a>
+<div class="bc"><a href="index.html">Commands</a> / <span>Find-sqmDatabaseObject</span></div>
+</div></header>
+<main>
+<div class="cn">Find-sqmDatabaseObject</div>
+<div class="cm">
+<span class="badge" style="background:#0f766e">Database</span>
+<span style="color:var(--mu)">sqmSQLTool v1.8.2+ &middot; Query</span>
+</div>
+<section class="desc">
+Searches user (or system) databases on an instance for objects matching a name pattern. Returns database, schema, object type (TABLE, VIEW, PROCEDURE, FUNCTION, TRIGGER, SYNONYM) and — optionally — a preview of the object definition for matches in SQL code.
+<br><br>
+Searches are performed on <code>sys.objects</code> (by name) and optionally <code>sys.sql_modules</code> (by definition text). Database and object-type filters support wildcards.
+</section>
+
+<section><h2 class="st">Parameters</h2>
+<table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>-ObjectName</td><td>string</td><td><span class="tr">Required</span></td><td><span class="dv">—</span></td><td>Object name or wildcard pattern (e.g. <code>sp_GetOrders</code>, <code>*log*</code>).</td></tr>
+<tr><td>-SqlInstance</td><td>string</td><td><span class="to">Optional</span></td><td><span class="dv">$env:COMPUTERNAME</span></td><td>Target SQL Server instance.</td></tr>
+<tr><td>-SqlCredential</td><td>PSCredential</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td><td>Credentials for the connection.</td></tr>
+<tr><td>-ObjectType</td><td>string[]</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td><td>Restrict to types: TABLE, VIEW, PROCEDURE, FUNCTION, TRIGGER, SYNONYM. Multiple allowed.</td></tr>
+<tr><td>-Database</td><td>string</td><td><span class="to">Optional</span></td><td><span class="dv">* = all user DBs</span></td><td>Database name or wildcard pattern (e.g. <code>Sales*</code>).</td></tr>
+<tr><td>-IncludeSystem</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Include system databases (master, model, msdb).</td></tr>
+<tr><td>-SearchDefinition</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Also search object definitions (slower).</td></tr>
+<tr><td>-EnableException</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Re-throw exceptions instead of logging warnings.</td></tr>
+</tbody></table>
+</section>
+
+<section><h2 class="st">Execution Flow</h2>
+<div class="fw">
+<svg viewBox="0 0 760 580" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="12">
+<defs>
+<marker id="a"  markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#5dade2"/></marker>
+<marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ef4444"/></marker>
+<marker id="ay" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#f59e0b"/></marker>
+</defs>
+
+<!-- START -->
+<ellipse cx="380" cy="30" rx="80" ry="22" fill="#1a1a2e" stroke="#00c8e8" stroke-width="2"/>
+<text x="380" y="35" text-anchor="middle" fill="#00c8e8" font-weight="bold">START</text>
+<line x1="380" y1="52" x2="380" y2="72" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- dbatools check -->
+<polygon points="380,73 480,105 380,137 280,105" fill="#0d1b2e" stroke="#ef4444" stroke-width="1.5"/>
+<text x="380" y="101" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">dbatools</text>
+<text x="380" y="115" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">available?</text>
+<line x1="280" y1="105" x2="172" y2="105" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="268" y="99" text-anchor="end" fill="#ef4444" font-size="11">NO</text>
+<rect x="20" y="85" width="150" height="40" rx="5" fill="rgba(239,68,68,.15)" stroke="#ef4444" stroke-width="1.5"/>
+<text x="95" y="101" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="10">throw:</text>
+<text x="95" y="115" text-anchor="middle" fill="#ef4444" font-size="10">dbatools not found</text>
+<text x="394" y="148" fill="#22c55e" font-size="11">YES</text>
+<line x1="380" y1="137" x2="380" y2="157" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Load databases -->
+<rect x="90" y="158" width="540" height="36" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="172" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Get-DbaDatabase (exclude system unless -IncludeSystem)</text>
+<text x="360" y="186" text-anchor="middle" fill="#e2e8f0" font-size="10">Apply -Database wildcard filter via -like</text>
+<line x1="380" y1="194" x2="380" y2="214" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Check databases found -->
+<polygon points="380,215 480,247 380,279 280,247" fill="#0d1b2e" stroke="#5dade2" stroke-width="1.5"/>
+<text x="380" y="243" text-anchor="middle" fill="#e2e8f0" font-weight="bold" font-size="11">DBs found</text>
+<text x="380" y="257" text-anchor="middle" fill="#e2e8f0" font-weight="bold" font-size="11">after filter?</text>
+<!-- NO right -->
+<line x1="480" y1="247" x2="566" y2="247" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ay)"/>
+<text x="488" y="241" fill="#ef4444" font-size="11">NO</text>
+<rect x="566" y="229" width="118" height="36" rx="5" fill="rgba(245,158,11,.1)" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="625" y="243" text-anchor="middle" fill="#f59e0b" font-size="10">log WARNING</text>
+<text x="625" y="257" text-anchor="middle" fill="#f59e0b" font-size="10">return empty</text>
+<!-- YES down -->
+<text x="394" y="290" fill="#22c55e" font-size="11">YES</text>
+<line x1="380" y1="279" x2="380" y2="299" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Build query -->
+<rect x="90" y="300" width="540" height="44" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="360" y="317" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Build T-SQL query: sys.objects + (optional) sys.sql_modules</text>
+<text x="360" y="331" text-anchor="middle" fill="#e2e8f0" font-size="10">Apply ObjectType IN filter and ObjectName LIKE filter</text>
+<line x1="380" y1="344" x2="380" y2="364" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Per-DB loop [dashed] -->
+<rect x="60" y="365" width="640" height="134" rx="5" fill="rgba(0,200,232,.03)" stroke="#5dade2" stroke-width="1" stroke-dasharray="6,3"/>
+<text x="80" y="382" fill="#5dade2" font-size="10" font-style="italic">foreach $db in $dbList</text>
+
+<rect x="100" y="393" width="560" height="94" rx="4" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="380" y="411" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="10">Invoke-DbaQuery -Database $db.Name -Query $query</text>
+<text x="380" y="425" text-anchor="middle" fill="#e2e8f0" font-size="10">For each row: add [PSCustomObject] to results</text>
+<text x="380" y="439" text-anchor="middle" fill="#e2e8f0" font-size="10">SqlInstance, Database, Schema, ObjectName, ObjectType, DefinitionPreview</text>
+<text x="380" y="453" text-anchor="middle" fill="#f59e0b" font-size="10">catch per-DB: log WARNING (continue if -EnableException)</text>
+<text x="380" y="467" text-anchor="middle" fill="#94a8c0" font-size="10">continue to next DB</text>
+<line x1="380" y1="499" x2="380" y2="519" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Return -->
+<rect x="170" y="520" width="420" height="36" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.5"/>
+<text x="380" y="534" text-anchor="middle" fill="#94a8c0" font-weight="bold" font-size="11">Return $allResults</text>
+<text x="380" y="548" text-anchor="middle" fill="#e2e8f0" font-size="10">[PSCustomObject[]] object search results</text>
+<line x1="380" y1="556" x2="380" y2="560" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- DONE -->
+<ellipse cx="380" cy="574" rx="100" ry="22" fill="#1a1a2e" stroke="#22c55e" stroke-width="2"/>
+<text x="380" y="579" text-anchor="middle" fill="#22c55e" font-weight="bold">DONE</text>
+</svg>
+</div>
+</section>
+
+<section><h2 class="st">Examples</h2>
+
+<div class="example">
+<div class="exl">Find a stored procedure by name</div>
+<div class="cw"><button class="cp" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText).then(()=>{this.textContent='Copied!';this.classList.add('ok');setTimeout(()=>{this.textContent='Copy';this.classList.remove('ok')},2000)})">Copy</button>
+<pre class="cb">Find-sqmDatabaseObject -SqlInstance "SQL01" -ObjectName "sp_GetOrders"</pre>
+</div></div>
+
+<div class="example">
+<div class="exl">Search for all objects with name containing 'log' (tables and views only)</div>
+<div class="cw"><button class="cp" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText).then(()=>{this.textContent='Copied!';this.classList.add('ok');setTimeout(()=>{this.textContent='Copy';this.classList.remove('ok')},2000)})">Copy</button>
+<pre class="cb">Find-sqmDatabaseObject -SqlInstance "SQL01" -ObjectName "*log*" -ObjectType "TABLE","VIEW" -Database "Sales*"</pre>
+</div></div>
+
+<div class="example">
+<div class="exl">Search object definitions (in addition to names)</div>
+<div class="cw"><button class="cp" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText).then(()=>{this.textContent='Copied!';this.classList.add('ok');setTimeout(()=>{this.textContent='Copy';this.classList.remove('ok')},2000)})">Copy</button>
+<pre class="cb">Find-sqmDatabaseObject -SqlInstance "SQL01" -ObjectName "old_table_name" -SearchDefinition</pre>
+</div></div>
+
+</section>
+
+<div class="nav">
+<a href="index.html" class="nl"><div class="nll">&#8592; Back</div><div class="nlt">Command Index</div></a>
+</div>
+</main>
+<footer>
+<p>sqmSQLTool &mdash; SQL Server DBA Automation &mdash; <a href="https://powershelldba.de/">powershelldba.de</a></p>
+<p style="margin-top:8px;font-size:.8rem">dtcSoftware &middot; Module v1.8.2+</p>
+</footer>
+<script>document.querySelectorAll('.cp').forEach(b=>{b.addEventListener('click',()=>{})});</script>
+</body>
+</html>

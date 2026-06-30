@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Copy-sqmLogins — sqmSQLTool</title>
+<meta name="description" content="Copies SQL and Windows logins from a source SQL Server to a target instance. AD-validates Windows logins, aligns auth mode, repairs orphaned users. Policy-safe via finally block.">
+<meta name="keywords" content="sqmSQLTool,PowerShell,SQL Server,Copy-sqmLogins,login migration,AD orphan,auth mode">
+<meta name="author" content="dtcSoftware">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Copy-sqmLogins","description":"Copies SQL and Windows logins from source to target SQL Server with AD validation, auth mode alignment, and orphan repair","author":{"@type":"Organization","name":"dtcSoftware"}}</script>
+<style>
+:root{--n:#1a1a2e;--b:#5dade2;--c:#00c8e8;--p:#7c3aed;--bg:#060f20;--sf:rgba(255,255,255,.04);--br:rgba(46,134,193,.25);--tx:#e2e8f0;--mu:#94a8c0;--cb:#012456;--ct:#e8e8e8}
+*{box-sizing:border-box;margin:0;padding:0}html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--tx);line-height:1.6}
+header{background:linear-gradient(135deg,var(--n),var(--b));padding:20px 0;border-bottom:2px solid var(--c);position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.hc{max-width:1000px;margin:0 auto;padding:0 24px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:1.2rem;font-weight:900;color:#fff;text-decoration:none}
+.bc{font-size:.9rem;color:var(--mu)}.bc a{color:var(--c);text-decoration:none;margin:0 4px}.bc a:hover{text-decoration:underline}
+main{max-width:960px;margin:0 auto;padding:40px 24px}
+.cn{font-family:"Cascadia Code","Consolas",monospace;font-size:1.9rem;font-weight:900;color:var(--c);margin-bottom:12px}
+.cm{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:24px}
+.badge{padding:6px 14px;border-radius:20px;font-size:.82rem;font-weight:700;text-transform:uppercase;color:#fff}
+.desc{background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:20px;margin-bottom:28px;font-size:1rem;line-height:1.8;color:var(--mu)}
+.callout{background:rgba(37,99,235,.1);border:1px solid #2563eb;border-radius:8px;padding:14px 18px;margin-bottom:24px;color:#93c5fd;font-size:.93rem;line-height:1.7}
+.st{font-size:1.3rem;font-weight:800;color:var(--c);border-bottom:2px solid var(--p);padding-bottom:8px;margin-bottom:16px}
+section{margin-bottom:32px}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th{background:rgba(46,134,193,.2);color:var(--c);padding:9px 14px;text-align:left;font-weight:700;border-bottom:2px solid var(--br)}
+td{padding:9px 14px;border-bottom:1px solid var(--br);color:var(--mu);vertical-align:top}
+tr:hover td{background:rgba(0,200,232,.04)}
+td:first-child{font-family:"Cascadia Code","Consolas",monospace;color:var(--c);font-size:.84rem;white-space:nowrap}
+.tr{display:inline-block;background:rgba(239,68,68,.2);color:#ef4444;border:1px solid #ef4444;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.to{display:inline-block;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid #22c55e;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.ts{display:inline-block;background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid #f59e0b;border-radius:4px;padding:1px 7px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.dv{font-family:"Cascadia Code","Consolas",monospace;font-size:.8rem;color:#f59e0b}
+.fw{background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:20px 12px;overflow-x:auto;text-align:center}
+.fw svg{max-width:100%;height:auto}
+.example{background:var(--sf);border:1px solid var(--br);border-radius:8px;margin-bottom:14px;overflow:hidden}
+.exl{background:rgba(46,134,193,.2);padding:11px 16px;font-size:.86rem;font-weight:600;color:var(--c);border-bottom:1px solid var(--br);font-family:"Cascadia Code",monospace;word-break:break-all}
+.cw{position:relative;padding:14px}
+pre.cb{background:var(--cb);color:var(--ct);padding:12px 14px;border-radius:4px;font-family:"Cascadia Code","Consolas","Courier New",monospace;font-size:.88rem;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-wrap:break-word}
+.cp{position:absolute;top:18px;right:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#94a3b8;padding:5px 11px;border-radius:4px;font-size:.78rem;cursor:pointer;transition:all .2s;font-family:inherit}
+.cp:hover{background:rgba(0,200,232,.2);color:var(--c);border-color:var(--c)}.cp.ok{background:rgba(76,175,80,.2);color:#4caf50;border-color:#4caf50}
+.nav{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:50px;padding-top:32px;border-top:1px solid var(--br)}
+.nl{display:block;padding:18px;background:var(--sf);border:1px solid var(--br);border-radius:8px;text-decoration:none;transition:all .3s}
+.nl:hover{background:rgba(0,200,232,.08);border-color:var(--c)}
+.nll{font-size:.78rem;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.nlt{font-size:.95rem;font-weight:700;color:var(--c);font-family:"Cascadia Code",monospace}
+footer{background:var(--sf);border-top:1px solid var(--br);padding:36px 24px;margin-top:50px;text-align:center;color:var(--mu);font-size:.88rem}
+footer a{color:var(--c);text-decoration:none}
+@media(max-width:768px){.cn{font-size:1.4rem}.hc{flex-direction:column;gap:10px;text-align:center}.nav{grid-template-columns:1fr}main{padding:20px 14px}}
+</style>
+</head>
+<body>
+<header><div class="hc">
+<a href="https://powershelldba.de/" class="logo">&#128290; sqmSQLTool</a>
+<div class="bc"><a href="index.html">Commands</a> / <span>Copy-sqmLogins</span></div>
+</div></header>
+<main>
+<div class="cn">Copy-sqmLogins</div>
+<div class="cm">
+<span class="badge" style="background:#7c3aed">Security</span>
+<span style="color:var(--mu)">sqmSQLTool v1.8.2+ &middot; Copy</span>
+<span style="color:var(--mu);font-size:.82rem">&#10003; -WhatIf supported &nbsp;&middot;&nbsp; &#9888; Policy re-enabled via finally block</span>
+</div>
+<section class="desc">
+Copies SQL and Windows logins from a source SQL Server instance to a target instance. Process: (1) disable policy on target, (2) check and optionally align authentication mode, (3) load and filter logins (system logins, sysadmin logins including renamed sa, AD orphans are excluded), (4) AD-validate all Windows logins — unresolvable accounts are skipped and reported as <code>AdOrphan</code>, (5) copy via <code>Copy-DbaLogin</code> with password hash and SID mapping, (6) repair orphaned users on all target databases, (7) re-enable policy — guaranteed via <code>finally</code> block even on unhandled errors.
+</section>
+<div class="callout">
+&#9432;&nbsp; The sa account is always excluded regardless of <code>-IncludeSystemLogins</code> — it is detected via its well-known SID 0x01, so renamed sa accounts are safely excluded too. If source uses Mixed Mode and target is Windows-only, the function aborts unless <code>-AdjustAuthMode</code> is specified.
+</div>
+
+<section><h2 class="st">Parameters</h2>
+<table><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>-Source</td><td>string</td><td><span class="tr">Required</span></td><td><span class="dv">—</span></td><td>Source SQL Server instance.</td></tr>
+<tr><td>-Destination</td><td>string</td><td><span class="tr">Required</span></td><td><span class="dv">—</span></td><td>Target SQL Server instance.</td></tr>
+<tr><td>-SqlCredential</td><td>PSCredential</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td><td>Used for both source and target. For different credentials use -SourceCredential / -DestinationCredential.</td></tr>
+<tr><td>-SourceCredential</td><td>PSCredential</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td><td>Credential specifically for the source instance.</td></tr>
+<tr><td>-DestinationCredential</td><td>PSCredential</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td><td>Credential specifically for the target instance.</td></tr>
+<tr><td>-Login</td><td>string[]</td><td><span class="to">Optional</span></td><td><span class="dv">— (all)</span></td><td>Filter: only copy these logins (wildcards allowed).</td></tr>
+<tr><td>-ExcludeLogin</td><td>string[]</td><td><span class="to">Optional</span></td><td><span class="dv">—</span></td><td>Logins to exclude from the copy (wildcards allowed).</td></tr>
+<tr><td>-IncludeSystemLogins</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Also copies NT SERVICE\*, NT AUTHORITY\*, BUILTIN\* logins. The sa account (SID 0x01) is ALWAYS excluded regardless of this switch.</td></tr>
+<tr><td>-DisablePolicy</td><td>bool</td><td><span class="to">Optional</span></td><td><span class="dv">$true</span></td><td>Disables the configured DefaultPolicy on the target before copying and re-enables it afterwards via finally block.</td></tr>
+<tr><td>-AdjustAuthMode</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Switches target to Mixed Mode if source is Mixed Mode and target is Windows-only. Without this switch the function aborts on mode mismatch.</td></tr>
+<tr><td>-RestartServiceIfRequired</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Automatically restarts the SQL Server service on the target after an auth mode change.</td></tr>
+<tr><td>-Force</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Overwrites existing logins on the target.</td></tr>
+<tr><td>-AdModuleAction</td><td>string</td><td><span class="to">Optional</span></td><td><span class="dv">Install</span></td><td>Behavior when ActiveDirectory module is missing: <code>Install</code> (auto-install), <code>Skip</code> (skip AD check), <code>Abort</code> (error).</td></tr>
+<tr><td>-ContinueOnError</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Continue with next login on error instead of aborting.</td></tr>
+<tr><td>-EnableException</td><td>switch</td><td><span class="ts">Switch</span></td><td><span class="dv">$false</span></td><td>Throw terminating exceptions immediately.</td></tr>
+</tbody></table>
+</section>
+
+<section><h2 class="st">Execution Flow</h2>
+<div class="fw">
+<svg viewBox="0 0 780 980" xmlns="http://www.w3.org/2000/svg" font-family="'Cascadia Code','Consolas',monospace" font-size="12" fill="#e2e8f0">
+<defs>
+<marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#5dade2"/></marker>
+<marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ef4444"/></marker>
+<marker id="ao" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#94a8c0"/></marker>
+<marker id="ay" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#f59e0b"/></marker>
+<marker id="ag" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#22c55e"/></marker>
+</defs>
+
+<!-- START -->
+<ellipse cx="390" cy="30" rx="80" ry="22" fill="#1a1a2e" stroke="#00c8e8" stroke-width="2"/>
+<text x="390" y="35" text-anchor="middle" fill="#00c8e8" font-weight="bold">START</text>
+<line x1="390" y1="52" x2="390" y2="72" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- 1. Policy disable -->
+<rect x="180" y="73" width="420" height="36" rx="5" fill="#0d1b2e" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="390" y="88" text-anchor="middle" fill="#c4b5fd" font-weight="bold">1. Disable DefaultPolicy on target (if -DisablePolicy $true)</text>
+<text x="390" y="102" text-anchor="middle" fill="#94a8c0" font-size="10">$policyWasDisabled flag set — finally block re-enables it guaranteed</text>
+<line x1="390" y1="109" x2="390" y2="129" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- 2. Auth mode check -->
+<polygon points="390,130 530,165 390,200 250,165" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="390" y="159" text-anchor="middle" fill="#f59e0b" font-weight="bold">Source = Mixed Mode</text>
+<text x="390" y="173" text-anchor="middle" fill="#f59e0b" font-weight="bold">Target = Windows-Only?</text>
+<!-- YES right -->
+<line x1="530" y1="165" x2="600" y2="165" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ay)"/>
+<text x="540" y="159" fill="#f59e0b" font-size="11">YES</text>
+<polygon points="670,165 760,145 760,185" fill="none" stroke="#f59e0b" stroke-width="1"/>
+<text x="760" y="151" fill="#f59e0b" font-size="10">-AdjustAuthMode</text>
+<text x="760" y="163" fill="#22c55e" font-size="10">YES → switch to Mixed</text>
+<text x="760" y="175" fill="#ef4444" font-size="10">NO → throw &amp; abort</text>
+<!-- NO down -->
+<text x="248" y="178" text-anchor="end" fill="#22c55e" font-size="11">NO</text>
+<line x1="390" y1="200" x2="390" y2="220" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- 3. Load + filter logins -->
+<rect x="140" y="221" width="500" height="48" rx="5" fill="#0d1b2e" stroke="#5dade2" stroke-width="1.5"/>
+<text x="390" y="239" text-anchor="middle" fill="#5dade2" font-weight="bold">3. Load logins from source — apply filters</text>
+<text x="390" y="253" text-anchor="middle" fill="#94a8c0" font-size="10">Exclude: sa (SID 0x01) &nbsp;·&nbsp; all sysadmins &nbsp;·&nbsp; ##MS_* &nbsp;·&nbsp; NT SERVICE\* &nbsp;·&nbsp; NT AUTHORITY\* &nbsp;·&nbsp; -ExcludeLogin patterns</text>
+<text x="390" y="265" text-anchor="middle" fill="#94a8c0" font-size="10">Apply -Login filter &nbsp;·&nbsp; IncludeSystemLogins overrides NT SERVICE/ AUTHORITY (but NEVER sa)</text>
+<line x1="390" y1="269" x2="390" y2="289" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Empty after filter? -->
+<polygon points="390,290 510,320 390,350 270,320" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="390" y="314" text-anchor="middle" fill="#f59e0b" font-weight="bold">No logins</text>
+<text x="390" y="328" text-anchor="middle" fill="#f59e0b" font-weight="bold">after filter?</text>
+<line x1="510" y1="320" x2="620" y2="320" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="522" y="314" fill="#ef4444" font-size="11">YES</text>
+<rect x="620" y="302" width="145" height="36" rx="5" fill="rgba(239,68,68,.12)" stroke="#ef4444" stroke-width="1.5"/>
+<text x="692" y="318" text-anchor="middle" fill="#ef4444" font-weight="bold" font-size="11">Warning + return</text>
+<text x="692" y="332" text-anchor="middle" fill="#94a8c0" font-size="10">empty result set</text>
+<text x="268" y="334" text-anchor="end" fill="#22c55e" font-size="11">NO</text>
+<line x1="390" y1="350" x2="390" y2="370" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- 4. AD check -->
+<rect x="140" y="371" width="500" height="48" rx="5" fill="#0d1b2e" stroke="#5dade2" stroke-width="1.5"/>
+<text x="390" y="389" text-anchor="middle" fill="#5dade2" font-weight="bold">4. AD-validate Windows logins (WindowsUser / WindowsGroup)</text>
+<text x="390" y="403" text-anchor="middle" fill="#94a8c0" font-size="10">Get-ADObject per SamAccountName &nbsp;·&nbsp; Not found → AdOrphan (removed from batch)</text>
+<text x="390" y="415" text-anchor="middle" fill="#94a8c0" font-size="10">AD query fails → AdQueryFailed (also skipped) &nbsp;·&nbsp; No AD module → behavior per -AdModuleAction</text>
+<line x1="390" y1="419" x2="390" y2="439" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- AdModule check -->
+<polygon points="390,440 510,470 390,500 270,470" fill="#0d1b2e" stroke="#f59e0b" stroke-width="1.5"/>
+<text x="390" y="464" text-anchor="middle" fill="#f59e0b" font-weight="bold">AD module</text>
+<text x="390" y="478" text-anchor="middle" fill="#f59e0b" font-weight="bold">missing?</text>
+<line x1="510" y1="470" x2="620" y2="470" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ay)"/>
+<text x="522" y="464" fill="#f59e0b" font-size="11">YES</text>
+<rect x="620" y="447" width="150" height="46" rx="5" fill="#0d1b2e" stroke="#94a8c0" stroke-width="1.2"/>
+<text x="695" y="463" text-anchor="middle" fill="#f59e0b" font-size="10">Install → try install</text>
+<text x="695" y="475" text-anchor="middle" fill="#94a8c0" font-size="10">Skip → skip AD check</text>
+<text x="695" y="487" text-anchor="middle" fill="#ef4444" font-size="10">Abort → throw error</text>
+<text x="268" y="484" text-anchor="end" fill="#22c55e" font-size="11">NO</text>
+<line x1="390" y1="500" x2="390" y2="520" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- 5. Copy logins -->
+<rect x="140" y="521" width="500" height="48" rx="5" fill="rgba(124,58,237,.1)" stroke="#7c3aed" stroke-width="2"/>
+<text x="390" y="539" text-anchor="middle" fill="#c4b5fd" font-weight="bold">5. Copy-DbaLogin — password hash + SID mapping</text>
+<text x="390" y="553" text-anchor="middle" fill="#94a8c0" font-size="10">All remaining logins copied to target &nbsp;·&nbsp; -Force overwrites existing</text>
+<text x="390" y="565" text-anchor="middle" fill="#94a8c0" font-size="10">Per-login result: Success / Skipped / Failed added to result list</text>
+<line x1="390" y1="569" x2="390" y2="589" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- 6. Orphan repair -->
+<rect x="140" y="590" width="500" height="48" rx="5" fill="#0d1b2e" stroke="#5dade2" stroke-width="1.5"/>
+<text x="390" y="608" text-anchor="middle" fill="#5dade2" font-weight="bold">6. Repair-DbaDbOrphanUser on all target user databases</text>
+<text x="390" y="622" text-anchor="middle" fill="#94a8c0" font-size="10">Runs on all databases in Status = Normal &nbsp;·&nbsp; Always runs (no switch) &nbsp;·&nbsp; Skipped if no user DBs</text>
+<text x="390" y="636" text-anchor="middle" fill="#94a8c0" font-size="10">Repairs user-to-login mapping broken by SID drift</text>
+<line x1="390" y1="640" x2="390" y2="660" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Finally block -->
+<rect x="140" y="661" width="500" height="48" rx="5" fill="rgba(239,68,68,.08)" stroke="#ef4444" stroke-width="2"/>
+<text x="390" y="679" text-anchor="middle" fill="#ef4444" font-weight="bold">FINALLY — Re-enable DefaultPolicy on target</text>
+<text x="390" y="693" text-anchor="middle" fill="#94a8c0" font-size="10">Runs always — even after unhandled exceptions &nbsp;·&nbsp; Only if $policyWasDisabled = $true</text>
+<text x="390" y="707" text-anchor="middle" fill="#94a8c0" font-size="10">Errors in finally: logged only, never rethrown (would mask original error)</text>
+<line x1="390" y1="709" x2="390" y2="729" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Summary -->
+<rect x="190" y="730" width="400" height="36" rx="5" fill="#0d1b2e" stroke="#0891b2" stroke-width="1.5"/>
+<text x="390" y="748" text-anchor="middle" fill="#0891b2" font-weight="bold">Summary: Success / Failed / AdOrphan counts</text>
+<text x="390" y="762" text-anchor="middle" fill="#94a8c0" font-size="10">Write-Host summary line + return $results list</text>
+<line x1="390" y1="766" x2="390" y2="806" stroke="#5dade2" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- DONE -->
+<ellipse cx="390" cy="830" rx="160" ry="24" fill="#1a1a2e" stroke="#22c55e" stroke-width="2"/>
+<text x="390" y="834" text-anchor="middle" fill="#22c55e" font-weight="bold" font-size="13">DONE — List[PSCustomObject] returned</text>
+</svg>
+</div></section>
+
+<section><h2 class="st">Examples</h2>
+<div class="example">
+<div class="exl">Copy all non-system logins — AD check and orphan repair included</div>
+<div class="cw"><pre class="cb">Copy-sqmLogins -Source 'SQL01' -Destination 'SQL02'</pre><button class="cp">copy</button></div>
+</div>
+<div class="example">
+<div class="exl">Copy with auth mode alignment and automatic service restart</div>
+<div class="cw"><pre class="cb">Copy-sqmLogins `
+    -Source 'SQL01' `
+    -Destination 'SQL02' `
+    -AdjustAuthMode `
+    -RestartServiceIfRequired</pre><button class="cp">copy</button></div>
+</div>
+<div class="example">
+<div class="exl">Copy only App_ logins, overwrite existing, preview with -WhatIf</div>
+<div class="cw"><pre class="cb">Copy-sqmLogins `
+    -Source 'SQL01' `
+    -Destination 'SQL02' `
+    -Login 'App_*' `
+    -Force `
+    -WhatIf</pre><button class="cp">copy</button></div>
+</div>
+<div class="example">
+<div class="exl">Copy without policy handling; abort on AD module missing</div>
+<div class="cw"><pre class="cb">Copy-sqmLogins `
+    -Source 'SQL01' `
+    -Destination 'SQL02' `
+    -DisablePolicy $false `
+    -AdModuleAction Abort `
+    -EnableException</pre><button class="cp">copy</button></div>
+</div>
+</section>
+
+<div class="nav">
+<a href="index.html" class="nl" style="grid-column:1/-1;text-align:center"><div class="nll">&#11014; Index</div><div class="nlt">All Commands</div></a>
+</div>
+</main>
+<footer>
+<p>sqmSQLTool Documentation &middot; <a href="https://github.com/JankeUwe/sqmSQLTool">GitHub</a> &middot; <a href="https://powershelldba.de/">powershelldba.de</a></p>
+<p style="margin-top:10px;font-size:.82rem">PowerShell SQL Server Administration Toolset by dtcSoftware</p>
+</footer>
+<script>document.querySelectorAll(".cp").forEach(b=>{b.addEventListener("click",function(){const c=this.previousElementSibling.textContent;navigator.clipboard.writeText(c).then(()=>{const o=this.textContent;this.textContent="✓ Copied!";this.classList.add("ok");setTimeout(()=>{this.textContent=o;this.classList.remove("ok")},2000)})})});</script>
+</body></html>

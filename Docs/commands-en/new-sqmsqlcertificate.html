@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New-sqmSqlCertificate – sqmSQLTool</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
+.hero{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-bottom:1px solid #334155;padding:2rem 2rem 1.5rem}
+.hero-inner{max-width:960px;margin:0 auto}
+.breadcrumb{font-size:.75rem;color:#64748b;margin-bottom:.75rem}
+.breadcrumb a{color:#64748b;text-decoration:none}
+.breadcrumb a:hover{color:#94a3b8}
+h1{font-size:1.75rem;font-weight:700;color:#f1f5f9;font-family:'Cascadia Code','Consolas',monospace}
+.badge{display:inline-block;font-size:.7rem;font-weight:600;padding:.2rem .6rem;border-radius:9999px;margin-left:.75rem;vertical-align:middle;background:#7c3aed;color:#fff;letter-spacing:.04em}
+.synopsis{color:#94a3b8;margin-top:.5rem;font-size:.95rem;max-width:720px}
+.content{max-width:960px;margin:0 auto;padding:2rem}
+section{margin-bottom:2rem}
+h2{font-size:1.1rem;font-weight:600;color:#7dd3fc;border-bottom:1px solid #1e3a5f;padding-bottom:.4rem;margin-bottom:1rem;text-transform:uppercase;letter-spacing:.06em}
+p{color:#cbd5e1;margin-bottom:.75rem;font-size:.9rem}
+.param-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.param-table th{background:#1e293b;color:#7dd3fc;text-align:left;padding:.5rem .75rem;font-weight:600;border-bottom:1px solid #334155}
+.param-table td{padding:.45rem .75rem;border-bottom:1px solid #1e293b;color:#cbd5e1;vertical-align:top}
+.param-table tr:hover td{background:#1e293b55}
+.param-name{font-family:'Cascadia Code','Consolas',monospace;color:#f0abfc;font-weight:600}
+.param-type{font-family:'Cascadia Code','Consolas',monospace;color:#6ee7b7;font-size:.78rem}
+.param-default{font-family:'Cascadia Code','Consolas',monospace;color:#fbbf24;font-size:.78rem}
+pre{background:#1e293b;border:1px solid #334155;border-radius:.5rem;padding:1rem;overflow-x:auto;font-size:.82rem;font-family:'Cascadia Code','Consolas',monospace;line-height:1.5}
+.comment{color:#64748b}.keyword{color:#c084fc}.string{color:#86efac}.cmdlet{color:#67e8f9}.param{color:#fbbf24}
+.note-box{background:#1e293b;border-left:3px solid #0ea5e9;border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin:.75rem 0;font-size:.85rem;color:#94a3b8}
+.warn-box{background:#1c1a0f;border-left:3px solid #f59e0b;border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin:.75rem 0;font-size:.85rem;color:#fcd34d}
+.diagram-wrap{background:#1e293b;border:1px solid #334155;border-radius:.75rem;padding:1.5rem;text-align:center;overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="hero-inner">
+    <div class="breadcrumb"><a href="../index.html">sqmSQLTool</a> › <a href="index.html">Commands</a> › New-sqmSqlCertificate</div>
+    <h1>New-sqmSqlCertificate <span class="badge">Security</span></h1>
+    <p class="synopsis">Renews an existing SQL Server self-signed certificate: backs up the old cert, creates a new one with the same subject and purpose, optionally auto-binds to AlwaysOn endpoints or TDE databases, and writes a renewal protocol.</p>
+  </div>
+</div>
+
+<div class="content">
+
+<section>
+<h2>Execution Flow</h2>
+<div class="diagram-wrap">
+<svg viewBox="0 0 760 1060" xmlns="http://www.w3.org/2000/svg" style="max-width:760px;width:100%;font-family:'Segoe UI',Arial,sans-serif;font-size:12px">
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#5dade2"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#ef4444"/></marker>
+    <marker id="aa" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#f59e0b"/></marker>
+  </defs>
+
+  <!-- START -->
+  <ellipse cx="380" cy="30" rx="60" ry="18" fill="#00c8e8" opacity=".9"/>
+  <text x="380" y="34" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">START</text>
+
+  <!-- dbatools -->
+  <line x1="380" y1="48" x2="380" y2="68" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <polygon points="380,68 440,98 380,128 320,98" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="380" y="95" text-anchor="middle" fill="#fca5a5" font-size="10">dbatools</text>
+  <text x="380" y="108" text-anchor="middle" fill="#fca5a5" font-size="10">available?</text>
+  <line x1="320" y1="98" x2="205" y2="98" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+  <rect x="105" y="83" width="100" height="30" rx="4" fill="#7f1d1d"/>
+  <text x="155" y="101" text-anchor="middle" fill="#fca5a5" font-size="10">throw + ERROR</text>
+  <text x="286" y="95" fill="#ef4444" font-size="10">NO</text>
+
+  <!-- Read existing cert -->
+  <line x1="380" y1="128" x2="380" y2="153" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="235" y="153" width="290" height="28" rx="5" fill="#1e3a5f" stroke="#5dade2" stroke-width="1"/>
+  <text x="380" y="171" text-anchor="middle" fill="#bfdbfe" font-size="11">Invoke-DbaQuery: sys.certificates</text>
+
+  <!-- cert not found -->
+  <line x1="380" y1="181" x2="380" y2="206" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <polygon points="380,206 440,226 380,246 320,226" fill="#1e293b" stroke="#5dade2" stroke-width="1.5"/>
+  <text x="380" y="230" text-anchor="middle" fill="#bfdbfe" font-size="10">Cert found?</text>
+  <line x1="320" y1="226" x2="205" y2="226" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+  <rect x="105" y="211" width="100" height="30" rx="4" fill="#7f1d1d"/>
+  <text x="155" y="229" text-anchor="middle" fill="#fca5a5" font-size="10">throw "not found"</text>
+  <text x="286" y="223" fill="#ef4444" font-size="10">NO</text>
+
+  <!-- Read endpoint + TDE binding -->
+  <line x1="380" y1="246" x2="380" y2="271" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="225" y="271" width="310" height="28" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="380" y="289" text-anchor="middle" fill="#94a3b8" font-size="10.5">Read endpoint binding (mirroring/broker endpoints)</text>
+  <line x1="380" y1="299" x2="380" y2="319" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="225" y="319" width="310" height="28" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="380" y="337" text-anchor="middle" fill="#94a3b8" font-size="10.5">Read TDE binding (dm_database_encryption_keys)</text>
+
+  <!-- Determine new name + expiry -->
+  <line x1="380" y1="347" x2="380" y2="372" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="245" y="372" width="270" height="28" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="380" y="390" text-anchor="middle" fill="#94a3b8" font-size="10.5">NewCertificateName = OldName_YEAR, ExpiryDate</text>
+
+  <!-- PK password check -->
+  <line x1="380" y1="400" x2="380" y2="425" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <polygon points="380,425 440,450 380,475 320,450" fill="#1e293b" stroke="#5dade2" stroke-width="1.5"/>
+  <text x="380" y="447" text-anchor="middle" fill="#bfdbfe" font-size="10">HasPrivateKey</text>
+  <text x="380" y="460" text-anchor="middle" fill="#bfdbfe" font-size="10">&amp;&amp; no Password?</text>
+  <line x1="440" y1="450" x2="560" y2="450" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+  <rect x="560" y="435" width="100" height="30" rx="4" fill="#7f1d1d"/>
+  <text x="610" y="453" text-anchor="middle" fill="#fca5a5" font-size="10">throw "password</text>
+  <text x="448" y="447" fill="#ef4444" font-size="10">YES</text>
+
+  <!-- ShouldProcess High -->
+  <line x1="380" y1="475" x2="380" y2="500" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#aa)"/>
+  <polygon points="380,500 440,525 380,550 320,525" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="380" y="520" text-anchor="middle" fill="#fcd34d" font-size="10">ShouldProcess</text>
+  <text x="380" y="533" text-anchor="middle" fill="#fcd34d" font-size="10">HIGH</text>
+  <line x1="320" y1="525" x2="205" y2="525" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#aa)"/>
+  <rect x="105" y="510" width="100" height="30" rx="4" fill="#451a03"/>
+  <text x="155" y="528" text-anchor="middle" fill="#fcd34d" font-size="10">return $null</text>
+  <text x="286" y="522" fill="#f59e0b" font-size="10">NO</text>
+
+  <!-- Backup old cert -->
+  <line x1="380" y1="550" x2="380" y2="575" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="245" y="575" width="270" height="28" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="380" y="593" text-anchor="middle" fill="#94a3b8" font-size="10.5">BACKUP CERTIFICATE → .cer + .pvk (HasPrivateKey)</text>
+
+  <!-- CREATE CERTIFICATE -->
+  <line x1="380" y1="603" x2="380" y2="628" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="250" y="628" width="260" height="28" rx="5" fill="#1e3a5f" stroke="#5dade2" stroke-width="1"/>
+  <text x="380" y="646" text-anchor="middle" fill="#bfdbfe" font-size="11">CREATE CERTIFICATE [NewName]</text>
+
+  <!-- BindEndpoint optional -->
+  <line x1="380" y1="656" x2="380" y2="681" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="170" y="681" width="420" height="50" rx="6" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="185" y="696" fill="#64748b" font-size="9.5">if $BindEndpoint &amp;&amp; $boundEndpoint</text>
+  <rect x="255" y="700" width="250" height="20" rx="4" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="714" text-anchor="middle" fill="#94a3b8" font-size="10">ALTER ENDPOINT … CERTIFICATE [NewName]</text>
+
+  <!-- BindTde optional -->
+  <line x1="380" y1="731" x2="380" y2="751" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="170" y="751" width="420" height="50" rx="6" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="185" y="766" fill="#64748b" font-size="9.5">if $BindTde &amp;&amp; $tdeDatabases</text>
+  <rect x="230" y="770" width="300" height="20" rx="4" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="784" text-anchor="middle" fill="#94a3b8" font-size="10">ALTER DATABASE ENCRYPTION KEY … CERTIFICATE [New]</text>
+
+  <!-- RenameOld warning -->
+  <line x1="380" y1="801" x2="380" y2="821" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="215" y="821" width="330" height="28" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="380" y="839" text-anchor="middle" fill="#94a3b8" font-size="10.5">RenameOld: WARNING — drop manually after verification</text>
+
+  <!-- Write protocol TXT -->
+  <line x1="380" y1="849" x2="380" y2="874" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="245" y="874" width="270" height="28" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="380" y="892" text-anchor="middle" fill="#94a3b8" font-size="10.5">Write renewal protocol TXT + Copy-sqmToCentralPath</text>
+
+  <!-- Return -->
+  <line x1="380" y1="902" x2="380" y2="927" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="265" y="927" width="230" height="28" rx="5" fill="#1e3a5f" stroke="#5dade2" stroke-width="1"/>
+  <text x="380" y="945" text-anchor="middle" fill="#bfdbfe" font-size="11">Return $result [PSCustomObject]</text>
+
+  <!-- DONE -->
+  <line x1="380" y1="955" x2="380" y2="1015" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <ellipse cx="380" cy="1033" rx="60" ry="18" fill="#22c55e" opacity=".9"/>
+  <text x="380" y="1037" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">DONE</text>
+</svg>
+</div>
+</section>
+
+<section>
+<h2>Synopsis</h2>
+<p>Reads all relevant properties of the existing certificate (subject, endpoint binding, TDE binding), backs it up as <code>.cer</code> + <code>.pvk</code>, creates a new self-signed certificate with <code>CREATE CERTIFICATE</code>, and optionally auto-binds it to AlwaysOn/Broker endpoints or TDE-encrypted databases. Writes a detailed renewal protocol TXT file.</p>
+<div class="warn-box"><strong>ConfirmImpact = High.</strong> Use <code>-WhatIf</code> to preview without making changes. For AlwaysOn, the new certificate must be distributed to all replica instances separately.</div>
+</section>
+
+<section>
+<h2>Syntax</h2>
+<pre><span class="cmdlet">New-sqmSqlCertificate</span>
+    [<span class="param">-SqlInstance</span> &lt;String&gt;]
+    [<span class="param">-SqlCredential</span> &lt;PSCredential&gt;]
+    <span class="param">-CertificateName</span> &lt;String&gt;          <span class="comment"># required</span>
+    [<span class="param">-Database</span> &lt;String&gt;]               <span class="comment"># default: master</span>
+    [<span class="param">-NewCertificateName</span> &lt;String&gt;]
+    [<span class="param">-ValidityYears</span> &lt;Int&gt;]
+    [<span class="param">-BackupPath</span> &lt;String&gt;]
+    [<span class="param">-BackupEncryptionPassword</span> &lt;SecureString&gt;]
+    [<span class="param">-RenameOldCertificate</span> &lt;Bool&gt;]
+    [<span class="param">-BindEndpoint</span>]
+    [<span class="param">-BindTde</span>]
+    [<span class="param">-EnableException</span>]
+    [<span class="param">-WhatIf</span>] [<span class="param">-Confirm</span>]</pre>
+</section>
+
+<section>
+<h2>Parameters</h2>
+<table class="param-table">
+<tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+<tr><td class="param-name">-SqlInstance</td><td class="param-type">String</td><td class="param-default">$env:COMPUTERNAME</td><td>SQL Server instance to connect to.</td></tr>
+<tr><td class="param-name">-SqlCredential</td><td class="param-type">PSCredential</td><td class="param-default">—</td><td>Credential for the SQL connection.</td></tr>
+<tr><td class="param-name">-CertificateName</td><td class="param-type">String</td><td class="param-default"><span style="color:#f87171">Required</span></td><td>Exact name of the certificate to renew (from sys.certificates).</td></tr>
+<tr><td class="param-name">-Database</td><td class="param-type">String</td><td class="param-default">master</td><td>Database containing the certificate.</td></tr>
+<tr><td class="param-name">-NewCertificateName</td><td class="param-type">String</td><td class="param-default">OldName_YEAR</td><td>Name for the new certificate. Auto-generated as &lt;OldName&gt;_&lt;ExpiryYear&gt; if omitted.</td></tr>
+<tr><td class="param-name">-ValidityYears</td><td class="param-type">Int</td><td class="param-default">5</td><td>Validity period for the new certificate in years (1–20).</td></tr>
+<tr><td class="param-name">-BackupPath</td><td class="param-type">String</td><td class="param-default">Config OutputPath</td><td>Directory for .cer and .pvk backup files.</td></tr>
+<tr><td class="param-name">-BackupEncryptionPassword</td><td class="param-type">SecureString</td><td class="param-default">—</td><td>Password to encrypt the exported private key (.pvk). Required when the certificate has a private key.</td></tr>
+<tr><td class="param-name">-RenameOldCertificate</td><td class="param-type">Bool</td><td class="param-default">$true</td><td>Log a reminder to rename/drop the old certificate after verification (SQL Server has no RENAME CERTIFICATE).</td></tr>
+<tr><td class="param-name">-BindEndpoint</td><td class="param-type">Switch</td><td class="param-default">false</td><td>Automatically rebind AlwaysOn / Service Broker endpoints to the new certificate.</td></tr>
+<tr><td class="param-name">-BindTde</td><td class="param-type">Switch</td><td class="param-default">false</td><td>Automatically rotate the TDE encryption key to the new certificate (online, no downtime).</td></tr>
+<tr><td class="param-name">-EnableException</td><td class="param-type">Switch</td><td class="param-default">false</td><td>Throw terminating exceptions instead of writing errors.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Return Value</h2>
+<table class="param-table">
+<tr><th>Property</th><th>Type</th><th>Description</th></tr>
+<tr><td class="param-name">Success</td><td class="param-type">Bool</td><td>True on success, False on error.</td></tr>
+<tr><td class="param-name">OldCertificateName</td><td class="param-type">String</td><td>Name of the original certificate.</td></tr>
+<tr><td class="param-name">NewCertificateName</td><td class="param-type">String</td><td>Name of the newly created certificate.</td></tr>
+<tr><td class="param-name">NewExpiryDate</td><td class="param-type">DateTime</td><td>Calculated expiry date of the new certificate.</td></tr>
+<tr><td class="param-name">NewThumbprint</td><td class="param-type">String</td><td>Hex thumbprint of the new certificate.</td></tr>
+<tr><td class="param-name">EndpointBound</td><td class="param-type">Bool</td><td>Whether the endpoint was automatically rebound.</td></tr>
+<tr><td class="param-name">TdeBound</td><td class="param-type">Bool</td><td>Whether TDE was automatically rotated.</td></tr>
+<tr><td class="param-name">BackupDirectory</td><td class="param-type">String</td><td>Path to the backup directory containing .cer, .pvk, and protocol.</td></tr>
+<tr><td class="param-name">ProtocolFile</td><td class="param-type">String</td><td>Full path to the renewal protocol TXT file.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Examples</h2>
+<pre><span class="comment"># Simple renewal — no automatic binding</span>
+<span class="cmdlet">New-sqmSqlCertificate</span> <span class="param">-SqlInstance</span> <span class="string">"SQL01"</span> <span class="param">-CertificateName</span> <span class="string">"AG_CERT"</span> `
+    <span class="param">-BackupEncryptionPassword</span> (<span class="cmdlet">Read-Host</span> <span class="param">-AsSecureString</span>)
+
+<span class="comment"># Renewal with automatic endpoint binding and 10-year validity</span>
+<span class="cmdlet">New-sqmSqlCertificate</span> <span class="param">-SqlInstance</span> <span class="string">"SQL01"</span> <span class="param">-CertificateName</span> <span class="string">"AG_CERT"</span> `
+    <span class="param">-ValidityYears</span> 10 <span class="param">-BindEndpoint</span> `
+    <span class="param">-BackupEncryptionPassword</span> (<span class="cmdlet">Read-Host</span> <span class="param">-AsSecureString</span> <span class="string">"Backup password"</span>)
+
+<span class="comment"># Renew TDE certificate with auto rotation</span>
+<span class="cmdlet">New-sqmSqlCertificate</span> <span class="param">-SqlInstance</span> <span class="string">"SQL01"</span> <span class="param">-CertificateName</span> <span class="string">"TDE_PROD"</span> `
+    <span class="param">-BindTde</span> <span class="param">-BackupEncryptionPassword</span> (<span class="cmdlet">Read-Host</span> <span class="param">-AsSecureString</span> <span class="string">"Backup password"</span>)</pre>
+</section>
+
+<section>
+<h2>Notes</h2>
+<div class="note-box">Requires sysadmin on the instance. dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, and Copy-sqmToCentralPath must be available.</div>
+<div class="warn-box"><strong>AlwaysOn:</strong> After renewal, the new certificate must be distributed to every replica instance and installed there with <code>Install-sqmCertificate -ForAlwaysOn</code>. SQL Server has no RENAME CERTIFICATE statement — the old cert must be dropped manually after verification.</div>
+<div class="warn-box"><strong>TDE:</strong> The new TDE certificate <em>must</em> be backed up including its private key immediately after creation. Without a backup, a database recovery is impossible if the master database is lost.</div>
+</section>
+
+</div>
+</body>
+</html>

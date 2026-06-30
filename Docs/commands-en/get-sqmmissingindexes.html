@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get-sqmMissingIndexes – sqmSQLTool</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
+.hero{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-bottom:1px solid #334155;padding:2rem 2rem 1.5rem}
+.hero-inner{max-width:960px;margin:0 auto}
+.breadcrumb{font-size:.75rem;color:#64748b;margin-bottom:.75rem}
+.breadcrumb a{color:#64748b;text-decoration:none}.breadcrumb a:hover{color:#94a3b8}
+h1{font-size:1.75rem;font-weight:700;color:#f1f5f9;font-family:'Cascadia Code','Consolas',monospace}
+.badge{display:inline-block;font-size:.7rem;font-weight:600;padding:.2rem .6rem;border-radius:9999px;margin-left:.75rem;vertical-align:middle;background:#0369a1;color:#fff;letter-spacing:.04em}
+.synopsis{color:#94a3b8;margin-top:.5rem;font-size:.95rem;max-width:720px}
+.content{max-width:960px;margin:0 auto;padding:2rem}
+section{margin-bottom:2rem}
+h2{font-size:1.1rem;font-weight:600;color:#7dd3fc;border-bottom:1px solid #1e3a5f;padding-bottom:.4rem;margin-bottom:1rem;text-transform:uppercase;letter-spacing:.06em}
+p{color:#cbd5e1;margin-bottom:.75rem;font-size:.9rem}
+.param-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.param-table th{background:#1e293b;color:#7dd3fc;text-align:left;padding:.5rem .75rem;font-weight:600;border-bottom:1px solid #334155}
+.param-table td{padding:.45rem .75rem;border-bottom:1px solid #1e293b;color:#cbd5e1;vertical-align:top}
+.param-table tr:hover td{background:#1e293b55}
+.param-name{font-family:'Cascadia Code','Consolas',monospace;color:#f0abfc;font-weight:600}
+.param-type{font-family:'Cascadia Code','Consolas',monospace;color:#6ee7b7;font-size:.78rem}
+.param-default{font-family:'Cascadia Code','Consolas',monospace;color:#fbbf24;font-size:.78rem}
+pre{background:#1e293b;border:1px solid #334155;border-radius:.5rem;padding:1rem;overflow-x:auto;font-size:.82rem;font-family:'Cascadia Code','Consolas',monospace;line-height:1.5}
+.comment{color:#64748b}.string{color:#86efac}.cmdlet{color:#67e8f9}.param{color:#fbbf24}
+.note-box{background:#1e293b;border-left:3px solid #0ea5e9;border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin:.75rem 0;font-size:.85rem;color:#94a3b8}
+.diagram-wrap{background:#1e293b;border:1px solid #334155;border-radius:.75rem;padding:1.5rem;text-align:center;overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="hero-inner">
+    <div class="breadcrumb"><a href="../index.html">sqmSQLTool</a> › <a href="index.html">Commands</a> › Get-sqmMissingIndexes</div>
+    <h1>Get-sqmMissingIndexes <span class="badge">Performance</span></h1>
+    <p class="synopsis">Queries the SQL Server missing index DMVs for high-impact index recommendations, computes an ImpactScore, generates ready-to-run CREATE INDEX statements, and exports CSV and HTML reports. Excludes system databases automatically.</p>
+  </div>
+</div>
+<div class="content">
+
+<section>
+<h2>Execution Flow</h2>
+<div class="diagram-wrap">
+<svg viewBox="0 0 760 760" xmlns="http://www.w3.org/2000/svg" style="max-width:760px;width:100%;font-family:'Segoe UI',Arial,sans-serif;font-size:12px">
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#5dade2"/></marker>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#ef4444"/></marker>
+  </defs>
+  <ellipse cx="380" cy="30" rx="60" ry="18" fill="#00c8e8" opacity=".9"/>
+  <text x="380" y="34" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">START</text>
+
+  <line x1="380" y1="48" x2="380" y2="68" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <polygon points="380,68 440,98 380,128 320,98" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="380" y="93" text-anchor="middle" fill="#fca5a5" font-size="10">dbatools</text>
+  <text x="380" y="106" text-anchor="middle" fill="#fca5a5" font-size="10">available?</text>
+  <line x1="320" y1="98" x2="205" y2="98" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ar)"/>
+  <rect x="105" y="83" width="100" height="30" rx="4" fill="#7f1d1d"/>
+  <text x="155" y="101" text-anchor="middle" fill="#fca5a5" font-size="10">throw ERROR</text>
+
+  <line x1="380" y1="128" x2="380" y2="153" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="155" y="153" width="450" height="80" rx="6" fill="none" stroke="#334155" stroke-dasharray="6,3"/>
+  <text x="170" y="168" fill="#64748b" font-size="9.5">Invoke-DbaQuery: JOIN dm_db_missing_index_details / _groups / _group_stats</text>
+  <rect x="190" y="173" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="186" text-anchor="middle" fill="#94a3b8" font-size="10">WHERE database_id NOT IN (1,2,3,4) [excludes master/model/msdb/tempdb]</text>
+  <rect x="190" y="195" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="208" text-anchor="middle" fill="#94a3b8" font-size="10">ImpactScore = ROUND((seeks+scans)*avg_total_user_cost*(avg_user_impact/100.0),2)</text>
+
+  <line x1="380" y1="233" x2="380" y2="258" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="258" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="276" text-anchor="middle" fill="#94a3b8" font-size="10.5">PS-side filter: -Database wildcards, -MinImpactScore, -MinSeeks, -Top</text>
+
+  <line x1="380" y1="286" x2="380" y2="311" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="155" y="311" width="450" height="60" rx="6" fill="none" stroke="#334155" stroke-dasharray="6,3"/>
+  <text x="170" y="326" fill="#64748b" font-size="9.5">foreach $row — New-sqmCreateIndexStatement (private helper)</text>
+  <rect x="190" y="331" width="380" height="18" rx="3" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="344" text-anchor="middle" fill="#94a3b8" font-size="10">IX_&lt;Table&gt;_&lt;ColShort&gt;_&lt;yyyyMMdd&gt; (max 128 chars) + INCLUDE columns</text>
+
+  <line x1="380" y1="371" x2="380" y2="396" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="396" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="414" text-anchor="middle" fill="#94a3b8" font-size="10.5">CSV export + ConvertTo-sqmHtmlReport → HTML</text>
+
+  <line x1="380" y1="424" x2="380" y2="449" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="449" width="360" height="28" rx="5" fill="#1e293b" stroke="#334155"/>
+  <text x="380" y="467" text-anchor="middle" fill="#94a3b8" font-size="10.5">Copy-sqmToCentralPath -Path @($csvFile)</text>
+
+  <line x1="380" y1="477" x2="380" y2="502" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <rect x="200" y="502" width="360" height="28" rx="5" fill="#1e3a5f" stroke="#5dade2"/>
+  <text x="380" y="520" text-anchor="middle" fill="#bfdbfe" font-size="11">Return $results[]  (ImpactScore desc, Top N)</text>
+
+  <line x1="380" y1="530" x2="380" y2="550" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <ellipse cx="380" cy="568" rx="60" ry="18" fill="#22c55e" opacity=".9"/>
+  <text x="380" y="572" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="11">DONE</text>
+</svg>
+</div>
+</section>
+
+<section>
+<h2>Synopsis</h2>
+<p>Reads the three missing-index DMVs (<code>dm_db_missing_index_details</code>, <code>dm_db_missing_index_groups</code>, <code>dm_db_missing_index_group_stats</code>) and ranks results by ImpactScore. A private helper <code>New-sqmCreateIndexStatement</code> generates a <code>CREATE NONCLUSTERED INDEX</code> statement for each recommendation, including INCLUDE columns and a date-stamped name. The CSV is also copied to the central path via <code>Copy-sqmToCentralPath</code>. The backward-compatible alias <code>Build-sqmCreateIndexStatement</code> maps to the same helper.</p>
+<div class="note-box">Requires dbatools. Index recommendations survive SQL Server restarts only until the DMV is cleared. ImpactScore is an estimate — always validate recommendations on a test system before applying. System databases are excluded in the SQL WHERE clause.</div>
+</section>
+
+<section>
+<h2>ImpactScore Formula</h2>
+<pre><span class="comment"># Impact = estimated cumulative query cost savings</span>
+ImpactScore = ROUND(
+    (user_seeks + user_scans)
+    * avg_total_user_cost
+    * (avg_user_impact / 100.0),
+2)</pre>
+</section>
+
+<section>
+<h2>Syntax</h2>
+<pre><span class="cmdlet">Get-sqmMissingIndexes</span>
+    [<span class="param">-SqlInstance</span> &lt;String&gt;]
+    [<span class="param">-SqlCredential</span> &lt;PSCredential&gt;]
+    [<span class="param">-Database</span> &lt;String[]&gt;]         <span class="comment"># wildcards; PS-side filter</span>
+    [<span class="param">-MinImpactScore</span> &lt;Double&gt;]     <span class="comment"># default 10</span>
+    [<span class="param">-MinSeeks</span> &lt;Int&gt;]              <span class="comment"># default 50</span>
+    [<span class="param">-Top</span> &lt;Int&gt;]                    <span class="comment"># default 50</span>
+    [<span class="param">-OutputPath</span> &lt;String&gt;]
+    [<span class="param">-EnableException</span>]</pre>
+</section>
+
+<section>
+<h2>Parameters</h2>
+<table class="param-table">
+<tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+<tr><td class="param-name">-SqlInstance</td><td class="param-type">String</td><td class="param-default">$env:COMPUTERNAME</td><td>SQL Server instance to query.</td></tr>
+<tr><td class="param-name">-SqlCredential</td><td class="param-type">PSCredential</td><td class="param-default">—</td><td>SQL connection credential.</td></tr>
+<tr><td class="param-name">-Database</td><td class="param-type">String[]</td><td class="param-default">all user DBs</td><td>Wildcard filter applied after query. Example: <code>@('Sales*','HR')</code>.</td></tr>
+<tr><td class="param-name">-MinImpactScore</td><td class="param-type">Double</td><td class="param-default">10</td><td>Minimum computed ImpactScore to include a row.</td></tr>
+<tr><td class="param-name">-MinSeeks</td><td class="param-type">Int</td><td class="param-default">50</td><td>Minimum combined user_seeks + user_scans count.</td></tr>
+<tr><td class="param-name">-Top</td><td class="param-type">Int</td><td class="param-default">50</td><td>Maximum rows to return after scoring and filtering.</td></tr>
+<tr><td class="param-name">-OutputPath</td><td class="param-type">String</td><td class="param-default">Get-sqmConfig 'OutputPath'</td><td>Directory for CSV and HTML report files.</td></tr>
+<tr><td class="param-name">-EnableException</td><td class="param-type">Switch</td><td class="param-default">false</td><td>Throw terminating exceptions.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Return Value</h2>
+<table class="param-table">
+<tr><th>Property</th><th>Description</th></tr>
+<tr><td class="param-name">DatabaseName</td><td>Database containing the table.</td></tr>
+<tr><td class="param-name">TableName</td><td>Schema-qualified table name.</td></tr>
+<tr><td class="param-name">EqualityColumns</td><td>Columns referenced in equality predicates.</td></tr>
+<tr><td class="param-name">InequalityColumns</td><td>Columns referenced in range predicates.</td></tr>
+<tr><td class="param-name">IncludedColumns</td><td>Columns needed for covering the query (SELECT list).</td></tr>
+<tr><td class="param-name">ImpactScore</td><td>Computed impact estimate (higher = more beneficial).</td></tr>
+<tr><td class="param-name">UserSeeks / UserScans</td><td>Query execution counts that triggered this recommendation.</td></tr>
+<tr><td class="param-name">CreateIndexStatement</td><td>Ready-to-run CREATE NONCLUSTERED INDEX T-SQL.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Examples</h2>
+<pre><span class="comment"># Top 20 high-impact indexes, local instance</span>
+<span class="cmdlet">Get-sqmMissingIndexes</span> <span class="param">-Top</span> 20
+
+<span class="comment"># Filter to specific database, higher thresholds</span>
+<span class="cmdlet">Get-sqmMissingIndexes</span> <span class="param">-SqlInstance</span> <span class="string">"SQL01"</span> <span class="param">-Database</span> <span class="string">"Sales"</span> <span class="param">-MinImpactScore</span> 100 <span class="param">-MinSeeks</span> 200
+
+<span class="comment"># Export CREATE INDEX scripts to file</span>
+<span class="cmdlet">Get-sqmMissingIndexes</span> | <span class="cmdlet">Select-Object</span> CreateIndexStatement | <span class="cmdlet">Out-File</span> <span class="string">"create_indexes.sql"</span></pre>
+</section>
+</div>
+</body>
+</html>
