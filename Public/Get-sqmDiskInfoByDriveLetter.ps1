@@ -94,6 +94,14 @@ function Get-sqmDiskInfoByDriveLetter
 				[math]::Round(($logicalDisk.FreeSpace / $logicalDisk.Size) * 100, 2)
 			} else { 0 }
 
+			# Berechnung: Wie viel GB muss das Laufwerk erweitert werden, damit >= Schwellwert% frei sind?
+			# Formel: (Free+X)/(Total+X) = t  =>  X = (t*Total - Free) / (1-t)
+			$threshold      = [int](Get-sqmConfig -Key 'DiskFreeSpaceThresholdPct')
+			$thresholdRatio = $threshold / 100.0
+			$extendNeededGB = if ($freePercent -lt $threshold -and $logicalDisk.Size -gt 0) {
+				[math]::Ceiling(($thresholdRatio * $totalGB - $freeGB) / (1 - $thresholdRatio))
+			} else { 0 }
+
 			$serialNumber = if ([string]::IsNullOrWhiteSpace($disk.SerialNumber)) {
 				'N/A'
 			} else {
@@ -128,20 +136,23 @@ function Get-sqmDiskInfoByDriveLetter
 			$machine = Get-sqmMachineType
 
 			$result = [PSCustomObject]@{
-				DriveLetter       = "${Letter}:"
-				DiskNumber        = $diskNumber
-				TotalGB           = $totalGB
-				FreeGB            = $freeGB
-				FreePercent       = $freePercent
-				SerialNumber      = $serialNumber
-				IsVM              = $machine.IsVM
-				MachineType       = $machine.MachineType
-				IsPartitionedDisk = $isPartitioned
-				SharedWith        = $sharedWith
+				DriveLetter         = "${Letter}:"
+				DiskNumber          = $diskNumber
+				TotalGB             = $totalGB
+				FreeGB              = $freeGB
+				FreePercent         = $freePercent
+				ThresholdPct        = $threshold
+				ExtendNeededGB      = $extendNeededGB
+				SerialNumber        = $serialNumber
+				IsVM                = $machine.IsVM
+				MachineType         = $machine.MachineType
+				IsPartitionedDisk   = $isPartitioned
+				SharedWith          = $sharedWith
 			}
 
+			$extMsg  = if ($extendNeededGB -gt 0) { "  ERWEITERUNG NOETIG: +${extendNeededGB} GB" } else { '' }
 			$partMsg = if ($isPartitioned) { "  GETEILT mit: $sharedWith" } else { '' }
-			Invoke-sqmLogging -Message "[$Letter`:] DiskNr=$diskNumber  Total=${totalGB} GB  Free=${freeGB} GB (${freePercent}%)  SN=$serialNumber  Typ=$($machine.MachineType)$partMsg" -FunctionName $functionName -Level "INFO"
+			Invoke-sqmLogging -Message "[$Letter`:] DiskNr=$diskNumber  Total=${totalGB} GB  Free=${freeGB} GB (${freePercent}%)  SN=$serialNumber  Typ=$($machine.MachineType)$partMsg$extMsg" -FunctionName $functionName -Level "INFO"
 
 			$results.Add($result)
 			$result

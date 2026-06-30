@@ -377,7 +377,7 @@ function Invoke-sqmSplunkConfiguration {
 
     if (-not $LogPath) {
         $LogPath = Get-sqmConfig -Key 'LogPath'
-        if (-not $LogPath) { $LogPath = '$env:ProgramData\sqmSQLTool\Logs' }
+        if (-not $LogPath) { $LogPath = Join-Path $env:ProgramData 'sqmSQLTool\Logs' }
     }
 
     $result = [PSCustomObject]@{

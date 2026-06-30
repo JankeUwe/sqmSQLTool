@@ -147,7 +147,7 @@ function New-sqmOlaSysDbBackupJob
 		if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
 		
 		$logDir = $cfg['LogPath']
-		if (-not $logDir) { $logDir = '$env:ProgramData\sqmSQLTool\Logs' }
+		if (-not $logDir) { $logDir = Join-Path $env:ProgramData 'sqmSQLTool\Logs' }
 		$maintenanceLogDir = Join-Path $logDir 'MaintenanceLog'
 		$centralLogDir = $cfg['CentralPath']
 	}

@@ -108,7 +108,9 @@ function Export-sqmServerConfiguration
 		# Default OutputPath
 		if (-not $OutputPath)
 		{
-			$OutputPath = "$env:ProgramData\sqmSQLTool\Snapshots"
+			$configOutput = Get-sqmConfig -Key 'OutputPath'
+			$OutputPath   = if ($configOutput) { Join-Path $configOutput 'Snapshots' }
+			               else               { Join-Path $env:ProgramData 'sqmSQLTool\Snapshots' }
 		}
 
 		# Ensure output directory exists

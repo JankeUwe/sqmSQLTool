@@ -86,6 +86,12 @@
     Empfohlene NTFS-Blockgroesse in Bytes fuer Get-sqmDiskBlockSize.
     Standard: 65536 (64 KB)
 
+.PARAMETER DiskFreeSpaceThresholdPct
+    Schwellwert (in Prozent) fuer den freien Speicherplatz auf Laufwerken.
+    Laufwerke unterhalb dieses Schwellwerts werden als kritisch markiert und
+    die benoetigte Erweiterung wird automatisch berechnet.
+    Standard: 10 (10 %)
+
 .PARAMETER Language
     Output language of the module. Allowed values: de-DE, en-US.
     Default: de-DE.
@@ -162,6 +168,9 @@ function Set-sqmConfig
 		[Parameter(Mandatory = $false)]
 		[ValidateSet(4096, 8192, 16384, 32768, 65536, 131072)]
 		[int]$CheckDiskBlockSize,
+		[Parameter(Mandatory = $false)]
+		[ValidateRange(1, 50)]
+		[int]$DiskFreeSpaceThresholdPct,
 		[Parameter(Mandatory = $false)]
 		[ValidateSet('de-DE', 'en-US')]
 		[string]$Language,
@@ -431,6 +440,11 @@ function Set-sqmConfig
 	if ($PSBoundParameters.ContainsKey('CheckDiskBlockSize'))
 	{
 		$globalConfig['CheckDiskBlockSize'] = $CheckDiskBlockSize
+		$updated = $true
+	}
+	if ($PSBoundParameters.ContainsKey('DiskFreeSpaceThresholdPct'))
+	{
+		$globalConfig['DiskFreeSpaceThresholdPct'] = $DiskFreeSpaceThresholdPct
 		$updated = $true
 	}
 

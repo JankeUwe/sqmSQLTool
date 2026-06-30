@@ -235,10 +235,10 @@ function New-sqmOlaMaintenanceJobs
 		if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
 		
 		$logDir = $cfg['LogPath']
-		if (-not $logDir) { $logDir = '$env:ProgramData\sqmSQLTool\Logs' }
+		if (-not $logDir) { $logDir = Join-Path $env:ProgramData 'sqmSQLTool\Logs' }
 		$maintenanceLogDir = Join-Path $logDir 'MaintenanceLog'
 		$centralLogDir = $cfg['CentralPath']
-		
+
 		$dayNames = @{ 1 = 'Sonntag'; 2 = 'Montag'; 4 = 'Dienstag'; 8 = 'Mittwoch'; 16 = 'Donnerstag'; 32 = 'Freitag'; 64 = 'Samstag' }
 		$schedDayName = if ($dayNames.ContainsKey($ScheduleDay)) { $dayNames[$ScheduleDay] }
 		else { "Tag $ScheduleDay" }

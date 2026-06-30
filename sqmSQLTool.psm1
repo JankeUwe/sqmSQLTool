@@ -122,6 +122,7 @@ if ($script:sqmIsFitsEnvironment)
 	$script:sqmModuleConfig['CheckCostThresholdMin']  = 50
 	$script:sqmModuleConfig['CheckTempDbMaxFiles']    = 8
 	$script:sqmModuleConfig['CheckDiskBlockSize']     = 65536
+	$script:sqmModuleConfig['DiskFreeSpaceThresholdPct'] = 10
 }
 
 # =============================================================================

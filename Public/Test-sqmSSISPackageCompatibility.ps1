@@ -118,8 +118,9 @@ function Test-sqmSSISPackageCompatibility
         # Set default OutputPath
         if (-not $OutputPath)
         {
-            $OutputPath = Get-sqmConfig -Key 'OutputPath'
-            if (-not $OutputPath) { $OutputPath = "$env:ProgramData\sqmSQLTool\SSISReports" }
+            $configOutput = Get-sqmConfig -Key 'OutputPath'
+            $OutputPath   = if ($configOutput) { Join-Path $configOutput 'SSISReports' }
+                            else               { Join-Path $env:ProgramData 'sqmSQLTool\SSISReports' }
         }
 
         # Version mapping: SQL Server version -> version major

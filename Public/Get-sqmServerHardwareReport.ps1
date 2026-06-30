@@ -107,7 +107,9 @@ function Get-sqmServerHardwareReport
 
         if (-not $PSBoundParameters.ContainsKey('ReportPath') -or [string]::IsNullOrWhiteSpace($ReportPath))
         {
-            $ReportPath = Join-Path $env:ProgramData 'sqmSQLTool\HardwareReports'
+            $configOutput = Get-sqmConfig -Key 'OutputPath'
+            $ReportPath   = if ($configOutput) { Join-Path $configOutput 'HardwareReports' }
+                            else               { Join-Path $env:ProgramData 'sqmSQLTool\HardwareReports' }
         }
 
         if (-not (Test-Path $ReportPath))
@@ -538,31 +540,47 @@ function _Build-sqmHardwareReportHtml
     # -------------------------------------------------------------------------
     # ABSCHNITT: Logische Laufwerke
     # -------------------------------------------------------------------------
+    $diskThreshold = [int](Get-sqmConfig -Key 'DiskFreeSpaceThresholdPct')
+    $diskThresholdRatio = $diskThreshold / 100.0
+
     $logHtml = "<table class='itbl'><thead><tr>" +
         "<th>Laufwerk</th><th>Label</th><th>Dateisystem</th>" +
-        "<th>Gesamt</th><th>Belegt</th><th>Frei</th><th>Auslastung</th>" +
+        "<th>Gesamt</th><th>Belegt</th><th>Frei</th><th>Auslastung</th><th>Erweiterung</th>" +
         "</tr></thead><tbody>"
 
     foreach ($ld in ($d.LogicalDisks | Sort-Object DeviceID))
     {
-        $ldTotal   = if ($ld.Size)      { _Size ([double]$ld.Size) }      else { 'n/a' }
-        $ldFree    = if ($ld.FreeSpace) { _Size ([double]$ld.FreeSpace) } else { 'n/a' }
-        $ldUsed    = if ($ld.Size -and $ld.FreeSpace) { _Size ([double]($ld.Size - $ld.FreeSpace)) } else { 'n/a' }
-        $pctUsed   = if ($ld.Size -gt 0) { [int](([double]($ld.Size - $ld.FreeSpace) / [double]$ld.Size) * 100) } else { 0 }
+        $ldTotalBytes = if ($ld.Size)      { [double]$ld.Size }      else { 0 }
+        $ldFreeBytes  = if ($ld.FreeSpace) { [double]$ld.FreeSpace } else { 0 }
+        $ldTotal   = if ($ldTotalBytes -gt 0) { _Size $ldTotalBytes } else { 'n/a' }
+        $ldFree    = if ($ldFreeBytes  -gt 0) { _Size $ldFreeBytes  } else { 'n/a' }
+        $ldUsed    = if ($ldTotalBytes -gt 0) { _Size ($ldTotalBytes - $ldFreeBytes) } else { 'n/a' }
+        $pctUsed   = if ($ldTotalBytes -gt 0) { [int](($ldTotalBytes - $ldFreeBytes) / $ldTotalBytes * 100) } else { 0 }
         $pctFree   = 100 - $pctUsed
-        $barColor  = if ($pctFree -lt 10) { '#e74c3c' } elseif ($pctUsed -ge 90) { '#e74c3c' } elseif ($pctUsed -ge 75) { '#f39c12' } else { '#27ae60' }
+        $isCritical = $pctFree -lt $diskThreshold
+        $barColor  = if ($isCritical) { '#e74c3c' } elseif ($pctUsed -ge 90) { '#e74c3c' } elseif ($pctUsed -ge 75) { '#f39c12' } else { '#27ae60' }
         $bar       = "<div class='dbar'><div class='dfill' style='width:{0}%;background:{1}'></div></div><span class='dpct'>{0}%</span>" -f $pctUsed, $barColor
         $drive     = if ($ld.DeviceID) { "$($ld.DeviceID)\" } else { 'n/a' }
         $fs        = if ($ld.FileSystem) { [string]$ld.FileSystem } else { 'n/a' }
         $volName   = if ($ld.VolumeName) { [string]$ld.VolumeName } else { '' }
-        $warningFlag = if ($pctFree -lt 10) { " ⚠️ KRITISCH" } else { '' }
+        $warningFlag = if ($isCritical) { " &#9888; KRITISCH" } else { '' }
+
+        # Erweiterungsberechnung: (t*Total - Free) / (1-t) auf naechstes GB aufrunden
+        $extendCell = if ($isCritical -and $ldTotalBytes -gt 0) {
+            $totalGB = $ldTotalBytes / 1GB
+            $freeGB  = $ldFreeBytes  / 1GB
+            $extGB   = [math]::Ceiling(($diskThresholdRatio * $totalGB - $freeGB) / (1 - $diskThresholdRatio))
+            "<span style='color:#e74c3c;font-weight:700'>+${extGB} GB</span>"
+        } else {
+            "<span style='color:#27ae60'>&#10003; OK</span>"
+        }
 
         $logHtml += "<tr><td><strong>$(_H $drive)</strong></td><td>$(_H $volName)</td><td>$(_H $fs)</td>" +
-            "<td>$(_H $ldTotal)</td><td>$(_H $ldUsed)</td><td>$(_H $ldFree)</td><td>$bar$warningFlag</td></tr>"
+            "<td>$(_H $ldTotal)</td><td>$(_H $ldUsed)</td><td>$(_H $ldFree)</td><td>$bar$warningFlag</td><td>$extendCell</td></tr>"
     }
     if ($d.LogicalDisks.Count -eq 0)
     {
-        $logHtml += '<tr><td colspan="7" class="norow">Keine lokalen Laufwerke gefunden</td></tr>'
+        $logHtml += '<tr><td colspan="8" class="norow">Keine lokalen Laufwerke gefunden</td></tr>'
     }
     $logHtml += '</tbody></table>'
 
@@ -940,19 +958,28 @@ function _Build-sqmHardwareReportTxt
         }
     }
 
-    # Detaillierte Logical Disk-Infos mit < 10% Warnung
+    # Detaillierte Logical Disk-Infos mit Schwellwert-Warnung und Erweiterungsberechnung
+    $txtThreshold      = [int](Get-sqmConfig -Key 'DiskFreeSpaceThresholdPct')
+    $txtThresholdRatio = $txtThreshold / 100.0
     if ($Data.LogicalDisks.Count -gt 0)
     {
         $lines += ""
-        $lines += "  [LOGISCHE LAUFWERKE]"
+        $lines += "  [LOGISCHE LAUFWERKE]  (Schwellwert: $txtThreshold% frei)"
         foreach ($ld in ($Data.LogicalDisks | Sort-Object DeviceID))
         {
             $drive     = if ($ld.DeviceID) { "$($ld.DeviceID)\" } else { 'n/a' }
-            $total     = if ($ld.Size) { '{0:N0}' -f ([double]$ld.Size / 1GB) + ' GB' } else { 'n/a' }
-            $free      = if ($ld.FreeSpace) { '{0:N0}' -f ([double]$ld.FreeSpace / 1GB) + ' GB' } else { 'n/a' }
-            $pctFree   = if ($ld.Size -gt 0) { [int](([double]$ld.FreeSpace / [double]$ld.Size) * 100) } else { 0 }
-            $warning   = if ($pctFree -lt 10) { " [!!! KRITISCH !!!]" } else { '' }
-            $lines += "    $drive $total Gesamt, $free Frei ($pctFree% frei)$warning"
+            $totalGB   = if ($ld.Size) { [double]$ld.Size / 1GB } else { 0 }
+            $freeGB    = if ($ld.FreeSpace) { [double]$ld.FreeSpace / 1GB } else { 0 }
+            $total     = '{0:N0}' -f $totalGB + ' GB'
+            $free      = '{0:N0}' -f $freeGB  + ' GB'
+            $pctFree   = if ($ld.Size -gt 0) { [int](($freeGB / $totalGB) * 100) } else { 0 }
+            $extMsg    = ''
+            if ($pctFree -lt $txtThreshold -and $totalGB -gt 0)
+            {
+                $extGB  = [math]::Ceiling(($txtThresholdRatio * $totalGB - $freeGB) / (1 - $txtThresholdRatio))
+                $extMsg = "  [!!! KRITISCH !!! Erweiterung um +$extGB GB noetig]"
+            }
+            $lines += "    $drive $total Gesamt, $free Frei ($pctFree% frei)$extMsg"
         }
     }
 
