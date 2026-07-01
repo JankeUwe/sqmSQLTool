@@ -320,7 +320,7 @@ function New-sqmOlaUsrDbBackupJob
 				if (-not $PSBoundParameters.ContainsKey('BackupDirectory'))
 				{
 					$existStep = $existingFullJob.JobSteps | Select-Object -First 1
-					if ($existStep -and $existStep.Command -match "@Directory\s*=\s*N?'([^']+)'")
+					if ($existStep -and $existStep.Command -match "@Directory\s*=\s*N?'{1,2}([^']+)'{1,2}")
 					{
 						$BackupDirectory = $Matches[1] -replace '\\Usr-db$', ''
 						Invoke-sqmLogging -Message "BackupDirectory aus vorhandenem Job: $BackupDirectory" -FunctionName $functionName -Level "INFO"

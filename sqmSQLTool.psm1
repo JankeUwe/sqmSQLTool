@@ -72,10 +72,30 @@ if (Test-Path $manifestPath)
 }
 
 # =============================================================================
-# SCHRITT 1b: FI-TS-Umgebungserkennung
+# SCHRITT 1b: Persistierte Konfiguration laden (ueberschreibt Standardwerte)
+# =============================================================================
+$configFile = Join-Path $env:APPDATA "MSSQLTools\config.json"
+if (Test-Path $configFile)
+{
+	try
+	{
+		$userConfig = Get-Content $configFile -Raw | ConvertFrom-Json
+		foreach ($key in $userConfig.PSObject.Properties)
+		{
+			$script:sqmModuleConfig[$key.Name] = $key.Value
+		}
+	}
+	catch
+	{
+		Write-Warning "Konfiguration konnte nicht geladen werden: $($_.Exception.Message)"
+	}
+}
+
+# =============================================================================
+# SCHRITT 1c: FI-TS-Umgebungserkennung (ueberschreibt config.json — gewinnt immer)
 # Kriterium 1: Modul liegt auf W:\ (FI-TS Netzlaufwerk)
 # Kriterium 2: Angemeldeter Benutzer ist in Domaene OFFICELAN.IZB / OFFICELAN
-# Wenn erkannt: FI-TS-Standardwerte setzen (config.json ueberschreibt weiterhin).
+# FI-TS-Werte werden NACH config.json gesetzt und haben stets Vorrang.
 # =============================================================================
 $script:sqmIsFitsEnvironment = $false
 
@@ -117,32 +137,12 @@ if ($script:sqmIsFitsEnvironment)
 	$script:sqmModuleConfig['OlaJobNameOutputCleanup']       = 'FITS Output File Cleanup'
 	$script:sqmModuleConfig['OlaJobNamePurgeJobHistory']     = 'FITS sp_purge_jobhistory'
 	$script:sqmModuleConfig['OlaJobNameDeleteBackupHistory'] = 'FITS sp_delete_backuphistory'
-	# FI-TS Check-Profil und Grenzwerte (identisch mit Defaults, explizit gesetzt fuer Ueberschreibbarkeit)
+	# FI-TS Check-Profil und Grenzwerte
 	$script:sqmModuleConfig['CheckProfile']           = 'FiTs'
 	$script:sqmModuleConfig['CheckCostThresholdMin']  = 50
 	$script:sqmModuleConfig['CheckTempDbMaxFiles']    = 8
 	$script:sqmModuleConfig['CheckDiskBlockSize']     = 65536
 	$script:sqmModuleConfig['DiskFreeSpaceThresholdPct'] = 10
-}
-
-# =============================================================================
-# SCHRITT 1c: Persistierte Konfiguration laden (ueberschreibt alle Standardwerte)
-# =============================================================================
-$configFile = Join-Path $env:APPDATA "MSSQLTools\config.json"
-if (Test-Path $configFile)
-{
-	try
-	{
-		$userConfig = Get-Content $configFile -Raw | ConvertFrom-Json
-		foreach ($key in $userConfig.PSObject.Properties)
-		{
-			$script:sqmModuleConfig[$key.Name] = $key.Value
-		}
-	}
-	catch
-	{
-		Write-Warning "Konfiguration konnte nicht geladen werden: $($_.Exception.Message)"
-	}
 }
 
 # String-Cache invalidieren (wird durch Get-sqmString bei erstem Zugriff neu befuellt)

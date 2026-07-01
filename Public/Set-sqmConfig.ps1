@@ -462,14 +462,38 @@ function Set-sqmConfig
 		return
 	}
 	
-	# Persistenz: JSON-Datei schreiben
+	# Persistenz: Nur explizit gesetzte Keys in JSON-Datei schreiben (Merge)
+	# Verhindert, dass Auto-Werte (FI-TS-Defaults, Umgebungsvariablen) in config.json
+	# landen und beim naechsten Modulimport den FI-TS-Block ueberschreiben.
 	$configFile = Join-Path $env:APPDATA "MSSQLTools\config.json"
 	$configDir = Split-Path $configFile -Parent
 	if (-not (Test-Path $configDir))
 	{
 		New-Item -ItemType Directory -Path $configDir -Force | Out-Null
 	}
-	$globalConfig | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Force
+
+	# Bestehende config.json einlesen (nur user-gesetzte Keys)
+	$persistConfig = [ordered]@{}
+	if (Test-Path $configFile)
+	{
+		try
+		{
+			$existingJson = Get-Content $configFile -Raw | ConvertFrom-Json
+			foreach ($prop in $existingJson.PSObject.Properties) { $persistConfig[$prop.Name] = $prop.Value }
+		}
+		catch { }
+	}
+
+	# Nur in diesem Aufruf explizit geaenderte Keys uebernehmen
+	foreach ($paramName in $PSBoundParameters.Keys)
+	{
+		if ($globalConfig.ContainsKey($paramName))
+		{
+			$persistConfig[$paramName] = $globalConfig[$paramName]
+		}
+	}
+
+	$persistConfig | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Force
 	Write-Verbose "Konfiguration gespeichert: $configFile"
 	
 	if ($PassThru)
