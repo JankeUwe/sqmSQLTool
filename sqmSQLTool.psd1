@@ -22,7 +22,6 @@
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
 	
-	# Author of this module
 	Author				   = 'Uwe Janke'
 
 	# Company or vendor of this module
