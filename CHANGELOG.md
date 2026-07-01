@@ -1,5 +1,28 @@
 # sqmSQLTool — Changelog
 
+## [1.8.5.0] — 2026-07-01
+
+### Erweiterungen
+
+**`New-sqmOlaUsrDbBackupJob`**
+- Neu: Parameter `-CreateSyncJob` (`[bool]`, Default `$true`).
+  Wenn `-UseExcludeTable` aktiv ist, wird automatisch ein SQL Agent Job
+  (`sqm BackupExclude - SYNC` bzw. `FITS BackupExclude - SYNC` in FI-TS-Umgebungen) angelegt.
+  Der Job laeuft alle 30 Minuten via `pwsh`-CmdExec-Step und ruft
+  `Sync-sqmBackupExcludeTable -SqlInstance '.'` auf. Stellt sicher, dass `IsActive`-Aenderungen
+  aus `Show-sqmBackupExcludeForm` ohne manuellen Eingriff auf alle AG-Secondaries propagiert werden.
+  Der Job wird bei `-Update` aktualisiert; bei `-CreateSyncJob $false` wird er nicht angelegt.
+  Job-Name leitet sich aus dem FULL-Job-Praefix ab (`FITS *` → FITS, sonst Standard).
+  AG-Propagation: Secundaries erhalten ebenfalls den Sync-Job (rekursiver Aufruf mit gesetztem
+  `CreateSyncJob = $CreateSyncJob`).
+
+**`New-sqmOlaUsrDbBackupJob`** — Konfigurationsfehler behoben (v1.8.4.0)
+- Fix: `Set-sqmConfig` schrieb zuvor die gesamte `$globalConfig` in `config.json`, wodurch
+  auf FI-TS-Maschinen die OlaHH-Jobnamen aus einer frueheren Non-FITS-Session die FITS-Namen
+  ueberschrieben. Fix (A): `Set-sqmConfig` speichert nur explizit uebergebene Keys (Merge).
+  Fix (B): In `sqmSQLTool.psm1` wird `config.json` vor dem FI-TS-Block geladen —
+  FI-TS-Override gewinnt immer.
+
 ## [1.8.3.0] — 2026-06-29
 
 ### Bugfixes & Erweiterungen

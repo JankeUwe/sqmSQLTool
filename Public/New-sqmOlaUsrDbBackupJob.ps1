@@ -113,6 +113,13 @@
     adds them as @ExcludeDatabases to the Ola DatabaseBackup command in the job step.
     If the table does not exist or is empty, the Databases parameter is used unchanged.
 
+.PARAMETER CreateSyncJob
+    When -UseExcludeTable is set, automatically creates a SQL Agent job that runs
+    Sync-sqmBackupExcludeTable every 30 minutes via pwsh CmdExec step.
+    Ensures IsActive changes (made via Show-sqmBackupExcludeForm) are propagated
+    to all AG secondaries without manual intervention.
+    Default: $true. Set to $false to suppress job creation.
+
 .PARAMETER EnableException
     Throw exceptions immediately.
 
@@ -262,6 +269,8 @@ function New-sqmOlaUsrDbBackupJob
 		[Parameter(Mandatory = $false)]
 		[switch]$UseExcludeTable,
 		[Parameter(Mandatory = $false)]
+		[bool]$CreateSyncJob = $true,
+		[Parameter(Mandatory = $false)]
 		[switch]$SkipAlwaysOnPropagation,
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
@@ -291,6 +300,7 @@ function New-sqmOlaUsrDbBackupJob
 		$effFullJobName = if ($FullJobName) { $FullJobName } elseif ($cfg['OlaJobNameFull']) { $cfg['OlaJobNameFull'] } else { 'OlaHH-UserDatabases-FULL' }
 		$effDiffJobName = if ($DiffJobName) { $DiffJobName } elseif ($cfg['OlaJobNameDiff']) { $cfg['OlaJobNameDiff'] } else { 'OlaHH-UserDatabases-DIFF' }
 		$effLogJobName  = if ($LogJobName)  { $LogJobName }  elseif ($cfg['OlaJobNameLog'])  { $cfg['OlaJobNameLog'] }  else { 'OlaHH-UserDatabases-LOG' }
+		$syncJobName    = if ($effFullJobName -like 'FITS *') { 'FITS BackupExclude - SYNC' } else { 'sqm BackupExclude - SYNC' }
 		
 		$connParams = @{ SqlInstance = $SqlInstance }
 		if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
@@ -729,8 +739,92 @@ EXECUTE master.dbo.DatabaseBackup
 				
 				$results.Add($result)
 			}
-			
-			# 7. Konfigurationsbericht schreiben
+
+			# 7. Sync-Job fuer sqm_BackupExclude anlegen (nur bei -UseExcludeTable -CreateSyncJob)
+			if ($UseExcludeTable -and $CreateSyncJob)
+			{
+				try
+				{
+					$syncJobExists = Get-DbaAgentJob @connParams -Job $syncJobName -ErrorAction SilentlyContinue
+					if ($syncJobExists -and -not $Update)
+					{
+						Invoke-sqmLogging -Message "Sync-Job '$syncJobName' existiert bereits (kein -Update — unveraendert)." -FunctionName $functionName -Level "INFO"
+					}
+					elseif ($PSCmdlet.ShouldProcess($SqlInstance, "Erstelle Sync-Job '$syncJobName' (alle 30 Min.)"))
+					{
+						$syncStepCmd = "pwsh -NonInteractive -NoProfile -Command `"& { Import-Module sqmSQLTool; Sync-sqmBackupExcludeTable -SqlInstance '.' }`""
+
+						if (-not $syncJobExists)
+						{
+							New-DbaAgentJob @connParams `
+								-Job         $syncJobName `
+								-Category    $JobCategory `
+								-OwnerLogin  $saLogin `
+								-Description "sqmSQLTool: Synchronisiert master.dbo.sqm_BackupExclude und propagiert Aenderungen auf AG-Secondaries." `
+								-ErrorAction Stop | Out-Null
+						}
+
+						$existingStep = if ($syncJobExists) { $syncJobExists.JobSteps | Where-Object { $_.ID -eq 1 } } else { $null }
+						if ($existingStep)
+						{
+							Set-DbaAgentJobStep @connParams -Job $syncJobName -StepId 1 -Command $syncStepCmd -SubSystem CmdExec -ErrorAction Stop | Out-Null
+						}
+						else
+						{
+							New-DbaAgentJobStep @connParams -Job $syncJobName -StepId 1 -StepName 'Sync sqm_BackupExclude' -Command $syncStepCmd -SubSystem CmdExec -ErrorAction Stop | Out-Null
+						}
+
+						if (-not $syncJobExists)
+						{
+							New-DbaAgentSchedule @connParams `
+								-Job                     $syncJobName `
+								-Schedule                "${syncJobName}_30min" `
+								-FrequencyType           Daily `
+								-FrequencyInterval       1 `
+								-FrequencySubdayType     Minutes `
+								-FrequencySubdayInterval 30 `
+								-StartTime               '000000' `
+								-Force `
+								-ErrorAction Stop | Out-Null
+						}
+
+						$syncAction = if ($syncJobExists) { 'aktualisiert' } else { 'erstellt' }
+						$syncMsg    = "Sync-Job '$syncJobName' $syncAction — laeuft taeglich alle 30 Minuten."
+						Invoke-sqmLogging -Message $syncMsg -FunctionName $functionName -Level "INFO"
+						$results.Add([PSCustomObject]@{
+							SqlInstance     = $SqlInstance
+							BackupType      = 'SYNC'
+							JobName         = $syncJobName
+							BackupDirectory = $null
+							Databases       = $null
+							ScheduleTime    = '00:00'
+							ScheduleDays    = 'EveryDay (alle 30 Min.)'
+							JobStatus       = if ($syncJobExists) { 'Updated' } else { 'Created' }
+							OverallStatus   = 'Success'
+							Message         = $syncMsg
+						})
+					}
+				}
+				catch
+				{
+					$errMsg = "Sync-Job '$syncJobName' konnte nicht erstellt werden: $($_.Exception.Message)"
+					Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "WARNING"
+					$results.Add([PSCustomObject]@{
+						SqlInstance     = $SqlInstance
+						BackupType      = 'SYNC'
+						JobName         = $syncJobName
+						BackupDirectory = $null
+						Databases       = $null
+						ScheduleTime    = $null
+						ScheduleDays    = $null
+						JobStatus       = 'Failed'
+						OverallStatus   = 'Warning'
+						Message         = $errMsg
+					})
+				}
+			}
+
+			# 8. Konfigurationsbericht schreiben
 			if (-not (Test-Path $maintenanceLogDir)) { New-Item -ItemType Directory -Path $maintenanceLogDir -Force | Out-Null }
 			$safeInst  = $SqlInstance -replace '[\\/:*?"<>|]', '_'
 			$datestamp = Get-Date -Format 'yyyy-MM-dd'
@@ -799,6 +893,7 @@ EXECUTE master.dbo.DatabaseBackup
 						}
 						if ($SqlCredential)   { $secParams['SqlCredential']   = $SqlCredential }
 						if ($UseExcludeTable) { $secParams['UseExcludeTable'] = $true }
+						$secParams['CreateSyncJob'] = $CreateSyncJob
 						if ($OperatorName)    { $secParams['OperatorName']    = $OperatorName }
 						if ($BackupDirectory) { $secParams['BackupDirectory'] = $BackupDirectory }
 
