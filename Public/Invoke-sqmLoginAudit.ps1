@@ -571,7 +571,7 @@ WHERE sp.type IN ('S','U','G')
 
 					Copy-sqmToCentralPath -Path $txtFile, $csvFile, $htmlFile
 
-					Invoke-sqmOpenReport -TxtFile $txtFile -NoOpen:$NoOpen
+					Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
 
 					Invoke-sqmLogging -Message "[$instance] Login-Audit-Bericht erstellt: $txtFile" -FunctionName $functionName -Level "INFO"
 				}

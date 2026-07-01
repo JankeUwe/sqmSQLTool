@@ -250,7 +250,7 @@ FROM sys.dm_exec_query_stats;
 			# Open report
 			if (-not $NoOpen)
 			{
-				Invoke-sqmOpenReport -ReportPath $htmlPath
+				Invoke-sqmOpenReport -HtmlFile $htmlPath -NoOpen:$NoOpen
 			}
 
 			Write-Verbose "Utilization data collection complete. Reports saved to: $OutputPath"
@@ -359,58 +359,28 @@ function Generate-UtilizationHtmlReport
     <meta charset='utf-8'>
     <title>SQL Server Utilization Report</title>
     <style>
-        body {
-            background-color: #1e1e1e;
-            color: #d4d4d4;
-            font-family: 'Consolas', 'Courier New', monospace;
-            margin: 20px;
-        }
-        h1, h2 {
-            color: #00c8e8;
-            border-bottom: 2px solid #00c8e8;
-            padding-bottom: 10px;
-        }
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            margin: 20px 0;
-            background-color: #252526;
-        }
-        th {
-            background-color: #00aae8;
-            color: #1e1e1e;
-            padding: 12px;
-            text-align: left;
-            font-weight: bold;
-        }
-        td {
-            border: 1px solid #3e3e3e;
-            padding: 10px;
-            text-align: left;
-        }
-        tr:hover {
-            background-color: #2d2d30;
-        }
-        .summary-table td {
-            border: 1px solid #3e3e3e;
-        }
-        .summary-table td:first-child {
-            font-weight: bold;
-            width: 25%;
-        }
-        .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #3e3e3e;
-            font-size: 0.9em;
-            color: #808080;
-        }
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Segoe UI',Arial,sans-serif;background:#0f172a;color:#e2e8f0;font-size:13px}
+        .page-header{background:linear-gradient(160deg,#1e3a8a 0%,#2e5090 100%);padding:28px 32px;border-left:4px solid #3b82f6;margin-bottom:24px}
+        .page-header h1{font-size:1.4rem;font-weight:700;color:#60a5fa;margin:0 0 4px 0}
+        .page-header .sub{font-size:.82rem;color:#94a3b8}
+        .wrap{padding:0 24px 40px}
+        h2{font-size:1rem;font-weight:600;color:#60a5fa;margin:28px 0 12px;border-bottom:1px solid #1e3a5f;padding-bottom:6px}
+        table{width:100%;border-collapse:collapse;background:#0b1e3d;border-radius:6px;overflow:hidden;margin-bottom:20px}
+        th{background:#1e3a8a;color:#60a5fa;padding:9px 12px;text-align:left;font-weight:600;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #3b82f6}
+        td{padding:8px 12px;border-bottom:1px solid #1e3a5f;color:#e2e8f0;vertical-align:top}
+        tr:hover td{background:#0f2744}
+        .summary-table td:first-child{color:#94a3b8;font-weight:600;width:28%}
+        .footer{margin-top:32px;padding-top:16px;border-top:1px solid #1e3a5f;font-size:.75rem;color:#475569;text-align:center}
+        .footer a{color:#5dade2;text-decoration:none}
     </style>
 </head>
 <body>
-    <h1>SQL Server Utilization Report</h1>
-    <h2>Instance: $SqlInstance</h2>
-    <p>Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')</p>
+<div class='page-header'>
+  <h1>SQL Server Utilization Report</h1>
+  <div class='sub'>Instance: $SqlInstance &bull; Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')</div>
+</div>
+<div class='wrap'>
 
     <h2>Summary Metrics</h2>
     <table class='summary-table'>
@@ -451,6 +421,7 @@ function Generate-UtilizationHtmlReport
         <p>$reference</p>
         <p>Sampling Period: $($Agg.StartTime.ToString('yyyy-MM-dd HH:mm:ss')) — $($Agg.EndTime.ToString('HH:mm:ss')) ($duration sec, $($Agg.SampleCount) samples)</p>
     </div>
+</div>
 </body>
 </html>
 "@

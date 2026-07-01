@@ -381,7 +381,7 @@ ORDER BY has.start_time;
 						$htmlFile = $null
 					}
 
-					Invoke-sqmOpenReport -TxtFile $txtFile -NoOpen:$NoOpen
+					Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
 
 					Invoke-sqmLogging -Message "[$instance] Health-Bericht erstellt: $txtFile" -FunctionName $functionName -Level "INFO"
 				}

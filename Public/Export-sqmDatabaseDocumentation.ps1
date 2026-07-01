@@ -172,45 +172,46 @@ function Export-sqmDatabaseDocumentation
 <title>$Title</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f4f8;color:#1e293b;font-size:13px}
-.page-header{background:#1a3a5c;color:#fff;padding:24px 32px}
-.page-header h1{font-size:1.5rem;font-weight:900;letter-spacing:-.03em}
-.page-header .sub{font-size:.82rem;opacity:.7;margin-top:4px}
-.toc{background:#fff;border-bottom:1px solid #dde4ee;padding:10px 32px;display:flex;gap:6px;flex-wrap:wrap}
-.toc a{font-size:.75rem;color:#2563a8;text-decoration:none;background:#eff6ff;border-radius:12px;padding:2px 10px}
-.toc a:hover{background:#dbeafe}
-.main{max-width:1200px;margin:0 auto;padding:28px 24px}
-.db-section{background:#fff;border:1px solid #dde4ee;border-radius:10px;margin-bottom:28px;overflow:hidden}
-.db-header{background:#1a3a5c;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
-.db-header h2{font-size:1rem;font-weight:800;letter-spacing:-.02em}
-.db-header .db-status{font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,.15)}
-.db-header .db-status.ok{background:#d1fae5;color:#064e3b}
-.db-header .db-status.warn{background:#fef3c7;color:#92400e}
-.db-header .db-status.crit{background:#fde8e8;color:#991b1b}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;font-size:13px}
+.page-header{background:linear-gradient(160deg,#1e3a8a 0%,#2e5090 100%);padding:30px 32px;border-left:4px solid #3b82f6;margin-bottom:24px}
+.page-header h1{font-size:1.5rem;font-weight:900;color:#60a5fa;letter-spacing:-.03em}
+.page-header .sub{font-size:.82rem;color:#94a3b8;margin-top:6px}
+.toc{background:#0b1e3d;border:1px solid #1e3a5f;border-radius:8px;padding:12px 20px;margin:0 24px 24px;display:flex;gap:6px;flex-wrap:wrap}
+.toc a{font-size:.75rem;color:#7dd3fc;text-decoration:none;background:#1e3a5f;border-radius:12px;padding:2px 10px}
+.toc a:hover{background:#2d5a8c;color:#bae6fd}
+.main{max-width:1400px;margin:0 auto;padding:0 24px 40px}
+.db-section{background:#0b1e3d;border:1px solid #1e3a5f;border-radius:10px;margin-bottom:24px;overflow:hidden}
+.db-header{background:#1e3a8a;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #3b82f6}
+.db-header h2{font-size:1rem;font-weight:800;color:#60a5fa;letter-spacing:-.02em}
+.db-header .db-status{font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:10px}
+.db-header .db-status.ok{background:rgba(52,211,153,.15);color:#34d399;border:1px solid #34d399}
+.db-header .db-status.warn{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid #f59e0b}
+.db-header .db-status.crit{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid #ef4444}
 .db-body{padding:16px 20px}
 .section-block{margin-bottom:18px}
-.section-block h3{font-size:.78rem;font-weight:700;color:#2563a8;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #e2e8f0;padding-bottom:5px;margin-bottom:10px}
-.props-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px 16px}
+.section-block h3{font-size:.78rem;font-weight:700;color:#60a5fa;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #1e3a5f;padding-bottom:5px;margin-bottom:10px}
+.props-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px 16px}
 .prop{display:flex;flex-direction:column}
 .prop .lbl{font-size:.68rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
-.prop .val{font-size:.82rem;color:#1e293b;font-weight:500;margin-top:1px}
-.prop .val.warn{color:#92400e;font-weight:700}
-.prop .val.ok{color:#064e3b}
-table{width:100%;border-collapse:collapse;font-size:.78rem}
-table th{background:#f0f4f8;color:#1e293b;padding:5px 10px;text-align:left;font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #dde4ee}
-table td{padding:5px 10px;border-bottom:1px solid #e8edf4;vertical-align:top}
-table tr:hover td{background:#f8fafc}
+.prop .val{font-size:.82rem;color:#e2e8f0;font-weight:500;margin-top:1px}
+.prop .val.warn{color:#f59e0b;font-weight:700}
+.prop .val.ok{color:#34d399}
+table{width:100%;border-collapse:collapse;font-size:.78rem;background:#071428;border-radius:6px;overflow:hidden}
+table th{background:#1e3a8a;color:#60a5fa;padding:7px 10px;text-align:left;font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #3b82f6}
+table td{padding:6px 10px;border-bottom:1px solid #1e3a5f;color:#e2e8f0;vertical-align:top}
+table tr:hover td{background:#0f2744}
 .badge{display:inline-block;font-size:.65rem;font-weight:700;padding:1px 7px;border-radius:9px;text-transform:uppercase;letter-spacing:.04em}
-.badge-full{background:#d1fae5;color:#064e3b}
-.badge-simple{background:#f3e8ff;color:#6b21a8}
-.badge-bulk{background:#fef3c7;color:#92400e}
-.footer{text-align:center;font-size:.72rem;color:#94a3b8;padding:20px;border-top:1px solid #dde4ee}
+.badge-full{background:rgba(52,211,153,.15);color:#34d399;border:1px solid #34d399}
+.badge-simple{background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid #a78bfa}
+.badge-bulk{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid #f59e0b}
+.footer{text-align:center;font-size:.72rem;color:#475569;padding:24px;border-top:1px solid #1e3a5f;margin-top:16px}
+.footer a{color:#5dade2}
 </style>
 </head>
 <body>
 <div class="page-header">
   <h1>&#128202; Datenbank-Dokumentation</h1>
-  <div class="sub">Instanz: $Instance &nbsp;?&nbsp; Erstellt: $Timestamp</div>
+  <div class="sub">Instanz: $Instance &nbsp;&bull;&nbsp; Erstellt: $Timestamp</div>
 </div>
 "@
 		}
@@ -367,11 +368,19 @@ GROUP BY s.database_id;
 				
 				# CSV-Zeilen-Liste
 				$csvRows = [System.Collections.Generic.List[PSCustomObject]]::new()
-				
+
 				# ?? Pro Datenbank ????????????????????????????????????????????????
-				foreach ($db in ($filteredDbs | Sort-Object Name))
+				$sortedDbs  = @($filteredDbs | Sort-Object Name)
+				$totalDbs   = $sortedDbs.Count
+				$dbIndex    = 0
+
+				foreach ($db in $sortedDbs)
 				{
+					$dbIndex++
 					$dbName = $db.Name
+					Write-Progress -Activity "Export-sqmDatabaseDocumentation [$instance]" `
+						-Status "[$dbIndex/$totalDbs] $dbName" `
+						-PercentComplete ([math]::Round($dbIndex / $totalDbs * 100))
 					Invoke-sqmLogging -Message "[$instance] Dokumentiere Datenbank '$dbName' ..." -FunctionName $functionName -Level "INFO"
 					
 					try

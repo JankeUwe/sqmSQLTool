@@ -122,9 +122,17 @@ function Get-sqmServerHardwareReport
 
     process
     {
+        $totalComputers = $ComputerName.Count
+        $computerIndex  = 0
+
         foreach ($computer in $ComputerName)
         {
+            $computerIndex++
             if ([string]::IsNullOrWhiteSpace($computer)) { $computer = $env:COMPUTERNAME }
+
+            Write-Progress -Activity 'Get-sqmServerHardwareReport' `
+                -Status "[$computerIndex/$totalComputers] $computer – Sammle Hardware-Daten..." `
+                -PercentComplete ([math]::Round($computerIndex / $totalComputers * 100))
 
             try
             {

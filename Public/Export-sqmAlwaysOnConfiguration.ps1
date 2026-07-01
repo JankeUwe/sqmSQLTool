@@ -280,11 +280,7 @@ ORDER BY ag.name, adc.database_name
 						# CSV-Datei
 						$configRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 
-						# Oeffne TXT-Datei wenn nicht -NoOpen
-						if (-not $NoOpen -and $txtFile)
-						{
-							Start-Process $txtFile
-						}
+						Invoke-sqmOpenReport -TxtFile $txtFile -NoOpen:$NoOpen
 
 						Invoke-sqmLogging -Message "[$instance] AlwaysOn-Konfiguration exportiert: $txtFile" -FunctionName $functionName -Level "INFO"
 					}

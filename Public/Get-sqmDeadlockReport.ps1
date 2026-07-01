@@ -107,12 +107,8 @@ function Get-sqmDeadlockReport
 	{
 		try
 		{
-			$connParams = @{
-				SqlInstance   = $SqlInstance
-				SqlCredential = $SqlCredential
-				Database	  = 'master'
-				ErrorAction   = 'Stop'
-			}
+			$connParams = @{ SqlInstance = $SqlInstance }
+			if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
 			
 			# -----------------------------------------------------------------------
 			# Deadlock-XML aus System Health Ring Buffer lesen
@@ -135,7 +131,7 @@ WHERE xdr.value('@timestamp', 'datetime2') >= '$($StartTime.ToString('yyyy-MM-dd
 ORDER BY EventTime DESC
 "@
 			
-			$rawDeadlocks = Invoke-DbaQuery @connParams -Query $ringBufferQuery
+			$rawDeadlocks = Invoke-DbaQuery @connParams -Database master -Query $ringBufferQuery -ErrorAction Stop
 			
 			Invoke-sqmLogging -Message "$(@($rawDeadlocks).Count) Deadlock-Ereignis(se) im Ring Buffer gefunden." -FunctionName $functionName -Level "INFO"
 			
