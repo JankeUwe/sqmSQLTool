@@ -20,6 +20,10 @@ mssSQLTool.*
 tests/coverage.xml
 tests/testresults.xml
 
+# Web documentation (gehört zur Website, nicht zum Modul)
+Docs/commands/
+Docs/commands-en/
+
 # IDE / Tools
 .vs/
 *.user
