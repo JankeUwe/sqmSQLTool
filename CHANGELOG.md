@@ -1,5 +1,18 @@
 # sqmSQLTool — Changelog
 
+## [1.8.8.0] — 2026-07-01
+
+### Erweiterungen
+
+**`New-sqmOlaUsrDbBackupJob`** — Neue Defaults + Auto-Setup bei -UseExcludeTable
+- Standard-Aufruf ohne -Full/-Diff/-Log legt jetzt automatisch FULL + LOG an
+  (statt Fehler). Info-Meldung im Log.
+- Default FULL: 21:15 Uhr, EveryDay (vorher 20:00 / Sunday).
+- Default LOG: alle 15 Minuten, EveryDay (vorher einmalig um 00:00).
+- Mit -UseExcludeTable (nur auf Primary): ruft automatisch
+  Sync-sqmBackupExcludeTable + Register-sqmBackupExcludeTrigger auf.
+  Admin-Setup reduziert sich auf einen einzigen Aufruf.
+
 ## [1.8.7.0] — 2026-07-01
 
 ### Erweiterung

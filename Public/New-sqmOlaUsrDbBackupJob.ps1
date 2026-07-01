@@ -204,10 +204,10 @@ function New-sqmOlaUsrDbBackupJob
 		[string]$FullJobName,
 		[Parameter(Mandatory = $false)]
 		[ValidatePattern('^\d{2}:\d{2}$')]
-		[string]$FullScheduleTime = '20:00',
+		[string]$FullScheduleTime = '21:15',
 		[Parameter(Mandatory = $false)]
 		[ValidateSet('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Weekdays', 'Weekend', 'EveryDay')]
-		[string[]]$FullScheduleDays = @('Sunday'),
+		[string[]]$FullScheduleDays = @('EveryDay'),
 		[Parameter(Mandatory = $false)]
 		[ValidateRange(0, 1440)]
 		[int]$FullScheduleIntervalMinutes = 0,
@@ -240,7 +240,7 @@ function New-sqmOlaUsrDbBackupJob
 		[string[]]$LogScheduleDays = @('EveryDay'),
 		[Parameter(Mandatory = $false)]
 		[ValidateRange(0, 1440)]
-		[int]$LogScheduleIntervalMinutes = 0,
+		[int]$LogScheduleIntervalMinutes = 15,
 
 		# --- Allgemein ---
 		[Parameter(Mandatory = $false)]
@@ -289,9 +289,9 @@ function New-sqmOlaUsrDbBackupJob
 		
 		if (-not $Full -and -not $Diff -and -not $Log)
 		{
-			$errMsg = "Mindestens einer der Parameter -Full, -Diff oder -Log muss angegeben werden."
-			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
-			throw $errMsg
+			$Full = $true
+			$Log  = $true
+			Invoke-sqmLogging -Message "Keine Backup-Typen angegeben — Standard: -Full (21:15 EveryDay) + -Log (alle 15 Min.)." -FunctionName $functionName -Level "INFO"
 		}
 		
 		$cfg = Get-sqmConfig
@@ -498,9 +498,27 @@ function New-sqmOlaUsrDbBackupJob
 				return ($expanded | Select-Object -Unique)
 			}
 			
-			if ($UseExcludeTable)
+			# 5b. UseExcludeTable: Tabelle + Trigger sicherstellen (nur auf Primary)
+			if ($UseExcludeTable -and -not $SkipAlwaysOnPropagation)
 			{
-				Invoke-sqmLogging -Message "-UseExcludeTable gesetzt: Job-Step liest sqm_BackupExclude zur Laufzeit dynamisch." -FunctionName $functionName -Level "INFO"
+				try
+				{
+					Sync-sqmBackupExcludeTable @connParams -ErrorAction Stop
+					Invoke-sqmLogging -Message "sqm_BackupExclude angelegt/synchronisiert." -FunctionName $functionName -Level "INFO"
+				}
+				catch
+				{
+					Invoke-sqmLogging -Message "Sync-sqmBackupExcludeTable: $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
+				}
+				try
+				{
+					Register-sqmBackupExcludeTrigger @connParams -ErrorAction Stop
+					Invoke-sqmLogging -Message "DDL-Trigger sqm_BackupExclude registriert/aktualisiert." -FunctionName $functionName -Level "INFO"
+				}
+				catch
+				{
+					Invoke-sqmLogging -Message "Register-sqmBackupExcludeTrigger: $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
+				}
 			}
 
 			# 6. Jeden Job anlegen
