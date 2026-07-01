@@ -15,7 +15,7 @@
 
     When -UseExcludeTable is set, the function reads master.dbo.sqm_BackupExclude
     (created by Sync-sqmBackupExcludeTable) for entries where IsActive=1 AND IsOrphaned=0.
-    If entries are found, they are passed to Ola's @ExcludeDatabases parameter in the
+    If entries are found, they are prepended with '!' and appended to the @Databases parameter in the
     generated job step command. If the table does not exist or contains no matching rows,
     the -Databases parameter is used unchanged.
 
@@ -110,7 +110,7 @@
 
 .PARAMETER UseExcludeTable
     When set, reads master.dbo.sqm_BackupExclude for active, non-orphaned entries and
-    adds them as @ExcludeDatabases to the Ola DatabaseBackup command in the job step.
+    adds them as '!DatabaseName' exclusions to the @Databases parameter of Ola's DatabaseBackup.
     If the table does not exist or is empty, the Databases parameter is used unchanged.
 
 .PARAMETER CreateSyncJob
@@ -529,38 +529,34 @@ function New-sqmOlaUsrDbBackupJob
 						# Exclude-Liste wird bei jedem Job-Lauf frisch aus sqm_BackupExclude gelesen —
 						# aenderungen in der Tabelle wirken sofort, ohne den Job neu anlegen zu muessen.
 						$olaCommand = @"
-DECLARE @ExcludeList NVARCHAR(MAX) = NULL;
+SET QUOTED_IDENTIFIER ON;
+
+DECLARE @Databases NVARCHAR(MAX) = N'$Databases';
 
 IF OBJECT_ID(N'master.dbo.sqm_BackupExclude', N'U') IS NOT NULL
 BEGIN
-    SELECT @ExcludeList = STUFF((
-        SELECT ',' + DatabaseName
+    DECLARE @Exclusions NVARCHAR(MAX);
+    SELECT @Exclusions = STUFF((
+        SELECT ',' + '!' + DatabaseName
         FROM   master.dbo.sqm_BackupExclude
         WHERE  IsActive   = 1
           AND  IsOrphaned = 0
         FOR XML PATH(''), TYPE
     ).value('.', 'NVARCHAR(MAX)'), 1, 1, '');
+
+    IF @Exclusions IS NOT NULL AND @Exclusions <> ''
+        SET @Databases = @Databases + ',' + @Exclusions;
 END
 
-DECLARE @cmd NVARCHAR(MAX);
-SET @cmd = N'EXECUTE master.dbo.DatabaseBackup
-    @Databases  = ''$Databases'',
-    @Directory  = N''$usrBackupDir'',
-    @BackupType = ''$($jobDef.BackupType)'',
-    @Verify     = ''$Verify'',
+EXECUTE master.dbo.DatabaseBackup
+    @Databases  = @Databases,
+    @Directory  = N'$usrBackupDir',
+    @BackupType = '$($jobDef.BackupType)',
+    @Verify     = '$Verify',
     $cleanupParam
-    @Compress   = ''$Compress'',
-    @CheckSum   = ''$CheckSum'',
-    @LogToTable = ''$LogToTable'''
-    + CASE
-        WHEN @ExcludeList IS NOT NULL AND @ExcludeList <> ''
-        THEN N',
-    @ExcludeDatabases = ''' + @ExcludeList + N''''
-        ELSE N''
-      END
-    + N';';
-
-EXEC sp_executesql @cmd;
+    @Compress   = '$Compress',
+    @CheckSum   = '$CheckSum',
+    @LogToTable = '$LogToTable';
 "@
 					}
 					else

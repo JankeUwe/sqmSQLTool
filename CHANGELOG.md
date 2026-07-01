@@ -1,5 +1,18 @@
 # sqmSQLTool — Changelog
 
+## [1.8.6.0] — 2026-07-01
+
+### Bugfix
+
+**`New-sqmOlaUsrDbBackupJob`** — UseExcludeTable Job-Step-SQL korrigiert
+- Fix: Job-Step verwendete `@ExcludeDatabases` als Ola-Parameter — dieser existiert nicht.
+  Ola's `DatabaseBackup` kennt nur `@Databases` mit `!`-Prefix-Syntax fuer Ausschluesse
+  (`USER_DATABASES,!db1,!db2`). Dynamisches SQL via `sp_executesql` entfernt;
+  Step baut jetzt direkt `@Databases = @Databases + ',' + @Exclusions` zusammen.
+- Fix: `FOR XML PATH ... .value()` im Agent-Job-Step schlug mit QUOTED_IDENTIFIER-Fehler
+  fehl wenn die Session-Option nicht gesetzt war. `SET QUOTED_IDENTIFIER ON;` an den
+  Anfang des Step-SQL gesetzt.
+
 ## [1.8.5.0] — 2026-07-01
 
 ### Erweiterungen
