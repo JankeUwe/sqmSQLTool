@@ -1,5 +1,19 @@
 # sqmSQLTool — Changelog
 
+## [1.8.10.0] — 2026-07-02
+
+### Bugfix
+
+**`Show-sqmBackupExcludeForm`** — Job-Details im Info-Panel wieder korrekt
+- `Load-JobInfo` parste `@Databases`, `@Directory` etc. bisher aus dem Step-Command.
+  Nach Umstellung auf Prozedur-Architektur (v1.8.7) enthaelt der Step nur noch
+  `EXEC master.dbo.[sqm_Run_...]` — die Parameter stecken im Prozedurkoerper.
+- Fix: Proc-Name per Regex aus Step-Command extrahieren, dann
+  `OBJECT_DEFINITION()` abfragen und daraus parsen. Fallback auf Step-Command
+  fuer aeltere Jobs ohne Prozedur.
+- `@Databases` im ExcludeTable-Modus wird aus dem `DECLARE`-Statement gelesen
+  (statt aus `@Databases = @Databases` im EXECUTE-Aufruf).
+
 ## [1.8.9.0] — 2026-07-01
 
 ### Bugfix

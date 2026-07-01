@@ -438,10 +438,14 @@
             DIFF = if ($cfg['OlaJobNameDiff']) { $cfg['OlaJobNameDiff'] } else { 'OlaHH-UserDatabases-DIFF' }
         }
 
-        # Liest einen benannten Ola-Parameter aus dem Step-Command (static + dynamic T-SQL)
+        # Liest einen benannten Ola-Parameter aus T-SQL (Step-Command oder Proc-Body)
         $parseParam = {
-            param ([string]$cmd, [string]$p)
-            if ($cmd -match "(?i)@$p\s*=\s*(?:N?'{1,2})([^']+)") { $Matches[1] } else { '—' }
+            param ([string]$sql, [string]$p)
+            # Databases: auch DECLARE-Variante abfangen (UseExcludeTable-Architektur)
+            if ($p -eq 'Databases' -and $sql -match "(?i)DECLARE\s+@Databases\s+\w+(?:\([^)]+\))?\s*=\s*N?'([^']+)'") {
+                return $Matches[1]
+            }
+            if ($sql -match "(?i)@$p\s*=\s*(?:N?'{1,2})([^']+)") { $Matches[1] } else { '—' }
         }
 
         $lines = [System.Collections.Generic.List[string]]::new()
@@ -491,18 +495,28 @@
             }
             else { $schedStr = 'kein Schedule' }
 
-            # Step-Command
+            # Step-Command lesen
             $cmd  = ''
             $step = $job.JobSteps | Where-Object { $_.ID -eq 1 }
             if ($step) { $cmd = $step.Command }
 
-            $db         = & $parseParam $cmd 'Databases'
-            $dir        = & $parseParam $cmd 'Directory'
-            $cleanup    = if ($cmd -match '(?i)@CleanupTime\s*=\s*(\d+)') { $Matches[1] } else { '—' }
-            $compress   = & $parseParam $cmd 'Compress'
-            $verify     = & $parseParam $cmd 'Verify'
-            $checksum   = & $parseParam $cmd 'CheckSum'
-            $hasExclude = $cmd -match 'sqm_BackupExclude'
+            # Neue Architektur: Step ruft Prozedur — Proc-Body fuer Parameter-Parse laden
+            $sqlToparse = $cmd
+            if ($cmd -match '(?i)EXEC\s+master\.dbo\.\[([^\]]+)\]')
+            {
+                $procDef = Invoke-DbaQuery @script:connParams -Database master `
+                    -Query "SELECT OBJECT_DEFINITION(OBJECT_ID(N'[$($Matches[1])]', N'P')) AS Def" `
+                    -ErrorAction SilentlyContinue
+                if ($procDef -and $procDef.Def) { $sqlToparse = $procDef.Def }
+            }
+
+            $db         = & $parseParam $sqlToparse 'Databases'
+            $dir        = & $parseParam $sqlToparse 'Directory'
+            $cleanup    = if ($sqlToparse -match '(?i)@CleanupTime\s*=\s*(\d+)') { $Matches[1] } else { '—' }
+            $compress   = & $parseParam $sqlToparse 'Compress'
+            $verify     = & $parseParam $sqlToparse 'Verify'
+            $checksum   = & $parseParam $sqlToparse 'CheckSum'
+            $hasExclude = $sqlToparse -match 'sqm_BackupExclude'
 
             $lines.Add("  [$type]  $jobName  |  Schedule: $schedStr")
             $lines.Add("         @Databases=$db   @Directory=$dir   @CleanupTime=${cleanup}h")
