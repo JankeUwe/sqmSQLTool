@@ -1,5 +1,17 @@
 # sqmSQLTool — Changelog
 
+## [1.8.7.0] — 2026-07-01
+
+### Erweiterung
+
+**`New-sqmOlaUsrDbBackupJob`** — Hilfsprozedur in master statt Inline-T-SQL im Job-Step
+- Umstellung: Job-Step enthaelt nur noch `EXEC master.dbo.[sqm_Run_{JobName}]`.
+  Der eigentliche Backup-Code wird als gespeicherte Prozedur in master angelegt.
+  Proc-Name wird aus dem Job-Namen abgeleitet (Sonderzeichen → Unterstrich).
+  Ergebnis im Agent-Fenster: Job-Step ist auf einen Blick lesbar.
+  Prozedur wird bei jedem Aufruf (auch `-Update`) frisch DROP+CREATE'd.
+  Bei AlwaysOn-Propagation erhalten die Secondaries ebenfalls ihre eigene Proc.
+
 ## [1.8.6.0] — 2026-07-01
 
 ### Bugfix

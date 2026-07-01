@@ -523,57 +523,67 @@ function New-sqmOlaUsrDbBackupJob
 				
 				try
 				{
-					# Ola-Kommando aufbauen (vor Job-Check, damit Update-Pfad es direkt nutzen kann)
+										# Hilfsprozedur in master anlegen — Job-Step enthaelt nur noch EXEC master.dbo.[proc]
+					$procName = 'sqm_Run_' + ($jobDef.JobName -replace '[\s\-]+', '_' -replace '[^a-zA-Z0-9_]', '')
+
 					if ($UseExcludeTable)
 					{
-						# Exclude-Liste wird bei jedem Job-Lauf frisch aus sqm_BackupExclude gelesen —
-						# aenderungen in der Tabelle wirken sofort, ohne den Job neu anlegen zu muessen.
-						$olaCommand = @"
-SET QUOTED_IDENTIFIER ON;
-
-DECLARE @Databases NVARCHAR(MAX) = N'$Databases';
-
-IF OBJECT_ID(N'master.dbo.sqm_BackupExclude', N'U') IS NOT NULL
+						$procBody = @"
+CREATE PROCEDURE master.dbo.[$procName]
+AS
 BEGIN
-    DECLARE @Exclusions NVARCHAR(MAX);
-    SELECT @Exclusions = STUFF((
-        SELECT ',' + '!' + DatabaseName
-        FROM   master.dbo.sqm_BackupExclude
-        WHERE  IsActive   = 1
-          AND  IsOrphaned = 0
-        FOR XML PATH(''), TYPE
-    ).value('.', 'NVARCHAR(MAX)'), 1, 1, '');
-
-    IF @Exclusions IS NOT NULL AND @Exclusions <> ''
-        SET @Databases = @Databases + ',' + @Exclusions;
+    SET NOCOUNT ON;
+    DECLARE @Databases NVARCHAR(MAX) = N'$Databases';
+    IF OBJECT_ID(N'master.dbo.sqm_BackupExclude', N'U') IS NOT NULL
+    BEGIN
+        DECLARE @Exclusions NVARCHAR(MAX);
+        SELECT @Exclusions = STUFF((
+            SELECT ',' + '!' + DatabaseName
+            FROM   master.dbo.sqm_BackupExclude
+            WHERE  IsActive   = 1
+              AND  IsOrphaned = 0
+            FOR XML PATH(''), TYPE
+        ).value('.', 'NVARCHAR(MAX)'), 1, 1, '');
+        IF @Exclusions IS NOT NULL AND @Exclusions <> ''
+            SET @Databases = @Databases + ',' + @Exclusions;
+    END
+    EXECUTE master.dbo.DatabaseBackup
+        @Databases  = @Databases,
+        @Directory  = N'$usrBackupDir',
+        @BackupType = '$($jobDef.BackupType)',
+        @Verify     = '$Verify',
+        $cleanupParam
+        @Compress   = '$Compress',
+        @CheckSum   = '$CheckSum',
+        @LogToTable = '$LogToTable';
 END
-
-EXECUTE master.dbo.DatabaseBackup
-    @Databases  = @Databases,
-    @Directory  = N'$usrBackupDir',
-    @BackupType = '$($jobDef.BackupType)',
-    @Verify     = '$Verify',
-    $cleanupParam
-    @Compress   = '$Compress',
-    @CheckSum   = '$CheckSum',
-    @LogToTable = '$LogToTable';
 "@
 					}
 					else
 					{
-						$olaCommand = @"
-EXECUTE master.dbo.DatabaseBackup
-    @Databases  = '$Databases',
-    @Directory  = N'$usrBackupDir',
-    @BackupType = '$($jobDef.BackupType)',
-    @Verify     = '$Verify',
-    $cleanupParam
-    @Compress   = '$Compress',
-    @CheckSum   = '$CheckSum',
-    @LogToTable = '$LogToTable';
+						$procBody = @"
+CREATE PROCEDURE master.dbo.[$procName]
+AS
+BEGIN
+    SET NOCOUNT ON;
+    EXECUTE master.dbo.DatabaseBackup
+        @Databases  = '$Databases',
+        @Directory  = N'$usrBackupDir',
+        @BackupType = '$($jobDef.BackupType)',
+        @Verify     = '$Verify',
+        $cleanupParam
+        @Compress   = '$Compress',
+        @CheckSum   = '$CheckSum',
+        @LogToTable = '$LogToTable';
+END
 "@
 					}
-					$olaCommand = ($olaCommand -split "`n" | Where-Object { $_.Trim() -ne '' }) -join "`n"
+
+					Invoke-DbaQuery @connParams -Database master -Query "IF OBJECT_ID(N'master.dbo.$procName', N'P') IS NOT NULL DROP PROCEDURE master.dbo.[$procName];" -ErrorAction Stop
+					Invoke-DbaQuery @connParams -Database master -Query $procBody -ErrorAction Stop
+					Invoke-sqmLogging -Message "Prozedur 'master.dbo.[$procName]' angelegt/aktualisiert." -FunctionName $functionName -Level "INFO"
+
+					$olaCommand = "EXEC master.dbo.[$procName];"
 
 					# Vorhandenen Job behandeln
 					$existingJob = Get-DbaAgentJob @connParams -Job $jobDef.JobName -ErrorAction SilentlyContinue
