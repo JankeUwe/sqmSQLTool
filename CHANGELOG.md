@@ -1,5 +1,17 @@
 # sqmSQLTool — Changelog
 
+## [1.8.9.0] — 2026-07-01
+
+### Bugfix
+
+**`New-sqmOlaUsrDbBackupJob`** — Drei Laufzeitfehler behoben
+- `CREATE/DROP PROCEDURE master.dbo.[name]` war ungueltiges SQL (Database-Prefix
+  in DDL-Statements nicht erlaubt). Fix: Prefix entfernt; `-Database master` auf
+  der Invoke-DbaQuery-Verbindung setzt den Kontext korrekt.
+- `Set-DbaAgentJobStep -StepId` existiert im dbatools-Parameter-Set nicht.
+  Fix: `-StepName` verwendet (Backup-Jobs: `"DatabaseBackup $StepSuffix"`,
+  Sync-Job: `'Sync sqm_BackupExclude'`).
+
 ## [1.8.8.0] — 2026-07-01
 
 ### Erweiterungen

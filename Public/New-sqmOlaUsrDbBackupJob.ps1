@@ -547,7 +547,7 @@ function New-sqmOlaUsrDbBackupJob
 					if ($UseExcludeTable)
 					{
 						$procBody = @"
-CREATE PROCEDURE master.dbo.[$procName]
+CREATE PROCEDURE [$procName]
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -580,7 +580,7 @@ END
 					else
 					{
 						$procBody = @"
-CREATE PROCEDURE master.dbo.[$procName]
+CREATE PROCEDURE [$procName]
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -597,7 +597,7 @@ END
 "@
 					}
 
-					Invoke-DbaQuery @connParams -Database master -Query "IF OBJECT_ID(N'master.dbo.$procName', N'P') IS NOT NULL DROP PROCEDURE master.dbo.[$procName];" -ErrorAction Stop
+					Invoke-DbaQuery @connParams -Database master -Query "IF OBJECT_ID(N'master.dbo.$procName', N'P') IS NOT NULL DROP PROCEDURE [$procName];" -ErrorAction Stop
 					Invoke-DbaQuery @connParams -Database master -Query $procBody -ErrorAction Stop
 					Invoke-sqmLogging -Message "Prozedur 'master.dbo.[$procName]' angelegt/aktualisiert." -FunctionName $functionName -Level "INFO"
 
@@ -625,7 +625,7 @@ END
 							# still den alten Job zurueckgibt ohne den Step zu aendern.
 							Set-DbaAgentJobStep @connParams `
 								-Job $jobDef.JobName `
-								-StepId 1 `
+								-StepName "DatabaseBackup $($jobDef.StepSuffix)" `
 								-Command $olaCommand `
 								-EnableException -ErrorAction Stop | Out-Null
 							Set-DbaAgentJob @connParams `
@@ -791,7 +791,7 @@ END
 						$existingStep = if ($syncJobExists) { $syncJobExists.JobSteps | Where-Object { $_.ID -eq 1 } } else { $null }
 						if ($existingStep)
 						{
-							Set-DbaAgentJobStep @connParams -Job $syncJobName -StepId 1 -Command $syncStepCmd -SubSystem CmdExec -ErrorAction Stop | Out-Null
+							Set-DbaAgentJobStep @connParams -Job $syncJobName -StepName 'Sync sqm_BackupExclude' -Command $syncStepCmd -SubSystem CmdExec -ErrorAction Stop | Out-Null
 						}
 						else
 						{
