@@ -27,8 +27,9 @@
     PSCredential for the SQL connection.
 
 .PARAMETER BackupDirectory
-    Backup base directory. User databases are backed up to <BackupDirectory>\Usr-db.
-    Default: automatically determined from SQL Server.
+    Backup target directory. When omitted, the base directory is automatically determined
+    from SQL Server and '\Usr-db' is appended. When explicitly specified, the given path is
+    used as-is (no '\Usr-db' is appended) — pass the full, final backup path.
 
 .PARAMETER Databases
     Database filter for Ola. E.g. 'USER_DATABASES', 'ALL_DATABASES', or
@@ -430,7 +431,17 @@ function New-sqmOlaUsrDbBackupJob
 				if (-not $effBackupDir) { $effBackupDir = $sqlSrv.BackupDirectory }
 			}
 			if (-not $effBackupDir) { $effBackupDir = 'C:\Program Files\Microsoft SQL Server\MSSQL\Backup' }
-			$usrBackupDir = "$effBackupDir\Usr-db"
+
+			# Explizit uebergebener -BackupDirectory wird unveraendert als Zielpfad verwendet;
+			# nur bei automatisch ermitteltem Pfad wird '\Usr-db' angehaengt.
+			if ($PSBoundParameters.ContainsKey('BackupDirectory') -and $BackupDirectory)
+			{
+				$usrBackupDir = $BackupDirectory
+			}
+			else
+			{
+				$usrBackupDir = "$effBackupDir\Usr-db"
+			}
 			Invoke-sqmLogging -Message "Backup-Verzeichnis fuer User-Datenbanken: $usrBackupDir" -FunctionName $functionName -Level "INFO"
 			
 			# 3. SA-Login und Job-Kategorie

@@ -1,5 +1,18 @@
 # sqmSQLTool — Changelog
 
+## [1.8.12.0] — 2026-07-02
+
+### Bugfix
+
+**`New-sqmOlaUsrDbBackupJob`** — expliziter `-BackupDirectory` wurde ueberschrieben
+- Bisher wurde an JEDEN ermittelten Backup-Pfad `\Usr-db` angehaengt, auch wenn
+  der Aufrufer `-BackupDirectory` explizit als vollstaendigen Zielpfad uebergeben
+  hat. Fix: `\Usr-db` wird nur noch an automatisch ermittelte Pfade (Registry /
+  `sqlSrv.BackupDirectory` / Default) angehaengt; ein explizit gesetzter
+  `-BackupDirectory` wird unveraendert als Zielpfad verwendet.
+- Verifiziert auf DEV02: `-BackupDirectory "C:\Temp\ExplicitTestPath"` ergibt
+  exakt diesen Pfad ohne Suffix.
+
 ## [1.8.11.0] — 2026-07-02
 
 ### Bugfix
