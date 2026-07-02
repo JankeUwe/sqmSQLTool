@@ -128,6 +128,61 @@
 
     $pTop.Controls.AddRange(@($lblInstance, $txtInstance, $cbSysDbs, $btnLoad, $btnAlleAn, $btnAlleAus))
 
+    # ----- Warnzeile: Laenge der resultierenden Exclusion-Liste -----------------------
+    # Ola's DatabaseBackup gibt @Databases als Teil einer einzigen RAISERROR('%s',...)-Zeile
+    # aus; RAISERROR kappt den %s-Parameter bei 2047 Zeichen. Wird dieses Limit ueberschritten,
+    # verschwindet die eigentliche Fehlermeldung im Job-Verlauf (siehe CHANGELOG 1.8.11.0).
+    $script:ExclLenWarnThreshold  = 1500
+    $script:ExclLenErrorThreshold = 1900
+
+    $pWarn = New-Object System.Windows.Forms.Panel
+    $pWarn.Dock      = 'Top'
+    $pWarn.Height    = 22
+    $pWarn.BackColor = $cPanel
+
+    $lblExclLen = New-Object System.Windows.Forms.Label
+    $lblExclLen.AutoSize   = $false
+    $lblExclLen.Location   = New-Object System.Drawing.Point(6, 2)
+    $lblExclLen.Size       = New-Object System.Drawing.Size(908, 18)
+    $lblExclLen.ForeColor  = $cDim
+    $lblExclLen.Font       = New-Object System.Drawing.Font('Segoe UI', 8)
+    $lblExclLen.Text       = ''
+
+    $pWarn.Controls.Add($lblExclLen)
+
+    function Update-ExclusionLengthIndicator
+    {
+        $len = 0
+        $count = 0
+        for ($i = 0; $i -lt $grid.Rows.Count; $i++)
+        {
+            $row = $grid.Rows[$i]
+            if ($row.Cells['colOrphaned'].Value -eq 'Ja') { continue }
+            $active = [bool]$row.Cells['colActive'].Value
+            if ($active) { continue }
+            $dbName = $row.Cells['colName'].Value
+            if ([string]::IsNullOrEmpty($dbName)) { continue }
+            $len += (",-$dbName").Length
+            $count++
+        }
+
+        if ($len -ge $script:ExclLenErrorThreshold)
+        {
+            $lblExclLen.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 100)
+            $lblExclLen.Text = "ACHTUNG: Exclusion-Liste $count DB(s), $len Zeichen — ueberschreitet das RAISERROR-Limit (2047)! Die Fehlermeldung im Job-Verlauf wird abgeschnitten."
+        }
+        elseif ($len -ge $script:ExclLenWarnThreshold)
+        {
+            $lblExclLen.ForeColor = [System.Drawing.Color]::FromArgb(220, 180, 60)
+            $lblExclLen.Text = "Warnung: Exclusion-Liste $count DB(s), $len Zeichen — naehert sich dem RAISERROR-Limit (2047). Nicht mehr weiter Datenbanken abwaehlen."
+        }
+        else
+        {
+            $lblExclLen.ForeColor = $cDim
+            $lblExclLen.Text = "Exclusion-Liste: $count DB(s), $len Zeichen."
+        }
+    }
+
     # ----- DataGridView ---------------------------------------------------------------
     $grid = New-Object System.Windows.Forms.DataGridView
     $grid.Dock                    = 'Fill'
@@ -255,7 +310,11 @@
     $pJobInfo.Controls.Add($rtfJobInfo)
 
     # ----- Layout zusammenbauen -------------------------------------------------------
+    # Reihenfolge bei gleichem Dock-Wert: zuletzt hinzugefuegtes Control liegt aussen
+    # (siehe pJobInfo vor pBottom unten) — pWarn deshalb VOR pTop hinzufuegen, damit
+    # pTop oben bleibt und der Warnstreifen direkt darunter erscheint.
     $form.Controls.Add($grid)
+    $form.Controls.Add($pWarn)
     $form.Controls.Add($pTop)
     $form.Controls.Add($pJobInfo)
     $form.Controls.Add($pBottom)
@@ -371,6 +430,8 @@
         {
             Set-Status "Fehler: $($_.Exception.Message)" 'Error'
         }
+
+        Update-ExclusionLengthIndicator
 
         # Load-JobInfo ausserhalb des try-Blocks — Fehler dort sollen den Save-Button nicht blockieren
         try { Load-JobInfo } catch { $rtfJobInfo.Text = "  Job-Info nicht verfuegbar: $($_.Exception.Message)" }
@@ -598,6 +659,7 @@
                     "Fehler beim Speichern:`n$($_.Exception.Message)",
                     'Speichern – Fehler', 'OK', 'Error') | Out-Null
             }
+            Update-ExclusionLengthIndicator
         }
     })
 

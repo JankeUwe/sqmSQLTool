@@ -1,5 +1,20 @@
 # sqmSQLTool — Changelog
 
+## [1.8.14.0] — 2026-07-02
+
+### Erweiterung
+
+**`Show-sqmBackupExcludeForm`** — Warnanzeige fuer Laenge der Exclusion-Liste
+- Neuer Statusstreifen unter der Werkzeugleiste zeigt live die Anzahl abgewaehlter
+  (IsActive=0) Datenbanken und die daraus resultierende Zeichenlaenge der
+  `-DatabaseName`-Exclusion-Liste.
+- Grund: Ola's `DatabaseBackup` gibt `@Databases` als Teil einer `RAISERROR('%s',...)`-
+  Zeile aus; der `%s`-Parameter wird bei 2047 Zeichen gekappt, wodurch nachfolgende
+  echte Fehlermeldungen im Job-Verlauf verschwinden koennen (siehe 1.8.11.0-Vorfall
+  auf BLBNBGFATDBA3).
+- Ab 1500 Zeichen gelbe Warnung, ab 1900 Zeichen rote Fehleranzeige. Aktualisiert
+  sich beim Laden und bei jedem Checkbox-Toggle.
+
 ## [1.8.13.0] — 2026-07-02
 
 ### Bugfix (kritisch)
