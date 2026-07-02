@@ -1,5 +1,28 @@
 # sqmSQLTool — Changelog
 
+## [1.8.11.0] — 2026-07-02
+
+### Bugfix
+
+**`New-sqmOlaUsrDbBackupJob`** — Exclude-Prefix `!` war nie gueltige Ola-Syntax
+- Ursache eines echten Produktionsvorfalls (BLBNBGFATDBA3, `DatabaseBackup`-Job
+  schlug fehl): der in v1.8.6.0 eingefuehrte `!`-Prefix fuer Exclusions
+  (`USER_DATABASES,!db1,!db2`) wird von Ola Hallengrens `MaintenanceSolution.sql`
+  nirgends ausgewertet — dort wird ausschliesslich `-db1` als Exclude-Marker
+  erkannt (`DatabaseItem LIKE '-%'`). Alle `!`-Eintraege wurden dadurch als
+  positive (nicht existierende) Datenbanknamen interpretiert: Exclusions griffen
+  nie, und die daraus resultierende lange "do not exist"-Warnliste sprengte das
+  2047-Zeichen-Limit von `RAISERROR('%s', ...)`, wodurch die eigentliche
+  Fehlermeldung im Job-Verlauf unsichtbar wurde.
+- Fix: Prefix auf `-` korrigiert. Zusaetzlich Filter `EXISTS (SELECT 1 FROM
+  sys.databases ...)`, sodass nur Datenbanken, die auf der jeweiligen Instanz
+  tatsaechlich existieren, in die Exclude-Liste aufgenommen werden — verhindert
+  erneutes Anwachsen der "do not exist"-Liste bei einer instanzuebergreifend
+  gepflegten `sqm_BackupExclude`-Tabelle.
+- Verifiziert auf DEV02: kompletter FULL-Backup-Lauf ueber die neu generierte
+  Prozedur, 0 "do not exist"-Meldungen, alle aktiven Exclusions korrekt
+  uebersprungen.
+
 ## [1.8.10.0] — 2026-07-02
 
 ### Bugfix

@@ -14,9 +14,10 @@
         OlaJobNameLog   (Default: 'OlaHH-UserDatabases-LOG')
 
     When -UseExcludeTable is set, the function reads master.dbo.sqm_BackupExclude
-    (created by Sync-sqmBackupExcludeTable) for entries where IsActive=1 AND IsOrphaned=0.
-    If entries are found, they are prepended with '!' and appended to the @Databases parameter in the
-    generated job step command. If the table does not exist or contains no matching rows,
+    (created by Sync-sqmBackupExcludeTable) for entries where IsActive=1 AND IsOrphaned=0
+    AND the database actually exists on this instance (sys.databases). If entries are found,
+    they are prepended with '-' (Ola's exclude prefix) and appended to the @Databases parameter
+    in the generated job step command. If the table does not exist or contains no matching rows,
     the -Databases parameter is used unchanged.
 
 .PARAMETER SqlInstance
@@ -109,9 +110,10 @@
     Continue with remaining jobs if one job fails.
 
 .PARAMETER UseExcludeTable
-    When set, reads master.dbo.sqm_BackupExclude for active, non-orphaned entries and
-    adds them as '!DatabaseName' exclusions to the @Databases parameter of Ola's DatabaseBackup.
-    If the table does not exist or is empty, the Databases parameter is used unchanged.
+    When set, reads master.dbo.sqm_BackupExclude for active, non-orphaned entries that exist
+    on this instance and adds them as '-DatabaseName' exclusions to the @Databases parameter
+    of Ola's DatabaseBackup. If the table does not exist or is empty, the Databases parameter
+    is used unchanged.
 
 .PARAMETER CreateSyncJob
     When -UseExcludeTable is set, automatically creates a SQL Agent job that runs
@@ -556,10 +558,11 @@ BEGIN
     BEGIN
         DECLARE @Exclusions NVARCHAR(MAX);
         SELECT @Exclusions = STUFF((
-            SELECT ',' + '!' + DatabaseName
-            FROM   master.dbo.sqm_BackupExclude
-            WHERE  IsActive   = 1
-              AND  IsOrphaned = 0
+            SELECT ',-' + e.DatabaseName
+            FROM   master.dbo.sqm_BackupExclude e
+            WHERE  e.IsActive   = 1
+              AND  e.IsOrphaned = 0
+              AND  EXISTS (SELECT 1 FROM sys.databases d WHERE d.name = e.DatabaseName)
             FOR XML PATH(''), TYPE
         ).value('.', 'NVARCHAR(MAX)'), 1, 1, '');
         IF @Exclusions IS NOT NULL AND @Exclusions <> ''
