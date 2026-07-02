@@ -1,5 +1,21 @@
 # sqmSQLTool — Changelog
 
+## [1.8.17.0] — 2026-07-02
+
+### Bugfix
+
+**Docs/_gen-reference.ps1** — Mojibake-Bug bei Ausfuehrung unter Windows PowerShell 5.1
+- `Get-Content $file -Raw` (ohne `-Encoding UTF8`) las `sqmSQLTool-reference.html`
+  (keine BOM) unter PS 5.1 mit der System-ANSI-Codepage statt UTF-8. Mehrbyte-
+  Zeichen (z. B. "─", Emojis) wurden dadurch falsch decodiert und beim
+  Zurueckschreiben als kaputtes UTF-8 dauerhaft verstuemmelt (Mojibake).
+- Fix: `-Encoding UTF8` ergaenzt. Unter PS 5.1 und PS 7 getestet — reference.html
+  bleibt bei erneuter Generierung inhaltlich unveraendert (143 Funktionen,
+  Cards/Nav/Overview synchron), kein Mojibake mehr.
+- `sqmSQLTool-reference.html` selbst war bereits aktuell (unsere heutigen Docstring-
+  Aenderungen betrafen nur `.DESCRIPTION`/`.PARAMETER`, die dieser Generator nicht
+  ausliest — nur `.SYNOPSIS` und `.EXAMPLE` fliessen in die Referenz ein).
+
 ## [1.8.16.0] — 2026-07-02
 
 ### Doku

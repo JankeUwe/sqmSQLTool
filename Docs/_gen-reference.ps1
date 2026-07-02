@@ -91,7 +91,7 @@ function Get-Meta([string]$name){
   [pscustomobject]@{ Syn=$syn; Examples=$ex }
 }
 
-$htmlOrig = Get-Content $file -Raw
+$htmlOrig = Get-Content $file -Raw -Encoding UTF8
 $ovMap = @{}
 foreach($m in [regex]::Matches($htmlOrig,'<td class="psdb-st-ov-fn">([^<]+)</td><td>(.*?)</td>')){
   $ovMap[$m.Groups[1].Value] = $m.Groups[2].Value
