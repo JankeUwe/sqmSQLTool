@@ -1,5 +1,26 @@
 # sqmSQLTool — Changelog
 
+## [1.8.19.0] — 2026-07-02
+
+### Bugfix (kritisch)
+
+**jobs/Sync-Job.ps1** — Login-Verlust im unbeaufsichtigten Agent-Lauf durch `-Force`
+- Im SQL-Agent-Job rief `Sync-Job.ps1` `Sync-sqmLoginsToAlwaysOn -Force` auf. `-Force`
+  bewirkt bei bereits vorhandenen Logins DROP + CREATE (nicht ALTER, siehe 1.8.18.0).
+  Schlaegt CREATE danach fehl (Policy, Transientes, AD-Latenz o.ae.), ist der Login
+  komplett weg statt nur nicht aktualisiert - im unbeaufsichtigten Agent-Kontext
+  bestaetigt Uwe konkreten Verlust mehrerer Logins; manuelle Laeufe ohne `-Force`
+  blieben unauffaellig.
+- Fix: Agent-Job ruft jetzt `-Force:$false` auf - es werden nur fehlende Logins auf
+  den Secondaries ergaenzt, bestehende bleiben unangetastet (kein DROP mehr moeglich).
+  `-BackupLogins` entfernt (war ohnehin nur mit `-Force` aktiv, siehe
+  `if ($BackupLogins -and $Force)` in Sync-sqmLoginsToAlwaysOn.ps1).
+- Bewusster Trade-off: Passwort-/Attribut-Drift auf bereits vorhandenen Logins wird
+  ueber den automatischen Sync-Job nicht mehr propagiert. Fuer bewusste, manuelle
+  Aktualisierung bestehender Logins bleibt `Sync-sqmLoginsToAlwaysOn -Force
+  -BackupLogins` weiterhin verfuegbar (Funktions-Default fuer `-Force` unveraendert
+  `$true`, nur der Agent-Job wurde umgestellt).
+
 ## [1.8.18.0] — 2026-07-02
 
 ### Bugfix
