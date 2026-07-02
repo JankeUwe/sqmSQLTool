@@ -1,5 +1,17 @@
 # sqmSQLTool — Changelog
 
+## [1.8.16.0] — 2026-07-02
+
+### Doku
+
+**Docs/sqmSQLTool_Anwender-Kurzanleitung.docx** — neues Anwenderhandbuch
+- Eigenstaendiges Dokument fuer Endanwender von `Show-sqmBackupExcludeForm`
+  (nicht Administratoren): Programm oeffnen, Oberflaeche/Spalten erklaert,
+  Datenbank aus-/einschliessen, "Alle aktiv/inaktiv", der neue Laengen-
+  Warnhinweis aus 1.8.14.0, verwaiste Eintraege, wichtige Hinweise.
+- Screenshot-Platzhalter (gestrichelter Rahmen) im Abschnitt "Die
+  Oberflaeche" — wird manuell ergaenzt.
+
 ## [1.8.15.0] — 2026-07-02
 
 ### Doku
