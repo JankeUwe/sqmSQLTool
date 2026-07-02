@@ -6,15 +6,17 @@
     Transfers SQL and Windows logins from a source instance to a target instance.
 
     Process:
-        1. Disable policy  (Set-sqmSqlPolicyState -State Disable, if -DisablePolicy $true)
-        2. Connect + authentication mode check / alignment
-        3. Load and filter logins
-        4. Check Windows logins against Active Directory (AD module required)
+        1. Connect + authentication mode check / alignment
+        2. Load and filter logins
+        3. Check Windows logins against Active Directory (AD module required)
            - Unresolvable logins are skipped and reported as 'AdOrphan'.
+        4. Disable policy (Set-sqmSqlPolicyState -State Disable, if -DisablePolicy $true)
         5. Copy logins (Copy-DbaLogin, password hash + SID mapping)
-        6. Repair orphaned users on all user databases on the target
+        6. Re-enable policy - guaranteed via a finally block scoped tightly around step 5,
+           even on error. The policy is only disabled for the duration of the actual copy,
+           not for the connect/auth-mode/AD-check steps before it.
+        7. Repair orphaned users on all user databases on the target
            (Repair-DbaDbOrphanUser - always runs, no optional switch)
-        7. Re-enable policy - guaranteed via finally block, even on error.
 
     Authentication mode alignment:
         If the source uses Mixed Mode (SQL + Windows) and the target is set to
@@ -51,12 +53,14 @@
         databases on the target (no optional switch).
 
     Policy:
-        Before copying, Set-sqmSqlPolicyState disables the configured default policy
-        on the target instance. After completion (even on error) it is guaranteed to
-        be re-enabled via a finally block.
+        Immediately before the Copy-DbaLogin call, Set-sqmSqlPolicyState disables the
+        configured default policy on the target instance; immediately after (in a finally
+        block scoped to just that step) it is guaranteed to be re-enabled, even on error.
+        Connect, auth-mode check and the AD lookup run BEFORE this window with the policy
+        still enabled - the disabled window is kept as short as possible.
         Controlled by -DisablePolicy (default: $true).
-        The finally block re-enables the policy only if it was previously successfully
-        disabled ($policyWasDisabled flag).
+        Re-enable only runs if the policy was previously successfully disabled
+        ($policyWasDisabled flag).
 
 .PARAMETER Source
     Source SQL Server instance. Mandatory.
@@ -150,7 +154,9 @@
     AD check       : Requires the ActiveDirectory module (RSAT). Behavior when module is missing
                      is controllable via -AdModuleAction (Install/Skip/Abort).
     Auth Mode SMO  : Server.LoginMode - Integrated(0/1) = Windows Only, Mixed(2) = SQL+Windows
-    Policy guarantee: The finally block ensures the policy is re-enabled even on unhandled exceptions.
+    Policy guarantee: A finally block scoped tightly around the Copy-DbaLogin call ensures
+                      the policy is re-enabled immediately afterwards, even on unhandled
+                      exceptions during the copy.
 #>
 function Copy-sqmLogins
 {
@@ -296,11 +302,111 @@ function Copy-sqmLogins
 					Timestamp   = (Get-Date)
 				})
 		}
-		
-		# Merker: wurde die Policy tatsaechlich deaktiviert?
-		# Wird im finally-Block ausgewertet um unnoetige Reaktivierung zu vermeiden.
-		$policyWasDisabled = $false
-		
+
+		# Hilfsfunktion: Policy auf Zielinstanz deaktivieren.
+		# Wird absichtlich erst UNMITTELBAR vor Copy-DbaLogin aufgerufen (nicht vor Connect/
+		# Auth-Mode-Check/AD-Pruefung) - das Zeitfenster, in dem eine sicherheitsrelevante
+		# Policy deaktiviert ist, soll so kurz wie moeglich sein.
+		# Rueckgabe: $true nur wenn tatsaechlich deaktiviert wurde (dann muss _EnablePolicy
+		# spaeter aufgerufen werden), sonst $false.
+		function _DisablePolicy
+		{
+			if (-not $DisablePolicy) { return $false }
+
+			$_configuredPolicy = Get-sqmConfig -Key 'DefaultPolicy' 3>$null
+			if ([string]::IsNullOrWhiteSpace($_configuredPolicy))
+			{
+				$skipMsg = "Policy-Handling uebersprungen: kein 'DefaultPolicy' in der Modulkonfiguration. " +
+						   "Verwende 'Set-sqmConfig -DefaultPolicy <Name>' um einen Policy-Namen zu setzen."
+				Write-Warning $skipMsg
+				Invoke-sqmLogging -Message $skipMsg -FunctionName $functionName -Level 'WARNING'
+				_AddResult 'PolicyDisable' '(Server)' 'Skipped' $skipMsg
+				return $false
+			}
+
+			try
+			{
+				$policyDisableAction = "Default-Policy auf '$Destination' deaktivieren"
+				Invoke-sqmLogging -Message $policyDisableAction -FunctionName $functionName -Level 'INFO'
+
+				$policyResult = Set-sqmSqlPolicyState `
+													  -SqlInstance $Destination `
+													  -SqlCredential $dstCred `
+													  -State Disable `
+													  -ContinueOnError:$ContinueOnError `
+													  -EnableException:$EnableException
+
+				$policyStatus = ($policyResult | Select-Object -ExpandProperty Status -First 1)
+
+				if ($policyStatus -eq 'Success')
+				{
+					_AddResult 'PolicyDisable' '(Server)' 'Success' 'Default-Policy erfolgreich deaktiviert.'
+					Invoke-sqmLogging -Message "Policy auf '$Destination' deaktiviert." `
+									  -FunctionName $functionName -Level 'INFO'
+					return $true
+				}
+				elseif ($policyStatus -eq 'Skipped')
+				{
+					# Policy existiert nicht - kein Re-Enable erforderlich
+					_AddResult 'PolicyDisable' '(Server)' 'Skipped' 'Policy nicht gefunden - uebersprungen.'
+					Invoke-sqmLogging -Message "Policy auf '$Destination' nicht gefunden - uebersprungen." `
+									  -FunctionName $functionName -Level 'WARNING'
+					return $false
+				}
+				else
+				{
+					$msg = "Policy-Deaktivierung auf '$Destination' fehlgeschlagen (Status: $policyStatus)."
+					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'ERROR'
+					_AddResult 'PolicyDisable' '(Server)' 'Failed' $msg
+					if ($EnableException) { throw $msg }
+					return $false
+				}
+			}
+			catch
+			{
+				$msg = "Fehler bei Policy-Deaktivierung auf '$Destination': $($_.Exception.Message)"
+				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'ERROR'
+				_AddResult 'PolicyDisable' '(Server)' 'Failed' $msg
+				if ($EnableException) { throw }
+				return $false
+			}
+		}
+
+		# Hilfsfunktion: Policy auf Zielinstanz wieder aktivieren.
+		# Wird in einem eng um Copy-DbaLogin gelegten finally-Block aufgerufen - laeuft also
+		# unmittelbar NACH dem eigentlichen Lauf, garantiert auch bei Fehlern in Copy-DbaLogin.
+		# EnableException wird hier absichtlich NIE gesetzt: ein Fehler beim Reaktivieren darf
+		# eine urspruengliche Ausnahme aus dem Copy-Vorgang nicht verdecken.
+		function _EnablePolicy
+		{
+			try
+			{
+				$reenableAction = "Default-Policy auf '$Destination' wieder aktivieren"
+				Invoke-sqmLogging -Message $reenableAction -FunctionName $functionName -Level 'INFO'
+
+				$reEnableResult = Set-sqmSqlPolicyState `
+														-SqlInstance $Destination `
+														-SqlCredential $dstCred `
+														-State Enable `
+														-ContinueOnError:$ContinueOnError `
+														-EnableException:$false
+
+				$reEnableStatus = ($reEnableResult | Select-Object -ExpandProperty Status -First 1)
+				_AddResult 'PolicyEnable' '(Server)' $reEnableStatus "Policy reaktiviert: $reEnableStatus"
+				Invoke-sqmLogging -Message "Policy-Reaktivierung auf '$Destination': $reEnableStatus" `
+								  -FunctionName $functionName -Level 'INFO'
+			}
+			catch
+			{
+				# Fehler hier nur loggen, nicht weiterwerfen - sonst wuerde eine urspruengliche
+				# Ausnahme aus dem Copy-Vorgang verdeckt.
+				$msg = "KRITISCH: Policy-Reaktivierung auf '$Destination' fehlgeschlagen: $($_.Exception.Message)"
+				Write-Warning $msg
+				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'ERROR'
+				_AddResult 'PolicyEnable' '(Server)' 'Failed' $msg
+			}
+		}
+
 		# ?? AD-Modul sicherstellen ????????????????????????????????????????????
 		# Steuerung ueber -AdModuleAction:
 		#   'Install' (Standard) ? Install-sqmAdModule aufrufen falls nicht vorhanden
@@ -359,80 +465,9 @@ function Copy-sqmLogins
 		try # aeusserer try ? finally garantiert Policy-Reaktivierung in jedem Fall
 		{
 			# ??????????????????????????????????????????????????????????????
-			# 1. Policy auf Zielinstanz deaktivieren
-			# ??????????????????????????????????????????????????????????????
-			if ($DisablePolicy)
-			{
-				# Vor dem Aufruf pruefen ob DefaultPolicy konfiguriert ist.
-				# Fehlt sie, wird Policy-Handling uebersprungen statt mit Fehler abzubrechen.
-				$_configuredPolicy = Get-sqmConfig -Key 'DefaultPolicy' 3>$null
-				if ([string]::IsNullOrWhiteSpace($_configuredPolicy))
-				{
-					$skipMsg = "Policy-Handling uebersprungen: kein 'DefaultPolicy' in der Modulkonfiguration. " +
-					           "Verwende 'Set-sqmConfig -DefaultPolicy <Name>' um einen Policy-Namen zu setzen."
-					Write-Warning $skipMsg
-					Invoke-sqmLogging -Message $skipMsg -FunctionName $functionName -Level 'WARNING'
-					_AddResult 'PolicyDisable' '(Server)' 'Skipped' $skipMsg
-				}
-				else
-				{
-
-				$policyDisableAction = "Default-Policy auf '$Destination' deaktivieren"
-				if ($PSCmdlet.ShouldProcess($Destination, $policyDisableAction))
-				{
-					try
-					{
-						Invoke-sqmLogging -Message $policyDisableAction -FunctionName $functionName -Level 'INFO'
-
-						$policyResult = Set-sqmSqlPolicyState `
-															  -SqlInstance $Destination `
-															  -SqlCredential $dstCred `
-															  -State Disable `
-															  -ContinueOnError:$ContinueOnError `
-															  -EnableException:$EnableException
-						
-						$policyStatus = ($policyResult | Select-Object -ExpandProperty Status -First 1)
-						
-						if ($policyStatus -eq 'Success')
-						{
-							# Nur bei 'Success' muss spaeter reaktiviert werden
-							$policyWasDisabled = $true
-							_AddResult 'PolicyDisable' '(Server)' 'Success' 'Default-Policy erfolgreich deaktiviert.'
-							Invoke-sqmLogging -Message "Policy auf '$Destination' deaktiviert." `
-											  -FunctionName $functionName -Level 'INFO'
-						}
-						elseif ($policyStatus -eq 'Skipped')
-						{
-							# Policy existiert nicht ? kein Re-Enable erforderlich
-							_AddResult 'PolicyDisable' '(Server)' 'Skipped' 'Policy nicht gefunden - uebersprungen.'
-							Invoke-sqmLogging -Message "Policy auf '$Destination' nicht gefunden - uebersprungen." `
-											  -FunctionName $functionName -Level 'WARNING'
-						}
-						else
-						{
-							$msg = "Policy-Deaktivierung auf '$Destination' fehlgeschlagen (Status: $policyStatus). Abbruch."
-							Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'ERROR'
-							_AddResult 'PolicyDisable' '(Server)' 'Failed' $msg
-							if (-not $ContinueOnError -and $EnableException) { throw $msg }
-							if (-not $ContinueOnError) { return $results }
-						}
-					}
-					catch
-					{
-						$msg = "Fehler bei Policy-Deaktivierung auf '$Destination': $($_.Exception.Message)"
-						Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'ERROR'
-						_AddResult 'PolicyDisable' '(Server)' 'Failed' $msg
-						if (-not $ContinueOnError -and $EnableException) { throw }
-						if (-not $ContinueOnError) { return $results }
-					}
-				}
-				else
-				{
-					_AddResult 'PolicyDisable' '(Server)' 'WhatIf' 'WhatIf: Policy wuerde deaktiviert.'
-				}
-				} # end else (DefaultPolicy konfiguriert)
-			} # end if ($DisablePolicy)
-
+			# 1. Policy-Deaktivierung liegt jetzt eng um Copy-DbaLogin (Schritt 6, s.u.),
+			#    nicht mehr hier vor Connect/Auth-Mode-Check/AD-Pruefung - das Zeitfenster
+			#    mit deaktivierter Policy soll so kurz wie moeglich sein.
 			# ??????????????????????????????????????????????????????????????
 			# 2. Verbindung zu Quelle und Ziel aufbauen (SMO-Server-Objekte)
 			# ??????????????????????????????????????????????????????????????
@@ -720,10 +755,17 @@ function Copy-sqmLogins
 			
 			if ($PSCmdlet.ShouldProcess($Destination, $copyAction))
 			{
+				# Policy-Deaktivierung liegt bewusst HIER, direkt vor Copy-DbaLogin - und wird
+				# im finally garantiert direkt danach wieder aktiviert (s. _DisablePolicy/
+				# _EnablePolicy oben in begin). Verbinden/Auth-Mode-Check/AD-Pruefung laufen
+				# VOR diesem Block mit weiterhin aktiver Policy.
+				$policyWasDisabled = $false
 				try
 				{
 					Invoke-sqmLogging -Message $copyAction -FunctionName $functionName -Level 'INFO'
-					
+
+					$policyWasDisabled = _DisablePolicy
+
 					$copyParams = @{
 						Source		    = $Source
 						Destination	    = $Destination
@@ -733,9 +775,9 @@ function Copy-sqmLogins
 					if ($srcCred) { $copyParams['SqlCredential'] = $srcCred }
 					if ($dstCred) { $copyParams['DestinationSqlCredential'] = $dstCred }
 					if ($Force) { $copyParams['Force'] = $true }
-					
+
 					$copyResults = Copy-DbaLogin @copyParams
-					
+
 					foreach ($item in $copyResults)
 					{
 						$itemStatus = if ($item.Status -eq 'Successful') { 'Success' }
@@ -743,7 +785,7 @@ function Copy-sqmLogins
 						$itemMsg = if ($item.Notes) { $item.Notes }
 						else { $item.Status }
 						_AddResult 'CopyLogin' $item.Name $itemStatus $itemMsg
-						
+
 						$logLevel = if ($item.Status -eq 'Successful') { 'INFO' }
 						else { 'WARNING' }
 						Invoke-sqmLogging -Message "Login '$($item.Name)': $itemStatus - $itemMsg" `
@@ -756,6 +798,12 @@ function Copy-sqmLogins
 					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'ERROR'
 					_AddResult 'CopyLogin' '(alle)' 'Failed' $msg
 					if ($EnableException) { throw }
+				}
+				finally
+				{
+					# Laeuft garantiert direkt nach Copy-DbaLogin, auch bei Fehlern darin -
+					# das Deaktivierungsfenster endet hier, nicht erst am Ende der Funktion.
+					if ($policyWasDisabled) { _EnablePolicy }
 				}
 			}
 			else
@@ -819,48 +867,9 @@ function Copy-sqmLogins
 		}
 		finally
 		{
-			# ??????????????????????????????????????????????????????????????
-			# 8. Policy auf Zielinstanz garantiert wieder aktivieren
-			#    Laeuft immer - auch bei unbehandelten Ausnahmen im try-Block.
-			#    Nur wenn $policyWasDisabled = $true (d.h. erfolgreich deaktiviert).
-			#    EnableException=$false im finally-Block: Fehler hier NIEMALS werfen.
-			# ??????????????????????????????????????????????????????????????
-			if ($DisablePolicy -and $policyWasDisabled)
-			{
-				$reenableAction = "Default-Policy auf '$Destination' wieder aktivieren"
-				if ($PSCmdlet.ShouldProcess($Destination, $reenableAction))
-				{
-					try
-					{
-						Invoke-sqmLogging -Message $reenableAction -FunctionName $functionName -Level 'INFO'
-						
-						$reEnableResult = Set-sqmSqlPolicyState `
-																-SqlInstance $Destination `
-																-SqlCredential $dstCred `
-																-State Enable `
-																-ContinueOnError:$ContinueOnError `
-																-EnableException:$false # im finally-Block niemals werfen
-						
-						$reEnableStatus = ($reEnableResult | Select-Object -ExpandProperty Status -First 1)
-						_AddResult 'PolicyEnable' '(Server)' $reEnableStatus "Policy reaktiviert: $reEnableStatus"
-						Invoke-sqmLogging -Message "Policy-Reaktivierung auf '$Destination': $reEnableStatus" `
-										  -FunctionName $functionName -Level 'INFO'
-					}
-					catch
-					{
-						# Fehler im finally-Block nur loggen, nicht weiterwerfen -
-						# sonst wuerde eine urspruengliche Ausnahme verdeckt.
-						$msg = "KRITISCH: Policy-Reaktivierung auf '$Destination' fehlgeschlagen: $($_.Exception.Message)"
-						Write-Warning $msg
-						Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'ERROR'
-						_AddResult 'PolicyEnable' '(Server)' 'Failed' $msg
-					}
-				}
-				else
-				{
-					_AddResult 'PolicyEnable' '(Server)' 'WhatIf' 'WhatIf: Policy wuerde reaktiviert.'
-				}
-			}
+			# Policy-Reaktivierung liegt jetzt eng um Copy-DbaLogin (Schritt 6, s.o.) und laeuft
+			# dort in einem eigenen finally direkt nach dem Copy-Vorgang - nicht mehr erst hier
+			# am Ende der gesamten Funktion (nach Orphan-Repair etc.).
 		}
 	}
 	

@@ -1,5 +1,28 @@
 # sqmSQLTool — Changelog
 
+## [1.8.18.0] — 2026-07-02
+
+### Bugfix
+
+**`Copy-sqmLogins`** — Policy-Deaktivierungsfenster auf den eigentlichen Kopiervorgang verengt
+- Ausgangslage: `Sync-sqmLoginsToAlwaysOn` schlug in FI-TS-Umgebungen mit "Policy 'New
+  Login_Enforce Passwort Policy' has been violated" fehl. `Copy-sqmLogins -Force`
+  (Default `$true`) reicht `-Force` an dbatools `Copy-DbaLogin` durch, das bei bereits
+  vorhandenen Logins DROP + CREATE statt ALTER macht — jeder Sync-Lauf loest damit ein
+  echtes `CREATE_LOGIN`-Event aus, das die PBM-Policy prueft.
+- Die Policy wurde bisher ganz am Anfang deaktiviert (vor Connect, Auth-Mode-Check inkl.
+  moeglichem Dienst-Neustart, AD-Pruefung) und erst ganz am Ende (nach Orphan-Repair)
+  wieder aktiviert — ein unnoetig grosses Zeitfenster fuer eine sicherheitsrelevante
+  Policy.
+- Fix: `_DisablePolicy`/`_EnablePolicy`-Hilfsfunktionen eingefuehrt und eng um den
+  `Copy-DbaLogin`-Aufruf gelegt (Disable unmittelbar davor, Enable in einem dediziert
+  dafuer scope-ten `finally` unmittelbar danach). Connect/Auth-Mode-Check/AD-Pruefung
+  laufen jetzt VOR dem deaktivierten Fenster, Orphan-Repair NACH der Reaktivierung.
+  Verifiziert auf DEV02: Reihenfolge jetzt AuthModeCheck -> PolicyDisable -> CopyLogin
+  -> RepairOrphanUsers (vorher: PolicyDisable ganz zuerst).
+- Kein Verhaltensunterschied bei `-DisablePolicy $false` oder wenn kein `DefaultPolicy`
+  konfiguriert ist (weiterhin "Skipped", keine Deaktivierung).
+
 ## [1.8.17.0] — 2026-07-02
 
 ### Bugfix
