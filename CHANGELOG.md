@@ -1,5 +1,19 @@
 # sqmSQLTool — Changelog
 
+## [1.8.15.0] — 2026-07-02
+
+### Doku
+
+**Docs/sqmSQLTool_Admin-Kurzanleitung.docx** — Einfache Version fuer Teil 1 ergaenzt
+- Bisher beschrieb "Teil 1: Backup-Ausschlussliste einrichten" ausschliesslich die
+  vier manuellen Einzelschritte (Sync, Berechtigung, GUI, Trigger).
+- Neue Box "Einfache Version (empfohlen, ab v1.8.8)" vor der Detailanleitung: ein
+  einziger Aufruf `New-sqmOlaUsrDbBackupJob -SqlInstance "SQL01" -Full -Log
+  -UseExcludeTable` erledigt Schritt 1 (Sync) und Schritt 4 (DDL-Trigger) automatisch.
+  Schritt 2 (Gruppenberechtigung) und Schritt 3 (laufende GUI-Pflege) bleiben
+  eigenstaendig. Die Detail-Ueberschrift wurde entsprechend zu "Im Detail: die vier
+  Einzelschritte (manuell, optional)" ergaenzt.
+
 ## [1.8.14.0] — 2026-07-02
 
 ### Erweiterung
