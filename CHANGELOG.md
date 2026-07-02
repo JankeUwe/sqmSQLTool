@@ -1,5 +1,26 @@
 # sqmSQLTool — Changelog
 
+## [1.8.13.0] — 2026-07-02
+
+### Bugfix (kritisch)
+
+**`New-sqmOlaUsrDbBackupJob`** — IsActive-Polaritaet in der Exclude-Abfrage invertiert
+- Die in v1.8.11.0 gefixte Abfrage filterte auf `e.IsActive = 1`, um Ausschluesse zu
+  bilden. Tatsaechliche Bedeutung von `IsActive` in `sqm_BackupExclude`: `IsActive=1`
+  heisst "diese Datenbank soll gesichert werden" (Default fuer neu entdeckte
+  Datenbanken, siehe `Sync-sqmBackupExcludeTable`), `IsActive=0` heisst "nicht sichern".
+  Mit `WHERE IsActive = 1` wurden also genau die zu sichernden Datenbanken
+  ausgeschlossen und die explizit stillgelegten (`IsActive=0`) gesichert — Polaritaet
+  komplett invertiert.
+- Fix: Filter auf `e.IsActive = 0` korrigiert.
+- Verifiziert auf DEV02: echter FULL-Lauf sichert jetzt exakt die 9 Datenbanken mit
+  `IsActive=1` (`AlwaysOnTest, amazon, DeadlockCollector, dtcSN, OperationsManagerDW,
+  pdRessourcen, ReportServerTempDB, Solutioninfo, SolutioninfoSTA`) und uebersprang
+  korrekt die 3 mit `IsActive=0` (`SSISDB, TestDB, ReportServer`).
+- `Sync-sqmBackupExcludeTable` (Default `IsActive=1` fuer neue Datenbanken) war von
+  Anfang an korrekt und musste NICHT geaendert werden — der Fehler lag ausschliesslich
+  in der Leserichtung dieser einen Abfrage.
+
 ## [1.8.12.0] — 2026-07-02
 
 ### Bugfix

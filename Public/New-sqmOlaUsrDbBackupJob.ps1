@@ -14,11 +14,13 @@
         OlaJobNameLog   (Default: 'OlaHH-UserDatabases-LOG')
 
     When -UseExcludeTable is set, the function reads master.dbo.sqm_BackupExclude
-    (created by Sync-sqmBackupExcludeTable) for entries where IsActive=1 AND IsOrphaned=0
-    AND the database actually exists on this instance (sys.databases). If entries are found,
-    they are prepended with '-' (Ola's exclude prefix) and appended to the @Databases parameter
-    in the generated job step command. If the table does not exist or contains no matching rows,
-    the -Databases parameter is used unchanged.
+    (created by Sync-sqmBackupExcludeTable) for entries where IsActive=0 (database should
+    NOT be backed up) AND IsOrphaned=0 AND the database actually exists on this instance
+    (sys.databases). If entries are found, they are prepended with '-' (Ola's exclude prefix)
+    and appended to the @Databases parameter in the generated job step command. If the table
+    does not exist or contains no matching rows, the -Databases parameter is used unchanged.
+    Note: IsActive=1 means "back this database up" (the default for newly discovered
+    databases); IsActive=0 means "exclude this database".
 
 .PARAMETER SqlInstance
     SQL Server instance. Default: current computer name.
@@ -111,10 +113,11 @@
     Continue with remaining jobs if one job fails.
 
 .PARAMETER UseExcludeTable
-    When set, reads master.dbo.sqm_BackupExclude for active, non-orphaned entries that exist
-    on this instance and adds them as '-DatabaseName' exclusions to the @Databases parameter
-    of Ola's DatabaseBackup. If the table does not exist or is empty, the Databases parameter
-    is used unchanged.
+    When set, reads master.dbo.sqm_BackupExclude for non-orphaned entries with IsActive=0
+    (databases explicitly marked as "do not back up") that exist on this instance, and adds
+    them as '-DatabaseName' exclusions to the @Databases parameter of Ola's DatabaseBackup.
+    IsActive=1 (the default for newly discovered databases) means "back this database up".
+    If the table does not exist or no rows match, the Databases parameter is used unchanged.
 
 .PARAMETER CreateSyncJob
     When -UseExcludeTable is set, automatically creates a SQL Agent job that runs
@@ -571,7 +574,7 @@ BEGIN
         SELECT @Exclusions = STUFF((
             SELECT ',-' + e.DatabaseName
             FROM   master.dbo.sqm_BackupExclude e
-            WHERE  e.IsActive   = 1
+            WHERE  e.IsActive   = 0
               AND  e.IsOrphaned = 0
               AND  EXISTS (SELECT 1 FROM sys.databases d WHERE d.name = e.DatabaseName)
             FOR XML PATH(''), TYPE
