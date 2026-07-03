@@ -1,5 +1,15 @@
 # sqmSQLTool — Changelog
 
+## [1.9.2.0] — 2026-07-03
+
+### Erweiterung
+
+**`Get-sqmSaLogin`** — jetzt exportiert (war bisher private)
+- Gleicher Grund wie bei `Invoke-sqmLogging` (siehe 1.9.1.0): `sqmPartitionTool`s
+  Job-Erstellungsfunktionen (`New-sqmPartitionExtendJob`,
+  `New-sqmPartitionRetentionJob`) nutzen dieselbe SA-Login-Ermittlung wie die
+  bestehenden `New-sqmOla*Job`-Funktionen statt sie zu duplizieren.
+
 ## [1.9.1.0] — 2026-07-03
 
 ### Erweiterung
