@@ -413,6 +413,17 @@ WHERE  r.replica_server_name <> @@SERVERNAME
 "@
 				$secondaries = Invoke-DbaQuery @connParams -Database master -Query $replicaQuery -ErrorAction SilentlyContinue
 
+				# Aktueller, endgueltiger Stand der PRIMARY nach allen obigen Aenderungen - wird unten
+				# per MERGE an jede Secondary GEPUSHT (nicht nur strukturell abgeglichen). Der
+				# rekursive Sync-sqmBackupExcludeTable-Aufruf allein erkennt auf der Secondary nur
+				# NEUE/geloeschte Datenbanken selbst, uebernimmt aber NIE die vom Admin ueber
+				# Show-sqmBackupExcludeForm gesetzten IsActive/Reason-Werte der Primary - das war die
+				# Ursache dafuer, dass Aenderungen an der Exclude-Liste nie auf Secondaries ankamen.
+				$primaryRows = if ($secondaries)
+				{
+					Invoke-DbaQuery @connParams -Database master -Query "SELECT DatabaseName, Reason, IsActive FROM master.dbo.sqm_BackupExclude" -ErrorAction Stop
+				}
+
 				foreach ($sec in $secondaries)
 				{
 					$secName = $sec.replica_server_name
@@ -428,6 +439,29 @@ WHERE  r.replica_server_name <> @@SERVERNAME
 
 						Sync-sqmBackupExcludeTable @secParams -ErrorAction Stop | Out-Null
 
+						if ($primaryRows)
+						{
+							$secConnParams = @{ SqlInstance = $secName }
+							if ($SqlCredential) { $secConnParams['SqlCredential'] = $SqlCredential }
+
+							$valuesSql = ($primaryRows | ForEach-Object {
+									$reasonSql = if ([string]::IsNullOrEmpty($_.Reason)) { 'NULL' } else { "N'$($_.Reason.Replace("'", "''"))'" }
+									"(N'$($_.DatabaseName.Replace("'", "''"))', $reasonSql, $([int][bool]$_.IsActive))"
+								}) -join ', '
+
+							$mergeSql = @"
+MERGE master.dbo.sqm_BackupExclude AS tgt
+USING (VALUES $valuesSql) AS src (DatabaseName, Reason, IsActive)
+ON tgt.DatabaseName = src.DatabaseName
+WHEN MATCHED AND (tgt.IsActive <> src.IsActive OR ISNULL(tgt.Reason, N'') <> ISNULL(src.Reason, N'')) THEN
+    UPDATE SET IsActive = src.IsActive, Reason = src.Reason
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (DatabaseName, Reason, IsActive, IsOrphaned) VALUES (src.DatabaseName, src.Reason, src.IsActive, 0);
+"@
+							Invoke-DbaQuery @secConnParams -Database master -Query $mergeSql -ErrorAction Stop
+							Invoke-sqmLogging -Message "AlwaysOn: IsActive/Reason-Werte der Primary auf '$secName' uebertragen ($($primaryRows.Count) Zeile(n))." -FunctionName $functionName -Level "INFO"
+						}
+
 						Invoke-sqmLogging -Message "AlwaysOn: Secondary '$secName' erfolgreich synchronisiert." -FunctionName $functionName -Level "INFO"
 						$results.Add([PSCustomObject]@{
 							SqlInstance  = $secName
@@ -435,7 +469,7 @@ WHERE  r.replica_server_name <> @@SERVERNAME
 							Action       = 'AlwaysOnPropagated'
 							IsActive     = $null
 							IsOrphaned   = $null
-							Message      = "AlwaysOn Secondary '$secName' synchronisiert."
+							Message      = "AlwaysOn Secondary '$secName' synchronisiert (inkl. IsActive/Reason-Werte)."
 						})
 					}
 					catch

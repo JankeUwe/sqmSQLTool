@@ -1,5 +1,32 @@
 # sqmSQLTool — Changelog
 
+## [1.9.3.0] — 2026-07-03
+
+### Fix: AlwaysOn-Propagierung fehlte/griff nicht zuverlaessig
+
+**Problem gemeldet:** Jobs fehlten auf Secondary-Repliken; `sqm_BackupExclude`-Aenderungen
+(IsActive/Reason, ueber `Show-sqmBackupExcludeForm` gesetzt) kamen nie auf Secondaries an.
+
+- **Fix `New-sqmOlaUsrDbBackupJob`**: die AlwaysOn-Job-Propagierung am Funktionsende pruefte nur
+  `JobStatus -eq 'Created'`. Bei jedem Folgelauf (Job existiert bereits auf der Primary ->
+  `JobStatus = 'Updated'` oder `'AlreadyExists'`) wurde die Bedingung `$false` und die
+  Propagierung auf Secondaries lief **gar nicht mehr** - Secondaries blieben nach dem allerersten
+  Lauf dauerhaft ohne die Jobs bzw. ohne spaetere Aenderungen (z.B. geaenderte Zeitplaene). Jetzt
+  wird bei `'Created'`, `'Updated'` UND `'AlreadyExists'` propagiert (New-sqmOlaUsrDbBackupJob ist
+  auf der Secondary ohnehin idempotent per `-Update`).
+- **Fix `Sync-sqmBackupExcludeTable`**: die AlwaysOn-Propagierung rief auf jeder Secondary nur
+  rekursiv `Sync-sqmBackupExcludeTable` auf - das erkennt dort ausschliesslich NEUE/geloeschte
+  Datenbanken lokal, uebertraegt aber **niemals** die vom Admin gesetzten `IsActive`/`Reason`-
+  Werte der Primary. Der DDL-Trigger (`Register-sqmBackupExcludeTrigger`) deckt nur
+  CREATE_DATABASE/DROP_DATABASE ab, ebenfalls keine Werte-Propagierung. Ergebnis: eine ueber die
+  GUI gesetzte Ausschluss-Entscheidung erreichte Secondaries **nie**, auch nicht ueber den
+  periodischen Sync-Job. Fix: nach dem strukturellen Abgleich wird der aktuelle Datenstand der
+  Primary jetzt zusaetzlich per `MERGE` (IsActive/Reason) auf jede Secondary uebertragen. Auf
+  DEV02 verifiziert (MERGE-Logik gegen eine Mock-Tabelle getestet: Aenderungen korrekt
+  uebernommen, neue Zeilen eingefuegt, nicht in der Primary-Liste enthaltene Zeilen unangetastet
+  gelassen, Escaping von Anfuehrungszeichen in `Reason` korrekt). Echte AlwaysOn-Propagierung
+  selbst ist auf DEV02 nicht End-to-End testbar (keine AG dort vorhanden).
+
 ## [1.9.2.0] — 2026-07-03
 
 ### Erweiterung

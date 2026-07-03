@@ -905,8 +905,12 @@ END
 			if (-not $ContinueOnError) { throw }
 		}
 
-		# AlwaysOn-Propagierung: erfolgreich erstellte Jobs auch auf Secondary-Repliken anlegen
-		if (-not $SkipAlwaysOnPropagation -and $jobDefinitions -and ($results | Where-Object { $_.JobStatus -eq 'Created' }))
+		# AlwaysOn-Propagierung: Jobs auch auf Secondary-Repliken anlegen/aktualisieren.
+		# Nicht nur bei 'Created' ausloesen - sonst propagiert ein spaeterer -Update-Lauf (JobStatus
+		# 'Updated') oder ein erneuter Lauf ohne Aenderung ('AlreadyExists') NIE auf die Secondaries,
+		# obwohl New-sqmOlaUsrDbBackupJob dort idempotent per -Update erneut aufgerufen wird - Ursache
+		# fuer fehlende/veraltete Jobs auf Secondaries nach dem allerersten Lauf.
+		if (-not $SkipAlwaysOnPropagation -and $jobDefinitions -and ($results | Where-Object { $_.JobStatus -in @('Created', 'Updated', 'AlreadyExists') }))
 		{
 			try
 			{
