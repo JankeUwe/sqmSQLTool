@@ -1,5 +1,18 @@
 # sqmSQLTool — Changelog
 
+## [1.9.1.0] — 2026-07-03
+
+### Erweiterung
+
+**`Invoke-sqmLogging`** — jetzt exportiert (war bisher private)
+- Grund: das neue Schwester-Projekt `sqmPartitionTool` (eigenstaendiges Modul,
+  `RequiredModules = @('dbatools','sqmSQLTool')`) soll das etablierte Logging
+  wiederverwenden statt es zu duplizieren. Private Funktionen sind aber auch
+  bei erklaerter Modul-Abhaengigkeit fuer andere Module nicht sichtbar -
+  `Invoke-sqmLogging` musste dafuer in `FunctionsToExport` aufgenommen werden.
+- Kein Verhaltensunterschied fuer sqmSQLTool selbst; reine Sichtbarkeits-
+  Erweiterung fuer Cross-Module-Nutzung.
+
 ## [1.9.0.0] — 2026-07-02
 
 ### Neue Funktion
