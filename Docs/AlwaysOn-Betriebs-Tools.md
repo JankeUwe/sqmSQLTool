@@ -104,6 +104,7 @@ Logins oder Datenbanken auf einem Read-Only-Secondary).
 |---|---|
 | `Sync-sqmLoginsToAlwaysOn` | Synchronisiert Logins vom Primary zu allen Secondary-Replicas. |
 | `Compare-sqmAlwaysOnLogins` | Vergleicht Logins aller Replicas (Vorhandensein, Default-DB, Sprache, Passwort-Hash, SID). |
+| `Compare-sqmAlwaysOnRoles` | Vergleicht Server-Rollen-Mitgliedschaft aller Replicas (fixe + benutzerdefinierte Rollen; sysadmin-Abweichung = Critical). |
 | `Sync-sqmAgNode` | Synchronisiert weitere Serverobjekte (Logins, Jobs u. a.) vom Primary zu allen Secondaries. |
 
 ### `-Force`: bestehende Logins aktualisieren — ohne Self-Lockout
@@ -216,7 +217,8 @@ New-sqmAlwaysOnRepairJob -SqlInstance "SQLPRIM01" -JobName "AO-AutoRepair" -Sche
 2. **Failover** — bei Wartung oder Störung `Invoke-sqmFailover` mit integrierten Vor-/Nachprüfungen
    statt manuellem `ALTER AVAILABILITY GROUP ... FAILOVER`.
 3. **Logins konsistent halten** — nach Änderungen am Primary `Sync-sqmLoginsToAlwaysOn`,
-   zur Kontrolle `Compare-sqmAlwaysOnLogins`.
+   zur Kontrolle `Compare-sqmAlwaysOnLogins` (Login-Attribute) und `Compare-sqmAlwaysOnRoles`
+   (Server-Rollen-Mitgliedschaft — wird von AlwaysOn nicht mitrepliziert).
 4. **Automatisieren** — wiederkehrende Aufgaben als Agent-Jobs einrichten
    (`New-sqmAutoLoginSyncJob`, `New-sqmAutoLoginCompareJob`, `New-sqmAlwaysOnRepairJob`).
    Der Compare-Job geht bei Login-Drift gezielt auf Fail und meldet dies (Operator + Windows Event Log

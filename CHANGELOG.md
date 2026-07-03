@@ -1,5 +1,33 @@
 # sqmSQLTool — Changelog
 
+## [1.9.0.0] — 2026-07-02
+
+### Neue Funktion
+
+**`Compare-sqmAlwaysOnRoles`** — Server-Rollen-Vergleich innerhalb einer AlwaysOn AG
+- AlwaysOn repliziert nur die Datenbanken, nicht `master` — Server-Principals
+  (Logins) *und* deren Server-Rollen-Mitgliedschaft (sysadmin, dbcreator,
+  securityadmin, ab SQL Server 2022 auch benutzerdefinierte Server-Rollen)
+  werden nicht automatisch synchron gehalten. Nach einem Failover kann ein
+  Login auf dem neuen Primary z. B. kein sysadmin mehr sein (oder umgekehrt zu
+  viele Rechte haben), ohne dass das bisher auffiel.
+- Diagnostisches Geschwister von `Compare-sqmAlwaysOnLogins` (dort:
+  Login-Existenz/-Attribute; hier: Rollen-Mitgliedschaft). Gleiches Muster:
+  AG-/Replica-Auflösung, System-Login-Filter, `-Login`/`-ExcludeLogin`,
+  `-OnlyDifferences`, TXT/HTML-Report, `-FailOnDrift` (Windows Event Log,
+  Source `sqmSQLTool`, EventId **9010** — erste freie Nummer, 9001-9009 waren
+  bereits belegt).
+- Statusbewertung: Critical bei fehlendem Login auf einer Replica ODER
+  abweichender `sysadmin`-Mitgliedschaft (höchstprivilegierte Rolle); Warning
+  bei jeder anderen abweichenden Rolle; OK bei identischem Rollen-Set.
+- Datenbank-Rollen sind bewusst nicht Teil des Vergleichs (liegen innerhalb
+  der replizierten Datenbank, damit strukturell kaum divergent).
+- Verifiziert auf DEV02: Rollen-Abfrage liefert korrekte Daten inkl.
+  `is_fixed_role` (SQL Server 2022) und einer real vorhandenen
+  benutzerdefinierten Server-Rolle; "keine AG gefunden"-Pfad sauber getestet
+  (DEV02 hat keine AlwaysOn-Gruppe, echter Mehr-Replica-Vergleich konnte
+  daher nicht End-to-End verifiziert werden).
+
 ## [1.8.19.0] — 2026-07-02
 
 ### Bugfix (kritisch)

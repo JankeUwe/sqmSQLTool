@@ -146,12 +146,13 @@
 	<!-- SIDEBAR -->
 	<div class="psdb-st-sidebar">
 	<input class="psdb-st-sidebar-search" type="text" placeholder="Funktion suchen…" oninput="psstSearch(this.value)">
-					<div class="psdb-st-nav-group" id="nav-alwayson">
+						<div class="psdb-st-nav-group" id="nav-alwayson">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-alwayson-list')">
-	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">17</span>
+	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">18</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-alwayson-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-addsqmdatabasetoag')">Add-sqmDatabaseToAG</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-comparesqmalwaysonlogins')">Compare-sqmAlwaysOnLogins</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-comparesqmalwaysonroles')">Compare-sqmAlwaysOnRoles</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-completesqmlistenermigration')">Complete-sqmListenerMigration</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-exportsqmalwaysonconfiguration')">Export-sqmAlwaysOnConfiguration</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmalwaysonfailoverhistory')">Get-sqmAlwaysOnFailoverHistory</span></li>
@@ -395,7 +396,7 @@
 
 	<!-- CONTENT -->
 	<div class="psdb-st-content" id="psdb-st-content">
-					<section class="psdb-st-section" id="cat-alwayson">
+						<section class="psdb-st-section" id="cat-alwayson">
 	<h2 class="psdb-st-section-title">🔄 AlwaysOn</h2>
 
 	<div class="psdb-st-func-card" id="f-addsqmdatabasetoag">
@@ -436,6 +437,29 @@
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Compare-sqmAlwaysOnLogins -SqlInstance &quot;SQL01&quot; | Format-Table</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Compare-sqmAlwaysOnLogins -SqlInstance &quot;SQL01&quot; | Format-Table</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-comparesqmalwaysonroles">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Compare-sqmAlwaysOnRoles</span>
+	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
+	</div>
+	<div class="psdb-st-func-desc">Vergleicht die Server-Rollen-Mitgliedschaft aller Replicas einer AlwaysOn Availability Group.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 3 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Compare-sqmAlwaysOnRoles -SqlInstance &quot;SQL01&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Compare-sqmAlwaysOnRoles -SqlInstance &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Compare-sqmAlwaysOnRoles -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;AG_Prod&quot; -OnlyDifferences</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Compare-sqmAlwaysOnRoles -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;AG_Prod&quot; -OnlyDifferences</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Compare-sqmAlwaysOnRoles -SqlInstance &quot;SQL01&quot; | Format-Table</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Compare-sqmAlwaysOnRoles -SqlInstance &quot;SQL01&quot; | Format-Table</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -4062,6 +4086,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Add-sqmDatabaseToAG</td><td>Adds one or more databases to an Always On availability group (AutoSeed).</td></tr>
 	<tr><td class="psdb-st-ov-fn">Add-sqmDatabaseToDistributedAg</td><td>Adds a database to a Distributed AlwaysOn Availability Group.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Compare-sqmAlwaysOnLogins</td><td>Compares the logins of all replicas in an AlwaysOn availability group.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Compare-sqmAlwaysOnRoles</td><td>Vergleicht die Server-Rollen-Mitgliedschaft aller Replicas einer AlwaysOn Availability Group.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Compare-sqmServerConfiguration</td><td>Compares important configuration settings between two SQL Server instances.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Complete-sqmListenerMigration</td><td>Completes listener migration after cluster team recreates the listener resource.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Copy-sqmLogins</td><td>Copies logins from a source SQL Server instance to a target instance.</td></tr>

@@ -7,6 +7,7 @@ $categoryMap = @{
     'Add-sqmDatabaseToAG'                 = 'Always On & Availability Groups'
     'Add-sqmDatabaseToDistributedAg'      = 'Always On & Availability Groups'
     'Compare-sqmAlwaysOnLogins'           = 'Always On & Availability Groups'
+    'Compare-sqmAlwaysOnRoles'            = 'Always On & Availability Groups'
     'Compare-sqmServerConfiguration'      = 'Configuration Management'
     'Complete-sqmListenerMigration'       = 'Always On & Availability Groups'
     'Copy-sqmLogins'                      = 'Login & User Security'
