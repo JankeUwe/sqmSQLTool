@@ -1,5 +1,13 @@
 # sqmSQLTool — Changelog
 
+## [1.9.6.0] — 2026-07-08
+
+### Docs: translate CHANGELOG history to en-US
+
+- All 49 historical version entries (1.3.0.0 through 1.9.5.0) translated from de-DE to en-US.
+  Version numbers, dates, function names, code identifiers and error message text left
+  unchanged; only prose translated.
+
 ## [1.9.5.0] — 2026-07-08
 
 ### Docs: translate comment-based help to en-US
@@ -9,823 +17,815 @@
 
 ## [1.9.4.0] — 2026-07-08
 
-### Feature: Klartextsuche in Show-sqmToolGui
+### Feature: plain-language search in Show-sqmToolGui
 
-Kolleg:innen, die sich Funktionsnamen nicht merken, koennen im Suchfeld jetzt auch einen Satz
-eingeben statt einer Wildcard, z.B. "Datenbank restoren" oder "Platte ist voll".
+Colleagues who can't remember function names can now type a sentence into the search box
+instead of a wildcard, e.g. "restore a database" or "disk is full".
 
-- Eingaben ohne `*`/`?` werden gegen Name, Synopsis, Description und Parameternamen jeder
-  Funktion gescort (Namenstreffer deutlich hoeher gewichtet als Treffer im Fliesstext) und als
-  rangierte "Best matches"-Liste angezeigt statt nach Kategorie gruppiert.
-- Neue `Public/nlp-synonyms.ps1`: kleine, erweiterbare Stichwort-Tabelle fuer umgangssprachliche
-  Formulierungen, die im Hilfetext nicht woertlich vorkommen (z.B. Konjugationen wie "restoren").
-- Reines Wildcard-/Namensverhalten bleibt unveraendert; es wird nie automatisch ausgefuehrt -
-  die Auswahl eines Treffers fuehrt in den bestehenden Parameter-/Preview-/Run-Flow.
+- Input without `*`/`?` is scored against name, Synopsis, Description and parameter names of
+  every function (a name match is weighted much higher than a match in the body text) and shown
+  as a ranked "Best matches" list instead of grouped by category.
+- New `Public/nlp-synonyms.ps1`: a small, extensible keyword table for colloquial wording that
+  doesn't appear verbatim in the help text (e.g. conjugations like "restoren").
+- Plain wildcard/name behaviour is unchanged; nothing is ever run automatically - selecting a
+  match feeds into the existing parameter/preview/run flow.
 
 ## [1.9.3.0] — 2026-07-03
 
-### Fix: AlwaysOn-Propagierung fehlte/griff nicht zuverlaessig
+### Fix: AlwaysOn propagation was missing / not reliable
 
-**Problem gemeldet:** Jobs fehlten auf Secondary-Repliken; `sqm_BackupExclude`-Aenderungen
-(IsActive/Reason, ueber `Show-sqmBackupExcludeForm` gesetzt) kamen nie auf Secondaries an.
+**Problem reported:** jobs were missing on secondary replicas; `sqm_BackupExclude` changes
+(IsActive/Reason, set via `Show-sqmBackupExcludeForm`) never reached the secondaries.
 
-- **Fix `New-sqmOlaUsrDbBackupJob`**: die AlwaysOn-Job-Propagierung am Funktionsende pruefte nur
-  `JobStatus -eq 'Created'`. Bei jedem Folgelauf (Job existiert bereits auf der Primary ->
-  `JobStatus = 'Updated'` oder `'AlreadyExists'`) wurde die Bedingung `$false` und die
-  Propagierung auf Secondaries lief **gar nicht mehr** - Secondaries blieben nach dem allerersten
-  Lauf dauerhaft ohne die Jobs bzw. ohne spaetere Aenderungen (z.B. geaenderte Zeitplaene). Jetzt
-  wird bei `'Created'`, `'Updated'` UND `'AlreadyExists'` propagiert (New-sqmOlaUsrDbBackupJob ist
-  auf der Secondary ohnehin idempotent per `-Update`).
-- **Fix `Sync-sqmBackupExcludeTable`**: die AlwaysOn-Propagierung rief auf jeder Secondary nur
-  rekursiv `Sync-sqmBackupExcludeTable` auf - das erkennt dort ausschliesslich NEUE/geloeschte
-  Datenbanken lokal, uebertraegt aber **niemals** die vom Admin gesetzten `IsActive`/`Reason`-
-  Werte der Primary. Der DDL-Trigger (`Register-sqmBackupExcludeTrigger`) deckt nur
-  CREATE_DATABASE/DROP_DATABASE ab, ebenfalls keine Werte-Propagierung. Ergebnis: eine ueber die
-  GUI gesetzte Ausschluss-Entscheidung erreichte Secondaries **nie**, auch nicht ueber den
-  periodischen Sync-Job. Fix: nach dem strukturellen Abgleich wird der aktuelle Datenstand der
-  Primary jetzt zusaetzlich per `MERGE` (IsActive/Reason) auf jede Secondary uebertragen. Auf
-  DEV02 verifiziert (MERGE-Logik gegen eine Mock-Tabelle getestet: Aenderungen korrekt
-  uebernommen, neue Zeilen eingefuegt, nicht in der Primary-Liste enthaltene Zeilen unangetastet
-  gelassen, Escaping von Anfuehrungszeichen in `Reason` korrekt). Echte AlwaysOn-Propagierung
-  selbst ist auf DEV02 nicht End-to-End testbar (keine AG dort vorhanden).
+- **Fix `New-sqmOlaUsrDbBackupJob`**: the AlwaysOn job propagation at the end of the function only
+  checked `JobStatus -eq 'Created'`. On every subsequent run (job already exists on the primary ->
+  `JobStatus = 'Updated'` or `'AlreadyExists'`) the condition became `$false` and propagation to
+  the secondaries **stopped entirely** - secondaries permanently lacked the jobs (or any later
+  changes, e.g. changed schedules) after the very first run. It now propagates on `'Created'`,
+  `'Updated'` AND `'AlreadyExists'` (New-sqmOlaUsrDbBackupJob is idempotent on the secondary via
+  `-Update` anyway).
+- **Fix `Sync-sqmBackupExcludeTable`**: the AlwaysOn propagation only recursively called
+  `Sync-sqmBackupExcludeTable` on each secondary - that only detects NEW/deleted databases
+  locally there, but **never** transfers the `IsActive`/`Reason` values set by the admin on the
+  primary. The DDL trigger (`Register-sqmBackupExcludeTrigger`) only covers
+  CREATE_DATABASE/DROP_DATABASE, also without value propagation. Result: an exclusion decision
+  set via the GUI **never** reached the secondaries, not even via the periodic sync job. Fix:
+  after the structural reconciliation, the primary's current data is now additionally
+  transferred to every secondary via `MERGE` (IsActive/Reason). Verified on DEV02 (MERGE logic
+  tested against a mock table: changes correctly applied, new rows inserted, rows not present in
+  the primary list left untouched, quote escaping in `Reason` correct). Real AlwaysOn propagation
+  itself could not be verified end-to-end on DEV02 (no AG present there).
 
 ## [1.9.2.0] — 2026-07-03
 
-### Erweiterung
+### Enhancement
 
-**`Get-sqmSaLogin`** — jetzt exportiert (war bisher private)
-- Gleicher Grund wie bei `Invoke-sqmLogging` (siehe 1.9.1.0): `sqmPartitionTool`s
-  Job-Erstellungsfunktionen (`New-sqmPartitionExtendJob`,
-  `New-sqmPartitionRetentionJob`) nutzen dieselbe SA-Login-Ermittlung wie die
-  bestehenden `New-sqmOla*Job`-Funktionen statt sie zu duplizieren.
+**`Get-sqmSaLogin`** — now exported (previously private)
+- Same reason as `Invoke-sqmLogging` (see 1.9.1.0): `sqmPartitionTool`'s job-creation functions
+  (`New-sqmPartitionExtendJob`, `New-sqmPartitionRetentionJob`) reuse the same SA login lookup as
+  the existing `New-sqmOla*Job` functions instead of duplicating it.
 
 ## [1.9.1.0] — 2026-07-03
 
-### Erweiterung
+### Enhancement
 
-**`Invoke-sqmLogging`** — jetzt exportiert (war bisher private)
-- Grund: das neue Schwester-Projekt `sqmPartitionTool` (eigenstaendiges Modul,
-  `RequiredModules = @('dbatools','sqmSQLTool')`) soll das etablierte Logging
-  wiederverwenden statt es zu duplizieren. Private Funktionen sind aber auch
-  bei erklaerter Modul-Abhaengigkeit fuer andere Module nicht sichtbar -
-  `Invoke-sqmLogging` musste dafuer in `FunctionsToExport` aufgenommen werden.
-- Kein Verhaltensunterschied fuer sqmSQLTool selbst; reine Sichtbarkeits-
-  Erweiterung fuer Cross-Module-Nutzung.
+**`Invoke-sqmLogging`** — now exported (previously private)
+- Reason: the new sibling project `sqmPartitionTool` (a standalone module,
+  `RequiredModules = @('dbatools','sqmSQLTool')`) is meant to reuse the established logging
+  instead of duplicating it. Private functions aren't visible to other modules even with a
+  declared module dependency - `Invoke-sqmLogging` had to be added to `FunctionsToExport` for
+  that.
+- No behavior change for sqmSQLTool itself; a pure visibility extension for cross-module use.
 
 ## [1.9.0.0] — 2026-07-02
 
-### Neue Funktion
+### New function
 
-**`Compare-sqmAlwaysOnRoles`** — Server-Rollen-Vergleich innerhalb einer AlwaysOn AG
-- AlwaysOn repliziert nur die Datenbanken, nicht `master` — Server-Principals
-  (Logins) *und* deren Server-Rollen-Mitgliedschaft (sysadmin, dbcreator,
-  securityadmin, ab SQL Server 2022 auch benutzerdefinierte Server-Rollen)
-  werden nicht automatisch synchron gehalten. Nach einem Failover kann ein
-  Login auf dem neuen Primary z. B. kein sysadmin mehr sein (oder umgekehrt zu
-  viele Rechte haben), ohne dass das bisher auffiel.
-- Diagnostisches Geschwister von `Compare-sqmAlwaysOnLogins` (dort:
-  Login-Existenz/-Attribute; hier: Rollen-Mitgliedschaft). Gleiches Muster:
-  AG-/Replica-Auflösung, System-Login-Filter, `-Login`/`-ExcludeLogin`,
-  `-OnlyDifferences`, TXT/HTML-Report, `-FailOnDrift` (Windows Event Log,
-  Source `sqmSQLTool`, EventId **9010** — erste freie Nummer, 9001-9009 waren
-  bereits belegt).
-- Statusbewertung: Critical bei fehlendem Login auf einer Replica ODER
-  abweichender `sysadmin`-Mitgliedschaft (höchstprivilegierte Rolle); Warning
-  bei jeder anderen abweichenden Rolle; OK bei identischem Rollen-Set.
-- Datenbank-Rollen sind bewusst nicht Teil des Vergleichs (liegen innerhalb
-  der replizierten Datenbank, damit strukturell kaum divergent).
-- Verifiziert auf DEV02: Rollen-Abfrage liefert korrekte Daten inkl.
-  `is_fixed_role` (SQL Server 2022) und einer real vorhandenen
-  benutzerdefinierten Server-Rolle; "keine AG gefunden"-Pfad sauber getestet
-  (DEV02 hat keine AlwaysOn-Gruppe, echter Mehr-Replica-Vergleich konnte
-  daher nicht End-to-End verifiziert werden).
+**`Compare-sqmAlwaysOnRoles`** — server role comparison within an AlwaysOn AG
+- AlwaysOn only replicates the databases, not `master` - server principals (logins) *and* their
+  server role membership (sysadmin, dbcreator, securityadmin, and from SQL Server 2022 also
+  custom server roles) are not kept in sync automatically. After a failover, a login on the new
+  primary might no longer be sysadmin (or conversely have too many rights) without this having
+  been noticed before.
+- Diagnostic sibling of `Compare-sqmAlwaysOnLogins` (there: login existence/attributes; here:
+  role membership). Same pattern: AG/replica resolution, system login filter,
+  `-Login`/`-ExcludeLogin`, `-OnlyDifferences`, TXT/HTML report, `-FailOnDrift` (Windows Event
+  Log, source `sqmSQLTool`, EventId **9010** - the first free number, 9001-9009 were already
+  taken).
+- Status evaluation: Critical if a login is missing on a replica OR `sysadmin` membership
+  differs (the highest-privilege role); Warning for any other differing role; OK when the role
+  set is identical.
+- Database roles are deliberately not part of the comparison (they live inside the replicated
+  database, so they're structurally unlikely to diverge).
+- Verified on DEV02: role query returns correct data including `is_fixed_role` (SQL Server 2022)
+  and an actually present custom server role; the "no AG found" path was cleanly tested (DEV02
+  has no AlwaysOn group, so a real multi-replica comparison could not be verified end-to-end).
 
 ## [1.8.19.0] — 2026-07-02
 
-### Bugfix (kritisch)
+### Bugfix (critical)
 
-**jobs/Sync-Job.ps1** — Login-Verlust im unbeaufsichtigten Agent-Lauf durch `-Force`
-- Im SQL-Agent-Job rief `Sync-Job.ps1` `Sync-sqmLoginsToAlwaysOn -Force` auf. `-Force`
-  bewirkt bei bereits vorhandenen Logins DROP + CREATE (nicht ALTER, siehe 1.8.18.0).
-  Schlaegt CREATE danach fehl (Policy, Transientes, AD-Latenz o.ae.), ist der Login
-  komplett weg statt nur nicht aktualisiert - im unbeaufsichtigten Agent-Kontext
-  bestaetigt Uwe konkreten Verlust mehrerer Logins; manuelle Laeufe ohne `-Force`
-  blieben unauffaellig.
-- Fix: Agent-Job ruft jetzt `-Force:$false` auf - es werden nur fehlende Logins auf
-  den Secondaries ergaenzt, bestehende bleiben unangetastet (kein DROP mehr moeglich).
-  `-BackupLogins` entfernt (war ohnehin nur mit `-Force` aktiv, siehe
-  `if ($BackupLogins -and $Force)` in Sync-sqmLoginsToAlwaysOn.ps1).
-- Bewusster Trade-off: Passwort-/Attribut-Drift auf bereits vorhandenen Logins wird
-  ueber den automatischen Sync-Job nicht mehr propagiert. Fuer bewusste, manuelle
-  Aktualisierung bestehender Logins bleibt `Sync-sqmLoginsToAlwaysOn -Force
-  -BackupLogins` weiterhin verfuegbar (Funktions-Default fuer `-Force` unveraendert
-  `$true`, nur der Agent-Job wurde umgestellt).
+**jobs/Sync-Job.ps1** — login loss in unattended agent runs due to `-Force`
+- In the SQL Agent job, `Sync-Job.ps1` called `Sync-sqmLoginsToAlwaysOn -Force`. For logins that
+  already exist, `-Force` causes DROP + CREATE (not ALTER, see 1.8.18.0). If CREATE then fails
+  (policy, something transient, AD latency, etc.), the login is gone entirely instead of merely
+  not updated - in the unattended agent context Uwe confirmed the actual loss of several logins;
+  manual runs without `-Force` went unnoticed.
+- Fix: the agent job now calls `-Force:$false` - only logins missing on the secondaries are
+  added, existing ones are left untouched (DROP is no longer possible). `-BackupLogins` removed
+  (it was only active together with `-Force` anyway, see `if ($BackupLogins -and $Force)` in
+  Sync-sqmLoginsToAlwaysOn.ps1).
+- Deliberate trade-off: password/attribute drift on already-existing logins is no longer
+  propagated by the automatic sync job. For deliberate, manual updates of existing logins,
+  `Sync-sqmLoginsToAlwaysOn -Force -BackupLogins` remains available (the function's default for
+  `-Force` is unchanged at `$true`; only the agent job was switched).
 
 ## [1.8.18.0] — 2026-07-02
 
 ### Bugfix
 
-**`Copy-sqmLogins`** — Policy-Deaktivierungsfenster auf den eigentlichen Kopiervorgang verengt
-- Ausgangslage: `Sync-sqmLoginsToAlwaysOn` schlug in FI-TS-Umgebungen mit "Policy 'New
-  Login_Enforce Passwort Policy' has been violated" fehl. `Copy-sqmLogins -Force`
-  (Default `$true`) reicht `-Force` an dbatools `Copy-DbaLogin` durch, das bei bereits
-  vorhandenen Logins DROP + CREATE statt ALTER macht — jeder Sync-Lauf loest damit ein
-  echtes `CREATE_LOGIN`-Event aus, das die PBM-Policy prueft.
-- Die Policy wurde bisher ganz am Anfang deaktiviert (vor Connect, Auth-Mode-Check inkl.
-  moeglichem Dienst-Neustart, AD-Pruefung) und erst ganz am Ende (nach Orphan-Repair)
-  wieder aktiviert — ein unnoetig grosses Zeitfenster fuer eine sicherheitsrelevante
-  Policy.
-- Fix: `_DisablePolicy`/`_EnablePolicy`-Hilfsfunktionen eingefuehrt und eng um den
-  `Copy-DbaLogin`-Aufruf gelegt (Disable unmittelbar davor, Enable in einem dediziert
-  dafuer scope-ten `finally` unmittelbar danach). Connect/Auth-Mode-Check/AD-Pruefung
-  laufen jetzt VOR dem deaktivierten Fenster, Orphan-Repair NACH der Reaktivierung.
-  Verifiziert auf DEV02: Reihenfolge jetzt AuthModeCheck -> PolicyDisable -> CopyLogin
-  -> RepairOrphanUsers (vorher: PolicyDisable ganz zuerst).
-- Kein Verhaltensunterschied bei `-DisablePolicy $false` oder wenn kein `DefaultPolicy`
-  konfiguriert ist (weiterhin "Skipped", keine Deaktivierung).
+**`Copy-sqmLogins`** — narrowed the policy-disable window to just the actual copy call
+- Background: `Sync-sqmLoginsToAlwaysOn` failed in FI-TS environments with "Policy 'New
+  Login_Enforce Passwort Policy' has been violated". `Copy-sqmLogins -Force` (default `$true`)
+  passes `-Force` through to dbatools' `Copy-DbaLogin`, which does DROP + CREATE instead of ALTER
+  for logins that already exist - every sync run therefore triggers a real `CREATE_LOGIN` event,
+  which the PBM policy checks.
+- The policy used to be disabled right at the very start (before connect, auth-mode check
+  including a possible service restart, AD check) and only re-enabled at the very end (after
+  orphan repair) - an unnecessarily large window for a security-relevant policy.
+- Fix: introduced `_DisablePolicy`/`_EnablePolicy` helper functions and wrapped them tightly
+  around the `Copy-DbaLogin` call (disable immediately before, enable in a dedicated `finally`
+  immediately after). Connect/auth-mode check/AD check now run BEFORE the disabled window,
+  orphan repair AFTER re-enabling. Verified on DEV02: order is now AuthModeCheck -> PolicyDisable
+  -> CopyLogin -> RepairOrphanUsers (previously: PolicyDisable first of all).
+- No behavior change with `-DisablePolicy $false` or when no `DefaultPolicy` is configured
+  (still "Skipped", no disabling).
 
 ## [1.8.17.0] — 2026-07-02
 
 ### Bugfix
 
-**Docs/_gen-reference.ps1** — Mojibake-Bug bei Ausfuehrung unter Windows PowerShell 5.1
-- `Get-Content $file -Raw` (ohne `-Encoding UTF8`) las `sqmSQLTool-reference.html`
-  (keine BOM) unter PS 5.1 mit der System-ANSI-Codepage statt UTF-8. Mehrbyte-
-  Zeichen (z. B. "─", Emojis) wurden dadurch falsch decodiert und beim
-  Zurueckschreiben als kaputtes UTF-8 dauerhaft verstuemmelt (Mojibake).
-- Fix: `-Encoding UTF8` ergaenzt. Unter PS 5.1 und PS 7 getestet — reference.html
-  bleibt bei erneuter Generierung inhaltlich unveraendert (143 Funktionen,
-  Cards/Nav/Overview synchron), kein Mojibake mehr.
-- `sqmSQLTool-reference.html` selbst war bereits aktuell (unsere heutigen Docstring-
-  Aenderungen betrafen nur `.DESCRIPTION`/`.PARAMETER`, die dieser Generator nicht
-  ausliest — nur `.SYNOPSIS` und `.EXAMPLE` fliessen in die Referenz ein).
+**Docs/_gen-reference.ps1** — mojibake bug when run under Windows PowerShell 5.1
+- `Get-Content $file -Raw` (without `-Encoding UTF8`) read `sqmSQLTool-reference.html` (no BOM)
+  under PS 5.1 using the system ANSI code page instead of UTF-8. Multi-byte characters (e.g.
+  "─", emoji) were thereby decoded incorrectly and permanently corrupted as broken UTF-8
+  (mojibake) when written back.
+- Fix: added `-Encoding UTF8`. Tested under PS 5.1 and PS 7 - reference.html stays unchanged in
+  content on regeneration (143 functions, cards/nav/overview in sync), no more mojibake.
+- `sqmSQLTool-reference.html` itself was already up to date (today's docstring changes only
+  touched `.DESCRIPTION`/`.PARAMETER`, which this generator doesn't read - only `.SYNOPSIS` and
+  `.EXAMPLE` flow into the reference).
 
 ## [1.8.16.0] — 2026-07-02
 
-### Doku
+### Docs
 
-**Docs/sqmSQLTool_Anwender-Kurzanleitung.docx** — neues Anwenderhandbuch
-- Eigenstaendiges Dokument fuer Endanwender von `Show-sqmBackupExcludeForm`
-  (nicht Administratoren): Programm oeffnen, Oberflaeche/Spalten erklaert,
-  Datenbank aus-/einschliessen, "Alle aktiv/inaktiv", der neue Laengen-
-  Warnhinweis aus 1.8.14.0, verwaiste Eintraege, wichtige Hinweise.
-- Screenshot-Platzhalter (gestrichelter Rahmen) im Abschnitt "Die
-  Oberflaeche" — wird manuell ergaenzt.
+**Docs/sqmSQLTool_Anwender-Kurzanleitung.docx** — new end-user guide
+- A standalone document for end users of `Show-sqmBackupExcludeForm` (not administrators):
+  opening the program, the UI/columns explained, including/excluding a database, "all
+  active/inactive", the new length warning from 1.8.14.0, orphaned entries, important notes.
+- Screenshot placeholder (dashed border) in the "The interface" section - to be filled in
+  manually.
 
 ## [1.8.15.0] — 2026-07-02
 
-### Doku
+### Docs
 
-**Docs/sqmSQLTool_Admin-Kurzanleitung.docx** — Einfache Version fuer Teil 1 ergaenzt
-- Bisher beschrieb "Teil 1: Backup-Ausschlussliste einrichten" ausschliesslich die
-  vier manuellen Einzelschritte (Sync, Berechtigung, GUI, Trigger).
-- Neue Box "Einfache Version (empfohlen, ab v1.8.8)" vor der Detailanleitung: ein
-  einziger Aufruf `New-sqmOlaUsrDbBackupJob -SqlInstance "SQL01" -Full -Log
-  -UseExcludeTable` erledigt Schritt 1 (Sync) und Schritt 4 (DDL-Trigger) automatisch.
-  Schritt 2 (Gruppenberechtigung) und Schritt 3 (laufende GUI-Pflege) bleiben
-  eigenstaendig. Die Detail-Ueberschrift wurde entsprechend zu "Im Detail: die vier
-  Einzelschritte (manuell, optional)" ergaenzt.
+**Docs/sqmSQLTool_Admin-Kurzanleitung.docx** — added a simple version for Part 1
+- So far, "Part 1: setting up the backup exclusion list" only described the four manual
+  individual steps (sync, permission, GUI, trigger).
+- New box "Simple version (recommended, from v1.8.8)" before the detailed instructions: a single
+  call `New-sqmOlaUsrDbBackupJob -SqlInstance "SQL01" -Full -Log -UseExcludeTable` handles step 1
+  (sync) and step 4 (DDL trigger) automatically. Step 2 (group permission) and step 3 (ongoing
+  GUI maintenance) remain separate. The detail heading was updated accordingly to "In detail: the
+  four individual steps (manual, optional)".
 
 ## [1.8.14.0] — 2026-07-02
 
-### Erweiterung
+### Enhancement
 
-**`Show-sqmBackupExcludeForm`** — Warnanzeige fuer Laenge der Exclusion-Liste
-- Neuer Statusstreifen unter der Werkzeugleiste zeigt live die Anzahl abgewaehlter
-  (IsActive=0) Datenbanken und die daraus resultierende Zeichenlaenge der
-  `-DatabaseName`-Exclusion-Liste.
-- Grund: Ola's `DatabaseBackup` gibt `@Databases` als Teil einer `RAISERROR('%s',...)`-
-  Zeile aus; der `%s`-Parameter wird bei 2047 Zeichen gekappt, wodurch nachfolgende
-  echte Fehlermeldungen im Job-Verlauf verschwinden koennen (siehe 1.8.11.0-Vorfall
-  auf BLBNBGFATDBA3).
-- Ab 1500 Zeichen gelbe Warnung, ab 1900 Zeichen rote Fehleranzeige. Aktualisiert
-  sich beim Laden und bei jedem Checkbox-Toggle.
+**`Show-sqmBackupExcludeForm`** — warning display for the length of the exclusion list
+- New status strip below the toolbar shows live the number of deselected (IsActive=0) databases
+  and the resulting character length of the `-DatabaseName` exclusion list.
+- Reason: Ola's `DatabaseBackup` outputs `@Databases` as part of a `RAISERROR('%s',...)` line;
+  the `%s` parameter is truncated at 2047 characters, which can make subsequent real error
+  messages disappear from the job history (see the 1.8.11.0 incident on BLBNBGFATDBA3).
+- Yellow warning from 1500 characters, red error display from 1900 characters. Updates on load
+  and on every checkbox toggle.
 
 ## [1.8.13.0] — 2026-07-02
 
-### Bugfix (kritisch)
+### Bugfix (critical)
 
-**`New-sqmOlaUsrDbBackupJob`** — IsActive-Polaritaet in der Exclude-Abfrage invertiert
-- Die in v1.8.11.0 gefixte Abfrage filterte auf `e.IsActive = 1`, um Ausschluesse zu
-  bilden. Tatsaechliche Bedeutung von `IsActive` in `sqm_BackupExclude`: `IsActive=1`
-  heisst "diese Datenbank soll gesichert werden" (Default fuer neu entdeckte
-  Datenbanken, siehe `Sync-sqmBackupExcludeTable`), `IsActive=0` heisst "nicht sichern".
-  Mit `WHERE IsActive = 1` wurden also genau die zu sichernden Datenbanken
-  ausgeschlossen und die explizit stillgelegten (`IsActive=0`) gesichert — Polaritaet
-  komplett invertiert.
-- Fix: Filter auf `e.IsActive = 0` korrigiert.
-- Verifiziert auf DEV02: echter FULL-Lauf sichert jetzt exakt die 9 Datenbanken mit
-  `IsActive=1` (`AlwaysOnTest, amazon, DeadlockCollector, dtcSN, OperationsManagerDW,
-  pdRessourcen, ReportServerTempDB, Solutioninfo, SolutioninfoSTA`) und uebersprang
-  korrekt die 3 mit `IsActive=0` (`SSISDB, TestDB, ReportServer`).
-- `Sync-sqmBackupExcludeTable` (Default `IsActive=1` fuer neue Datenbanken) war von
-  Anfang an korrekt und musste NICHT geaendert werden — der Fehler lag ausschliesslich
-  in der Leserichtung dieser einen Abfrage.
+**`New-sqmOlaUsrDbBackupJob`** — IsActive polarity in the exclude query was inverted
+- The query fixed in v1.8.11.0 filtered on `e.IsActive = 1` to build exclusions. The actual
+  meaning of `IsActive` in `sqm_BackupExclude`: `IsActive=1` means "this database should be
+  backed up" (default for newly discovered databases, see `Sync-sqmBackupExcludeTable`),
+  `IsActive=0` means "don't back up". So `WHERE IsActive = 1` excluded exactly the databases
+  that should be backed up and backed up the ones explicitly deactivated (`IsActive=0`) -
+  polarity completely inverted.
+- Fix: filter corrected to `e.IsActive = 0`.
+- Verified on DEV02: a real FULL run now backs up exactly the 9 databases with `IsActive=1`
+  (`AlwaysOnTest, amazon, DeadlockCollector, dtcSN, OperationsManagerDW, pdRessourcen,
+  ReportServerTempDB, Solutioninfo, SolutioninfoSTA`) and correctly skipped the 3 with
+  `IsActive=0` (`SSISDB, TestDB, ReportServer`).
+- `Sync-sqmBackupExcludeTable` (default `IsActive=1` for new databases) was correct from the
+  start and did NOT need to be changed - the bug was solely in the read direction of this one
+  query.
 
 ## [1.8.12.0] — 2026-07-02
 
 ### Bugfix
 
-**`New-sqmOlaUsrDbBackupJob`** — expliziter `-BackupDirectory` wurde ueberschrieben
-- Bisher wurde an JEDEN ermittelten Backup-Pfad `\Usr-db` angehaengt, auch wenn
-  der Aufrufer `-BackupDirectory` explizit als vollstaendigen Zielpfad uebergeben
-  hat. Fix: `\Usr-db` wird nur noch an automatisch ermittelte Pfade (Registry /
-  `sqlSrv.BackupDirectory` / Default) angehaengt; ein explizit gesetzter
-  `-BackupDirectory` wird unveraendert als Zielpfad verwendet.
-- Verifiziert auf DEV02: `-BackupDirectory "C:\Temp\ExplicitTestPath"` ergibt
-  exakt diesen Pfad ohne Suffix.
+**`New-sqmOlaUsrDbBackupJob`** — an explicit `-BackupDirectory` was being overwritten
+- Previously, `\Usr-db` was appended to EVERY resolved backup path, even when the caller had
+  explicitly passed `-BackupDirectory` as a complete target path. Fix: `\Usr-db` is now only
+  appended to automatically resolved paths (registry / `sqlSrv.BackupDirectory` / default); an
+  explicitly set `-BackupDirectory` is used unchanged as the target path.
+- Verified on DEV02: `-BackupDirectory "C:\Temp\ExplicitTestPath"` results in exactly this path
+  without a suffix.
 
 ## [1.8.11.0] — 2026-07-02
 
 ### Bugfix
 
-**`New-sqmOlaUsrDbBackupJob`** — Exclude-Prefix `!` war nie gueltige Ola-Syntax
-- Ursache eines echten Produktionsvorfalls (BLBNBGFATDBA3, `DatabaseBackup`-Job
-  schlug fehl): der in v1.8.6.0 eingefuehrte `!`-Prefix fuer Exclusions
-  (`USER_DATABASES,!db1,!db2`) wird von Ola Hallengrens `MaintenanceSolution.sql`
-  nirgends ausgewertet — dort wird ausschliesslich `-db1` als Exclude-Marker
-  erkannt (`DatabaseItem LIKE '-%'`). Alle `!`-Eintraege wurden dadurch als
-  positive (nicht existierende) Datenbanknamen interpretiert: Exclusions griffen
-  nie, und die daraus resultierende lange "do not exist"-Warnliste sprengte das
-  2047-Zeichen-Limit von `RAISERROR('%s', ...)`, wodurch die eigentliche
-  Fehlermeldung im Job-Verlauf unsichtbar wurde.
-- Fix: Prefix auf `-` korrigiert. Zusaetzlich Filter `EXISTS (SELECT 1 FROM
-  sys.databases ...)`, sodass nur Datenbanken, die auf der jeweiligen Instanz
-  tatsaechlich existieren, in die Exclude-Liste aufgenommen werden — verhindert
-  erneutes Anwachsen der "do not exist"-Liste bei einer instanzuebergreifend
-  gepflegten `sqm_BackupExclude`-Tabelle.
-- Verifiziert auf DEV02: kompletter FULL-Backup-Lauf ueber die neu generierte
-  Prozedur, 0 "do not exist"-Meldungen, alle aktiven Exclusions korrekt
-  uebersprungen.
+**`New-sqmOlaUsrDbBackupJob`** — exclude prefix `!` was never valid Ola syntax
+- Root cause of a real production incident (BLBNBGFATDBA3, `DatabaseBackup` job failed): the
+  `!` prefix for exclusions introduced in v1.8.6.0 (`USER_DATABASES,!db1,!db2`) is never
+  evaluated anywhere by Ola Hallengren's `MaintenanceSolution.sql` - it only recognizes `-db1`
+  as an exclude marker (`DatabaseItem LIKE '-%'`). All `!` entries were therefore interpreted as
+  positive (non-existent) database names: exclusions never took effect, and the resulting long
+  "do not exist" warning list blew past the 2047-character limit of `RAISERROR('%s', ...)`,
+  which made the actual error message invisible in the job history.
+- Fix: prefix corrected to `-`. Additionally added a filter `EXISTS (SELECT 1 FROM
+  sys.databases ...)`, so only databases that actually exist on the respective instance are
+  added to the exclude list - prevents the "do not exist" list from growing again in a
+  `sqm_BackupExclude` table maintained across instances.
+- Verified on DEV02: a complete FULL backup run through the newly generated procedure, 0 "do not
+  exist" messages, all active exclusions correctly skipped.
 
 ## [1.8.10.0] — 2026-07-02
 
 ### Bugfix
 
-**`Show-sqmBackupExcludeForm`** — Job-Details im Info-Panel wieder korrekt
-- `Load-JobInfo` parste `@Databases`, `@Directory` etc. bisher aus dem Step-Command.
-  Nach Umstellung auf Prozedur-Architektur (v1.8.7) enthaelt der Step nur noch
-  `EXEC master.dbo.[sqm_Run_...]` — die Parameter stecken im Prozedurkoerper.
-- Fix: Proc-Name per Regex aus Step-Command extrahieren, dann
-  `OBJECT_DEFINITION()` abfragen und daraus parsen. Fallback auf Step-Command
-  fuer aeltere Jobs ohne Prozedur.
-- `@Databases` im ExcludeTable-Modus wird aus dem `DECLARE`-Statement gelesen
-  (statt aus `@Databases = @Databases` im EXECUTE-Aufruf).
+**`Show-sqmBackupExcludeForm`** — job details in the info panel correct again
+- `Load-JobInfo` used to parse `@Databases`, `@Directory` etc. from the step command. After the
+  switch to the procedure architecture (v1.8.7) the step only contains
+  `EXEC master.dbo.[sqm_Run_...]` - the parameters live in the procedure body.
+- Fix: extract the proc name from the step command via regex, then query
+  `OBJECT_DEFINITION()` and parse it from there. Falls back to the step command for older jobs
+  without a procedure.
+- `@Databases` in ExcludeTable mode is now read from the `DECLARE` statement (instead of from
+  `@Databases = @Databases` in the EXECUTE call).
 
 ## [1.8.9.0] — 2026-07-01
 
 ### Bugfix
 
-**`New-sqmOlaUsrDbBackupJob`** — Drei Laufzeitfehler behoben
-- `CREATE/DROP PROCEDURE master.dbo.[name]` war ungueltiges SQL (Database-Prefix
-  in DDL-Statements nicht erlaubt). Fix: Prefix entfernt; `-Database master` auf
-  der Invoke-DbaQuery-Verbindung setzt den Kontext korrekt.
-- `Set-DbaAgentJobStep -StepId` existiert im dbatools-Parameter-Set nicht.
-  Fix: `-StepName` verwendet (Backup-Jobs: `"DatabaseBackup $StepSuffix"`,
-  Sync-Job: `'Sync sqm_BackupExclude'`).
+**`New-sqmOlaUsrDbBackupJob`** — fixed three runtime errors
+- `CREATE/DROP PROCEDURE master.dbo.[name]` was invalid SQL (database prefix not allowed in DDL
+  statements). Fix: prefix removed; `-Database master` on the Invoke-DbaQuery connection sets
+  the context correctly.
+- `Set-DbaAgentJobStep -StepId` doesn't exist in the dbatools parameter set. Fix: uses
+  `-StepName` (backup jobs: `"DatabaseBackup $StepSuffix"`, sync job:
+  `'Sync sqm_BackupExclude'`).
 
 ## [1.8.8.0] — 2026-07-01
 
-### Erweiterungen
+### Enhancements
 
-**`New-sqmOlaUsrDbBackupJob`** — Neue Defaults + Auto-Setup bei -UseExcludeTable
-- Standard-Aufruf ohne -Full/-Diff/-Log legt jetzt automatisch FULL + LOG an
-  (statt Fehler). Info-Meldung im Log.
-- Default FULL: 21:15 Uhr, EveryDay (vorher 20:00 / Sunday).
-- Default LOG: alle 15 Minuten, EveryDay (vorher einmalig um 00:00).
-- Mit -UseExcludeTable (nur auf Primary): ruft automatisch
-  Sync-sqmBackupExcludeTable + Register-sqmBackupExcludeTrigger auf.
-  Admin-Setup reduziert sich auf einen einzigen Aufruf.
+**`New-sqmOlaUsrDbBackupJob`** — new defaults + auto-setup with -UseExcludeTable
+- The default call without -Full/-Diff/-Log now automatically creates FULL + LOG (instead of an
+  error). Info message in the log.
+- Default FULL: 21:15, EveryDay (previously 20:00 / Sunday).
+- Default LOG: every 15 minutes, EveryDay (previously once at 00:00).
+- With -UseExcludeTable (primary only): automatically calls Sync-sqmBackupExcludeTable +
+  Register-sqmBackupExcludeTrigger. Admin setup is reduced to a single call.
 
 ## [1.8.7.0] — 2026-07-01
 
-### Erweiterung
+### Enhancement
 
-**`New-sqmOlaUsrDbBackupJob`** — Hilfsprozedur in master statt Inline-T-SQL im Job-Step
-- Umstellung: Job-Step enthaelt nur noch `EXEC master.dbo.[sqm_Run_{JobName}]`.
-  Der eigentliche Backup-Code wird als gespeicherte Prozedur in master angelegt.
-  Proc-Name wird aus dem Job-Namen abgeleitet (Sonderzeichen → Unterstrich).
-  Ergebnis im Agent-Fenster: Job-Step ist auf einen Blick lesbar.
-  Prozedur wird bei jedem Aufruf (auch `-Update`) frisch DROP+CREATE'd.
-  Bei AlwaysOn-Propagation erhalten die Secondaries ebenfalls ihre eigene Proc.
+**`New-sqmOlaUsrDbBackupJob`** — helper procedure in master instead of inline T-SQL in the job step
+- Change: the job step now only contains `EXEC master.dbo.[sqm_Run_{JobName}]`. The actual
+  backup code is created as a stored procedure in master. The proc name is derived from the job
+  name (special characters → underscore). Result in the Agent window: the job step is readable
+  at a glance. The procedure is freshly DROP+CREATE'd on every call (including `-Update`). On
+  AlwaysOn propagation, the secondaries also get their own proc.
 
 ## [1.8.6.0] — 2026-07-01
 
 ### Bugfix
 
-**`New-sqmOlaUsrDbBackupJob`** — UseExcludeTable Job-Step-SQL korrigiert
-- Fix: Job-Step verwendete `@ExcludeDatabases` als Ola-Parameter — dieser existiert nicht.
-  Ola's `DatabaseBackup` kennt nur `@Databases` mit `!`-Prefix-Syntax fuer Ausschluesse
-  (`USER_DATABASES,!db1,!db2`). Dynamisches SQL via `sp_executesql` entfernt;
-  Step baut jetzt direkt `@Databases = @Databases + ',' + @Exclusions` zusammen.
-- Fix: `FOR XML PATH ... .value()` im Agent-Job-Step schlug mit QUOTED_IDENTIFIER-Fehler
-  fehl wenn die Session-Option nicht gesetzt war. `SET QUOTED_IDENTIFIER ON;` an den
-  Anfang des Step-SQL gesetzt.
+**`New-sqmOlaUsrDbBackupJob`** — fixed UseExcludeTable job step SQL
+- Fix: the job step used `@ExcludeDatabases` as an Ola parameter - this doesn't exist. Ola's
+  `DatabaseBackup` only knows `@Databases` with `!`-prefix syntax for exclusions
+  (`USER_DATABASES,!db1,!db2`). Removed dynamic SQL via `sp_executesql`; the step now directly
+  builds `@Databases = @Databases + ',' + @Exclusions`.
+- Fix: `FOR XML PATH ... .value()` in the agent job step failed with a QUOTED_IDENTIFIER error
+  when the session option wasn't set. Added `SET QUOTED_IDENTIFIER ON;` at the start of the step
+  SQL.
 
 ## [1.8.5.0] — 2026-07-01
 
-### Erweiterungen
+### Enhancements
 
 **`New-sqmOlaUsrDbBackupJob`**
-- Neu: Parameter `-CreateSyncJob` (`[bool]`, Default `$true`).
-  Wenn `-UseExcludeTable` aktiv ist, wird automatisch ein SQL Agent Job
-  (`sqm BackupExclude - SYNC` bzw. `FITS BackupExclude - SYNC` in FI-TS-Umgebungen) angelegt.
-  Der Job laeuft alle 30 Minuten via `pwsh`-CmdExec-Step und ruft
-  `Sync-sqmBackupExcludeTable -SqlInstance '.'` auf. Stellt sicher, dass `IsActive`-Aenderungen
-  aus `Show-sqmBackupExcludeForm` ohne manuellen Eingriff auf alle AG-Secondaries propagiert werden.
-  Der Job wird bei `-Update` aktualisiert; bei `-CreateSyncJob $false` wird er nicht angelegt.
-  Job-Name leitet sich aus dem FULL-Job-Praefix ab (`FITS *` → FITS, sonst Standard).
-  AG-Propagation: Secundaries erhalten ebenfalls den Sync-Job (rekursiver Aufruf mit gesetztem
-  `CreateSyncJob = $CreateSyncJob`).
+- New: parameter `-CreateSyncJob` (`[bool]`, default `$true`).
+  When `-UseExcludeTable` is active, a SQL Agent job is automatically created
+  (`sqm BackupExclude - SYNC` or `FITS BackupExclude - SYNC` in FI-TS environments). The job runs
+  every 30 minutes via a `pwsh` CmdExec step and calls `Sync-sqmBackupExcludeTable -SqlInstance
+  '.'`. Ensures `IsActive` changes from `Show-sqmBackupExcludeForm` are propagated to all AG
+  secondaries without manual intervention. The job is updated on `-Update`; with
+  `-CreateSyncJob $false` it is not created. Job name is derived from the FULL job prefix
+  (`FITS *` → FITS, otherwise standard). AG propagation: secondaries also get the sync job
+  (recursive call with `CreateSyncJob = $CreateSyncJob` set).
 
-**`New-sqmOlaUsrDbBackupJob`** — Konfigurationsfehler behoben (v1.8.4.0)
-- Fix: `Set-sqmConfig` schrieb zuvor die gesamte `$globalConfig` in `config.json`, wodurch
-  auf FI-TS-Maschinen die OlaHH-Jobnamen aus einer frueheren Non-FITS-Session die FITS-Namen
-  ueberschrieben. Fix (A): `Set-sqmConfig` speichert nur explizit uebergebene Keys (Merge).
-  Fix (B): In `sqmSQLTool.psm1` wird `config.json` vor dem FI-TS-Block geladen —
-  FI-TS-Override gewinnt immer.
+**`New-sqmOlaUsrDbBackupJob`** — fixed a configuration bug (v1.8.4.0)
+- Fix: `Set-sqmConfig` previously wrote the entire `$globalConfig` to `config.json`, which meant
+  that on FI-TS machines the OlaHH job names from an earlier non-FITS session overwrote the FITS
+  names. Fix (A): `Set-sqmConfig` now only saves explicitly passed keys (merge). Fix (B): in
+  `sqmSQLTool.psm1`, `config.json` is loaded before the FI-TS block - the FI-TS override always
+  wins.
 
 ## [1.8.3.0] — 2026-06-29
 
-### Bugfixes & Erweiterungen
+### Bugfixes & enhancements
 
 **`Sync-sqmLoginsToAlwaysOn`**
-- Fix: Primary-Replica-Erkennung schlaegt auf Secondary-Instanzen nicht mehr fehl.
-  `sys.dm_hadr_availability_replica_states.role_desc` liefert NULL/RESOLVING wenn von
-  einer Secondary abgefragt — Umstieg auf `sys.dm_hadr_availability_group_states.primary_replica`,
-  das auf jeder Replica den aktuellen Primary enthaelt.
-- Fix: `Write-EventLog`-Fehler (AccessDenied) leckte auf die Konsole, weil der Setter eine
-  non-terminating Exception wirft, die `catch { }` nicht abfaengt.
-  `-ErrorAction SilentlyContinue` ergaenzt (EventId 9002 / 9003).
+- Fix: primary replica detection no longer fails when run on secondary instances.
+  `sys.dm_hadr_availability_replica_states.role_desc` returns NULL/RESOLVING when queried from a
+  secondary - switched to `sys.dm_hadr_availability_group_states.primary_replica`, which contains
+  the current primary on every replica.
+- Fix: a `Write-EventLog` error (AccessDenied) leaked to the console because the setter throws a
+  non-terminating exception that `catch { }` doesn't catch. Added `-ErrorAction SilentlyContinue`
+  (EventId 9002 / 9003).
 
 **`Invoke-sqmCollationChange`**
-- Fix: `PropertyAssignmentException` bei `ProcessStartInfo.CreateNoNewWindow = $true` entfernt.
-  Die Property kann nicht gesetzt werden wenn `UseShellExecute` noch nicht evaluiert wurde.
-  Redundant: bei `UseShellExecute = $false` + `RedirectStandard* = $true` entsteht ohnehin
-  kein Konsolenfenster.
+- Fix: removed a `PropertyAssignmentException` on `ProcessStartInfo.CreateNoNewWindow = $true`.
+  The property can't be set when `UseShellExecute` hasn't been evaluated yet. Redundant anyway:
+  with `UseShellExecute = $false` + `RedirectStandard* = $true` no console window appears in the
+  first place.
 
 **`Get-sqmSQLInstanceCheck`**
-- Neu: Check **Instance Collation** (Status `Info`) — meldet `server.Collation` in jedem Lauf.
-- Neu: Check **Database Collation vs. Instance** (nur mit `-Detailed`) — listet alle
-  Benutzerdatenbanken, deren Collation von der Instanz-Collation abweicht, als `Warning`.
+- New: check **Instance Collation** (status `Info`) - reports `server.Collation` on every run.
+- New: check **Database Collation vs. Instance** (only with `-Detailed`) - lists all user
+  databases whose collation differs from the instance collation as `Warning`.
 
 **`Compare-sqmServerConfiguration`**
-- Neu: **Collation (Instance)** wird jetzt immer im Report ausgegeben (`Category = "Collation"`),
-  nicht nur bei Abweichung — wichtig fuer Migrationschecks.
+- New: **Collation (Instance)** is now always output in the report (`Category = "Collation"`),
+  not only on a mismatch - important for migration checks.
 
 ## [1.8.2.0] — 2026-06-26
 
-### ✨ Temporäre Sysadmin-Rechte: AD-Login-Anlage, Cleanup & AlwaysOn
+### ✨ Temporary sysadmin rights: AD login creation, cleanup & AlwaysOn
 
-Erweiterung von `Grant-sqmTemporarySysadmin` / `Invoke-sqmTempSysadminAction`:
+Extension of `Grant-sqmTemporarySysadmin` / `Invoke-sqmTempSysadminAction`:
 
-- **Login wird bei Bedarf angelegt** — fehlt der Login, legt das Tool ihn per
-  `CREATE LOGIN [DOMAIN\Konto] FROM WINDOWS` an (statt wie bisher abzubrechen).
-- **Nur AD-Logins** — `Grant-sqmTemporarySysadmin` weist Nicht-Windows-Logins ab;
-  Existenzprüfung auf `type IN ('U','G')` beschränkt (keine SQL-/Zertifikats-Logins).
-- **PBM-Policy-Handling beim Anlegen** — ist `DefaultPolicy` konfiguriert, wird diese
-  Policy vor dem Anlegen via `Set-sqmSqlPolicyState -State Disable` deaktiviert und
-  danach wieder aktiviert (steuerbar über `-DisablePolicy`, Default `$true`).
-- **Selbst angelegter Login wird nach Ablauf entfernt** — neuer Schalter `-RemoveLogin`
-  in `Invoke-sqmTempSysadminAction`: beim Entzug `DROP LOGIN`, aber als Sicherheitsnetz
-  **nur**, wenn der Login an keiner weiteren festen Serverrolle (außer `public`) hängt.
-  Bereits zuvor vorhandene Logins bleiben grundsätzlich bestehen.
-- **AlwaysOn-fähig (Default)** — ist die Instanz Teil einer AG, werden Login-Anlage,
-  sysadmin-Vergabe und Entzug/Cleanup auf **allen Replicas** ausgeführt. Jede Replica
-  erhält eigene, lokal arbeitende, selbstlöschende Jobs → failover-robust. Abschaltbar
-  über `-PrimaryOnly`; einzelne Replicas via `-SkipSecondaryServers` überspringbar.
-- `Grant-sqmTemporarySysadmin` liefert jetzt **ein Ergebnisobjekt je Replica**
-  (inkl. `LoginExisted`); neue Event-IDs 9003 (Login angelegt), 9004 (Drop übersprungen),
-  9005 (Login entfernt).
+- **Login is created if needed** — if the login is missing, the tool creates it via
+  `CREATE LOGIN [DOMAIN\Account] FROM WINDOWS` (instead of aborting as before).
+- **AD logins only** — `Grant-sqmTemporarySysadmin` rejects non-Windows logins; the existence
+  check is restricted to `type IN ('U','G')` (no SQL/certificate logins).
+- **PBM policy handling on creation** — if `DefaultPolicy` is configured, this policy is disabled
+  via `Set-sqmSqlPolicyState -State Disable` before creation and re-enabled afterwards
+  (controllable via `-DisablePolicy`, default `$true`).
+- **A self-created login is removed after expiry** — new switch `-RemoveLogin` in
+  `Invoke-sqmTempSysadminAction`: on revocation, `DROP LOGIN`, but as a safety net **only** if the
+  login isn't attached to any other fixed server role (other than `public`). Logins that already
+  existed before are always kept.
+- **AlwaysOn-capable (default)** — if the instance is part of an AG, login creation, sysadmin
+  grant, and revocation/cleanup are performed on **all replicas**. Each replica gets its own,
+  locally running, self-deleting jobs → failover-robust. Can be disabled via `-PrimaryOnly`;
+  individual replicas can be skipped via `-SkipSecondaryServers`.
+- `Grant-sqmTemporarySysadmin` now returns **one result object per replica** (including
+  `LoginExisted`); new event IDs 9003 (login created), 9004 (drop skipped), 9005 (login removed).
 
 ## [1.8.1.0] — 2026-06-26
 
-### ✨ Temporäre Sysadmin-Rechte mit automatischem Entzug
+### ✨ Temporary sysadmin rights with automatic revocation
 
-Für Patch-/Installationssituationen: ein Login zeitlich befristet zum **sysadmin** machen,
-danach automatischer Entzug über einen **selbstlöschenden SQL-Agent-Job**.
+For patching/installation situations: temporarily make a login **sysadmin**, then automatically
+revoke it via a **self-deleting SQL Agent job**.
 
-- **`Grant-sqmTemporarySysadmin`** — vergibt sysadmin für `-Days` Tage. Ohne `-StartDate`
-  **sofort** (inline) + Revoke-Job auf heute+X; mit `-StartDate` ein Grant-Job auf das Startdatum
-  und ein Revoke-Job auf Startdatum+X. Optionale **`-TicketNumber`** (Auftragsnummer) fürs Log.
-  `ConfirmImpact='High'` + `-WhatIf`.
-- **`Invoke-sqmTempSysadminAction`** — führt `ALTER SERVER ROLE [sysadmin] ADD|DROP MEMBER`
-  aus, protokolliert in **Modul-Logfile + Windows Event Log** (Source `sqmSQLTool`, inkl.
-  Auftragsnummer) und **löscht bei Erfolg den aufrufenden Job** (`sp_delete_job`). Bei Fehler
-  bleibt der Job (als fehlgeschlagen) erhalten. Auch für **manuellen vorzeitigen Entzug** nutzbar.
-- One-Time-Jobs (`sp_add_schedule @freq_type=1`); Job-Steps rufen das Modul per `Import-Module sqmSQLTool`
-  (Modulname, kein hardcodierter Pfad) auf. Revoke-Job läuft unter dem SQL-Agent-Dienstkonto.
+- **`Grant-sqmTemporarySysadmin`** — grants sysadmin for `-Days` days. Without `-StartDate`
+  **immediately** (inline) + a revoke job scheduled for today+X; with `-StartDate` a grant job on
+  the start date and a revoke job on start date+X. Optional **`-TicketNumber`** (work order
+  number) for the log. `ConfirmImpact='High'` + `-WhatIf`.
+- **`Invoke-sqmTempSysadminAction`** — runs `ALTER SERVER ROLE [sysadmin] ADD|DROP MEMBER`, logs
+  to the **module log file + Windows Event Log** (source `sqmSQLTool`, including the work order
+  number) and **deletes the calling job on success** (`sp_delete_job`). On error the job is kept
+  (as failed). Also usable for **manual early revocation**.
+- One-time jobs (`sp_add_schedule @freq_type=1`); job steps call the module via
+  `Import-Module sqmSQLTool` (module name, no hardcoded path). The revoke job runs under the SQL
+  Agent service account.
 
 ## [1.8.0.0] — 2026-06-26
 
-### ✨ Quellenbewusstes Auto-Update beim Import
+### ✨ Source-aware auto-update on import
 
-Das Auto-Update (`AutoUpdate=$true`) erkennt eine neue Version und aktualisiert jetzt
-**automatisch von der zuletzt verwendeten Installationsquelle** — für **alle** Quellen
-(bisher nur UNC automatisch, PSGallery/GitHub nur Hinweis):
+The auto-update (`AutoUpdate=$true`) now detects a newer version and updates **automatically
+from the last-used installation source** - for **all** sources (previously only UNC updated
+automatically, PSGallery/GitHub only gave a hint):
 
-- **Quelle wird gemerkt**: `Install.ps1` speichert nach der Installation Typ + Pfad der Quelle
-  (`Set-sqmConfig -InstallSourceType/-InstallSourcePath`). PSGallery-Installs werden zur Laufzeit
-  via `Get-InstalledModule` erkannt (neue private `Get-sqmInstallSource`).
-- **Quellenlogik „letzte Quelle, sonst Fallback"**: `Test-sqmModuleUpdate` prüft zuerst die letzte
-  Quelle; ist sie unbekannt/nicht erreichbar, greift die Kette PSGallery→GitHub→UNC.
-- **Automatisches Update je Quelle**: `Update-sqmModule` ist ein Dispatcher —
-  PSGallery → `Install-Module -Force` (Scope automatisch AllUsers/CurrentUser),
-  GitHub → Release-ZIP laden + entpacken (neue `Update-sqmFromGitHub`),
-  UNC/LocalDir → Datei-Copy mit Backup (gemeinsame `Copy-sqmModuleFiles`).
-- **Throttle**: On-Import-Check max. alle `UpdateCheckIntervalHours` (Default 24) via Marker-Datei —
-  keine Netz-Calls bei jedem Import. Skip weiterhin über `SQMSQLTOOL_SKIP_AUTO_UPDATE=1`.
-- Robust: Fehler beim Update (z. B. AllUsers ohne Adminrechte) brechen den Import **nie** ab.
-- Neue Config-Keys: `InstallSourceType`, `InstallSourcePath`, `UpdateCheckIntervalHours`.
+- **Source is remembered**: after installation, `Install.ps1` saves the source type + path
+  (`Set-sqmConfig -InstallSourceType/-InstallSourcePath`). PSGallery installs are detected at
+  runtime via `Get-InstalledModule` (new private `Get-sqmInstallSource`).
+- **"Last source, else fallback" logic**: `Test-sqmModuleUpdate` first checks the last source; if
+  it's unknown/unreachable, the chain PSGallery→GitHub→UNC applies.
+- **Automatic update per source**: `Update-sqmModule` is a dispatcher - PSGallery →
+  `Install-Module -Force` (scope automatically AllUsers/CurrentUser), GitHub → download + unpack
+  release ZIP (new `Update-sqmFromGitHub`), UNC/LocalDir → file copy with backup (shared
+  `Copy-sqmModuleFiles`).
+- **Throttle**: the on-import check runs at most every `UpdateCheckIntervalHours` (default 24)
+  via a marker file - no network calls on every import. Can still be skipped via
+  `SQMSQLTOOL_SKIP_AUTO_UPDATE=1`.
+- Robust: an update error (e.g. AllUsers without admin rights) **never** aborts the import.
+- New config keys: `InstallSourceType`, `InstallSourcePath`, `UpdateCheckIntervalHours`.
 
 ## [1.7.9.0] — 2026-06-26
 
-### ✨ Get-sqmADGroupMembersRecursive — echter Anzeigename
+### ✨ Get-sqmADGroupMembersRecursive — real display name
 
-- Für **User-Accounts** wird jetzt das echte AD-Attribut **`displayName`** aufgelöst (via `Get-ADUser`),
-  statt nur den CN/Namen aus `Get-ADGroupMember` zu zeigen (der bei vielen Konten dem Login entspricht).
-  Die `DisplayName`-Spalte zeigt damit den Personennamen. Fallback-Kette: `displayName` → CN/Name → `sAMAccountName`.
-- **LDAP-Fallback-Pfad gehärtet:** Fehlte das `displayName`-Attribut, warf `InvokeGet` eine Exception und der
-  Member ging verloren. Jetzt tolerantes Lesen mit derselben Fallback-Kette.
+- For **user accounts**, the real AD attribute **`displayName`** is now resolved (via
+  `Get-ADUser`), instead of only showing the CN/name from `Get-ADGroupMember` (which for many
+  accounts matches the login). The `DisplayName` column now shows the person's name. Fallback
+  chain: `displayName` → CN/Name → `sAMAccountName`.
+- **Hardened the LDAP fallback path:** if the `displayName` attribute was missing, `InvokeGet`
+  threw an exception and the member was lost. Now reads tolerantly with the same fallback chain.
 
 ## [1.7.8.1] — 2026-06-25
 
-### 🔧 Installer — dbatools-Abhängigkeit absichern
+### 🔧 Installer — secure the dbatools dependency
 
-- **`Install.ps1`** stellt jetzt die Pflicht-Abhängigkeit **`dbatools` im selben Scope** sicher,
-  bevor der Import-Test läuft. Bisher setzte der Installer voraus, dass dbatools bereits vorhanden
-  ist → auf einem **frischen Server ohne dbatools** schlug der Import-Test fehl. Bei `-Scope AllUsers`
-  wird dbatools systemweit installiert (kein Scope-Mismatch mehr, bei dem ein AllUsers-Modul ein nur
-  in CurrentUser liegendes dbatools in fremden/Admin-Sessions nicht findet). Fehlt dbatools, wird es
-  von der PSGallery nachinstalliert (TLS 1.2 + NuGet-Provider werden mit gesetzt).
+- **`Install.ps1`** now ensures the mandatory **`dbatools`** dependency **in the same scope**
+  before the import test runs. Previously the installer assumed dbatools was already present →
+  on a **fresh server without dbatools** the import test failed. With `-Scope AllUsers`,
+  dbatools is installed system-wide (no more scope mismatch where an AllUsers module can't find a
+  dbatools that only lives in CurrentUser in other/admin sessions). If dbatools is missing, it is
+  installed from the PSGallery (TLS 1.2 + NuGet provider are set along with it).
 
 ## [1.7.8.0] — 2026-06-25
 
-### 🐛 Kritischer Fix — TrustServerCertificate griff nie (modulweit)
+### 🐛 Critical fix — TrustServerCertificate never took effect (module-wide)
 
-- **`sqmSQLTool.psm1`**: Der Aufruf `Set-DbatoolsConfig -FullName 'sql.connection.trustcert' -Value $true -Scope Session`
-  verwendete den Parameter **`-Scope`, den `Set-DbatoolsConfig` (dbatools 2.8.x) nicht besitzt**. Die dadurch
-  geworfene Exception wurde vom umgebenden `catch` still verschluckt (nur Write-Verbose), sodass
-  `sql.connection.trustcert` **nie gesetzt** wurde. Folge: Gegen **SQL Server 2022 über TCP** schlug
-  praktisch **jede** dbatools-Verbindung mit „The certificate chain was issued by an authority that is not
-  trusted" fehl. Fix: `-Scope Session` entfernt (die Einstellung gilt ohnehin sessionweit).
+- **`sqmSQLTool.psm1`**: the call
+  `Set-DbatoolsConfig -FullName 'sql.connection.trustcert' -Value $true -Scope Session` used the
+  parameter **`-Scope`, which `Set-DbatoolsConfig` (dbatools 2.8.x) doesn't have**. The resulting
+  exception was silently swallowed by the surrounding `catch` (only Write-Verbose), so
+  `sql.connection.trustcert` was **never set**. Consequence: against **SQL Server 2022 over
+  TCP**, virtually **every** dbatools connection failed with "The certificate chain was issued by
+  an authority that is not trusted". Fix: removed `-Scope Session` (the setting applies
+  session-wide anyway).
 
-### 🐛 Fixes — Get-sqmServerUtilization (gegen SQL 2022 live verifiziert)
+### 🐛 Fixes — Get-sqmServerUtilization (verified live against SQL 2022)
 
-- Datei war ohne UTF-8-BOM/CRLF gespeichert → PS 5.1 las Box-/Sonderzeichen falsch (Parse-Fehler). Jetzt BOM+CRLF.
-- Ungültige Format-Interpolation `$($x:N0)` → `.ToString('N0')`.
-- DMV-Queries korrigiert: `COUNT(*) FILTER(...)` (PostgreSQL) → `SUM(CASE...)`; Ring-Buffer-CPU via **XML**
-  (`record.value(...)`) statt `JSON_VALUE`; Memory-Snapshot als ein Resultset (CROSS JOIN).
-- Einzeiliges DMV-Resultat: `$result[0].Spalte` griff bei einem DataRow die erste *Spalte* statt der Zeile
-  (→ 0-Werte). Jetzt `@($result)[0]` + `ISNULL(...)` in SQL gegen DBNull.
+- The file was saved without a UTF-8 BOM/CRLF → PS 5.1 misread box/special characters (parse
+  error). Now BOM+CRLF.
+- Invalid format interpolation `$($x:N0)` → `.ToString('N0')`.
+- Fixed DMV queries: `COUNT(*) FILTER(...)` (PostgreSQL) → `SUM(CASE...)`; ring-buffer CPU via
+  **XML** (`record.value(...)`) instead of `JSON_VALUE`; memory snapshot as a single result set
+  (CROSS JOIN).
+- Single-row DMV result: `$result[0].Column` grabbed the first *column* of a DataRow instead of
+  the row (→ 0 values). Now `@($result)[0]` + `ISNULL(...)` in SQL against DBNull.
 
 ## [1.7.7.0] — 2026-06-25
 
-### ✨ Neu / Erweiterung — Invoke-sqmTsmConfiguration
+### ✨ New / enhancement — Invoke-sqmTsmConfiguration
 
-Die TSM-Konfiguration kann jetzt reale Umgebungen abbilden, in denen INCLUDE/EXCLUDE
-in eine ausgelagerte Datei (INCLEXCL, z. B. `ie_dsm.opt`) ausgelagert sind:
+TSM configuration can now represent real environments where INCLUDE/EXCLUDE is offloaded to a
+separate file (INCLEXCL, e.g. `ie_dsm.opt`):
 
-- **`-UseInclExclFile`**: löst die `INCLEXCL`-Option aus der `dsm.opt` auf und schreibt
-  den verwalteten Block in die referenzierte Include/Exclude-Datei statt in die `dsm.opt`.
-- **`-InclExclPath`**: Zieldatei explizit angeben (wird bei Bedarf neu angelegt).
-- **`-ExcludePatterns`**: eigene EXCLUDE-Patterns statt der fixen drei SQL-Typen.
-- **`-IncludeRule`** (`@{ Path=...; ManagementClass=... }`): pro Pfad eine eigene
-  Managementklasse (z. B. 365-Tage für ein `01Year`-Verzeichnis).
-- **ManagementClass-Validierung gelockert**: `ValidateSet` → `ValidatePattern '^MC_[A-Za-z0-9._]+$'`.
-  Real eingesetzte Klassen wie `MC_B_2.2_15.15.NA_IMG` oder `MC_B_NL_NL_365.365.NA` werden
-  nicht mehr abgelehnt. **Rückwärtskompatibel**: bisher gültige Aufrufe bleiben gültig.
-- Ergebnisobjekt um **`TargetFile`** erweitert (tatsächlich geschriebene Datei).
+- **`-UseInclExclFile`**: resolves the `INCLEXCL` option from `dsm.opt` and writes the managed
+  block into the referenced include/exclude file instead of `dsm.opt`.
+- **`-InclExclPath`**: specify the target file explicitly (created if needed).
+- **`-ExcludePatterns`**: custom EXCLUDE patterns instead of the fixed three SQL types.
+- **`-IncludeRule`** (`@{ Path=...; ManagementClass=... }`): a dedicated management class per
+  path (e.g. 365 days for a `01Year` directory).
+- **Loosened ManagementClass validation**: `ValidateSet` → `ValidatePattern '^MC_[A-Za-z0-9._]+$'`.
+  Classes actually in use like `MC_B_2.2_15.15.NA_IMG` or `MC_B_NL_NL_365.365.NA` are no longer
+  rejected. **Backward-compatible**: previously valid calls remain valid.
+- Result object extended with **`TargetFile`** (the file actually written).
 
-### 🔧 Hinweis
+### 🔧 Note
 
-Liegt eine `dsm.opt`/ie-Datei unter Kontrolle eines Hersteller-TSM-Konfigurators, kann
-dieser den verwalteten Block überschreiben — ggf. erneut ausführen.
+If a `dsm.opt`/ie file is under the control of a vendor TSM configurator, that tool may overwrite
+the managed block - re-run if needed.
 
 ## [1.7.6.0] — 2026-06-25
 
-### ✨ Neu
+### ✨ New
 
-- **Get-sqmServerUtilization**: Neue Report-Funktion für CPU/RAM-Auslastungs-Trends. Erfasst über mehrere 
-  Zeitpunkte (default 6 Snapshots à 10 Sekunden = 1 Minute) Daten aus SQL-Server-DMVs: CPU %, Speichernutzung,
-  Worker Threads, Kompilierungen. Berechnet Min/Max/Avg je Metrik und erzeugt Reports (TXT/CSV/HTML).
-  Parameter: `-SampleCount` (default 6), `-SampleIntervalSeconds` (default 10).
+- **Get-sqmServerUtilization**: new reporting function for CPU/RAM utilization trends. Collects
+  data from SQL Server DMVs across multiple points in time (default 6 snapshots of 10 seconds =
+  1 minute): CPU %, memory usage, worker threads, compilations. Computes Min/Max/Avg per metric
+  and generates reports (TXT/CSV/HTML). Parameters: `-SampleCount` (default 6),
+  `-SampleIntervalSeconds` (default 10).
 
 ## [1.7.2.0] — 2026-06-22
 
 ### 🔧 Fixes
 
-- **Show-sqmToolGui**: Bei ShouldProcess-fähigen Befehlen war die „WhatIf (simulation)"-Checkbox
-  **vorab angehakt** (`Checked = $true`/`$supportsWhatIf`). Dadurch lief „Run" bei genau diesen
-  Befehlen ungewollt als reine Simulation statt echt auszuführen. Die Checkbox ist jetzt
-  **standardmäßig deaktiviert** (opt-in): „Run" führt real aus, Simulation wird bewusst angehakt.
+- **Show-sqmToolGui**: for ShouldProcess-capable commands, the "WhatIf (simulation)" checkbox
+  was **pre-checked** (`Checked = $true`/`$supportsWhatIf`). This caused "Run" on exactly these
+  commands to run unintentionally as a pure simulation instead of executing for real. The
+  checkbox is now **disabled by default** (opt-in): "Run" executes for real, simulation must be
+  checked deliberately.
 
 ## [1.7.1.0] — 2026-06-22
 
-### ✨ Neu
+### ✨ New
 
-- **Get-sqmDiskSpaceReport — Bootstrap aus Backup-Historie (Methode B2)**: Neuer Schalter
-  `-SeedFromBackupHistory`. Solange die Snapshot-Historie (B1) für ein Volume noch < `-MinDataPoints`
-  Punkte hat, wird ersatzweise eine Wachstumsrate aus `msdb.dbo.backupset` abgeleitet: je Datenbank
-  der Daten-Wachstumstrend aus den Full-Backup-Größen (lineare Regression, ab 3 Punkten) und
-  proportional zur Datendatei-Größe auf die Volumes verteilt. Überbrückt die ~5-Läufe-Anlaufzeit von
-  B1. Ausgewiesen mit `ForecastBasis='BackupHistory'`, Konfidenz `Low` (Report-Spalte `Boot`). Sobald
-  B1 genug Snapshots hat, übernimmt wieder B1. Greift nur bei gesetztem Schalter; benötigt Lesezugriff
-  auf `msdb.dbo.backupset`.
+- **Get-sqmDiskSpaceReport — bootstrap from backup history (method B2)**: new switch
+  `-SeedFromBackupHistory`. As long as the snapshot history (B1) for a volume still has fewer
+  than `-MinDataPoints` points, a growth rate is instead derived from `msdb.dbo.backupset`: per
+  database, the data growth trend from the full-backup sizes (linear regression, from 3 points),
+  distributed across volumes proportionally to data-file size. Bridges B1's ~5-run ramp-up time.
+  Flagged with `ForecastBasis='BackupHistory'`, confidence `Low` (report column `Boot`). Once B1
+  has enough snapshots, B1 takes over again. Only applies when the switch is set; requires read
+  access to `msdb.dbo.backupset`.
 
 ## [1.7.0.0] — 2026-06-22
 
-### ✨ Neu
+### ✨ New
 
-- **Get-sqmDiskSpaceReport — Wachstumsprognose neu auf Snapshot-Historie (Methode B1)**:
-  Die Prognose basierte bisher ausschließlich auf AutoGrow-Events des Default Trace und blieb
-  damit leer, sobald keine automatischen Dateivergrößerungen im Zeitfenster lagen (gut dimensionierte
-  DBs) oder die kurze Default-Trace-Retention die Events verdrängt hatte. Stattdessen wird jetzt bei
-  jedem Lauf die Volume-Belegung in eine JSON-Historie (`History\DiskHistory_<Instanz>.json`)
-  geschrieben und über die letzten `-HistoryDays` Tage per **linearer Regression (Least Squares)**
-  ausgewertet: `GB/Tag`, `DaysUntilFull` und eine Konfidenz (R²/Punktzahl: Low/Medium/High).
-  - Misst den **tatsächlichen Verbrauchstrend** (auch Datenwachstum in vorab dimensionierten Dateien)
-    und ist **mountpoint-sicher** (Auswertung je `volume_mount_point`).
-  - Vor `-MinDataPoints` Läufen (Default 5) wird das Volume transparent als „Prognose sammelt noch
-    Daten (n von m)" ausgewiesen statt still `n/a`.
-  - Neue Parameter: `-HistoryPath`, `-MinDataPoints`, `-NoHistory`. Neue Ausgabefelder:
-    `DataPoints`, `ForecastConfidence`, `ForecastBasis`. Report-Spalten: `GB/Tag`, `DaysFull`, `Konf`.
-  - `-WhatIf` persistiert die Historie nicht.
-  - Hinweis: Für belastbare Prognosen die Funktion regelmäßig planen (z. B. täglicher Agent-Job).
+- **Get-sqmDiskSpaceReport — growth forecast rebuilt on snapshot history (method B1)**: the
+  forecast previously relied exclusively on AutoGrow events from the default trace and stayed
+  empty whenever there were no automatic file-growth events in the time window (well-sized DBs)
+  or the short default-trace retention had already evicted the events. Instead, on every run the
+  volume usage is now written to a JSON history (`History\DiskHistory_<Instance>.json`) and
+  evaluated over the last `-HistoryDays` days via **linear regression (least squares)**: `GB/day`,
+  `DaysUntilFull`, and a confidence level (R²/point count: Low/Medium/High).
+  - Measures the **actual consumption trend** (including data growth in pre-sized files) and is
+    **mount-point-safe** (evaluated per `volume_mount_point`).
+  - Before `-MinDataPoints` runs (default 5), the volume is transparently reported as "forecast
+    still collecting data (n of m)" instead of silently `n/a`.
+  - New parameters: `-HistoryPath`, `-MinDataPoints`, `-NoHistory`. New output fields:
+    `DataPoints`, `ForecastConfidence`, `ForecastBasis`. Report columns: `GB/day`, `DaysFull`,
+    `Conf`.
+  - `-WhatIf` does not persist the history.
+  - Note: for reliable forecasts, schedule the function regularly (e.g. a daily agent job).
 
 ## [1.6.4.0] — 2026-06-22
 
-### 🔧 Fixes — ungültige DMV-Spalten (gefunden per Live-Lauf + statischer DMV-Validierung gegen SQL 2022)
+### 🔧 Fixes — invalid DMV columns (found via live run + static DMV validation against SQL 2022)
 
-- **Get-sqmMissingIndexes**: Join referenzierte `mid.index_group_handle`, das es in
-  `sys.dm_db_missing_index_details` nicht gibt (nur `index_handle`). Query lieferte „Ungültiger
-  Spaltenname index_group_handle" → keine Ergebnisse. Join korrigiert auf
+- **Get-sqmMissingIndexes**: the join referenced `mid.index_group_handle`, which doesn't exist in
+  `sys.dm_db_missing_index_details` (only `index_handle`). The query returned "Invalid column
+  name index_group_handle" → no results. Join fixed to
   `mid.index_handle = mig.index_handle`.
-- **Get-sqmOperationStatus**: AutoSeed-Query nutzte die nicht existierenden Spalten `total_size_bytes`,
-  `start_time` und `estimated_completion_time_ms` aus `sys.dm_hadr_physical_seeding_stats`. Korrigiert
-  auf die realen Spalten `database_size_bytes`, `start_time_utc` und `estimate_time_complete_utc`
-  (Restzeit per `DATEDIFF` in ms), per Alias auf die erwarteten Namen abgebildet.
-- **Get-sqmAlwaysOnFailoverHistory**: optionale SQL-Ergänzung las `ars.role_start_time`, das es in
-  `sys.dm_hadr_availability_replica_states` nicht gibt. Ersetzt durch die valide Spalte
-  `current_configuration_commit_start_time_utc` (UTC-Näherung; maßgeblich bleibt das Event Log,
-  EventID 1480). UTC-Vergleich und NULL-Schutz ergänzt.
+- **Get-sqmOperationStatus**: the AutoSeed query used the non-existent columns
+  `total_size_bytes`, `start_time` and `estimated_completion_time_ms` from
+  `sys.dm_hadr_physical_seeding_stats`. Corrected to the real columns `database_size_bytes`,
+  `start_time_utc` and `estimate_time_complete_utc` (remaining time via `DATEDIFF` in ms), mapped
+  by alias to the expected names.
+- **Get-sqmAlwaysOnFailoverHistory**: an optional SQL addition read `ars.role_start_time`, which
+  doesn't exist in `sys.dm_hadr_availability_replica_states`. Replaced with the valid column
+  `current_configuration_commit_start_time_utc` (a UTC approximation; the Event Log, EventID
+  1480, remains authoritative). Added UTC comparison and NULL protection.
 
 ## [1.6.3.0] — 2026-06-22
 
-### 🔧 Fixes — dbatools-Parameter-/Cmdlet-Drift (gefunden per statischem Audit gegen dbatools 2.8.1, validiert gegen lokalen SQL 2022)
+### 🔧 Fixes — dbatools parameter/cmdlet drift (found via static audit against dbatools 2.8.1, validated against local SQL 2022)
 
-Mechanische Parameter-Korrekturen:
+Mechanical parameter fixes:
 - **Invoke-sqmRestoreDatabase**: `Get-DbaDefaultPath -Type Backup` → `(Get-DbaDefaultPath …).Backup`
-  (`-Type` existiert nicht; betraf den `-BackupBeforeRestore`-Pfad).
+  (`-Type` doesn't exist; affected the `-BackupBeforeRestore` path).
 - **Test-sqmBackupIntegrity**: `Restore-DbaDatabase -FileListOnly` → `Read-DbaBackupHeader -FileList`
-  (Restore-DbaDatabase kennt kein `-FileListOnly`; der Verify-Pfad nutzte bereits korrekt `-VerifyOnly`).
+  (Restore-DbaDatabase has no `-FileListOnly`; the verify path already correctly used
+  `-VerifyOnly`).
 - **New-sqmBackupMaintenanceJob / New-sqmOlaMaintenanceJobs / New-sqmOlaSysDbBackupJob /
   New-sqmOlaUsrDbBackupJob**: `Set-DbaAgentJob -OperatorToEmail` → `-EmailOperator`.
 - **Invoke-sqmDeployScripts**: `Connect-DbaInstance -EnableException` → `-ErrorAction Stop`
-  (Connect-DbaInstance hat kein `-EnableException`).
+  (Connect-DbaInstance has no `-EnableException`).
 
-Redesigns (Cmdlet existiert gar nicht):
-- **Invoke-sqmUpdateStatistics**: nutzte `Update-DbaDbStatistic` — diesen Cmdlet gibt es nicht, die
-  Funktion war wirkungslos. Neu implementiert über `Invoke-DbaQuery` mit echtem `UPDATE STATISTICS`;
-  Zielstatistiken werden serverseitig aus `sys.stats`/`sys.dm_db_stats_properties` ermittelt, sodass
-  `-OnlyModified`, `-Index`, `-Table`, `-Statistics` und `-SamplePercent` (FULLSCAN/SAMPLE) greifen.
-- **Invoke-sqmConfigRollback**: `Set-DbaService -StartMode` existiert nicht. dbatools' `Get-DbaService`
-  liefert CIM-Instanzen der Klasse `SqlService`; der StartMode wird jetzt über deren CIM-Methode
-  `SetStartMode(UInt32)` gesetzt (Automatic=2, Manual=3, Disabled=4). Funktioniert unter PS 5.1 und 7.
-- **Sync-sqmLoginsToAlwaysOn**: `Get-DbaAgentServiceAccount` existiert nicht. Das Agent-Dienstkonto
-  kommt jetzt aus `sys.dm_server_services` (locale-robustes `LIKE '%Agent%'`) über die bestehende
-  SQL-Verbindung.
+Redesigns (cmdlet doesn't exist at all):
+- **Invoke-sqmUpdateStatistics**: used `Update-DbaDbStatistic` - this cmdlet doesn't exist, so the
+  function had no effect. Reimplemented via `Invoke-DbaQuery` with a real `UPDATE STATISTICS`;
+  target statistics are determined server-side from `sys.stats`/`sys.dm_db_stats_properties`, so
+  `-OnlyModified`, `-Index`, `-Table`, `-Statistics` and `-SamplePercent` (FULLSCAN/SAMPLE) now
+  take effect.
+- **Invoke-sqmConfigRollback**: `Set-DbaService -StartMode` doesn't exist. dbatools'
+  `Get-DbaService` returns CIM instances of the `SqlService` class; the StartMode is now set via
+  their CIM method `SetStartMode(UInt32)` (Automatic=2, Manual=3, Disabled=4). Works under PS 5.1
+  and 7.
+- **Sync-sqmLoginsToAlwaysOn**: `Get-DbaAgentServiceAccount` doesn't exist. The agent service
+  account now comes from `sys.dm_server_services` (locale-robust `LIKE '%Agent%'`) via the
+  existing SQL connection.
 
 ## [1.6.2.0] — 2026-06-22
 
 ### 🔧 Fixes
 
-- **Invoke-sqmRestoreDatabase**: Mehrere dbatools-Parameter passten nicht zur installierten
-  Version und ließen den scharfen Lauf abbrechen:
-  - `Export-DbaUser -Force` → `-Force` existiert nicht; jetzt `-FilePath` (Vollpfad) ohne `-Force`.
-    (Behebt „A parameter cannot be found that matches parameter name 'Force'".)
-  - `Restore-DbaDatabase -NewDatabaseName/-DatabaseFilePath/-LogFilePath` → diese Parameter gibt es
-    nicht. Der (ggf. neue) Zielname läuft jetzt über `-DatabaseName` (`$finalDbName`), die physischen
-    Datei-Namen/-Pfade regelt das bereits gebaute `-FileMapping`. Umbenennen + Verschieben damit
-    versionsstabil.
-  - User-Export-Dateiname: `$DatabaseName_` wurde als (leere) Variable interpretiert, der DB-Name
-    fehlte im Namen; jetzt `${DatabaseName}` und korrektes Zeitstempelformat.
-- **Invoke-sqmRestoreDatabase**: Doppelte Ergebniszeilen bei Früh-Returns (WhatIf/Fehler) behoben.
-  Die `return $results` im `process`-Block sind jetzt bloße `return`; der `end`-Block gibt die Liste
-  genau einmal zurück.
+- **Invoke-sqmRestoreDatabase**: several dbatools parameters didn't match the installed version
+  and aborted the real run:
+  - `Export-DbaUser -Force` → `-Force` doesn't exist; now uses `-FilePath` (full path) without
+    `-Force`. (Fixes "A parameter cannot be found that matches parameter name 'Force'".)
+  - `Restore-DbaDatabase -NewDatabaseName/-DatabaseFilePath/-LogFilePath` → these parameters
+    don't exist. The (possibly new) target name now goes through `-DatabaseName`
+    (`$finalDbName`); the physical file names/paths are handled by the already-built
+    `-FileMapping`. Renaming + moving is thereby version-stable.
+  - User-export filename: `$DatabaseName_` was interpreted as an (empty) variable, so the DB name
+    was missing from the name; now `${DatabaseName}` and a correct timestamp format.
+- **Invoke-sqmRestoreDatabase**: fixed duplicate result rows on early returns (WhatIf/error). The
+  `return $results` in the `process` block are now plain `return`; the `end` block returns the
+  list exactly once.
 
 ## [1.6.1.0] — 2026-06-22
 
 ### 🔧 Fixes
 
-- **Invoke-sqmRestoreDatabase**: Brach bei existierender Ziel-Datenbank mit
-  „A parameter cannot be found that matches parameter name 'Database'" ab. Ursache war
-  `Get-DbaAvailabilityGroup -Database` (diesen Parameter gibt es nicht; der Parameter-Binding-Fehler
-  ist terminierend und wird von `-ErrorAction SilentlyContinue` nicht abgefangen). AG-Mitgliedschaft
-  wird jetzt über `Get-DbaAgDatabase` geprüft, das AG-Objekt über den AG-Namen nachgeladen.
-- **Invoke-sqmLogging**: `-WhatIf` des Aufrufers leakte über `$WhatIfPreference` in die
-  internen `Out-File`/`New-Item`-Aufrufe und erzeugte „What if: Output to File"-Rauschen, während
-  gar kein Log geschrieben wurde. Beide Aufrufe laufen jetzt mit `-WhatIf:$false` (Logging ist ein
-  Seitenkanal und darf nicht unter ShouldProcess fallen).
+- **Invoke-sqmRestoreDatabase**: aborted with "A parameter cannot be found that matches parameter
+  name 'Database'" when the target database already existed. Caused by
+  `Get-DbaAvailabilityGroup -Database` (this parameter doesn't exist; the parameter-binding error
+  is terminating and isn't caught by `-ErrorAction SilentlyContinue`). AG membership is now
+  checked via `Get-DbaAgDatabase`, and the AG object is reloaded via the AG name.
+- **Invoke-sqmLogging**: the caller's `-WhatIf` leaked via `$WhatIfPreference` into the internal
+  `Out-File`/`New-Item` calls and produced "What if: Output to File" noise while no log was
+  written at all. Both calls now run with `-WhatIf:$false` (logging is a side channel and must
+  not be subject to ShouldProcess).
 
 ## [1.6.0.0] — 2026-06-21
 
-### ✨ Neu
+### ✨ New
 
-- **Invoke-sqmNtfsSetup**: Setzt NTFS-Berechtigungen für die SQL-Dienstkonten auf den
-  Data/Log/TempDB/Backup-Verzeichnissen. Ermittelt Dienstkonten (Get-DbaService) und
-  Verzeichnisse (Get-DbaDefaultPath + sys.master_files) automatisch, schreibt vorher ein
-  ACL-Backup (SDDL je Verzeichnis), unterstützt `-WhatIf`/`-EnableException`.
-  Schließt den Aufruf in SQLSetupTool\Modules\PostInstall.psm1, der bisher ins Leere lief.
-- **Show-sqmToolGui**: Kleine WinForms-Oberfläche (Visual-Studio-Dark) mit allen exportierten
-  Funktionen nach Kategorie gruppiert; erzeugt Parameter-Eingaben automatisch (inkl.
-  Credential-Picker für PSCredential und Dropdowns für ValidateSet/Enum), Befehlsvorschau,
-  Ausführen/Kopieren/Hilfe.
+- **Invoke-sqmNtfsSetup**: sets NTFS permissions for the SQL service accounts on the
+  Data/Log/TempDB/Backup directories. Determines service accounts (Get-DbaService) and
+  directories (Get-DbaDefaultPath + sys.master_files) automatically, writes an ACL backup (SDDL
+  per directory) beforehand, supports `-WhatIf`/`-EnableException`. Closes the call in
+  SQLSetupTool\Modules\PostInstall.psm1 that previously had no target.
+- **Show-sqmToolGui**: a small WinForms interface (Visual Studio Dark) with all exported
+  functions grouped by category; generates parameter inputs automatically (including a
+  credential picker for PSCredential and dropdowns for ValidateSet/Enum), command preview,
+  run/copy/help.
 
-### 🔧 Fixes / Wartung
+### 🔧 Fixes / maintenance
 
-- **category-map.ps1** neu generiert (war Encoding-korrupt und unvollständig); deckt jetzt
-  alle exportierten Funktionen ab.
-- **CI**: GitHub-Actions-Workflow (PSScriptAnalyzer, BOM-Check, Import PS 5.1 + 7, Pester).
-- **Tests**: Contract-Test, der die von SQLSetupTool genutzte Funktions-API einfriert.
+- **category-map.ps1** regenerated (was encoding-corrupt and incomplete); now covers all
+  exported functions.
+- **CI**: GitHub Actions workflow (PSScriptAnalyzer, BOM check, import PS 5.1 + 7, Pester).
+- **Tests**: a contract test that freezes the function API used by SQLSetupTool.
 
 ## [1.5.1.0] — 2026-06-10
 
-Versionssprung über das (fehlbenannte) Tag v1.5.0, damit die gesammelten Fixes 1.4.8 - 1.4.15
-auf GitHub eindeutig die neueste Version sind und vom Update-Mechanismus gezogen werden.
-Inhaltlich identisch mit 1.4.15.0 (siehe Einträge darunter); kein neuer Funktionscode.
+Version bump past the (misnamed) tag v1.5.0, so the accumulated fixes 1.4.8 - 1.4.15 are
+unambiguously the newest version on GitHub and get picked up by the update mechanism. Content
+identical to 1.4.15.0 (see entries below); no new function code.
 
 ## [1.4.15.0] — 2026-06-10
 
 ### 🔧 Fixes
 
-- **New-sqmAutoLoginSyncJob / New-sqmAutoLoginCompareJob**: `-Overwrite` schlug fehl mit
-  „A parameter cannot be found that matches parameter name 'Force'". `Remove-DbaAgentJob -Force`
-  existiert nicht in jeder dbatools-Version; jetzt `-Confirm:$false` (versionsstabil, wie in
-  allen anderen Job-Funktionen).
+- **New-sqmAutoLoginSyncJob / New-sqmAutoLoginCompareJob**: `-Overwrite` failed with "A parameter
+  cannot be found that matches parameter name 'Force'". `Remove-DbaAgentJob -Force` doesn't exist
+  in every dbatools version; now uses `-Confirm:$false` (version-stable, as in all other job
+  functions).
 
 ## [1.4.14.0] — 2026-06-10
 
 ### 🔧 Fixes
 
-- **New-sqmAutoLoginCompareJob**: dieselben Schedule-Fehler wie zuvor beim Sync-Job
-  („SqlInstance is specified more than once", `ActiveStartTimeOfDay`, versionsabhängige
-  `New-DbaAgentSchedule`-Parameter, doppelte Schedules). Zeitplan jetzt über native
-  msdb-Prozeduren (`sp_add_schedule` / `sp_attach_schedule`), Duplikate vorher per
-  `schedule_id` entfernt.
+- **New-sqmAutoLoginCompareJob**: the same schedule errors as before with the sync job
+  ("SqlInstance is specified more than once", `ActiveStartTimeOfDay`, version-dependent
+  `New-DbaAgentSchedule` parameters, duplicate schedules). The schedule is now created via native
+  msdb procedures (`sp_add_schedule` / `sp_attach_schedule`); duplicates removed beforehand by
+  `schedule_id`.
 
-### ♻️ Vereinfachung
+### ♻️ Simplification
 
-- **New-sqmAutoLoginCompareJob**: Job-Step ist jetzt zwei Zeilen - `Import-Module` plus
-  `Compare-sqmAlwaysOnLogins -FailOnDrift`. Keine Hashtable, keine Pfade, kein Servername.
-- **Compare-sqmAlwaysOnLogins**: neuer Schalter `-FailOnDrift`. Bei Login-Drift
-  (Warning/Critical) wird Windows Event 9001 (Splunk) geschrieben und eine Ausnahme geworfen,
-  sodass der SQL-Agent-Job rot wird (Drift-Alarm via OnFailure-Operator). Impliziert `-NoOpen`;
-  der Report wird vorher geschrieben.
+- **New-sqmAutoLoginCompareJob**: the job step is now two lines - `Import-Module` plus
+  `Compare-sqmAlwaysOnLogins -FailOnDrift`. No hashtable, no paths, no server name.
+- **Compare-sqmAlwaysOnLogins**: new switch `-FailOnDrift`. On login drift (Warning/Critical),
+  Windows Event 9001 (Splunk) is written and an exception is thrown, so the SQL Agent job turns
+  red (drift alarm via the OnFailure operator). Implies `-NoOpen`; the report is written
+  beforehand.
 
-### 🌐 Sonstiges
+### 🌐 Other
 
-- **Default-Ausgabesprache auf `en-US`** umgestellt (Modul-Config `Language` + Get-sqmString-
-  Fallback). Betrifft alle über Get-sqmString lokalisierten Strings. Hinweis: noch hartkodiert
-  deutsche Reports bleiben deutsch, bis die Mehrsprachigkeits-Migration abgeschlossen ist.
+- **Default output language switched to `en-US`** (module config `Language` + Get-sqmString
+  fallback). Affects all strings localized via Get-sqmString. Note: reports that are still
+  hardcoded German remain German until the multi-language migration is complete.
 
 ## [1.4.13.0] — 2026-06-10
 
-### ♻️ Vereinfachung
+### ♻️ Simplification
 
-- **Sync-sqmLoginsToAlwaysOn** läuft jetzt sinnvoll ohne jede Angabe: `Force`, `BackupLogins`
-  (je $true) und `BackupRetentionDays` (7) sind Defaults. Ein bloßes `Sync-sqmLoginsToAlwaysOn`
-  hält die Secondaries komplett synchron (SqlInstance = Computername, AG = erste gefundene,
-  Pfade aus den Settings). Opt-out via `-Force:$false` / `-BackupLogins:$false`.
-- **New-sqmAutoLoginSyncJob**: Job-Step ist jetzt nur noch zwei Zeilen - `Import-Module` plus
-  der parameterlose Aufruf `Sync-sqmLoginsToAlwaysOn`. Keine Hashtable, keine Pfade, kein
-  Servername, keine AG im Step.
+- **Sync-sqmLoginsToAlwaysOn** now runs sensibly with no arguments at all: `Force`,
+  `BackupLogins` (each $true) and `BackupRetentionDays` (7) are defaults. A bare
+  `Sync-sqmLoginsToAlwaysOn` keeps the secondaries fully in sync (SqlInstance = computer name, AG
+  = the first one found, paths from the settings). Opt out via `-Force:$false` /
+  `-BackupLogins:$false`.
+- **New-sqmAutoLoginSyncJob**: the job step is now just two lines - `Import-Module` plus the
+  parameterless call `Sync-sqmLoginsToAlwaysOn`. No hashtable, no paths, no server name, no AG in
+  the step.
 
 ### 🔧 Fixes
 
-- **New-sqmAutoLoginSyncJob**: „There are two or more schedules named …" - mehrfach vorhandene
-  Schedules gleichen Namens (aus früheren Fehlversuchen) werden jetzt vor dem Anlegen per
-  `schedule_id` in einer Schleife entfernt, statt per mehrdeutigem `@schedule_name`.
-- **Sync-sqmLoginsToAlwaysOn**: meldet Fehlschläge per Windows Event Log (Source 'sqmSQLTool',
-  EventId 9002) für Splunk - der schlanke Job-Step braucht dafür keinen eigenen throw mehr.
+- **New-sqmAutoLoginSyncJob**: "There are two or more schedules named …" - multiple schedules
+  with the same name (from earlier failed attempts) are now removed by `schedule_id` in a loop
+  before creating a new one, instead of via an ambiguous `@schedule_name`.
+- **Sync-sqmLoginsToAlwaysOn**: reports failures via the Windows Event Log (source 'sqmSQLTool',
+  EventId 9002) for Splunk - the lean job step no longer needs its own throw for that.
 
 ## [1.4.12.0] — 2026-06-10
 
 ### 🔧 Fixes
 
-- **New-sqmAutoLoginSyncJob**: Zeitplan-Erstellung scheiterte versionsabhängig an
-  `New-DbaAgentSchedule` („A parameter cannot be found that matches parameter name 'Force'",
-  „… 'sch_…' is not a valid value for the Schedule variable"). Die Parameter dieses Cmdlets
-  variieren je dbatools-Version. Der Zeitplan wird jetzt über native msdb-Prozeduren
-  (`sp_add_schedule` / `sp_attach_schedule`) per `Invoke-DbaQuery` erstellt - identisch stabil
-  auf jeder SQL-Server- und dbatools-Version, kein API-Raten mehr.
+- **New-sqmAutoLoginSyncJob**: schedule creation failed in a version-dependent way on
+  `New-DbaAgentSchedule` ("A parameter cannot be found that matches parameter name 'Force'", "…
+  'sch_…' is not a valid value for the Schedule variable"). This cmdlet's parameters vary by
+  dbatools version. The schedule is now created via native msdb procedures (`sp_add_schedule` /
+  `sp_attach_schedule`) through `Invoke-DbaQuery` - equally stable across every SQL Server and
+  dbatools version, no more API guessing.
 
 ## [1.4.11.0] — 2026-06-10
 
 ### 🔧 Fixes
 
-- **New-sqmAutoLoginSyncJob**: Job-Erstellung schlug fehl mit „A parameter cannot be found that
-  matches parameter name 'ActiveStartTimeOfDay'". `ActiveStartTimeOfDay` ist eine SMO-Property,
-  kein `New-DbaAgentSchedule`-Parameter. Zeitplan nutzt jetzt korrekt `-StartTime` (Format
-  `HHMMSS`), für Weekly/Monthly `-FrequencyRecurrenceFactor`, für stündlich
-  `-FrequencySubdayType Hours` / `-FrequencySubdayInterval`.
+- **New-sqmAutoLoginSyncJob**: job creation failed with "A parameter cannot be found that
+  matches parameter name 'ActiveStartTimeOfDay'". `ActiveStartTimeOfDay` is an SMO property, not
+  a `New-DbaAgentSchedule` parameter. The schedule now correctly uses `-StartTime` (format
+  `HHMMSS`), `-FrequencyRecurrenceFactor` for Weekly/Monthly, and
+  `-FrequencySubdayType Hours` / `-FrequencySubdayInterval` for hourly.
 
 ## [1.4.10.0] — 2026-06-10
 
 ### 🔧 Fixes
 
-- **Copy-sqmLogins / AlwaysOn-Login-Sync**: umbenannte `sa` wurde nicht erkannt. Ursache war
-  ein Reihenfolge-Bug - die dynamische sysadmin-Erkennung lief, bevor `$srcConnParams`
-  definiert war, scheiterte still und fiel auf das Literal `'sa'` zurück. Dadurch konnte eine
-  auf einem Node umbenannte `sa` in den Kopier-Batch gelangen (SID-Kollision 0x01 auf dem Ziel).
-  - ConnParams/Credentials werden jetzt VOR der Erkennung aufgebaut.
-  - `sa` wird zusätzlich über die well-known SID `0x01` identifiziert (namensunabhängig) und
-    grundsätzlich nie kopiert - auch nicht mit `-IncludeSystemLogins`.
-  - sysadmin-Abfrage in Copy-sqmLogins und Sync-sqmLoginsToAlwaysOn ergänzt um `OR sid = 0x01`.
+- **Copy-sqmLogins / AlwaysOn login sync**: a renamed `sa` wasn't recognized. Caused by an
+  ordering bug - the dynamic sysadmin detection ran before `$srcConnParams` was defined, failed
+  silently, and fell back to the literal `'sa'`. This allowed an `sa` renamed on one node to end
+  up in the copy batch (SID collision 0x01 on the target).
+  - ConnParams/credentials are now built BEFORE the detection.
+  - `sa` is now additionally identified via the well-known SID `0x01` (name-independent) and is
+    fundamentally never copied - not even with `-IncludeSystemLogins`.
+  - The sysadmin query in Copy-sqmLogins and Sync-sqmLoginsToAlwaysOn was extended with
+    `OR sid = 0x01`.
 
 ## [1.4.9.0] — 2026-06-10
 
 ### 🔧 Fixes
 
-- **Get-sqmBlockingReport**: `most_recent_sql_handle` korrekt aus `sys.dm_exec_connections`
-  statt `sys.dm_exec_sessions` (Fehler „Invalid column name 'most_recent_sql_handle'").
-- **New-sqmAutoLoginSyncJob**: `SqlInstance` wurde beim Anlegen des Zeitplans doppelt gebunden
-  (Fehler „parameter 'SqlInstance' is specified more than once") - jetzt nur noch explizit.
+- **Get-sqmBlockingReport**: `most_recent_sql_handle` correctly read from
+  `sys.dm_exec_connections` instead of `sys.dm_exec_sessions` (error "Invalid column name
+  'most_recent_sql_handle'").
+- **New-sqmAutoLoginSyncJob**: `SqlInstance` was bound twice when creating the schedule (error
+  "parameter 'SqlInstance' is specified more than once") - now only explicitly once.
 
 ### ♻️ Refactoring
 
-- **New-sqmAutoLoginSyncJob**: Job-Step radikal vereinfacht. Statt ~60 Zeilen eingebackener
-  Orchestrierung jetzt ein schlanker Direkt-Aufruf von `Sync-sqmLoginsToAlwaysOn`; bei Fehlern
-  `throw` → SQL Agent markiert den Job als fehlgeschlagen (Operator-Benachrichtigung).
-  Keine hartkodierten Pfade mehr im Step.
-- **Sync-sqmLoginsToAlwaysOn**: übernimmt jetzt Retention (`-BackupRetentionDays`) und den
-  AD-Orphan-Audit (`-AuditAdOrphans`, Detection-only, Event Log 9003). `-BackupPath` nimmt den
-  konfigurierten Ausgabepfad (`Get-sqmDefaultOutputPath`) statt eines festen Literals - alle
-  Pfade kommen aus den Settings.
+- **New-sqmAutoLoginSyncJob**: the job step was drastically simplified. Instead of ~60 lines of
+  baked-in orchestration, now a lean direct call to `Sync-sqmLoginsToAlwaysOn`; on error `throw`
+  → SQL Agent marks the job as failed (operator notification). No more hardcoded paths in the
+  step.
+- **Sync-sqmLoginsToAlwaysOn**: now handles retention (`-BackupRetentionDays`) and the AD orphan
+  audit (`-AuditAdOrphans`, detection-only, Event Log 9003). `-BackupPath` uses the configured
+  output path (`Get-sqmDefaultOutputPath`) instead of a fixed literal - all paths come from the
+  settings.
 
 ## [1.4.8.0] — 2026-06-10
 
-### ✨ Neue Features
+### ✨ New features
 
 #### Remove-sqmAdOrphanLogin
-Manuelles, sicheres Entfernen von Windows-Logins, deren AD-Konto nicht mehr existiert
-(„tote" AD-Logins). Bewusst nur manuell, nicht für den unbeaufsichtigten Betrieb.
-- ActiveDirectory-Modul Pflicht (Default `-AdModuleAction Abort`); ohne AD keine Löschung
-- System- und alle sysadmin-Logins immer ausgeschlossen, DB-Owner-Logins übersprungen
-- Orphan nur bei positivem AD-„nicht vorhanden"; AD-Abfragefehler → überspringen
-- Rollback-Skript (CREATE LOGIN FROM WINDOWS + Server-Rollen) vor dem Drop
-- `ConfirmImpact = High`: `-WhatIf` / `-Confirm` greifen
+Manual, safe removal of Windows logins whose AD account no longer exists ("dead" AD logins).
+Deliberately manual only, not for unattended operation.
+- ActiveDirectory module required (default `-AdModuleAction Abort`); no deletion without AD
+- System logins and all sysadmin logins are always excluded; DB-owner logins are skipped
+- Only treated as orphaned on a positive AD "not present" result; AD query errors → skip
+- A rollback script (CREATE LOGIN FROM WINDOWS + server roles) is generated before the drop
+- `ConfirmImpact = High`: `-WhatIf` / `-Confirm` apply
 
-#### New-sqmAutoLoginSyncJob — neue Optionen
-- `-Force` und `-BackupLogins` standardmäßig aktiv: der laufende Job hält die Secondaries
-  vollständig synchron (Passwort-/Sprach-/Default-DB-Drift), mit Rollback-Backup.
-  Opt-out via `-Force:$false` / `-BackupLogins:$false`
-- `-BackupRetentionDays` (Default 7): räumt Backups, Sync-Logs und Audit-Reports auf
-- `-AuditAdOrphans`: meldet nach jedem Lauf verwaiste Windows-Logins (Sync-Log + Event Log
-  EventId 9003 für Splunk) — nur Erkennung, kein Auto-Delete
+#### New-sqmAutoLoginSyncJob — new options
+- `-Force` and `-BackupLogins` active by default: the running job keeps the secondaries fully in
+  sync (password/language/default-DB drift), with a rollback backup. Opt out via `-Force:$false`
+  / `-BackupLogins:$false`
+- `-BackupRetentionDays` (default 7): cleans up backups, sync logs and audit reports
+- `-AuditAdOrphans`: reports orphaned Windows logins after every run (sync log + Event Log
+  EventId 9003 for Splunk) - detection only, no auto-delete
 
 ### 🔧 Fixes
 
-- **Login-Backup-Query**: `password_hash` aus `sys.sql_logins` statt `sys.server_principals`
-  (Fehler „Invalid column name 'password_hash'" bei `-BackupLogins`)
-- **Sync-sqmLoginsToAlwaysOn**: AG-Ermittlung sortiert nach `name` statt nicht existierender
-  Spalte `creation_date`
-- **Install.cmd / Update.cmd**: unter GPO `RemoteSigned` immer lokal stagen (Mark-of-the-Web
-  entfernen), damit die Ausführung vom UNC-/`\\tsclient\`-Pfad nicht blockiert wird
+- **Login backup query**: `password_hash` read from `sys.sql_logins` instead of
+  `sys.server_principals` (error "Invalid column name 'password_hash'" with `-BackupLogins`)
+- **Sync-sqmLoginsToAlwaysOn**: AG lookup now sorts by `name` instead of the non-existent column
+  `creation_date`
+- **Install.cmd / Update.cmd**: under GPO `RemoteSigned`, always stage locally first (removing
+  Mark-of-the-Web), so execution from a UNC/`\\tsclient\` path is not blocked
 
 ## [1.4.0.0] — 2026-05-31
 
-### ✨ Neue Features
+### ✨ New features
 
 #### Get-sqmServerHardwareReport
-Umfassender HTML-Hardware-Report für lokale und Remote-Systeme:
-- **RAM-Informationen**: Gesamt, Verfügbar, DIMM-Details (Hersteller, Größe)
-- **CPU-Details**: Modell, Sockel, Anzahl Kerne, Takthöhe
-- **Laufwerke**: Physikalische Laufwerke mit logischen Partitionen und Auslastungsbalken
-- **VM-Erkennung**: Hyper-V, VMware, VirtualBox, KVM
-- **Systeminfo**: Netzwerk, Betriebssystem, SQL Server Instanzen
-- **Remote-Unterstützung**: CIM/WMI-basiert, öffnet Report automatisch im Browser
+Comprehensive HTML hardware report for local and remote systems:
+- **RAM information**: total, available, DIMM details (manufacturer, size)
+- **CPU details**: model, socket, core count, clock speed
+- **Drives**: physical drives with logical partitions and utilization bars
+- **VM detection**: Hyper-V, VMware, VirtualBox, KVM
+- **System info**: network, operating system, SQL Server instances
+- **Remote support**: CIM/WMI-based, opens the report automatically in the browser
 
-### 🔧 Verbesserungen
+### 🔧 Improvements
 
-#### IntelliSense Fix (PowerShell ISE / VS Code)
-- `FunctionsToExport` in `sqmSQLTool.psd1` von Wildcard-Pattern `*-sqm*` auf explizite Liste aller 103 Funktionen umgestellt
-- Alle Funktionen werden sofort nach `Import-Module sqmSQLTool` in der IDE angezeigt
-- Schnellere IntelliSense-Performance
+#### IntelliSense fix (PowerShell ISE / VS Code)
+- `FunctionsToExport` in `sqmSQLTool.psd1` switched from the wildcard pattern `*-sqm*` to an
+  explicit list of all 103 functions
+- All functions now show up immediately in the IDE after `Import-Module sqmSQLTool`
+- Faster IntelliSense performance
 
-#### Code Signing Setup
-- SignPath.io Integration vorbereitet (Self-Signed Certificate + Workflow)
-- Bewerbung für SignPath.org Community Plan eingereicht
+#### Code signing setup
+- SignPath.io integration prepared (self-signed certificate + workflow)
+- Application submitted for the SignPath.org Community plan
 
-#### 4 neue Reveal.js Präsentationen
-Interaktive Präsentationen auf www.powershelldba.de/Praesentation/:
-- **Performance & Diagnose** (13 Slides)
-- **Security & Compliance** (12 Slides)
-- **Database Health & Best Practices** (12 Slides)
-- **Integration & Externe Systeme** (12 Slides)
+#### 4 new Reveal.js presentations
+Interactive presentations at www.powershelldba.de/Praesentation/:
+- **Performance & Diagnostics** (13 slides)
+- **Security & Compliance** (12 slides)
+- **Database Health & Best Practices** (12 slides)
+- **Integration & External Systems** (12 slides)
 
 ---
 
 ## [1.3.0.0] — 2026-04-30
 
-(Frühere Versionen nicht dokumentiert)
+(Earlier versions not documented)
