@@ -1,5 +1,12 @@
 # sqmSQLTool — Changelog
 
+## [1.9.5.0] — 2026-07-08
+
+### Docs: translate comment-based help to en-US
+
+- `Get-sqmDiskBlockSize`, `New-sqmRandomSaPassword`: comment-based help (SYNOPSIS, DESCRIPTION,
+  PARAMETER, EXAMPLE, NOTES) translated from de-DE to en-US. No logic changes.
+
 ## [1.9.4.0] — 2026-07-08
 
 ### Feature: Klartextsuche in Show-sqmToolGui

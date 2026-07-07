@@ -1,50 +1,50 @@
 ﻿<#
 .SYNOPSIS
-    Generiert ein zufaelliges, richtlinienkonformes SA-Passwort.
+    Generates a random, policy-compliant SA password.
 
 .DESCRIPTION
-    Erstellt ein kryptografisch sicheres Passwort das die SQL Server
-    Passwort-Richtlinie erfuellt:
-        - Mindestlaenge konfigurierbar (Standard: 20 Zeichen)
-        - Mindestens 1 Grossbuchstabe (A-Z)
-        - Mindestens 1 Kleinbuchstabe (a-z)
-        - Mindestens 1 Ziffer (0-9)
-        - Mindestens 1 Sonderzeichen aus dem definierten Set
+    Creates a cryptographically secure password that meets the SQL Server
+    password policy:
+        - Minimum length configurable (default: 20 characters)
+        - At least 1 uppercase letter (A-Z)
+        - At least 1 lowercase letter (a-z)
+        - At least 1 digit (0-9)
+        - At least 1 special character from the defined set
 
-    Optionaler Datei-Export: Passwort wird DPAPI-verschluesselt in eine
-    Textdatei geschrieben (ConvertFrom-SecureString).
-    Nur der Benutzer/Computer der exportiert hat kann die Datei wieder lesen.
+    Optional file export: the password is written to a text file, DPAPI-
+    encrypted (ConvertFrom-SecureString).
+    Only the user/computer that exported it can read the file again.
 
 .PARAMETER Length
-    Laenge des Passworts. Standard: 20. Minimum: 12.
+    Length of the password. Default: 20. Minimum: 12.
 
 .PARAMETER ExportPath
-    Optionaler Pfad fuer die verschluesselte Passwort-Datei.
-    Z.B.: C:\System\Passwords\sa_password.txt
-    Wenn leer: kein Export.
+    Optional path for the encrypted password file.
+    E.g.: C:\System\Passwords\sa_password.txt
+    If empty: no export.
 
 .OUTPUTS
-    [SecureString] - Das generierte Passwort als SecureString.
-    (Klartext wird nicht ausgegeben - nur auf expliziten Wunsch via [PSCredential].)
+    [SecureString] - The generated password as a SecureString.
+    (Plain text is not output - only on explicit request via [PSCredential].)
 
 .EXAMPLE
     $pwd = New-sqmRandomSaPassword
-    # Gibt SecureString zurueck
+    # Returns a SecureString
 
 .EXAMPLE
     $pwd = New-sqmRandomSaPassword -Length 24 -ExportPath 'C:\System\Passwords\sa.txt'
-    # SecureString + DPAPI-Export nach C:\System\Passwords\sa.txt
+    # SecureString + DPAPI export to C:\System\Passwords\sa.txt
 
 .EXAMPLE
-    # Klartext anzeigen (nur fuer Debugging):
+    # Show plain text (debugging only):
     $pwd = New-sqmRandomSaPassword
     $cred = New-Object PSCredential('sa', $pwd)
     $cred.GetNetworkCredential().Password
 
 .NOTES
-    DPAPI-Export: Die Datei kann nur vom selben Windows-Benutzerprofil
-    auf demselben Computer entschluesselt werden.
-    Fuer produktive Umgebungen: Key Vault oder CyberArk verwenden.
+    DPAPI export: the file can only be decrypted from the same Windows user
+    profile on the same computer.
+    For production environments: use Key Vault or CyberArk instead.
 #>
 function New-sqmRandomSaPassword
 {

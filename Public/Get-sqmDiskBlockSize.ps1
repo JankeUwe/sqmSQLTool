@@ -1,54 +1,54 @@
 ﻿<#
 .SYNOPSIS
-    Prueft die NTFS-Blockgroesse (Cluster-Groesse) von Laufwerken auf 64KB.
+    Checks the NTFS block size (cluster size) of drives against 64KB.
 
 .DESCRIPTION
-    Liest die NTFS-Allokationseinheit (Blockgroesse) der angegebenen Laufwerke
-    per WMI (Win32_Volume) und prueft ob die fuer SQL Server empfohlenen
-    64 KB (65536 Bytes) konfiguriert sind.
+    Reads the NTFS allocation unit (block size) of the specified drives via
+    WMI (Win32_Volume) and checks whether the 64 KB (65536 bytes) recommended
+    for SQL Server is configured.
 
-    Kann entweder gezielt einzelne Laufwerkbuchstaben pruefen oder automatisch
-    alle Laufwerke ermitteln die von einer SQL Server-Instanz genutzt werden
-    (Data, Log, Backup, TempDB).
+    Can either check individual drive letters directly, or automatically
+    discover all drives used by a SQL Server instance (Data, Log, Backup,
+    TempDB).
 
-    Rein lesender Zugriff - keine Aenderungen am System.
-    Zum Formatieren: Invoke-sqmFormatDrive64k
+    Read-only access - makes no changes to the system.
+    To format: Invoke-sqmFormatDrive64k
 
 .PARAMETER Drive
-    Laufwerkbuchstabe(n) ohne Doppelpunkt, z.B. 'F', 'G', 'H'.
-    Pipeline-faehig. Wenn nicht angegeben: -SqlInstance muss gesetzt sein.
+    Drive letter(s) without a colon, e.g. 'F', 'G', 'H'.
+    Pipeline-capable. If not provided: -SqlInstance must be set.
 
 .PARAMETER SqlInstance
-    SQL Server-Instanz. Wenn angegeben werden automatisch alle von SQL Server
-    genutzten Laufwerke (Data, Log, Backup, TempDB) aus der Registry ermittelt.
+    SQL Server instance. When provided, all drives used by SQL Server (Data,
+    Log, Backup, TempDB) are automatically discovered from the registry.
 
 .PARAMETER ComputerName
-    Zielcomputer fuer die WMI-Abfrage. Standard: lokaler Computer.
+    Target computer for the WMI query. Default: local computer.
 
 .PARAMETER RecommendedBlockSize
-    Empfohlene Blockgroesse in Bytes. Standard: 65536 (64 KB).
+    Recommended block size in bytes. Default: 65536 (64 KB).
 
 .PARAMETER EnableException
-    Ausnahmen sofort ausloesen statt Write-Error.
+    Throw exceptions immediately instead of Write-Error.
 
 .OUTPUTS
-    [PSCustomObject] je Laufwerk mit den Feldern:
-        Drive                : Laufwerkbuchstabe
-        Path                 : Vollstaendiger Pfad (z.B. F:\)
-        Label                : Volume-Label
-        BlockSize            : Aktuelle Blockgroesse in Bytes
-        BlockSizeKB          : Aktuelle Blockgroesse in KB
-        RecommendedBlockSize : Empfohlene Blockgroesse in Bytes
-        IsRecommended        : $true wenn Blockgroesse korrekt
+    [PSCustomObject] per drive with the fields:
+        Drive                : Drive letter
+        Path                 : Full path (e.g. F:\)
+        Label                : Volume label
+        BlockSize            : Current block size in bytes
+        BlockSizeKB          : Current block size in KB
+        RecommendedBlockSize : Recommended block size in bytes
+        IsRecommended        : $true if the block size is correct
         Status               : OK | Warning | NotNTFS | Error
-        Message              : Detailmeldung
+        Message              : Detail message
 
 .EXAMPLE
-    # Einzelne Laufwerke pruefen
+    # Check individual drives
     Get-sqmDiskBlockSize -Drive 'F', 'G', 'H'
 
 .EXAMPLE
-    # Automatisch alle SQL-Laufwerke der Instanz ermitteln und pruefen
+    # Automatically discover and check all SQL drives of the instance
     Get-sqmDiskBlockSize -SqlInstance "SQL01"
 
 .EXAMPLE
@@ -56,14 +56,14 @@
     'F','G' | Get-sqmDiskBlockSize
 
 .EXAMPLE
-    # Nur Laufwerke mit falscher Blockgroesse anzeigen
+    # Only show drives with an incorrect block size
     Get-sqmDiskBlockSize -SqlInstance "SQL01" | Where-Object { -not $_.IsRecommended }
 
 .NOTES
-    SQL Server Empfehlung: NTFS-Allokationseinheit 64 KB fuer alle Datenlaufwerke.
-    Standard-Windows-Format: 4 KB - fuer SQL Server nicht optimal.
-    Gilt nicht fuer System- und OS-Laufwerke (C:\).
-    Zum Formatieren mit 64 KB: Invoke-sqmFormatDrive64k
+    SQL Server recommendation: 64 KB NTFS allocation unit for all data drives.
+    Default Windows format: 4 KB - not optimal for SQL Server.
+    Does not apply to system/OS drives (C:\).
+    To format with 64 KB: Invoke-sqmFormatDrive64k
 #>
 function Get-sqmDiskBlockSize
 {
