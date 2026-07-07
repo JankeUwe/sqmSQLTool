@@ -1,5 +1,20 @@
 # sqmSQLTool — Changelog
 
+## [1.9.4.0] — 2026-07-08
+
+### Feature: Klartextsuche in Show-sqmToolGui
+
+Kolleg:innen, die sich Funktionsnamen nicht merken, koennen im Suchfeld jetzt auch einen Satz
+eingeben statt einer Wildcard, z.B. "Datenbank restoren" oder "Platte ist voll".
+
+- Eingaben ohne `*`/`?` werden gegen Name, Synopsis, Description und Parameternamen jeder
+  Funktion gescort (Namenstreffer deutlich hoeher gewichtet als Treffer im Fliesstext) und als
+  rangierte "Best matches"-Liste angezeigt statt nach Kategorie gruppiert.
+- Neue `Public/nlp-synonyms.ps1`: kleine, erweiterbare Stichwort-Tabelle fuer umgangssprachliche
+  Formulierungen, die im Hilfetext nicht woertlich vorkommen (z.B. Konjugationen wie "restoren").
+- Reines Wildcard-/Namensverhalten bleibt unveraendert; es wird nie automatisch ausgefuehrt -
+  die Auswahl eines Treffers fuehrt in den bestehenden Parameter-/Preview-/Run-Flow.
+
 ## [1.9.3.0] — 2026-07-03
 
 ### Fix: AlwaysOn-Propagierung fehlte/griff nicht zuverlaessig

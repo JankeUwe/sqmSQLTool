@@ -14,18 +14,34 @@
     support -WhatIf get a "WhatIf (simulation)" option. It is OFF by default, so "Run" actually
     executes - enable the checkbox deliberately to only simulate.
 
+    The search box also accepts plain-language phrases instead of a function name (e.g.
+    "Datenbank restoren" or "Platte ist voll"). Entries without wildcards (*/?) are matched
+    against name, Synopsis, Description and parameter names of every function, boosted by
+    Public\nlp-synonyms.ps1 for colloquial wording that isn't in the help text verbatim. Results
+    are shown ranked under "Best matches" instead of grouped by category. Selecting a suggestion
+    works exactly like picking a function from the tree - nothing is ever run automatically.
+
     The interface uses a Visual Studio "Dark" colour scheme.
 .PARAMETER Filter
-    Optional initial filter for the function list (wildcards allowed).
+    Optional initial filter for the function list. Accepts a wildcard pattern (e.g. '*AlwaysOn*')
+    or a plain-language phrase (e.g. 'Datenbank restoren').
 .EXAMPLE
     Show-sqmToolGui
     Opens the graphical interface with all functions.
 .EXAMPLE
     Show-sqmToolGui -Filter '*AlwaysOn*'
     Opens the interface filtered directly to Always-On functions.
+.EXAMPLE
+    Show-sqmToolGui -Filter 'Datenbank restoren'
+    Opens the interface with ranked suggestions for restoring a database, without needing to
+    know the function name (Invoke-sqmRestoreDatabase).
 .NOTES
     Requires Windows PowerShell with WinForms (System.Windows.Forms). Runs synchronously in the
     current runspace: long operations block the interface while they execute.
+
+    New commands rarely need a Public\nlp-synonyms.ps1 entry - Synopsis/Description text is
+    already searched. Add an entry there only for colloquial wording that wouldn't otherwise
+    match (conjugations, slang, symptom descriptions like "Platte voll").
 #>
 	[CmdletBinding()]
 	param (
@@ -53,12 +69,20 @@
 		$b.FlatAppearance.MouseOverBackColor = $cAccent
 	}
 
-	# --- Load category mapping -----------------------------------------------------
+	# --- Load category mapping -------------------------------------------------------
 	$categoryMap = @{ }
 	$mapFile = Join-Path $PSScriptRoot 'category-map.ps1'
 	if (Test-Path $mapFile)
 	{
 		. $mapFile   # defines $categoryMap
+	}
+
+	# --- Load plain-language synonym boost table for the search box -----------------
+	$sqmNlpSynonyms = @{ }
+	$synFile = Join-Path $PSScriptRoot 'nlp-synonyms.ps1'
+	if (Test-Path $synFile)
+	{
+		. $synFile   # defines $sqmNlpSynonyms
 	}
 
 	# --- Discover functions ---------------------------------------------------------
@@ -101,6 +125,40 @@
 		$funcByCat[$cat].Add($c.Name)
 	}
 
+	# --- Search index for plain-language queries -------------------------------------
+	# Combines name + Synopsis + Description + parameter names + category into one
+	# lowercase blob per function, so a free-text query like "Datenbank wiederherstellen"
+	# can match on wording used in the help text even when it isn't in the function name.
+	# Built once here (96 short file reads, sub-second) rather than per keystroke.
+	# Name and Body are kept separate (not one blob) so a word found in the function
+	# name itself can be weighted much higher than a word merely mentioned somewhere
+	# in its help text - otherwise generic domain words diluted the ranking badly.
+	$script:searchIndex = @{ }
+	foreach ($c in $commands)
+	{
+		$body = ''
+		$srcFile = $c.ScriptBlock.File
+		if ($srcFile -and (Test-Path $srcFile))
+		{
+			$src = Get-Content $srcFile -Raw
+			if ($src -match '(?ms)\.SYNOPSIS[ \t]*\r?\n(.*?)\r?\n[ \t]*(?:\.[A-Z]|#>)') { $body += ' ' + $Matches[1] }
+			if ($src -match '(?ms)\.DESCRIPTION[ \t]*\r?\n(.*?)\r?\n[ \t]*(?:\.[A-Z]|#>)') { $body += ' ' + $Matches[1] }
+		}
+		$body += ' ' + ($c.Parameters.Keys -join ' ')
+		$cat = if ($categoryMap.ContainsKey($c.Name)) { $categoryMap[$c.Name] } else { 'Other' }
+		$body += ' ' + $cat
+		$script:searchIndex[$c.Name] = @{ Name = $c.Name.ToLowerInvariant(); Body = $body.ToLowerInvariant() }
+	}
+
+	# German filler words that would otherwise dilute keyword scoring without adding
+	# any signal (e.g. "Ich will eine Datenbank restoren" -> only "datenbank"/"restoren" count).
+	$sqmNlpStopWords = @(
+		'ich', 'will', 'wir', 'du', 'sie', 'eine', 'einen', 'einer', 'eines', 'der', 'die', 'das',
+		'und', 'oder', 'für', 'fuer', 'mit', 'von', 'auf', 'ist', 'sind', 'soll', 'sollte',
+		'möchte', 'moechte', 'kann', 'kannst', 'wie', 'was', 'wo', 'bitte', 'mal', 'doch', 'auch',
+		'bei', 'zum', 'zur', 'den', 'dem', 'des'
+	)
+
 	# --- Main window ---------------------------------------------------------------
 	$form = New-Object System.Windows.Forms.Form
 	$yearSpan = "2025-$((Get-Date).ToString('yy'))"
@@ -131,10 +189,12 @@
 	$searchBox.ForeColor = $cText
 	$searchBox.BorderStyle = 'FixedSingle'
 	$lblSearch = New-Object System.Windows.Forms.Label
-	$lblSearch.Text = 'Search / filter:'
+	$lblSearch.Text = 'Search (name, wildcard, or plain language):'
 	$lblSearch.Dock = 'Top'
 	$lblSearch.Height = 18
 	$lblSearch.ForeColor = $cDim
+	$tipSearch = New-Object System.Windows.Forms.ToolTip
+	$tipSearch.SetToolTip($searchBox, "Type a function name/wildcard (e.g. *AlwaysOn*) or describe what you want to do, e.g. 'Datenbank restoren' or 'Platte ist voll'.")
 
 	$tree = New-Object System.Windows.Forms.TreeView
 	$tree.Dock = 'Fill'
@@ -150,23 +210,85 @@
 	$split.Panel1.Controls.Add($lblSearch)
 	$split.Panel1.BackColor = $cPanel
 
-	# (Re-)populate the tree from a filter
+	# (Re-)populate the tree from a filter. Two modes:
+	#  - wildcard/empty  -> classic behaviour: name match, grouped by category (unchanged).
+	#  - plain phrase    -> keyword search across name/Synopsis/Description/parameters,
+	#                       boosted by nlp-synonyms.ps1, shown as a single ranked list.
 	$populateTree = {
 		param ($flt)
 		$tree.BeginUpdate()
 		$tree.Nodes.Clear()
 		if ([string]::IsNullOrWhiteSpace($flt)) { $flt = '*' }
-		if ($flt -notmatch '[\*\?]') { $flt = "*$flt*" }
-		foreach ($cat in ($funcByCat.Keys | Sort-Object))
+
+		if ($flt -eq '*' -or $flt -match '[\*\?]')
 		{
-			$matched = $funcByCat[$cat] | Where-Object { $_ -like $flt }
-			if (-not $matched) { continue }
-			$catNode = $tree.Nodes.Add("$cat  ($($matched.Count))")
-			$catNode.Tag = $null
-			foreach ($fn in ($matched | Sort-Object))
+			foreach ($cat in ($funcByCat.Keys | Sort-Object))
 			{
-				$n = $catNode.Nodes.Add($fn)
-				$n.Tag = $fn
+				$matched = $funcByCat[$cat] | Where-Object { $_ -like $flt }
+				if (-not $matched) { continue }
+				$catNode = $tree.Nodes.Add("$cat  ($($matched.Count))")
+				$catNode.Tag = $null
+				foreach ($fn in ($matched | Sort-Object))
+				{
+					$n = $catNode.Nodes.Add($fn)
+					$n.Tag = $fn
+				}
+			}
+		}
+		else
+		{
+			$queryLower = $flt.ToLowerInvariant()
+			$words = ($queryLower -split '[^\p{L}\p{N}]+') |
+			Where-Object { $_.Length -ge 3 -and $sqmNlpStopWords -notcontains $_ }
+
+			# Synonym boost: ALL words of a multi-word key must appear among the query
+			# tokens (order/gaps don't matter), so "Platte ist voll" still matches the
+			# key "platte voll" even though "ist" sits in between.
+			$boost = @{ }
+			foreach ($synKey in $sqmNlpSynonyms.Keys)
+			{
+				$keyWords = $synKey -split '\s+'
+				$allPresent = $true
+				foreach ($kw in $keyWords) { if ($words -notcontains $kw) { $allPresent = $false; break } }
+				if ($allPresent)
+				{
+					foreach ($fn in $sqmNlpSynonyms[$synKey]) { $boost[$fn] = $boost[$fn] + 3 }
+				}
+			}
+
+			# A word found in the function name itself is a much stronger signal than one
+			# merely mentioned in the help text (e.g. "Failover" -> Invoke-sqmFailover should
+			# clearly outrank AG functions that just mention failover in passing).
+			$scores = @{ }
+			foreach ($fn in $commands.Name)
+			{
+				$idx = $script:searchIndex[$fn]
+				$score = 0
+				foreach ($w in $words)
+				{
+					if ($idx.Name -like "*$w*") { $score += 4 }
+					if ($idx.Body -like "*$w*") { $score += 1 }
+				}
+				if ($boost.ContainsKey($fn)) { $score += $boost[$fn] }
+				if ($score -gt 0) { $scores[$fn] = $score }
+			}
+
+			if ($scores.Count -eq 0)
+			{
+				$noneNode = $tree.Nodes.Add('No matches - try different words or a name fragment')
+				$noneNode.Tag = $null
+			}
+			else
+			{
+				$ranked = $scores.Keys | Sort-Object @{ Expression = { $scores[$_] }; Descending = $true }, @{ Expression = { $_ } }
+				$shown = $ranked | Select-Object -First 10
+				$topNode = $tree.Nodes.Add("Best matches  ($($shown.Count) of $($scores.Count))")
+				$topNode.Tag = $null
+				foreach ($fn in $shown)
+				{
+					$n = $topNode.Nodes.Add($fn)
+					$n.Tag = $fn
+				}
 			}
 		}
 		if ($tree.Nodes.Count -le 4) { $tree.ExpandAll() }
