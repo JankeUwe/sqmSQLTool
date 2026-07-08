@@ -225,18 +225,23 @@ function Get-sqmAgentJobScheduleReport {
                 }
             }
 
-            # Generate HTML report
+            # Generate HTML report (always, even if empty)
             $htmlPath = Join-Path $OutputPath "AgentJobSchedule_${cleanInstance}_${timestamp}.html"
-            $html = _GenerateAgentJobHtml -JobData $jobData -SqlInstance $SqlInstance -Timestamp $timestamp
 
             try {
+                $html = if ($jobData -and $jobData.Count -gt 0) {
+                    _GenerateAgentJobHtml -JobData $jobData -SqlInstance $SqlInstance -Timestamp $timestamp
+                } else {
+                    _GenerateAgentJobHtml -JobData @() -SqlInstance $SqlInstance -Timestamp $timestamp
+                }
+
                 $html | Out-File -FilePath $htmlPath -Encoding UTF8 -Force -ErrorAction Stop
-                Invoke-sqmLogging -Message "HTML report generated: $htmlPath" `
+                Invoke-sqmLogging -Message "HTML report generated successfully: $htmlPath" `
                                   -FunctionName $functionName -Level "INFO"
             } catch {
                 $fileErr = "Failed to write HTML report to '$htmlPath': $($_.Exception.Message)"
                 Invoke-sqmLogging -Message $fileErr -FunctionName $functionName -Level "ERROR"
-                throw $fileErr
+                if ($EnableException) { throw $fileErr }
             }
 
         } catch {
@@ -380,10 +385,12 @@ function _GenerateAgentJobHtml {
         [string]$Timestamp
     )
 
+    if (-not $JobData) { $JobData = @() }
+
     $reportDate = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    $successCount = ($JobData | Where-Object { $_.LastStatus -eq 'Success' }).Count
-    $failureCount = ($JobData | Where-Object { $_.LastStatus -eq 'Failed' }).Count
-    $disabledCount = ($JobData | Where-Object { $_.Enabled -eq 'No' }).Count
+    $successCount = @($JobData | Where-Object { $_.LastStatus -eq 'Success' }).Count
+    $failureCount = @($JobData | Where-Object { $_.LastStatus -eq 'Failed' }).Count
+    $disabledCount = @($JobData | Where-Object { $_.Enabled -eq 'No' }).Count
 
     $html = @"
 <!DOCTYPE html>
