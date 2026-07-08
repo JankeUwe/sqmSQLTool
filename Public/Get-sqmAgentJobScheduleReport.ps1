@@ -225,21 +225,23 @@ function Get-sqmAgentJobScheduleReport {
                 }
             }
 
-            # Generate HTML report (always, even if empty)
+            # Generate HTML report - always create file
             $htmlPath = Join-Path $OutputPath "AgentJobSchedule_${cleanInstance}_${timestamp}.html"
 
             try {
-                $html = if ($jobData -and $jobData.Count -gt 0) {
-                    _GenerateAgentJobHtml -JobData $jobData -SqlInstance $SqlInstance -Timestamp $timestamp
-                } else {
-                    _GenerateAgentJobHtml -JobData @() -SqlInstance $SqlInstance -Timestamp $timestamp
+                # Call HTML generation function
+                $html = _GenerateAgentJobHtml -JobData $jobData -SqlInstance $SqlInstance -Timestamp $timestamp
+
+                # Write to file with explicit error handling
+                if ([string]::IsNullOrEmpty($html)) {
+                    $html = "<html><body><h1>Error: HTML generation returned empty</h1></body></html>"
                 }
 
-                $html | Out-File -FilePath $htmlPath -Encoding UTF8 -Force -ErrorAction Stop
-                Invoke-sqmLogging -Message "HTML report generated successfully: $htmlPath" `
+                [System.IO.File]::WriteAllText($htmlPath, $html, [System.Text.Encoding]::UTF8)
+                Invoke-sqmLogging -Message "HTML report created: $htmlPath (Size: $([System.IO.FileInfo]::new($htmlPath).Length) bytes)" `
                                   -FunctionName $functionName -Level "INFO"
             } catch {
-                $fileErr = "Failed to write HTML report to '$htmlPath': $($_.Exception.Message)"
+                $fileErr = "HTML report creation failed: $($_.Exception.Message)"
                 Invoke-sqmLogging -Message $fileErr -FunctionName $functionName -Level "ERROR"
                 if ($EnableException) { throw $fileErr }
             }
