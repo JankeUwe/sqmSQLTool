@@ -203,7 +203,11 @@ function Get-sqmAgentJobScheduleReport {
                     AvgDuration         = $avgDuration
                     LastError           = if ($history.LastErrorMessage -and $history.LastRunStatus -eq 'Failed') {
                         $cleanMsg = ($history.LastErrorMessage -replace '\[.*?\]', '' -replace '\r\n', ' ').Trim()
-                        $cleanMsg.Substring(0, [math]::Min(100, $cleanMsg.Length))
+                        if ($cleanMsg.Length -gt 100) {
+                            $cleanMsg.Substring(0, 100)
+                        } else {
+                            $cleanMsg
+                        }
                     } else {
                         'N/A'
                     }
@@ -341,8 +345,14 @@ function _ConvertJobRunTime {
     if ($RunDate -eq 0) { return $null }
 
     try {
-        $dateStr = $RunDate.ToString('00000000')
-        $timeStr = $RunTime.ToString('000000')
+        # Pad with zeros to ensure correct length
+        $dateStr = $RunDate.ToString().PadLeft(8, '0')
+        $timeStr = $RunTime.ToString().PadLeft(6, '0')
+
+        # Validate length before substring
+        if ($dateStr.Length -lt 8 -or $timeStr.Length -lt 6) {
+            return 'Invalid DateTime Format'
+        }
 
         $year = [int]$dateStr.Substring(0, 4)
         $month = [int]$dateStr.Substring(4, 2)
