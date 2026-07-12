@@ -252,7 +252,7 @@
 			# IconUri = ''
 
 			# ReleaseNotes of this module
-			ReleaseNotes = 'See CHANGELOG.md and GitHub: https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.8.5.0'
+			ReleaseNotes = 'See CHANGELOG.md and GitHub: https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.9.6.0'
 
 			# External module dependencies
 			ExternalModuleDependencies = @('dbatools')

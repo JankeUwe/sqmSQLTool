@@ -1,7 +1,7 @@
 # AlwaysOn Betriebs-Tools
 
-**sqmSQLTool v1.4.7.0** — Zusammenstellung der Funktionen für den Betrieb von AlwaysOn Availability Groups
-Quelle: www.powershelldba.de · Stand: 2026-06-09 · *Interne Übersicht*
+**sqmSQLTool v1.9.6.0** — Zusammenstellung der Funktionen für den Betrieb von AlwaysOn Availability Groups
+Quelle: www.powershelldba.de · Stand: 2026-07-12 · *Interne Übersicht*
 
 ---
 
