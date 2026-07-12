@@ -1,5 +1,16 @@
 # sqmSQLTool — Changelog
 
+## [1.9.9.1] — 2026-07-12
+
+### Fix: Get-sqmCertificateReport always reported "Database Master Key: FEHLT"
+
+- The DMK-encryption-status query selected `is_master_key_encrypted_by_server` from
+  `sys.symmetric_keys`, but that column actually lives on `sys.databases` - the query always
+  failed silently (caught by `-ErrorAction SilentlyContinue`), so `HasDatabaseMasterKey` and
+  `DmkEncryptedBySmk` were always `$false` regardless of the real server state. Found while
+  generating demo reports against DEV01 for the website. Fixed by joining `sys.symmetric_keys`
+  (existence/modify_date) with `sys.databases` (encryption flag).
+
 ## [1.9.9.0] — 2026-07-12
 
 ### Feature: HTML reports for sysadmin/AD audit functions

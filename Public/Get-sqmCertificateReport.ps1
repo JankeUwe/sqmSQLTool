@@ -147,13 +147,15 @@ function Get-sqmCertificateReport
 				# -------------------------------------------------------------------
 				# 1. Database Master Key Status in master pruefen
 				# -------------------------------------------------------------------
+				# is_master_key_encrypted_by_server ist eine Spalte von sys.databases (DB-Property),
+				# NICHT von sys.symmetric_keys (dort gibt es diese Spalte nicht - fruehere Version
+				# dieser Abfrage schlug deshalb immer fehl und meldete faelschlich "DMK fehlt").
 				$dmkQuery = @"
-SELECT
-    name,
-    is_master_key_encrypted_by_server,
-    modify_date
-FROM sys.symmetric_keys
-WHERE name = '##MS_DatabaseMasterKey##'
+SELECT sk.name, sk.modify_date, d.is_master_key_encrypted_by_server
+FROM sys.symmetric_keys sk
+CROSS JOIN sys.databases d
+WHERE sk.name = '##MS_DatabaseMasterKey##'
+  AND d.name = 'master'
 "@
 				$dmkResult = Invoke-DbaQuery @connParams -Database 'master' -Query $dmkQuery -ErrorAction SilentlyContinue
 				$hasDmk = ($null -ne $dmkResult)
