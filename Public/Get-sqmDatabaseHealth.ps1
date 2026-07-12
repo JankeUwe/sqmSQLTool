@@ -12,7 +12,7 @@
     - Database size (data + log)
     - Database status (Online, Suspect, Restoring, ...)
 
-    Results are saved as TXT report and CSV file in the specified directory.
+    Results are saved as HTML, TXT and CSV files in the specified directory.
     The function also returns an object with the detail data and file paths.
 
 .PARAMETER SqlInstance
@@ -152,6 +152,7 @@ function Get-sqmDatabaseHealth
 							DetailRows  = @()
 							TxtFile	    = $null
 							CsvFile	    = $null
+							HtmlFile    = $null
 						})
 					continue
 				}
@@ -289,7 +290,8 @@ END
 				$safeInst = $instance -replace '[\\/:*?"<>|]', '_'
 				$txtFile = Join-Path $OutputPath "DatabaseHealth_${safeInst}_${datestamp}.txt"
 				$csvFile = Join-Path $OutputPath "DatabaseHealth_${safeInst}_${datestamp}.csv"
-				
+				$htmlFile = Join-Path $OutputPath "DatabaseHealth_${safeInst}_${datestamp}.html"
+
 				if ($PSCmdlet.ShouldProcess($instance, "Erstelle Database-Health-Bericht in $OutputPath"))
 				{
 					if (-not (Test-Path $OutputPath))
@@ -330,15 +332,28 @@ END
 					# CSV-Datei
 					$detailRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 
-					Invoke-sqmOpenReport -TxtFile $txtFile -NoOpen:$NoOpen
+					# HTML-Bericht (gleiches Farbschema: OK/Warning/Critical)
+					$rowsHtml = foreach ($e in ($detailRows | Sort-Object OverallStatus, Database))
+					{
+						$sevClass = switch ($e.OverallStatus) { 'Critical' { 'crit' }; 'Warning' { 'warn' }; default { 'ok' } }
+						"<tr><td class='$sevClass'>$($e.OverallStatus)</td><td>$([System.Net.WebUtility]::HtmlEncode($e.Database))</td><td>$($e.RecoveryModel)</td><td>$($e.SizeMB)</td><td>$($e.CheckDbStatus) ($($e.CheckDbAgeDays)d)</td><td>$($e.VlfStatus) ($($e.VlfCount))</td><td>$($e.AutoGrowthEvents)</td><td>$($e.LastFullBackup)</td><td>$($e.LastLogBackup)</td></tr>"
+					}
+					$bodyHtml = "<p>OK: $cntOk | Warning: $cntWarn | Critical: $cntCrit</p>" +
+						"<table><tr><th>Status</th><th>Datenbank</th><th>Recovery</th><th>SizeMB</th><th>CheckDB</th><th>VLF</th><th>AutoGrowth</th><th>Letztes Full</th><th>Letztes Log</th></tr>" +
+						($rowsHtml -join '') + "</table>"
+					$html = ConvertTo-sqmHtmlReport -Title "Database Health - $instance" -Subtitle "Erstellt: $timestamp" -BodyHtml $bodyHtml
+					$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
 
-					Invoke-sqmLogging -Message "[$instance] Database-Health-Bericht erstellt: $txtFile" -FunctionName $functionName -Level "INFO"
+					Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
+
+					Invoke-sqmLogging -Message "[$instance] Database-Health-Bericht erstellt: $htmlFile" -FunctionName $functionName -Level "INFO"
 				}
 				else
 				{
 					Invoke-sqmLogging -Message "[$instance] WhatIf: Berichtsdateien wuerden erstellt werden." -FunctionName $functionName -Level "VERBOSE"
 					$txtFile = $null
 					$csvFile = $null
+					$htmlFile = $null
 				}
 				
 				# Ergebnisobjekt fuer diese Instanz
@@ -348,6 +363,7 @@ END
 					DetailRows					     = $detailRows
 					TxtFile						     = $txtFile
 					CsvFile						     = $csvFile
+					HtmlFile					     = $htmlFile
 					Status						     = if ($cntCrit -gt 0) { 'Critical' } elseif ($cntWarn -gt 0) { 'Warning' } else { 'OK' }
 				}
 				$allInstanceResults.Add($result)
@@ -368,6 +384,7 @@ END
 						DetailRows  = $null
 						TxtFile	    = $null
 						CsvFile	    = $null
+						HtmlFile    = $null
 					})
 				if ($EnableException) { throw }
 				if (-not $ContinueOnError) { throw $_ }

@@ -51,7 +51,10 @@ function Get-sqmADGroupMembersRecursive
         [int]$Depth = 2,
 
         [Parameter(Mandatory = $false)]
-        [string]$OutputPath = "C:\System\WinSrvLog\MSSQL"
+        [string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+
+        [Parameter(Mandatory = $false)]
+        [switch]$NoOpen
     )
 
     begin
@@ -236,6 +239,7 @@ function Get-sqmADGroupMembersRecursive
                 # Write reports
                 $txtFile = $null
                 $csvFile = $null
+                $htmlFile = $null
 
                 if ($PSCmdlet.ShouldProcess($cleanGroup, "Create report"))
                 {
@@ -247,6 +251,7 @@ function Get-sqmADGroupMembersRecursive
                     $safeGroup = $cleanGroup -replace '[\\/:*?"<>|]', '_'
                     $txtFile = Join-Path $OutputPath "ADGroupMembers_${safeGroup}_Depth${Depth}_${datestamp}.txt"
                     $csvFile = Join-Path $OutputPath "ADGroupMembers_${safeGroup}_Depth${Depth}_${datestamp}.csv"
+                    $htmlFile = Join-Path $OutputPath "ADGroupMembers_${safeGroup}_Depth${Depth}_${datestamp}.html"
 
                     $lines = @(
                         "# sqmSQLTool - www.powershelldba.de"
@@ -271,7 +276,20 @@ function Get-sqmADGroupMembersRecursive
                     $lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
                     $members | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 
-                    Invoke-sqmLogging -Message "[$cleanGroup] Report: $txtFile" -FunctionName $functionName -Level "INFO"
+                    # HTML report
+                    $rowsHtml = foreach ($m in $members)
+                    {
+                        "<tr><td>$([System.Net.WebUtility]::HtmlEncode($m.SamAccountName))</td><td>$([System.Net.WebUtility]::HtmlEncode($m.DisplayName))</td><td>$($m.ObjectClass)</td><td>$($m.Depth)</td></tr>"
+                    }
+                    $bodyHtml = "<p>Gruppe: $([System.Net.WebUtility]::HtmlEncode($cleanGroup)) | Domain: $([System.Net.WebUtility]::HtmlEncode($targetDomain)) | Depth: $Depth | Mitglieder: $($members.Count)</p>" +
+                        "<table><tr><th>SamAccountName</th><th>DisplayName</th><th>Type</th><th>Level</th></tr>" +
+                        ($rowsHtml -join '') + "</table>"
+                    $html = ConvertTo-sqmHtmlReport -Title "AD Group Members (Recursive) - $cleanGroup" -Subtitle "Erstellt: $timestamp | Depth: $Depth" -BodyHtml $bodyHtml
+                    $html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+
+                    Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
+
+                    Invoke-sqmLogging -Message "[$cleanGroup] Report: $htmlFile" -FunctionName $functionName -Level "INFO"
                 }
 
                 $allResults.Add([PSCustomObject]@{
@@ -283,6 +301,7 @@ function Get-sqmADGroupMembersRecursive
                         Timestamp   = $timestamp
                         TxtFile     = $txtFile
                         CsvFile     = $csvFile
+                        HtmlFile    = $htmlFile
                         Status      = if ($members.Count -gt 0) { 'OK' } else { 'Warning' }
                     })
 
@@ -301,6 +320,7 @@ function Get-sqmADGroupMembersRecursive
                         Timestamp   = $timestamp
                         TxtFile     = $null
                         CsvFile     = $null
+                        HtmlFile    = $null
                         Status      = 'Error'
                         Message     = $errMsg
                     })

@@ -238,6 +238,40 @@ ORDER BY r.wait_time DESC
 					})
 			}
 			
+			# Optional: CSV- und HTML-Snapshot schreiben
+			$csvFile = $null
+			$htmlFile = $null
+			if ($OutputPath -and $blockedSessions.Count -gt 0)
+			{
+				if (-not (Test-Path $OutputPath))
+				{
+					New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
+				}
+				$stamp = Get-Date -Format 'yyyyMMdd_HHmsqm'
+				$safeInst = $SqlInstance -replace '\\', '_'
+
+				$csvFile = Join-Path $OutputPath "Blocking_${safeInst}_${stamp}.csv"
+				$blockedSessions | Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
+				# CSV wird NICHT automatisch geoeffnet (wuerde Excel starten).
+				Invoke-sqmLogging -Message "Blocking-Snapshot gespeichert: $csvFile" -FunctionName $functionName -Level "INFO"
+
+				# HTML-Bericht: Ketten + betroffene Sessions, farblich nach Wartezeit
+				$htmlFile = Join-Path $OutputPath "Blocking_${safeInst}_${stamp}.html"
+				$rowsHtml = foreach ($s in ($blockedSessions | Sort-Object WaitSeconds -Descending))
+				{
+					$sevClass = if ($s.WaitSeconds -ge 60) { 'crit' } elseif ($s.WaitSeconds -ge 10) { 'warn' } else { 'ok' }
+					"<tr><td class='$sevClass'>$($s.WaitSeconds)s</td><td>$($s.BlockedSpid)</td><td>$($s.BlockingSpid)</td><td>$([System.Net.WebUtility]::HtmlEncode($s.DatabaseName))</td><td>$([System.Net.WebUtility]::HtmlEncode($s.WaitType))</td><td>$([System.Net.WebUtility]::HtmlEncode($s.BlockedLogin))</td><td>$([System.Net.WebUtility]::HtmlEncode($s.BlockingLogin))</td><td>$([System.Net.WebUtility]::HtmlEncode($s.BlockedStatement))</td><td>$([System.Net.WebUtility]::HtmlEncode($s.BlockingStatement))</td></tr>"
+				}
+				$bodyHtml = "<p>$($chains.Count) Blockierungskette(n), $($blockedSessions.Count) blockierte Session(s).</p>" +
+					"<table><tr><th>Wartezeit</th><th>Blocked SPID</th><th>Blocking SPID</th><th>Datenbank</th><th>WaitType</th><th>Blocked Login</th><th>Blocking Login</th><th>Blocked Statement</th><th>Blocking Statement</th></tr>" +
+					($rowsHtml -join '') + "</table>"
+				$html = ConvertTo-sqmHtmlReport -Title "Blocking Report - $SqlInstance" -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -BodyHtml $bodyHtml
+				$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+
+				Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
+				Invoke-sqmLogging -Message "Blocking-HTML-Bericht gespeichert: $htmlFile" -FunctionName $functionName -Level "INFO"
+			}
+
 			$result = [PSCustomObject]@{
 				SqlInstance = $SqlInstance
 				CaptureTime = (Get-Date)
@@ -246,22 +280,8 @@ ORDER BY r.wait_time DESC
 				HeadBlockers = $trueHeadBlockers
 				BlockedSessions = $blockedSessions
 				BlockedCount = $blockedSessions.Count
-			}
-			
-			# Optional: CSV-Snapshot schreiben
-			if ($OutputPath -and $blockedSessions.Count -gt 0)
-			{
-				if (-not (Test-Path $OutputPath))
-				{
-					New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
-				}
-				$csvFile = Join-Path $OutputPath "Blocking_$(($SqlInstance -replace '\\', '_'))_$(Get-Date -Format 'yyyyMMdd_HHmsqm').csv"
-				$blockedSessions | Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
-
-				# CSV wird NICHT automatisch geoeffnet (wuerde Excel starten).
-				# TXT/HTML-Ausgabe mit Auto-Open folgt in einem spaeteren Schritt.
-
-				Invoke-sqmLogging -Message "Blocking-Snapshot gespeichert: $csvFile" -FunctionName $functionName -Level "INFO"
+				CsvFile = $csvFile
+				HtmlFile = $htmlFile
 			}
 			
 			$msg = if ($result.HasBlocking)

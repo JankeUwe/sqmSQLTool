@@ -47,7 +47,10 @@ function Get-sqmADGroupMembers
         [string]$Domain,
 
         [Parameter(Mandatory = $false)]
-        [string]$OutputPath = "C:\System\WinSrvLog\MSSQL"
+        [string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+
+        [Parameter(Mandatory = $false)]
+        [switch]$NoOpen
     )
 
     begin
@@ -213,6 +216,7 @@ function Get-sqmADGroupMembers
                 # Write report files
                 $txtFile = $null
                 $csvFile = $null
+                $htmlFile = $null
 
                 if ($PSCmdlet.ShouldProcess($cleanGroup, "Erstelle Bericht"))
                 {
@@ -226,6 +230,7 @@ function Get-sqmADGroupMembers
                     $safeGroup = $cleanGroup -replace '[\\/:*?"<>|]', '_'
                     $txtFile = Join-Path $OutputPath "ADGroupMembers_${safeGroup}_${datestamp}.txt"
                     $csvFile = Join-Path $OutputPath "ADGroupMembers_${safeGroup}_${datestamp}.csv"
+                    $htmlFile = Join-Path $OutputPath "ADGroupMembers_${safeGroup}_${datestamp}.html"
 
                     $lines = @(
                         "# sqmSQLTool - www.powershelldba.de"
@@ -250,7 +255,20 @@ function Get-sqmADGroupMembers
                     $lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
                     $members | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 
-                    Invoke-sqmLogging -Message "[$cleanGroup] Bericht: $txtFile" -FunctionName $functionName -Level "INFO"
+                    # HTML report (same theme/style as the rest of the module)
+                    $rowsHtml = foreach ($m in ($members | Sort-Object SamAccountName))
+                    {
+                        "<tr><td>$([System.Net.WebUtility]::HtmlEncode($m.SamAccountName))</td><td>$([System.Net.WebUtility]::HtmlEncode($m.DisplayName))</td><td>$($m.ObjectClass)</td></tr>"
+                    }
+                    $bodyHtml = "<p>Gruppe: $([System.Net.WebUtility]::HtmlEncode($cleanGroup)) | Domain: $([System.Net.WebUtility]::HtmlEncode($targetDomain)) | Methode: $methodUsed | Mitglieder: $($members.Count)</p>" +
+                        "<table><tr><th>SamAccountName</th><th>DisplayName</th><th>Type</th></tr>" +
+                        ($rowsHtml -join '') + "</table>"
+                    $html = ConvertTo-sqmHtmlReport -Title "AD Group Members - $cleanGroup" -Subtitle "Erstellt: $timestamp" -BodyHtml $bodyHtml
+                    $html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+
+                    Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
+
+                    Invoke-sqmLogging -Message "[$cleanGroup] Bericht: $htmlFile" -FunctionName $functionName -Level "INFO"
                 }
 
                 # Result object
@@ -263,6 +281,7 @@ function Get-sqmADGroupMembers
                         Timestamp   = $timestamp
                         TxtFile     = $txtFile
                         CsvFile     = $csvFile
+                        HtmlFile    = $htmlFile
                         Status      = if ($members.Count -gt 0) { 'OK' } else { 'Warning' }
                     })
             }
@@ -279,6 +298,7 @@ function Get-sqmADGroupMembers
                         Timestamp   = $timestamp
                         TxtFile     = $null
                         CsvFile     = $null
+                        HtmlFile    = $null
                         Status      = 'Error'
                         Message     = $errMsg
                     })

@@ -91,7 +91,9 @@ function Get-sqmServiceBrokerHealth
 			$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 			$cleanServerName = $server.Name -replace '\\', '-'
 			$reportFile = Join-Path $OutputPath ("ServiceBrokerHealth_" + $cleanServerName + "_" + $timestamp + ".txt")
+			$htmlFile = Join-Path $OutputPath ("ServiceBrokerHealth_" + $cleanServerName + "_" + $timestamp + ".html")
 			$reportContent = [System.Collections.Generic.List[string]]::new()
+			$htmlSections = [System.Collections.Generic.List[string]]::new()
 
 			# Header
 			$reportContent.Add("=" * 80) | Out-Null
@@ -107,6 +109,7 @@ function Get-sqmServiceBrokerHealth
 			$isAlwaysOn = $agResult.AGCount -gt 0
 			$reportContent.Add("Configuration: $(if ($isAlwaysOn) { 'AlwaysOn Availability Group' } else { 'Single System' })") | Out-Null
 			$reportContent.Add("") | Out-Null
+			$htmlSections.Add("<p>Configuration: $(if ($isAlwaysOn) { 'AlwaysOn Availability Group' } else { 'Single System' })</p>") | Out-Null
 
 			# 2. Broker Endpoints
 			$reportContent.Add("-" * 80) | Out-Null
@@ -135,11 +138,18 @@ ORDER BY name
 					$reportContent.Add("  Type:        $($ep.type_desc)") | Out-Null
 					$reportContent.Add("") | Out-Null
 				}
+				$epRowsHtml = foreach ($ep in $endpoints)
+				{
+					$sevClass = if ($ep.state_desc -eq 'STARTED') { 'ok' } else { 'warn' }
+					"<tr><td>$([System.Net.WebUtility]::HtmlEncode($ep.name))</td><td class='$sevClass'>$($ep.state_desc)</td><td>$($ep.protocol_desc)</td><td>$($ep.type_desc)</td></tr>"
+				}
+				$htmlSections.Add("<h3>Service Broker Endpoints</h3><table><tr><th>Endpoint</th><th>State</th><th>Protocol</th><th>Type</th></tr>$($epRowsHtml -join '')</table>") | Out-Null
 			}
 			else
 			{
 				$reportContent.Add("  No Service Broker endpoints found") | Out-Null
 				$reportContent.Add("") | Out-Null
+				$htmlSections.Add("<h3>Service Broker Endpoints</h3><p>No Service Broker endpoints found</p>") | Out-Null
 			}
 
 			# 3. Broker Status per Database
@@ -171,6 +181,13 @@ ORDER BY name
 				$reportContent.Add("  $($db.name): $status") | Out-Null
 			}
 			$reportContent.Add("") | Out-Null
+			$dbRowsHtml = foreach ($db in $brokerDbs)
+			{
+				$sevClass = if ($db.is_broker_enabled) { 'ok' } else { 'warn' }
+				$status = if ($db.is_broker_enabled) { "ENABLED" } else { "DISABLED" }
+				"<tr><td>$([System.Net.WebUtility]::HtmlEncode($db.name))</td><td class='$sevClass'>$status</td></tr>"
+			}
+			$htmlSections.Add("<h3>Service Broker Status per Database</h3><p>Enabled: $enabledCount | Disabled: $disabledCount</p><table><tr><th>Database</th><th>Status</th></tr>$($dbRowsHtml -join '')</table>") | Out-Null
 
 			# 4. Service Queues
 			$reportContent.Add("-" * 80) | Out-Null
@@ -188,6 +205,7 @@ FROM sys.service_queues
 ORDER BY name
 "@
 
+			$queueRowsHtml = [System.Collections.Generic.List[string]]::new()
 			foreach ($db in $brokerDbs | Where-Object { $_.is_broker_enabled -eq 1 })
 			{
 				$queues = $server.Query($queueQuery, $db.name)
@@ -201,9 +219,12 @@ ORDER BY name
 						$reportContent.Add("    Receive:     $(if ($q.is_receive_enabled) { 'ON' } else { 'OFF' })") | Out-Null
 						$reportContent.Add("    Activation:  $(if ($q.is_activation_enabled) { 'ON' } else { 'OFF' })") | Out-Null
 						$reportContent.Add("") | Out-Null
+
+						$queueRowsHtml.Add("<tr><td>$([System.Net.WebUtility]::HtmlEncode($db.name))</td><td>$([System.Net.WebUtility]::HtmlEncode($q.name))</td><td>$(if ($q.is_enqueue_enabled) { 'ON' } else { 'OFF' })</td><td>$(if ($q.is_receive_enabled) { 'ON' } else { 'OFF' })</td><td>$(if ($q.is_activation_enabled) { 'ON' } else { 'OFF' })</td></tr>") | Out-Null
 					}
 				}
 			}
+			$htmlSections.Add("<h3>Service Queues</h3><table><tr><th>Database</th><th>Queue</th><th>Enqueue</th><th>Receive</th><th>Activation</th></tr>$($queueRowsHtml -join '')</table>") | Out-Null
 
 			# 5. Undeliverable Messages
 			$reportContent.Add("-" * 80) | Out-Null
@@ -214,6 +235,7 @@ ORDER BY name
 SELECT COUNT(*) as UndeliverableCount FROM sys.transmission_queue
 "@
 
+			$undelivRowsHtml = [System.Collections.Generic.List[string]]::new()
 			foreach ($db in $brokerDbs | Where-Object { $_.is_broker_enabled -eq 1 })
 			{
 				$undeliverable = $server.Query($undeliverableQuery, $db.name)
@@ -228,7 +250,11 @@ SELECT COUNT(*) as UndeliverableCount FROM sys.transmission_queue
 					$reportContent.Add("  Undeliverable: 0 messages") | Out-Null
 				}
 				$reportContent.Add("") | Out-Null
+
+				$sevClass = if ($count -gt 0) { 'crit' } else { 'ok' }
+				$undelivRowsHtml.Add("<tr><td>$([System.Net.WebUtility]::HtmlEncode($db.name))</td><td class='$sevClass'>$count</td></tr>") | Out-Null
 			}
+			$htmlSections.Add("<h3>Undeliverable Messages (Transmission Queue)</h3><table><tr><th>Database</th><th>Undeliverable</th></tr>$($undelivRowsHtml -join '')</table>") | Out-Null
 
 			# 6. Service Pairs and Contracts
 			$reportContent.Add("-" * 80) | Out-Null
@@ -245,6 +271,7 @@ LEFT JOIN sys.service_contracts sc ON scu.service_contract_id = sc.service_contr
 ORDER BY s.name
 "@
 
+			$svcRowsHtml = [System.Collections.Generic.List[string]]::new()
 			foreach ($db in $brokerDbs | Where-Object { $_.is_broker_enabled -eq 1 })
 			{
 				$services = $server.Query($serviceQuery, $db.name)
@@ -257,9 +284,12 @@ ORDER BY s.name
 						$reportContent.Add("    Service:  $($svc.ServiceName)") | Out-Null
 						$reportContent.Add("    Contract: $contract") | Out-Null
 						$reportContent.Add("") | Out-Null
+
+						$svcRowsHtml.Add("<tr><td>$([System.Net.WebUtility]::HtmlEncode($db.name))</td><td>$([System.Net.WebUtility]::HtmlEncode($svc.ServiceName))</td><td>$([System.Net.WebUtility]::HtmlEncode($contract))</td></tr>") | Out-Null
 					}
 				}
 			}
+			$htmlSections.Add("<h3>Service Pairs and Contracts</h3><table><tr><th>Database</th><th>Service</th><th>Contract</th></tr>$($svcRowsHtml -join '')</table>") | Out-Null
 
 			# 7. AlwaysOn Replica Status (falls AG vorhanden)
 			if ($isAlwaysOn)
@@ -284,6 +314,11 @@ ORDER BY ag.name, ar.replica_server_name
 				$replicas = $server.Query($replicaQuery)
 				if ($replicas)
 				{
+					$replicaRowsHtml = foreach ($r in $replicas)
+					{
+						$sevClass = if ($r.operational_state_desc -eq 'ONLINE' -or [string]::IsNullOrEmpty($r.operational_state_desc)) { 'ok' } else { 'warn' }
+						"<tr><td>$([System.Net.WebUtility]::HtmlEncode($r.AGName))</td><td>$([System.Net.WebUtility]::HtmlEncode($r.replica_server_name))</td><td>$($r.role_desc)</td><td class='$sevClass'>$($r.operational_state_desc)</td></tr>"
+					}
 					foreach ($r in $replicas)
 					{
 						$reportContent.Add("  AG:       $($r.AGName)") | Out-Null
@@ -292,6 +327,7 @@ ORDER BY ag.name, ar.replica_server_name
 						$reportContent.Add("  State:    $($r.operational_state_desc)") | Out-Null
 						$reportContent.Add("") | Out-Null
 					}
+					$htmlSections.Add("<h3>AlwaysOn Replica Status</h3><table><tr><th>AG</th><th>Replica</th><th>Role</th><th>State</th></tr>$($replicaRowsHtml -join '')</table>") | Out-Null
 				}
 			}
 
@@ -303,25 +339,21 @@ ORDER BY ag.name, ar.replica_server_name
 			$reportContent -join "`n" | Out-File -FilePath $reportFile -Encoding UTF8 -Force
 			Invoke-sqmLogging -Message "Report erstellt: $reportFile" -FunctionName $functionName -Level "INFO"
 
+			# HTML-Bericht schreiben
+			$html = ConvertTo-sqmHtmlReport -Title "Service Broker Health - $($server.Name)" -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -BodyHtml ($htmlSections -join '')
+			$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+			Invoke-sqmLogging -Message "HTML-Bericht erstellt: $htmlFile" -FunctionName $functionName -Level "INFO"
+
 			# Return
 			$result = [PSCustomObject]@{
 				ComputerName = $server.Name
 				ReportPath   = $reportFile
+				HtmlPath     = $htmlFile
 				Timestamp    = $timestamp
 				IsAlwaysOn   = $isAlwaysOn
 			}
 
-			if (-not $NoOpen)
-			{
-				try
-				{
-					& notepad.exe $reportFile
-				}
-				catch
-				{
-					Invoke-sqmLogging -Message "Konnte Report nicht öffnen: $_" -FunctionName $functionName -Level "WARN"
-				}
-			}
+			Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $reportFile -NoOpen:$NoOpen
 
 			return $result
 		}

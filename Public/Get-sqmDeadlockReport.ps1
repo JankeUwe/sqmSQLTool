@@ -41,6 +41,9 @@
 .PARAMETER EnableException
     Throw exceptions immediately instead of returning as errors.
 
+.PARAMETER NoOpen
+    Do not automatically open the HTML summary report after creation (only relevant with -OutputPath).
+
 .EXAMPLE
     Get-sqmDeadlockReport
 
@@ -81,7 +84,9 @@ function Get-sqmDeadlockReport
 		[Parameter(Mandatory = $false)]
 		[string]$OutputPath,
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 	
 	begin
@@ -235,6 +240,7 @@ ORDER BY EventTime DESC
 						$xdlFile = Join-Path $OutputPath "Deadlock_$(($SqlInstance -replace '\\', '_'))_${timestamp}_${index}.xdl"
 						# XDL braucht den reinen deadlock-Knoten ohne Event-Wrapper
 						$graphXml | Set-Content -Path $xdlFile -Encoding UTF8 -Force
+						$result | Add-Member -NotePropertyName XdlFile -NotePropertyValue $xdlFile -Force
 					}
 				}
 				catch
@@ -243,10 +249,27 @@ ORDER BY EventTime DESC
 				}
 			}
 			
-			# XDL-Pfad loggen
+			# XDL-Pfad loggen + HTML-Summary-Bericht schreiben
 			if ($OutputPath -and $results.Count -gt 0)
 			{
 				Invoke-sqmLogging -Message "$($results.Count) XDL-Datei(en) gespeichert in: $OutputPath" -FunctionName $functionName -Level "INFO"
+
+				$rowsHtml = foreach ($r in $results)
+				{
+					$xdlLink = if ($r.XdlFile) { "<a href='$([System.IO.Path]::GetFileName($r.XdlFile))'>XDL</a>" } else { '' }
+					"<tr><td class='crit'>$($r.Timestamp.ToString('yyyy-MM-dd HH:mm:ss'))</td><td>$([System.Net.WebUtility]::HtmlEncode($r.VictimLogin))</td><td>$([System.Net.WebUtility]::HtmlEncode($r.VictimHost))</td><td>$([System.Net.WebUtility]::HtmlEncode($r.VictimProgram))</td><td>$($r.ProcessCount)</td><td>$([System.Net.WebUtility]::HtmlEncode($r.VictimStatement))</td><td>$xdlLink</td></tr>"
+				}
+				$bodyHtml = "<p>$($results.Count) Deadlock(s) im Zeitraum $($StartTime.ToString('yyyy-MM-dd HH:mm')) bis $($EndTime.ToString('yyyy-MM-dd HH:mm')).</p>" +
+					"<table><tr><th>Zeitpunkt</th><th>Victim Login</th><th>Victim Host</th><th>Victim Program</th><th>Prozesse</th><th>Victim Statement</th><th>Graph</th></tr>" +
+					($rowsHtml -join '') + "</table>"
+				$html = ConvertTo-sqmHtmlReport -Title "Deadlock Report - $SqlInstance" -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -BodyHtml $bodyHtml
+
+				$safeInst = $SqlInstance -replace '\\', '_'
+				$htmlFile = Join-Path $OutputPath "DeadlockReport_${safeInst}_$(Get-Date -Format 'yyyyMMdd_HHmsqm').html"
+				$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+				Invoke-sqmLogging -Message "HTML-Bericht gespeichert: $htmlFile" -FunctionName $functionName -Level "INFO"
+
+				Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
 			}
 			
 			$msg = "$($results.Count) Deadlock(s) im Zeitraum gefunden."

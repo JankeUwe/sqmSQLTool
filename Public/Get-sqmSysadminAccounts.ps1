@@ -23,6 +23,7 @@
     and is NOT automatically excluded - security review required.
 
     Output:
+        SysadminAccounts_<instance>_<date>.html  - HTML report (dark theme, status colored)
         SysadminAccounts_<instance>_<date>.txt   - Readable report
         SysadminAccounts_<instance>_<date>.csv   - Machine-readable
 
@@ -249,7 +250,8 @@ ORDER BY sp.type_desc, sp.name;
 				$safeInst = $instance -replace '[\\/:*?"<>|]', '_'
 				$txtFile = Join-Path $OutputPath "SysadminAccounts_${safeInst}_${datestamp}.txt"
 				$csvFile = Join-Path $OutputPath "SysadminAccounts_${safeInst}_${datestamp}.csv"
-				
+					$htmlFile = Join-Path $OutputPath "SysadminAccounts_${safeInst}_${datestamp}.html"
+
 				if ($PSCmdlet.ShouldProcess($instance, "Erstelle Sysadmin-Bericht in $OutputPath"))
 				{
 					if (-not (Test-Path $OutputPath))
@@ -353,15 +355,30 @@ ORDER BY sp.type_desc, sp.name;
 					$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
 					$detailRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 
-					Invoke-sqmOpenReport -TxtFile $txtFile -NoOpen:$NoOpen
+					# HTML-Bericht: SA/BuiltinAdmins/Unexpected farblich hervorgehoben
+					$classByStatus = @{ SA = 'crit'; BuiltinAdmins = 'crit'; Unexpected = 'warn'; Disabled = 'warn'; Excluded = 'ok'; Error = 'crit' }
+					$rowsHtml = foreach ($e in ($detailRows | Sort-Object Status, LoginType, LoginName))
+					{
+						$sevClass = $classByStatus[$e.Status]
+						if (-not $sevClass) { $sevClass = 'ok' }
+						"<tr><td class='$sevClass'>$($e.Status)</td><td>$([System.Net.WebUtility]::HtmlEncode($e.LoginName))</td><td>$($e.LoginType)</td><td>$($e.IsEnabled)</td><td>$($e.CreateDate)</td><td>$([System.Net.WebUtility]::HtmlEncode($e.Message))</td></tr>"
+					}
+					$bodyHtml = "<p>Gesamt: $($detailRows.Count) | SA: $cntSa | Ausgeschlossen: $cntExcluded | Deaktiviert: $cntDisabled | Unerwartet: $cntUnexpected | BUILTIN\Admins: $cntBuiltinAdmins</p>" +
+						"<table><tr><th>Status</th><th>Login</th><th>Typ</th><th>Enabled</th><th>Erstellt</th><th>Hinweis</th></tr>" +
+						($rowsHtml -join '') + "</table>"
+					$html = ConvertTo-sqmHtmlReport -Title "Sysadmin-Konten - $instance" -Subtitle "Erstellt: $timestamp" -BodyHtml $bodyHtml
+					$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
 
-					Invoke-sqmLogging -Message "[$instance] Bericht erstellt: $txtFile" -FunctionName $functionName -Level "INFO"
+					Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
+
+					Invoke-sqmLogging -Message "[$instance] Bericht erstellt: $htmlFile" -FunctionName $functionName -Level "INFO"
 				}
 				else
 				{
 					Invoke-sqmLogging -Message "[$instance] WhatIf: Berichtsdateien wuerden erstellt werden." -FunctionName $functionName -Level "VERBOSE"
 					$txtFile = $null
 					$csvFile = $null
+					$htmlFile = $null
 				}
 				
 				if ($cntBuiltinAdmins -gt 0)
@@ -379,6 +396,7 @@ ORDER BY sp.type_desc, sp.name;
 					DetailRows							     = $detailRows
 					TxtFile								     = $txtFile
 					CsvFile								     = $csvFile
+					HtmlFile							     = $htmlFile
 					Status								     = if ($cntUnexpected -gt 0 -or $cntBuiltinAdmins -gt 0) { 'Warning' } else { 'OK' }
 				}
 				$allInstanceResults.Add($instanceResult)
@@ -394,6 +412,7 @@ ORDER BY sp.type_desc, sp.name;
 						DetailRows  = $null
 						TxtFile	    = $null
 						CsvFile	    = $null
+						HtmlFile    = $null
 					})
 				if ($EnableException) { throw }
 				if (-not $ContinueOnError) { throw $_ }

@@ -48,7 +48,10 @@ function Get-sqmADMemberGroups
         [int]$Depth = 2,
 
         [Parameter(Mandatory = $false)]
-        [string]$OutputPath = "C:\System\WinSrvLog\MSSQL"
+        [string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+
+        [Parameter(Mandatory = $false)]
+        [switch]$NoOpen
     )
 
     begin
@@ -214,6 +217,7 @@ function Get-sqmADMemberGroups
                 # Write reports
                 $txtFile = $null
                 $csvFile = $null
+                $htmlFile = $null
 
                 if ($PSCmdlet.ShouldProcess($cleanIdentity, "Create report"))
                 {
@@ -225,6 +229,7 @@ function Get-sqmADMemberGroups
                     $safeIdentity = $cleanIdentity -replace '[\\/:*?"<>|]', '_'
                     $txtFile = Join-Path $OutputPath "ADMemberGroups_${safeIdentity}_Depth${Depth}_${datestamp}.txt"
                     $csvFile = Join-Path $OutputPath "ADMemberGroups_${safeIdentity}_Depth${Depth}_${datestamp}.csv"
+                    $htmlFile = Join-Path $OutputPath "ADMemberGroups_${safeIdentity}_Depth${Depth}_${datestamp}.html"
 
                     $lines = @(
                         "# sqmSQLTool - www.powershelldba.de"
@@ -249,7 +254,20 @@ function Get-sqmADMemberGroups
                     $lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
                     $parentGroups | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 
-                    Invoke-sqmLogging -Message "[$cleanIdentity] Report: $txtFile" -FunctionName $functionName -Level "INFO"
+                    # HTML report
+                    $rowsHtml = foreach ($g in $parentGroups)
+                    {
+                        "<tr><td>$([System.Net.WebUtility]::HtmlEncode($g.SamAccountName))</td><td>$([System.Net.WebUtility]::HtmlEncode($g.DisplayName))</td><td>$($g.GroupScope)</td><td>$($g.Depth)</td></tr>"
+                    }
+                    $bodyHtml = "<p>Mitglied: $([System.Net.WebUtility]::HtmlEncode($cleanIdentity)) | Domain: $([System.Net.WebUtility]::HtmlEncode($targetDomain)) | Depth: $Depth | Gruppen: $($parentGroups.Count)</p>" +
+                        "<table><tr><th>GroupName</th><th>DisplayName</th><th>Scope</th><th>Level</th></tr>" +
+                        ($rowsHtml -join '') + "</table>"
+                    $html = ConvertTo-sqmHtmlReport -Title "AD Member Groups - $cleanIdentity" -Subtitle "Erstellt: $timestamp | Depth: $Depth" -BodyHtml $bodyHtml
+                    $html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+
+                    Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
+
+                    Invoke-sqmLogging -Message "[$cleanIdentity] Report: $htmlFile" -FunctionName $functionName -Level "INFO"
                 }
 
                 $allResults.Add([PSCustomObject]@{
@@ -261,6 +279,7 @@ function Get-sqmADMemberGroups
                         Timestamp   = $timestamp
                         TxtFile     = $txtFile
                         CsvFile     = $csvFile
+                        HtmlFile    = $htmlFile
                         Status      = if ($parentGroups.Count -gt 0) { 'OK' } else { 'NoGroups' }
                     })
 
@@ -279,6 +298,7 @@ function Get-sqmADMemberGroups
                         Timestamp   = $timestamp
                         TxtFile     = $null
                         CsvFile     = $null
+                        HtmlFile    = $null
                         Status      = 'Error'
                         Message     = $errMsg
                     })

@@ -11,7 +11,7 @@
     - Listener configuration
     - Failover readiness status
 
-    Results are saved as TXT and CSV reports. Requires SQL Server 2016 SP1 or later.
+    Results are saved as HTML, TXT and CSV reports. Requires SQL Server 2016 SP1 or later.
 
 .PARAMETER SqlInstance
     SQL Server instance(s). Pipeline-capable. Default: current computer name.
@@ -197,7 +197,27 @@ ORDER BY ag.name, ars.role_desc DESC, ar.replica_server_name, DB_NAME(adbrs.data
 				# Exportiere CSV
 				$dagRows | Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
 
-				Invoke-sqmLogging -Message "[$instance] Reports erstellt: TXT=$reportFile CSV=$csvFile" -FunctionName $functionName -Level "INFO"
+				# HTML-Bericht: pro AG eine Tabelle mit Replicas, Sync-Status farblich markiert
+				$htmlFile = Join-Path -Path $OutputPath -ChildPath "Distributed-AG-Health-$instance-$reportDate.html"
+				$bodySections = foreach ($agGroup in $dagsByAg)
+				{
+					$agName = $agGroup.Name
+					$agData = $agGroup.Group | Select-Object -First 1
+					$replicas = $agGroup.Group | Select-Object -Unique ReplicaName, AvailabilityMode, Role, SyncHealth, ConnectionState
+					$rowsHtml = foreach ($r in $replicas)
+					{
+						$sevClass = if ($r.SyncHealth -eq 'HEALTHY') { 'ok' } else { 'crit' }
+						"<tr><td class='$sevClass'>$($r.SyncHealth)</td><td>$([System.Net.WebUtility]::HtmlEncode($r.ReplicaName))</td><td>$($r.Role)</td><td>$($r.AvailabilityMode)</td><td>$($r.ConnectionState)</td></tr>"
+					}
+					"<h3>AG: $([System.Net.WebUtility]::HtmlEncode($agName)) &rarr; $([System.Net.WebUtility]::HtmlEncode($agData.SecondaryAgName))</h3>" +
+						"<p>Sync State: $($agData.DagSyncState)</p>" +
+						"<table><tr><th>Sync Health</th><th>Replica</th><th>Role</th><th>Availability Mode</th><th>Connection</th></tr>" +
+						($rowsHtml -join '') + "</table>"
+				}
+				$html = ConvertTo-sqmHtmlReport -Title "Distributed AG Health - $instance" -Subtitle "Erstellt: $timestamp" -BodyHtml ($bodySections -join '')
+				$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+
+				Invoke-sqmLogging -Message "[$instance] Reports erstellt: TXT=$reportFile CSV=$csvFile HTML=$htmlFile" -FunctionName $functionName -Level "INFO"
 
 				$result = [PSCustomObject]@{
 					SqlInstance = $instance
@@ -208,12 +228,13 @@ ORDER BY ag.name, ars.role_desc DESC, ar.replica_server_name, DB_NAME(adbrs.data
 					Status = 'OK'
 					TxtFile = $reportFile
 					CsvFile = $csvFile
+					HtmlFile = $htmlFile
 					Details = $dagRows
 				}
 
 				$allInstanceResults.Add($result)
 
-				Invoke-sqmOpenReport -TxtFile $reportFile -NoOpen:$NoOpen
+				Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $reportFile -NoOpen:$NoOpen
 			}
 			catch
 			{

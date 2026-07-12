@@ -13,7 +13,7 @@
 	CRITICAL FI-TS CHECK: ReadableSecondary must be NO (not NONE, READ_ONLY, or ALL).
 	Any other value triggers a warning unless -NoWarning is specified.
 
-	Results are saved as TXT report and CSV file in the specified directory.
+	Results are saved as HTML, TXT report and CSV file in the specified directory.
 	The function also returns an object with the detail data and file paths.
 
 .PARAMETER SqlInstance
@@ -125,6 +125,7 @@ function Export-sqmAlwaysOnConfiguration
 							ConfigRows               = @()
 							TxtFile                  = $null
 							CsvFile                  = $null
+							HtmlFile                 = $null
 							Status                   = "OK"
 						})
 					continue
@@ -202,6 +203,7 @@ ORDER BY ag.name, adc.database_name
 					$safeInst = $instance -replace '[\\/:*?"<>|]', '_'
 					$txtFile = Join-Path $OutputPath "AlwaysOnConfiguration_${safeInst}_${datestamp}.txt"
 					$csvFile = Join-Path $OutputPath "AlwaysOnConfiguration_${safeInst}_${datestamp}.csv"
+					$htmlFile = Join-Path $OutputPath "AlwaysOnConfiguration_${safeInst}_${datestamp}.html"
 
 					if ($PSCmdlet.ShouldProcess($instance, "Erstelle AlwaysOn-Konfigurationsabericht in $OutputPath"))
 					{
@@ -280,15 +282,40 @@ ORDER BY ag.name, adc.database_name
 						# CSV-Datei
 						$configRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 
-						Invoke-sqmOpenReport -TxtFile $txtFile -NoOpen:$NoOpen
+						# HTML-Bericht: pro AG eine Tabelle, ReadableSecondary-Verstoesse farblich markiert
+						$bodySections = foreach ($agName in $agNames)
+						{
+							$agRows = $configRows | Where-Object { $_.AgName -eq $agName }
+							$firstRow = $agRows[0]
+							$dbListHtml = if ($dbsByAg[$agName] -and $dbsByAg[$agName].Count -gt 0) { [System.Net.WebUtility]::HtmlEncode(($dbsByAg[$agName] -join ', ')) } else { '' }
 
-						Invoke-sqmLogging -Message "[$instance] AlwaysOn-Konfiguration exportiert: $txtFile" -FunctionName $functionName -Level "INFO"
+							$replicaRowsHtml = foreach ($row in $agRows)
+							{
+								$isOk = ($row.ReadableSecondary -eq "NO" -or $row.ReadableSecondary -eq "NONE" -or [string]::IsNullOrWhiteSpace($row.ReadableSecondary))
+								$sevClass = if ($isOk) { 'ok' } else { 'crit' }
+								"<tr><td>$([System.Net.WebUtility]::HtmlEncode($row.ReplicaName))</td><td>$($row.AvailabilityMode)</td><td>$($row.FailoverMode)</td><td class='$sevClass'>$($row.ReadableSecondary)</td><td>$($row.BackupPriority)</td></tr>"
+							}
+
+							"<h3>AG: $([System.Net.WebUtility]::HtmlEncode($agName))</h3>" +
+								"<p>BackupPreference: $($firstRow.BackupPreference) | FailureCondition: $($firstRow.FailureConditionLevel) | HealthCheckTimeout: $($firstRow.HealthCheckTimeoutMs) ms | " +
+								"DbFailover: $(if ($firstRow.DbFailoverEnabled) { 'Enabled' } else { 'Disabled' })" +
+								$(if ($firstRow.ListenerName) { " | Listener: $($firstRow.ListenerName) Port:$($firstRow.ListenerPort) IP:$($firstRow.ListenerIP)" } else { '' }) +
+								$(if ($dbListHtml) { "<br>Datenbanken: $dbListHtml" } else { '' }) + "</p>" +
+								"<table><tr><th>Replica</th><th>Availability Mode</th><th>Failover Mode</th><th>ReadableSecondary</th><th>Backup%</th></tr>$($replicaRowsHtml -join '')</table>"
+						}
+						$html = ConvertTo-sqmHtmlReport -Title "AlwaysOn Configuration - $instance" -Subtitle "Erstellt: $timestamp | FI-TS Warnungen: $cntWarn" -BodyHtml ($bodySections -join '')
+						$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+
+						Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
+
+						Invoke-sqmLogging -Message "[$instance] AlwaysOn-Konfiguration exportiert: $htmlFile" -FunctionName $functionName -Level "INFO"
 					}
 					else
 					{
 						Invoke-sqmLogging -Message "[$instance] WhatIf: Berichtsdateien wuerden erstellt werden." -FunctionName $functionName -Level "VERBOSE"
 						$txtFile = $null
 						$csvFile = $null
+						$htmlFile = $null
 					}
 
 					# Ergebnisobjekt fuer diese Instanz
@@ -300,6 +327,7 @@ ORDER BY ag.name, adc.database_name
 						ConfigRows              = $configRows
 						TxtFile                 = $txtFile
 						CsvFile                 = $csvFile
+						HtmlFile                = $htmlFile
 						Status                  = if ($readableSecondaryIssues.Count -gt 0) { "Warning" } else { "OK" }
 					}
 					$allInstanceResults.Add($result)
@@ -324,6 +352,7 @@ ORDER BY ag.name, adc.database_name
 						Message                 = $errMsg
 						TxtFile                 = $null
 						CsvFile                 = $null
+						HtmlFile                = $null
 					})
 				if ($EnableException) { throw }
 			}

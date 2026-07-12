@@ -1,5 +1,36 @@
 # sqmSQLTool — Changelog
 
+## [1.9.9.0] — 2026-07-12
+
+### Feature: HTML reports for sysadmin/AD audit functions
+
+- Added HTML report output (same shared theme/helper as the previous release) to
+  `Get-sqmSysadminAccounts`, `Get-sqmADGroupMembers`, `Get-sqmADGroupMembersRecursive`, and
+  `Get-sqmADMemberGroups`. The three AD group functions gained a new `-NoOpen` switch and now use
+  `Invoke-sqmOpenReport` for consistency (HTML takes precedence when auto-opening).
+
+## [1.9.8.0] — 2026-07-12
+
+### Feature: HTML reports for management-facing functions
+
+- Added HTML report output (dark "sqmSQLTool" theme via the existing `ConvertTo-sqmHtmlReport`
+  helper, status-colored ok/warn/crit cells) to 8 reporting functions that previously only wrote
+  TXT/CSV: `Get-sqmBlockingReport`, `Get-sqmDatabaseHealth`, `Get-sqmDistributedAgHealth`,
+  `Get-sqmServiceBrokerHealth`, `Get-sqmCertificateReport`, `Export-sqmAlwaysOnConfiguration`,
+  `Get-sqmSpnReport`, `Get-sqmDeadlockReport`. `Get-sqmServiceBrokerHealth` and
+  `Get-sqmCertificateReport` gained an `-NoOpen` switch and now use the shared
+  `Invoke-sqmOpenReport` helper instead of `notepad.exe`/no auto-open, for consistency with the
+  rest of the module (HTML takes precedence over TXT when opening).
+
+## [1.9.7.0] — 2026-07-12
+
+### Feature: Find-sqmADUser
+
+- New public function `Find-sqmADUser`: searches Active Directory for user accounts by a
+  SamAccountName wildcard pattern (e.g. `so_*` for service accounts). RSAT (`Get-ADUser -Filter`)
+  path with automatic LDAP/ADSI fallback when the ActiveDirectory module is unavailable, matching
+  the existing dual-path pattern used by `Get-sqmADAccountStatus` and `Get-sqmADGroupMembers`.
+
 ## [1.9.6.0] — 2026-07-08
 
 ### Docs: translate CHANGELOG history to en-US

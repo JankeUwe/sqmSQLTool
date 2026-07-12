@@ -762,6 +762,7 @@ WHERE ag.group_id IN (
 					$safeInst  = $instanceName -replace '[\\/:*?"<>|]', '_'
 					$txtFile   = Join-Path $OutputPath "SpnReport_${safeComp}_${safeInst}_${datestamp}.txt"
 					$csvFile   = Join-Path $OutputPath "SpnReport_${safeComp}_${safeInst}_${datestamp}.csv"
+					$htmlFile  = Join-Path $OutputPath "SpnReport_${safeComp}_${safeInst}_${datestamp}.html"
 
 					if ($PSCmdlet.ShouldProcess("$computer\$instanceName", "Erstelle SPN-Bericht in $OutputPath"))
 					{
@@ -878,9 +879,38 @@ WHERE ag.group_id IN (
 						$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
 						$detailRows | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 
-						Invoke-sqmOpenReport -TxtFile $txtFile -NoOpen:$NoOpen
+						# --------------------------------------------------------
+						# HTML-Bericht (gleiche Gruppierung wie TXT, farblich markiert)
+						# --------------------------------------------------------
+						$bodySections = [System.Collections.Generic.List[string]]::new()
+						$bodySections.Add(
+							"<p>Computer: $([System.Net.WebUtility]::HtmlEncode($computer)) | Instanz: $([System.Net.WebUtility]::HtmlEncode($instanceName)) | " +
+							"Dienstkonto: $([System.Net.WebUtility]::HtmlEncode($serviceAccount)) | SPN-Konto (AD): $([System.Net.WebUtility]::HtmlEncode($spnAccount))<br>" +
+							"OK: $cntOk | Fehlend: $cntMissing | Unerwartet: $cntUnexpected</p>"
+						)
 
-						Invoke-sqmLogging -Message "[$computer\$instanceName] Bericht erstellt: $txtFile" `
+						if ($okSpns)
+						{
+							$rowsHtml = foreach ($r in $okSpns) { "<tr><td class='ok'>OK</td><td>$([System.Net.WebUtility]::HtmlEncode($r.Spn))</td><td></td></tr>" }
+							$bodySections.Add("<h3>Vorhandene SPNs ($cntOk / 4 erwartet)</h3><table><tr><th>Status</th><th>SPN</th><th>Hinweis</th></tr>$($rowsHtml -join '')</table>")
+						}
+						if ($missingSpns)
+						{
+							$rowsHtml = foreach ($r in $missingSpns) { "<tr><td class='crit'>Fehlend</td><td>$([System.Net.WebUtility]::HtmlEncode($r.Spn))</td><td><code>$([System.Net.WebUtility]::HtmlEncode($r.SetSpnCommand))</code></td></tr>" }
+							$bodySections.Add("<h3>Fehlende SPNs ($cntMissing) - Aktion erforderlich</h3><table><tr><th>Status</th><th>SPN</th><th>setspn-Kommando</th></tr>$($rowsHtml -join '')</table>")
+						}
+						if ($unexpectedSpns)
+						{
+							$rowsHtml = foreach ($r in $unexpectedSpns) { "<tr><td class='warn'>Unerwartet</td><td>$([System.Net.WebUtility]::HtmlEncode($r.Spn))</td><td>$([System.Net.WebUtility]::HtmlEncode($r.Note))</td></tr>" }
+							$bodySections.Add("<h3>Unerwartete SPNs ($cntUnexpected) - pruefen</h3><table><tr><th>Status</th><th>SPN</th><th>Hinweis</th></tr>$($rowsHtml -join '')</table>")
+						}
+
+						$html = ConvertTo-sqmHtmlReport -Title "SPN-Bericht - $computer\$instanceName" -Subtitle "Erstellt: $timestamp | Status: $instanceStatus" -BodyHtml ($bodySections -join '')
+						$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+
+						Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
+
+						Invoke-sqmLogging -Message "[$computer\$instanceName] Bericht erstellt: $htmlFile" `
 										  -FunctionName $functionName -Level 'INFO'
 					}
 					else
@@ -889,6 +919,7 @@ WHERE ag.group_id IN (
 										  -FunctionName $functionName -Level 'VERBOSE'
 						$txtFile = $null
 						$csvFile = $null
+						$htmlFile = $null
 					}
 
 					$allResults.Add([PSCustomObject]@{
@@ -910,6 +941,7 @@ WHERE ag.group_id IN (
 						DetailRows     = $detailRows
 						TxtFile        = $txtFile
 						CsvFile        = $csvFile
+						HtmlFile       = $htmlFile
 					})
 				}
 				catch

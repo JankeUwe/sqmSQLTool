@@ -29,7 +29,7 @@
       - Whether the private key is present and encrypted
       - Thumbprint
 
-    Results are saved as TXT report and CSV in the configured OutputPath.
+    Results are saved as HTML, TXT and CSV in the configured OutputPath.
     An additional filtered CSV is generated containing only expiring/expired certificates.
 
 .PARAMETER SqlInstance
@@ -55,6 +55,9 @@
 
 .PARAMETER EnableException
     Throw exceptions immediately.
+
+.PARAMETER NoOpen
+    Do not automatically open the generated report (HTML takes precedence over TXT).
 
 .EXAMPLE
     Get-sqmCertificateReport
@@ -99,7 +102,9 @@ function Get-sqmCertificateReport
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 	
 	begin
@@ -336,7 +341,8 @@ ORDER BY c.expiry_date ASC
 					Write-sqmCertReport `
 										-InstanceResult $instanceResult `
 										-OutputPath $OutputPath `
-										-FunctionName $functionName
+										-FunctionName $functionName `
+										-NoOpen:$NoOpen
 				}
 				
 				$msg = "[$instance] $($certificates.Count) Zertifikat(e): $expiredCount abgelaufen, $criticalCount kritisch, $warningCount Warnung."
@@ -452,7 +458,8 @@ function Write-sqmCertReport
 	param (
 		[PSCustomObject]$InstanceResult,
 		[string]$OutputPath,
-		[string]$FunctionName
+		[string]$FunctionName,
+		[switch]$NoOpen
 	)
 	
 	if (-not (Test-Path $OutputPath))
@@ -546,6 +553,39 @@ function Write-sqmCertReport
 		Invoke-sqmLogging -Message "Alert-CSV: $alertCsvFile" -FunctionName $FunctionName -Level "WARNING"
 	}
 	
+	# --- HTML-Bericht (gleiche Statusgruppierung wie TXT, farblich markiert) ---
+	$htmlFile = Join-Path $OutputPath "${baseName}.html"
+	$classByStatus = @{ Expired = 'crit'; Critical = 'crit'; Warning = 'warn'; OK = 'ok'; NoExpiry = 'ok' }
+
+	$bodySections = [System.Collections.Generic.List[string]]::new()
+	$bodySections.Add(
+		"<p>Zertifikate gesamt: $($InstanceResult.TotalCertificates) | Abgelaufen: $($InstanceResult.ExpiredCount) | " +
+		"Kritisch: $($InstanceResult.CriticalCount) | Warnung: $($InstanceResult.WarningCount) | " +
+		"Database Master Key: $(if ($InstanceResult.HasDatabaseMasterKey) { 'Vorhanden' } else { 'FEHLT' })</p>"
+	)
+
+	foreach ($status in @('Expired', 'Critical', 'Warning', 'OK', 'NoExpiry'))
+	{
+		$group = $InstanceResult.Certificates | Where-Object { $_.ExpiryStatus -eq $status }
+		if (-not $group) { continue }
+
+		$sevClass = $classByStatus[$status]
+		$rowsHtml = foreach ($c in ($group | Sort-Object DaysRemaining))
+		{
+			$expiryStr = if ($c.ExpiryDate) { $c.ExpiryDate.ToString('yyyy-MM-dd') } else { 'kein Ablaufdatum' }
+			$remainStr = if ($null -ne $c.DaysRemaining) { "$($c.DaysRemaining) Tage" } else { 'n/a' }
+			$pkStr = if ($c.HasPrivateKey) { "Ja ($($c.PrivateKeyEncryption))" } else { 'Nein' }
+			"<tr><td class='$sevClass'>$status</td><td>$([System.Net.WebUtility]::HtmlEncode($c.CertificateName))</td><td>$($c.Purpose)</td><td>$([System.Net.WebUtility]::HtmlEncode($c.DatabaseName))</td><td>$expiryStr</td><td>$remainStr</td><td>$pkStr</td><td>$([System.Net.WebUtility]::HtmlEncode($c.Thumbprint))</td></tr>"
+		}
+		$bodySections.Add("<h3>Status: $status ($($group.Count))</h3><table><tr><th>Status</th><th>Name</th><th>Zweck</th><th>Datenbank</th><th>Laeuft ab</th><th>Verbleibend</th><th>Priv. Key</th><th>Thumbprint</th></tr>$($rowsHtml -join '')</table>")
+	}
+
+	$html = ConvertTo-sqmHtmlReport -Title "Zertifikatsbericht - $($InstanceResult.SqlInstance)" -Subtitle "Erstellt: $($InstanceResult.CaptureTime.ToString('yyyy-MM-dd HH:mm:ss')) | Status: $($InstanceResult.OverallStatus)" -BodyHtml ($bodySections -join '')
+	$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+	Invoke-sqmLogging -Message "HTML-Bericht: $htmlFile" -FunctionName $FunctionName -Level "INFO"
+
+	Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
+
 	# Zentrale Kopie
-	Copy-sqmToCentralPath -Path @($txtFile, $csvFile)
+	Copy-sqmToCentralPath -Path @($txtFile, $csvFile, $htmlFile)
 }
