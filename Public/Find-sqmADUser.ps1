@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Durchsucht Active Directory nach Benutzerkonten anhand eines Namensmusters.
 
