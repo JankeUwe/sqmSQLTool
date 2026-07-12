@@ -51,7 +51,18 @@ jobs:
           echo "version=$ver" >> $env:GITHUB_OUTPUT
 
       # ------------------------------------------------------------------
-      # 3. Modul validieren
+      # 3. RequiredModules installieren (Manifest fordert dbatools an -
+      #    Test-ModuleManifest schlaegt sonst auf dem sauberen Runner fehl)
+      # ------------------------------------------------------------------
+      - name: Install RequiredModules (dbatools)
+        shell: pwsh
+        run: |
+          Write-Host "📦 Installiere dbatools (RequiredModules-Abhaengigkeit)..."
+          Install-Module -Name dbatools -Force -Scope CurrentUser -AllowClobber -ErrorAction Stop
+          Write-Host "✅ dbatools installiert."
+
+      # ------------------------------------------------------------------
+      # 4. Modul validieren
       # ------------------------------------------------------------------
       - name: Validate module manifest
         shell: pwsh
@@ -68,7 +79,7 @@ jobs:
           }
 
       # ------------------------------------------------------------------
-      # 4. Publish zu PowerShell Gallery
+      # 5. Publish zu PowerShell Gallery
       # ------------------------------------------------------------------
       - name: Publish to PowerShell Gallery
         shell: pwsh
@@ -107,7 +118,7 @@ jobs:
           }
 
       # ------------------------------------------------------------------
-      # 5. Verify auf PSGallery
+      # 6. Verify auf PSGallery
       # ------------------------------------------------------------------
       - name: Verify on PowerShell Gallery
         shell: pwsh
@@ -128,7 +139,7 @@ jobs:
           }
 
       # ------------------------------------------------------------------
-      # 6. Erfolgs-Notification
+      # 7. Erfolgs-Notification
       # ------------------------------------------------------------------
       - name: Success notification
         if: success()
