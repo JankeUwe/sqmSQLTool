@@ -4,7 +4,7 @@
 
 A comprehensive PowerShell module for SQL Server 2016+ administration, with specialized support for AlwaysOn Availability Groups, performance reporting, and security auditing.
 
-**Latest Release:** [v1.9.9.1](https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.9.9.1) | **Functions:** 144 | **Documentation:** [Full Reference](https://www.powershelldba.de/tools/befehls-referenz)
+**Latest Release:** [v1.9.9.1](https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.9.9.1) | **Functions:** 144 | **Documentation:** [Full Reference](https://www.powershelldba.de/sqmsqltool/commands-en/)
 
 ---
 
