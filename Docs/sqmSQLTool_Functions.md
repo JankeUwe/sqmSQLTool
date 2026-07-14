@@ -548,6 +548,22 @@ entirely. Use `-AvailabilityGroupName` to force AG-aware handling regardless of 
 membership. Every rejoin attempt (success and failure) is also written to the Windows
 Application Event Log (source "sqmAlwaysOn", same source as Repair-sqmAlwaysOnDatabases).
 
+The rejoin itself runs in a `finally` block once the restore has actually completed, so it is
+attempted even if a later, non-critical post-restore cleanup step (user re-import, orphan-user
+repair, stale Windows-login removal, owner assignment) throws - including with -EnableException.
+A database that was an AG member at the start of the run will never be left un-rejoined just
+because one of those cleanup steps failed.
+
+Policy: every database on an AG-capable instance must end up on AlwaysOn - this applies even if
+the database was NOT an AG member before the restore (including a brand-new database that has
+never existed on the instance before). If the database isn't currently in any AG and
+`-AvailabilityGroupName` wasn't given, the instance's Availability Groups are checked: with
+exactly one AG, the restored database is automatically added to it (with seeding); with zero AGs
+there is nothing to join and it stays standalone; with more than one AG the run aborts, since it
+would be ambiguous which AG should receive the database - `-AvailabilityGroupName` must be given
+explicitly in that case. Use `-KeepAlwaysOn` to opt out of this auto-join for a database that
+should genuinely stay standalone (e.g. a scratch/test restore).
+
 **Parameters:**
 
 - **-SqlInstance** - Target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE"). Default: current computer name.
@@ -568,28 +584,37 @@ of the target instance is used.
 The backup is stored in the default backup directory named "DatabaseName_preRestore_YYYYMMDD_HHmmss.bak".
 - **-NoUserExport** - Optional: Skips export of database users (users are always exported by default).
 The export file is stored temporarily in the %TEMP% directory.
-- **-KeepAlwaysOn** - Optional: If the database is part of an AG, it is not removed from the AG.
-Note: Restoring an AG database is only possible after removing it from the AG.
-Use this parameter only if the database is already outside the AG.
+- **-KeepAlwaysOn** - Optional. If the database is currently part of an AG, it is not removed from the AG - and since a
+restore is not possible while still an AG member, the run aborts instead (only useful if the
+database is actually already outside the AG despite -KeepAlwaysOn being set). If the database is
+NOT currently an AG member, this switch instead opts it out of the automatic single-AG auto-join
+described under AvailabilityGroupName below, leaving it standalone on purpose.
 - **-AvailabilityGroupName** - Optional: Explicitly declares which AG the database belongs to (or should end up in after
-the restore), instead of relying solely on live AG-membership detection at the start of the run.
-Use this when the database was already removed from the AG by a previous, incompletely finished
-run, or when restoring a brand-new database straight into an existing AG.
+the restore), instead of relying solely on live AG-membership/instance detection at the start of
+the run. Use this when the database was already removed from the AG by a previous, incompletely
+finished run, when restoring a brand-new database straight into an existing AG, or when the
+instance has more than one AG (auto-detection only works when there is exactly one).
+Policy note: even without this parameter, a database that is not currently in any AG will still
+be added to the instance's AG automatically if the instance has exactly one - restoring a
+database is not allowed to silently leave it standalone on an AG-capable instance. Use
+-KeepAlwaysOn to opt out of that auto-join deliberately.
 - **-WithNoRecovery** - Optional: Performs the restore with NORECOVERY so the database remains in restoring state
 (for additional log backups). By default RECOVERY is used (database online).
 - **-ContinueWithNoRecovery** - Optional: When set, the last restore is also performed with NORECOVERY (e.g. when
 additional backups are to be applied manually).
 - **-ForceSingleUser** - Forces the database into single-user mode before the restore (even if no active connections
 are detected). By default only switches when there are active connections.
-- **-NoRejoinAvailabilityGroup** - Optional: If the database was part of an AG (and removed from it for the restore), it is by
-default automatically re-added to the AG afterwards (Add-DbaAgDatabase with SeedingMode Automatic,
-which also seeds the secondaries). Use this switch to suppress that and leave the database
-outside the AG after the restore instead.
+- **-NoRejoinAvailabilityGroup** - Optional: Whenever the function has determined the database should be AG-managed (it was
+already an AG member, -AvailabilityGroupName was given, or the instance's single AG was
+auto-detected), it is by default automatically (re-)added to that AG afterwards (Add-DbaAgDatabase
+with SeedingMode Automatic, which also seeds the secondaries). Use this switch to suppress just
+the actual join/rejoin while still doing the rest (secondary cleanup etc.), leaving the database
+outside the AG after the restore.
 - **-EnableException** - Switch to allow exceptions to pass through (by default errors are logged and returned as objects).
 - **-Confirm** - Request confirmation before critical actions (removing from AG, restore).
 - **-WhatIf** - Shows what would happen without making changes.
 
-**Examples (4):**
+**Examples (6):**
 
 ```powershell
 # Simple restore of a full backup file
@@ -613,6 +638,16 @@ Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\OldDB.bak"
 # Retry after a previous run already removed the database from the AG but did not get to
 # rejoin it - force it explicitly to guarantee the secondaries get reseeded.
 Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\Arena.bak" -DatabaseName "Arena" -AvailabilityGroupName "AG_Prod"
+
+```powershell
+# "NewApp" was never an AG member. SQL01 has exactly one AG, so it is auto-detected and the
+# restored database is automatically joined to it (with seeding) - no extra parameter needed.
+Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\NewApp.bak" -DatabaseName "NewApp"
+
+```powershell
+# Same as above, but this restore is a deliberate standalone scratch copy that must NOT join
+# the instance's AG.
+Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\NewApp.bak" -DatabaseName "NewApp_scratch" -KeepAlwaysOn
 
 ### Invoke-sqmUserDatabaseBackup
 

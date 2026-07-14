@@ -109,6 +109,16 @@ Logins oder Datenbanken auf einem Read-Only-Secondary).
   „sqmAlwaysOn", dieselbe wie bei Repair-sqmAlwaysOnDatabases), damit ein ausbleibendes Reseed nicht
   unbemerkt bleibt, selbst wenn niemand die zurückgegebenen Ergebnisobjekte prüft.
 
+  **Richtlinie: jede Datenbank auf einer Instanz mit AG muss am Ende in AlwaysOn sein** - auch
+  wenn sie vor dem Restore in KEINER AG war, und selbst wenn sie unter diesem Namen auf der
+  Instanz noch nie existiert hat (Erst-Restore einer neuen Anwendung). War die Datenbank vorher
+  kein AG-Mitglied und wurde `-AvailabilityGroupName` nicht angegeben: Hat die Instanz genau eine
+  AG, wird die Datenbank automatisch dieser AG hinzugefügt (mit Seeding). Hat die Instanz keine AG,
+  bleibt sie standalone (nichts beizutreten). Hat die Instanz mehrere AGs, bricht der Lauf ab -
+  `-AvailabilityGroupName` muss dann explizit angegeben werden, da die Zuordnung sonst nicht
+  eindeutig wäre. Mit `-KeepAlwaysOn` lässt sich dieser automatische Beitritt bewusst unterdrücken,
+  wenn ein Restore absichtlich standalone bleiben soll (z.B. eine Scratch-/Test-Kopie).
+
 ## Logins synchron halten
 
 | Funktion | Zweck |

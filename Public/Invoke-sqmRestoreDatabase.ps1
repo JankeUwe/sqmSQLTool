@@ -39,6 +39,22 @@ the Windows Application Event Log (source "sqmAlwaysOn", same source as
 Repair-sqmAlwaysOnDatabases) so a failed reseed is visible to monitoring even if the returned
 result objects are never inspected.
 
+Policy: every database on an AG-capable instance must end up on AlwaysOn - this applies even if
+the database was NOT an AG member before the restore. If the database isn't currently in any AG
+and `-AvailabilityGroupName` wasn't given, the instance's Availability Groups are checked: with
+exactly one AG, the restored database is automatically added to it (with seeding); with zero AGs
+there is nothing to join and it stays standalone; with more than one AG the run aborts, since it
+would be ambiguous which AG should receive the database - `-AvailabilityGroupName` must be given
+explicitly in that case. Use `-KeepAlwaysOn` to opt out of this auto-join for a database that
+should genuinely stay standalone (e.g. a scratch/test restore), or `-NoRejoinAvailabilityGroup` to
+still do the detection/logging but skip the actual join.
+
+The rejoin itself runs in a `finally` block once the restore has actually completed, so it is
+attempted even if a later, non-critical post-restore cleanup step (user re-import, orphan-user
+repair, stale Windows-login removal, owner assignment) throws - including with -EnableException.
+A database that was an AG member at the start of the run will never be left un-rejoined just
+because one of those cleanup steps failed.
+
 .PARAMETER SqlInstance
 Target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE"). Default: current computer name.
 
@@ -78,18 +94,26 @@ Optional: Skips export of database users (users are always exported by default).
 The export file is stored temporarily in the %TEMP% directory.
 
 .PARAMETER KeepAlwaysOn
-Optional: If the database is part of an AG, it is not removed from the AG.
-Note: Restoring an AG database is only possible after removing it from the AG.
-Use this parameter only if the database is already outside the AG.
+Optional. If the database is currently part of an AG, it is not removed from the AG - and since a
+restore is not possible while still an AG member, the run aborts instead (only useful if the
+database is actually already outside the AG despite -KeepAlwaysOn being set). If the database is
+NOT currently an AG member, this switch instead opts it out of the automatic single-AG auto-join
+described under AvailabilityGroupName below, leaving it standalone on purpose.
 
 .PARAMETER AvailabilityGroupName
 Optional: Explicitly declares which AG the database belongs to (or should end up in after the
-restore), instead of relying solely on live AG-membership detection at the start of the run.
-Use this when the database was already removed from the AG by a previous, incompletely finished
-run (so it is no longer auto-detected as an AG member) or when restoring a brand-new database
-straight into an existing AG. When set, the restore is always treated as AG-aware: secondaries
-are cleaned up and the database is rejoined (with seeding) at the end, exactly as if live
-detection had found it - regardless of whether the database is currently an AG member.
+restore), instead of relying solely on live AG-membership/instance detection at the start of the
+run. Use this when the database was already removed from the AG by a previous, incompletely
+finished run (so it is no longer auto-detected as an AG member), when restoring a brand-new
+database straight into an existing AG, or when the instance has more than one AG (auto-detection
+only works when there is exactly one). When set, the restore is always treated as AG-aware:
+secondaries are cleaned up and the database is rejoined (with seeding) at the end, exactly as if
+live detection had found it - regardless of whether the database is currently an AG member.
+
+Policy note: even without this parameter, a database that is not currently in any AG will still
+be added to the instance's AG automatically if the instance has exactly one - restoring a
+database is not allowed to silently leave it standalone on an AG-capable instance. Use
+-KeepAlwaysOn to opt out of that auto-join deliberately.
 
 .PARAMETER WithNoRecovery
 Optional: Performs the restore with NORECOVERY so the database remains in restoring state
@@ -104,10 +128,12 @@ Forces the database into single-user mode before the restore (even if no active 
 are detected). By default only switches when there are active connections.
 
 .PARAMETER NoRejoinAvailabilityGroup
-Optional: If the database was part of an AG (and removed from it for the restore), it is by
-default automatically re-added to the AG afterwards (Add-DbaAgDatabase with SeedingMode
-Automatic, which also seeds the secondaries). Use this switch to suppress that and leave the
-database outside the AG after the restore instead.
+Optional: Whenever the function has determined the database should be AG-managed (it was already
+an AG member, -AvailabilityGroupName was given, or the instance's single AG was auto-detected), it
+is by default automatically (re-)added to that AG afterwards (Add-DbaAgDatabase with SeedingMode
+Automatic, which also seeds the secondaries). Use this switch to suppress just the actual join/
+rejoin while still doing the rest (secondary cleanup etc.), leaving the database outside the AG
+after the restore.
 
 .PARAMETER EnableException
 Switch to allow exceptions to pass through (by default errors are logged and returned as objects).
@@ -141,6 +167,16 @@ Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\OldDB.bak"
 # rejoin it (crash, network blip, etc.) - the database is no longer auto-detected as an AG
 # member, so force it explicitly to guarantee the secondaries get reseeded.
 Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\Arena.bak" -DatabaseName "Arena" -AvailabilityGroupName "AG_Prod"
+
+.EXAMPLE
+# "NewApp" was never an AG member. SQL01 has exactly one AG, so it is auto-detected and the
+# restored database is automatically joined to it (with seeding) - no extra parameter needed.
+Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\NewApp.bak" -DatabaseName "NewApp"
+
+.EXAMPLE
+# Same as above, but this restore is a deliberate standalone scratch copy that must NOT join
+# the instance's AG.
+Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\NewApp.bak" -DatabaseName "NewApp_scratch" -KeepAlwaysOn
 
 .NOTES
 Requires dbatools module, Invoke-sqmLogging, Get-sqmConfig, Set-sqmSqlPolicyState.
@@ -226,6 +262,12 @@ function Invoke-sqmRestoreDatabase
 		$secondaryInstances = @()
 		$wasSingleUser = $false
 		$originalDbStatus = $null
+		$restoreSucceeded = $false
+		# Sicherer Default, falls die Funktion vor Schritt 5 abbricht (z.B. Fehler bei AG-Entfernen)
+		# und $wasSingleUser bereits true ist (z.B. durch die Bereits-Single-User-Normalisierung in
+		# Schritt 1) - der finally-Block braucht fuer den MULTI_USER-Revert einen gueltigen Namen,
+		# nicht $null. Schritt 5 ueberschreibt dies bei Bedarf mit $NewDatabaseName.
+		$finalDbName = $DatabaseName
 
 		# Policy-Kontrolle
 		$policyName = Get-sqmConfig -Key 'DefaultPolicy' 3>$null
@@ -319,49 +361,6 @@ function Invoke-sqmRestoreDatabase
 					}
 				}
 
-				# Pruefen, ob die Datenbank in einer AG ist.
-				# WICHTIG: Get-DbaAvailabilityGroup hat KEINEN -Database-Parameter. Ein -Database loest einen
-				# terminierenden Parameter-Binding-Fehler aus, den -ErrorAction SilentlyContinue NICHT abfaengt.
-				# Daher Mitgliedschaft ueber Get-DbaAgDatabase pruefen und das AG-Objekt (mit .Name) anschliessend
-				# ueber den AG-Namen nachladen.
-				$agDbCheck = Get-DbaAgDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $DatabaseName -ErrorAction SilentlyContinue
-				if ($agDbCheck)
-				{
-					$isAGDatabase = $true
-					$agName = ($agDbCheck | Select-Object -First 1).AvailabilityGroup
-					if ($AvailabilityGroupName -and $AvailabilityGroupName -ne $agName)
-					{
-						Invoke-sqmLogging -Message "Hinweis: -AvailabilityGroupName '$AvailabilityGroupName' weicht von der live erkannten AG '$agName' ab - verwende die live erkannte AG." -FunctionName $functionName -Level "WARNING"
-					}
-					$availabilityGroup = Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $agName -ErrorAction SilentlyContinue
-					Invoke-sqmLogging -Message "Datenbank ist Mitglied der AG '$($availabilityGroup.Name)'." -FunctionName $functionName -Level "INFO"
-					if (-not $KeepAlwaysOn)
-					{
-						Invoke-sqmLogging -Message "Die Datenbank wird aus der AG entfernt (einschliesslich sekundaerer Replikate)." -FunctionName $functionName -Level "INFO"
-					}
-					else
-					{
-						Invoke-sqmLogging -Message "KeepAlwaysOn ist gesetzt - die Datenbank verbleibt in der AG. Ein Restore ist in einer AG nicht moeglich, daher wird der Vorgang abgebrochen." -FunctionName $functionName -Level "ERROR"
-						throw "Datenbank ist Teil einer AG und KeepAlwaysOn wurde angegeben. Restore nicht moeglich."
-					}
-				}
-				elseif ($AvailabilityGroupName)
-				{
-					# Datenbank ist AKTUELL kein AG-Mitglied (z.B. weil ein vorheriger, unvollstaendig
-					# abgeschlossener Lauf sie bereits aus der AG entfernt hat), aber der Aufrufer hat
-					# explizit angegeben, dass sie zur AG gehoert/gehoeren soll. Ohne diesen Parameter
-					# wuerde die Funktion die AG-Zugehoerigkeit hier NICHT mehr erkennen und den Rest
-					# des Laufs (Secondary-Cleanup, Rejoin/Reseed am Ende) stillschweigend ueberspringen -
-					# genau das darf bei einer AG-Datenbank nie passieren.
-					$availabilityGroup = Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $AvailabilityGroupName -ErrorAction SilentlyContinue
-					if (-not $availabilityGroup)
-					{
-						throw "Availability Group '$AvailabilityGroupName' wurde auf '$SqlInstance' nicht gefunden."
-					}
-					$isAGDatabase = $true
-					Invoke-sqmLogging -Message "Datenbank ist aktuell KEIN Mitglied der AG '$AvailabilityGroupName' (vermutlich bereits entfernt), wird aber laut -AvailabilityGroupName als AG-Datenbank behandelt: Secondary-Cleanup und Rejoin/Reseed werden trotzdem durchgefuehrt." -FunctionName $functionName -Level "WARNING"
-				}
-
 				# Aktive Verbindungen hier nur ermitteln (fuer spaeteren Single-User-Schritt) - NICHT
 				# schon jetzt in Single-User versetzen, das muss erst NACH dem User-Export (Schritt 3)
 				# passieren (siehe dort).
@@ -371,7 +370,82 @@ function Invoke-sqmRestoreDatabase
 			{
 				Invoke-sqmLogging -Message "Datenbank '$DatabaseName' existiert nicht auf $SqlInstance." -FunctionName $functionName -Level "INFO"
 			}
-			
+
+			# Pruefen, ob die Datenbank in einer AG ist. Laeuft UNABHAENGIG von $dbExists: eine
+			# Datenbank, die unter diesem Namen auf der Instanz noch nie existiert hat (Erst-Restore
+			# einer neuen Anwendung), muss der Richtlinie "alle Datenbanken muessen in AlwaysOn sein"
+			# genauso unterliegen wie eine bereits vorhandene, standalone Datenbank.
+			# WICHTIG: Get-DbaAvailabilityGroup hat KEINEN -Database-Parameter. Ein -Database loest einen
+			# terminierenden Parameter-Binding-Fehler aus, den -ErrorAction SilentlyContinue NICHT abfaengt.
+			# Daher Mitgliedschaft ueber Get-DbaAgDatabase pruefen und das AG-Objekt (mit .Name) anschliessend
+			# ueber den AG-Namen nachladen.
+			$agDbCheck = Get-DbaAgDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $DatabaseName -ErrorAction SilentlyContinue
+			if ($agDbCheck)
+			{
+				$isAGDatabase = $true
+				$agName = ($agDbCheck | Select-Object -First 1).AvailabilityGroup
+				if ($AvailabilityGroupName -and $AvailabilityGroupName -ne $agName)
+				{
+					Invoke-sqmLogging -Message "Hinweis: -AvailabilityGroupName '$AvailabilityGroupName' weicht von der live erkannten AG '$agName' ab - verwende die live erkannte AG." -FunctionName $functionName -Level "WARNING"
+				}
+				$availabilityGroup = Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $agName -ErrorAction SilentlyContinue
+				Invoke-sqmLogging -Message "Datenbank ist Mitglied der AG '$($availabilityGroup.Name)'." -FunctionName $functionName -Level "INFO"
+				if (-not $KeepAlwaysOn)
+				{
+					Invoke-sqmLogging -Message "Die Datenbank wird aus der AG entfernt (einschliesslich sekundaerer Replikate)." -FunctionName $functionName -Level "INFO"
+				}
+				else
+				{
+					Invoke-sqmLogging -Message "KeepAlwaysOn ist gesetzt - die Datenbank verbleibt in der AG. Ein Restore ist in einer AG nicht moeglich, daher wird der Vorgang abgebrochen." -FunctionName $functionName -Level "ERROR"
+					throw "Datenbank ist Teil einer AG und KeepAlwaysOn wurde angegeben. Restore nicht moeglich."
+				}
+			}
+			elseif ($AvailabilityGroupName)
+			{
+				# Datenbank ist AKTUELL kein AG-Mitglied (z.B. weil ein vorheriger, unvollstaendig
+				# abgeschlossener Lauf sie bereits aus der AG entfernt hat), aber der Aufrufer hat
+				# explizit angegeben, dass sie zur AG gehoert/gehoeren soll. Ohne diesen Parameter
+				# wuerde die Funktion die AG-Zugehoerigkeit hier NICHT mehr erkennen und den Rest
+				# des Laufs (Secondary-Cleanup, Rejoin/Reseed am Ende) stillschweigend ueberspringen -
+				# genau das darf bei einer AG-Datenbank nie passieren.
+				$availabilityGroup = Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $AvailabilityGroupName -ErrorAction SilentlyContinue
+				if (-not $availabilityGroup)
+				{
+					throw "Availability Group '$AvailabilityGroupName' wurde auf '$SqlInstance' nicht gefunden."
+				}
+				$isAGDatabase = $true
+				Invoke-sqmLogging -Message "Datenbank ist aktuell KEIN Mitglied der AG '$AvailabilityGroupName' (vermutlich bereits entfernt), wird aber laut -AvailabilityGroupName als AG-Datenbank behandelt: Secondary-Cleanup und Rejoin/Reseed werden trotzdem durchgefuehrt." -FunctionName $functionName -Level "WARNING"
+			}
+			elseif (-not $KeepAlwaysOn)
+			{
+				# Datenbank ist aktuell in KEINER AG (existierte evtl. noch nie unter diesem Namen)
+				# und der Aufrufer hat keine AG explizit angegeben. Unternehmensrichtlinie: JEDE
+				# Datenbank auf einer Instanz mit AG muss in AlwaysOn sein - ein Restore darf niemals
+				# stillschweigend eine standalone Datenbank zuruecklassen, wenn die Instanz eine AG
+				# hat (das gilt auch fuer den allerersten Restore einer neuen Anwendung). Hat die
+				# Instanz genau EINE AG, wird diese automatisch verwendet. Bei 0 AGs gibt es nichts
+				# beizutreten (z.B. Non-Cluster-Instanz) - bleibt standalone. Bei 2+ AGs ist die
+				# Zuordnung nicht eindeutig - Abbruch, -AvailabilityGroupName muss explizit angegeben
+				# werden.
+				$instanceAgs = @(Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction SilentlyContinue)
+				if ($instanceAgs.Count -eq 1)
+				{
+					$availabilityGroup = $instanceAgs[0]
+					$isAGDatabase = $true
+					Invoke-sqmLogging -Message "Datenbank ist aktuell in keiner AG, Instanz hat aber genau eine AG '$($availabilityGroup.Name)' - wird nach dem Restore automatisch dieser AG hinzugefuegt (Richtlinie: alle Datenbanken muessen in AlwaysOn sein)." -FunctionName $functionName -Level "WARNING"
+				}
+				elseif ($instanceAgs.Count -gt 1)
+				{
+					$agNames = ($instanceAgs | Select-Object -ExpandProperty Name) -join ', '
+					Invoke-sqmLogging -Message "Datenbank ist in keiner AG und Instanz '$SqlInstance' hat mehrere AGs ($agNames) - nicht eindeutig, welche AG die Datenbank erhalten soll." -FunctionName $functionName -Level "ERROR"
+					throw "Instanz '$SqlInstance' hat mehrere Availability Groups ($agNames). Bitte -AvailabilityGroupName explizit angeben."
+				}
+				else
+				{
+					Invoke-sqmLogging -Message "Datenbank ist in keiner AG und Instanz '$SqlInstance' hat keine Availability Group - Datenbank bleibt standalone." -FunctionName $functionName -Level "INFO"
+				}
+			}
+
 			# ---- 2. Optional: Backup der vorhandenen Datenbank ----
 			if ($BackupBeforeRestore -and $dbExists -and -not $isAGDatabase)
 			{
@@ -683,7 +757,13 @@ function Invoke-sqmRestoreDatabase
 					return
 				}
 			}
-			
+
+			# Ab hier ist die Datenbank tatsaechlich wiederhergestellt. Der AG-Rejoin (siehe finally-
+			# Block) darf danach durch nichts mehr verhindert werden - auch nicht durch einen mit
+			# -EnableException durchgereichten Fehler in einem der folgenden (nicht-kritischen)
+			# Aufraeumschritte 6-9.
+			$restoreSucceeded = $true
+
 			# ---- 6. Nach dem Restore: User wiederherstellen (wenn Export durchgefuehrt) ----
 			if (-not $NoUserExport -and (Test-Path $userExportFile))
 			{
@@ -810,25 +890,49 @@ WHERE dp.type IN ('U', 'G')
 				$results += [PSCustomObject]@{ Action = "SetDbOwner"; Status = "Skipped"; Message = "WhatIf - Setzen des Eigentuemers uebersprungen." }
 			}
 			
+			# AG-Rejoin (Schritt 10) laeuft NICHT mehr hier, sondern im finally-Block weiter unten -
+			# damit er garantiert ausgefuehrt wird, auch wenn einer der nachfolgenden (nicht-kritischen)
+			# Aufraeumschritte 6-9 mit -EnableException eine Ausnahme durchreicht. Siehe dort.
+
+			# Aufraeumen: temporaere Exportdatei loeschen
+			if (Test-Path $userExportFile)
+			{
+				Remove-Item $userExportFile -Force -ErrorAction SilentlyContinue
+			}
+		}
+		catch
+		{
+			$errMsg = "Allgemeiner Fehler: $($_.Exception.Message)"
+			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+			if ($EnableException) { throw }
+			$results += [PSCustomObject]@{ Action = "GlobalError"; Status = "Failed"; Message = $errMsg }
+		}
+		finally
+		{
 			# ---- 10. Datenbank wieder in die AG aufnehmen (inkl. Seeding der Secondaries) ----
+			# Laeuft bewusst im finally-Block: sobald der Restore selbst erfolgreich war
+			# ($restoreSucceeded), MUSS der Rejoin versucht werden - auch wenn einer der
+			# nachfolgenden (nicht-kritischen) Aufraeumschritte 6-9 mit -EnableException eine
+			# Ausnahme durchgereicht hat. finally laeuft in PowerShell garantiert, selbst wenn im
+			# try/catch ein throw weitergereicht wurde. War $restoreSucceeded nie true (Restore
+			# selbst fehlgeschlagen/uebersprungen), wird hier bewusst NICHT versucht, eine
+			# moeglicherweise kaputte/nicht vorhandene Datenbank in die AG aufzunehmen.
+			#
 			# Standardverhalten: eine Datenbank, die aus einer AG entfernt wurde, wird nach dem
 			# Restore automatisch wieder aufgenommen, damit die Secondaries per Automatic Seeding
 			# neu versorgt werden - sonst bleiben sie nach einem AG-Restore ohne diese Datenbank
 			# zurueck. Mit -NoRejoinAvailabilityGroup kann das explizit unterdrueckt werden (z.B. um
 			# den Restore erst zu verifizieren, bevor die AG manuell wieder aufgebaut wird).
-			# Diese Trace-Zeile immer schreiben (auch wenn IsAGDatabase=false), damit im Log
-			# nachvollziehbar ist, OB und WARUM Rejoin/Reseed lief oder nicht - genau das war zuvor
-			# nicht erkennbar und fuehrte dazu, dass ein ausbleibendes Rejoin unbemerkt blieb.
-			Invoke-sqmLogging -Message "AG-Status vor Rejoin-Entscheidung: IsAGDatabase=$isAGDatabase, KeepAlwaysOn=$($KeepAlwaysOn.IsPresent), NoRejoinAvailabilityGroup=$($NoRejoinAvailabilityGroup.IsPresent), AvailabilityGroup='$($availabilityGroup.Name)'." -FunctionName $functionName -Level "INFO"
+			Invoke-sqmLogging -Message "AG-Status vor Rejoin-Entscheidung: IsAGDatabase=$isAGDatabase, RestoreSucceeded=$restoreSucceeded, KeepAlwaysOn=$($KeepAlwaysOn.IsPresent), NoRejoinAvailabilityGroup=$($NoRejoinAvailabilityGroup.IsPresent), AvailabilityGroup='$($availabilityGroup.Name)'." -FunctionName $functionName -Level "INFO"
 
-			if ($isAGDatabase -and -not $KeepAlwaysOn -and $NoRejoinAvailabilityGroup)
+			if ($isAGDatabase -and $restoreSucceeded -and -not $KeepAlwaysOn -and $NoRejoinAvailabilityGroup)
 			{
 				$skipMsg = "Datenbank '$finalDbName' war Teil der AG '$($availabilityGroup.Name)', wird wegen -NoRejoinAvailabilityGroup NICHT wieder aufgenommen - Secondaries bleiben ohne diese Datenbank zurueck."
 				Invoke-sqmLogging -Message $skipMsg -FunctionName $functionName -Level "WARNING"
 				$results += [PSCustomObject]@{ Action = "RejoinAG"; Status = "SkippedByRequest"; Message = $skipMsg }
 			}
 
-			if ($isAGDatabase -and -not $KeepAlwaysOn -and -not $NoRejoinAvailabilityGroup)
+			if ($isAGDatabase -and $restoreSucceeded -and -not $KeepAlwaysOn -and -not $NoRejoinAvailabilityGroup)
 			{
 				$rejoinAction = "Fuge Datenbank '$finalDbName' wieder in AG '$($availabilityGroup.Name)' ein"
 				if ($PSCmdlet.ShouldProcess($finalDbName, $rejoinAction))
@@ -894,7 +998,10 @@ WHERE dp.type IN ('U', 'G')
 						# verschwinden, wenn niemand $results manuell prueft.
 						Write-EventLog -LogName Application -Source $agEventLogSource -EventId 9012 -EntryType Error `
 							-Message "Invoke-sqmRestoreDatabase: '$finalDbName' konnte nach dem Restore NICHT wieder in AG '$($availabilityGroup.Name)' aufgenommen werden - Secondaries erhalten diese Datenbank NICHT automatisch. Fehler: $errMsg" -ErrorAction SilentlyContinue
-						if ($EnableException) { throw }
+						# Bewusst KEIN erneutes throw hier, selbst mit -EnableException: dies laeuft im
+						# finally-Block, ein throw hier wuerde eine evtl. bereits laufende Exception-
+						# Weiterleitung aus dem try/catch ueberschreiben/verschlucken. Fehlschlag ist im
+						# Eventlog und in $results sichtbar.
 						$results += [PSCustomObject]@{ Action = "RejoinAG"; Status = "Failed"; Message = $errMsg }
 					}
 				}
@@ -904,21 +1011,6 @@ WHERE dp.type IN ('U', 'G')
 				}
 			}
 
-			# Aufraeumen: temporaere Exportdatei loeschen
-			if (Test-Path $userExportFile)
-			{
-				Remove-Item $userExportFile -Force -ErrorAction SilentlyContinue
-			}
-		}
-		catch
-		{
-			$errMsg = "Allgemeiner Fehler: $($_.Exception.Message)"
-			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
-			if ($EnableException) { throw }
-			$results += [PSCustomObject]@{ Action = "GlobalError"; Status = "Failed"; Message = $errMsg }
-		}
-		finally
-		{
 			# ---- Datenbank aus Single-User-Modus zuruecknehmen ----
 			if ($wasSingleUser)
 			{

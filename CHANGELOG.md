@@ -1,5 +1,47 @@
 # sqmSQLTool — Changelog
 
+## [1.9.16.0] — 2026-07-14
+
+### Fix: Invoke-sqmRestoreDatabase — AG rejoin could still be skipped by a later cleanup-step failure
+
+- Traced through the "was AG member at start -> does it get rejoined" path end to end. In the
+  normal case it already worked, but found a gap: with `-EnableException`, if any of the
+  non-critical post-restore cleanup steps (6-9: user re-import, orphan-user repair, stale
+  Windows-login removal, owner assignment) threw, the exception propagated straight past the AG
+  rejoin step (10) to the outer catch, so a database that was successfully restored could still
+  end up left outside the AG with no rejoin attempt at all.
+- Moved the AG-rejoin step into the function's `finally` block, gated by a new `$restoreSucceeded`
+  flag (set only once the restore itself has actually completed). `finally` in PowerShell always
+  runs even when an exception is rethrown from `catch`, so the rejoin is now guaranteed to be
+  attempted whenever the database was AG-managed and the restore succeeded - regardless of what
+  happens in the cleanup steps afterward. (If the restore itself failed or never ran,
+  `$restoreSucceeded` stays false and rejoin is correctly skipped, since attempting to add a
+  possibly broken/missing database back into the AG would be wrong.)
+- Fixed an adjacent bug this reshuffle made more likely to hit: `$finalDbName` was only ever
+  assigned at the start of the restore step, so if the function failed earlier (e.g. AG removal)
+  after `$wasSingleUser` was already set (possible since 1.9.14.0's already-SINGLE_USER-at-start
+  check runs even earlier), the `finally` block's MULTI_USER revert referenced `$null` and would
+  have produced a broken `ALTER DATABASE [] SET MULTI_USER;`. `$finalDbName` now defaults to
+  `$DatabaseName` from the start of the run.
+
+### Feature: Invoke-sqmRestoreDatabase — a restored database must always end up on AlwaysOn
+
+- Policy change: previously, a database that was NOT an AG member before the restore was always
+  left standalone afterward, even on an instance that has an AG - AG membership only ever
+  happened for databases that were already AG members (or via the new `-AvailabilityGroupName`
+  override from earlier in 1.9.14.0). That's backwards for an environment where every database on
+  an AG-capable instance must be on AlwaysOn, including a database being restored/deployed there
+  for the very first time.
+- The AG-membership check (previously nested inside "if the database already exists") now always
+  runs, so it also applies to a brand-new database name that has never existed on the instance
+  before - not just to databases that already existed standalone. When the database is not
+  currently an AG member and `-AvailabilityGroupName` wasn't given: if the instance has exactly
+  one Availability Group, the restored database is automatically added to it (with seeding); with
+  zero AGs there's nothing to join and it correctly stays standalone; with more than one AG the
+  run aborts and requires `-AvailabilityGroupName` to disambiguate, rather than guessing.
+- `-KeepAlwaysOn` now doubles as the deliberate opt-out for this auto-join, for a restore that must
+  genuinely stay standalone (e.g. a scratch/test copy) even though the instance has an AG.
+
 ## [1.9.15.0] — 2026-07-14
 
 ### Feature: Get-sqmSpnReport — copy-paste-ready setspn commands + clipboard hand-off for the AD team
