@@ -1,5 +1,36 @@
 # sqmSQLTool — Changelog
 
+## [1.9.14.0] — 2026-07-14
+
+### Fix: Invoke-sqmRestoreDatabase — AG rejoin/reseed could be silently lost after a partial failure
+
+- Follow-up to 1.9.13.0: rejoin was still not happening in practice for a database that a
+  *previous, incompletely finished* run had already removed from the AG. Root cause: AG
+  membership is auto-detected live at the start of the run (`Get-DbaAgDatabase`); once a database
+  has actually been removed from the AG, it no longer shows up as an AG member, so a retry would
+  silently skip secondary cleanup and the rejoin/reseed step entirely - with no error, since as
+  far as the function could tell, it was never an AG database to begin with.
+- Added `-AvailabilityGroupName` to force AG-aware handling regardless of current live
+  membership, for exactly this retry scenario (or restoring a brand-new database straight into an
+  existing AG). The AG-removal step now tolerates the database already not being a member (skips
+  `Remove-DbaAgDatabase` gracefully) while still cleaning up secondaries and performing the
+  rejoin/reseed at the end.
+- The rejoin step now always writes to the Windows Application Event Log (source "sqmAlwaysOn",
+  same source `Repair-sqmAlwaysOnDatabases` already creates) on both success and failure, so a
+  failed reseed is visible to monitoring/alerting even if nobody inspects the returned result
+  objects - this is exactly the kind of failure that must never go unnoticed.
+- Added an unconditional trace log line before the rejoin decision (AG-membership/KeepAlwaysOn/
+  NoRejoinAvailabilityGroup state) so a future "why didn't it rejoin" question can be answered
+  from the log instead of guessing.
+- Fixed a related gap in the 1.9.13.0 single-user reordering: it only accounted for single-user
+  mode that *this function itself* set in an earlier run. If the database was already found in
+  SINGLE_USER/RESTRICTED_USER mode when the run starts (e.g. left over from a previous interrupted
+  restore) with another session holding the one connection slot, `Export-DbaUser` would still fail
+  immediately with the same "database is already open and can only have one user at a time"
+  error, since it can't get a connection either. The database is now checked via
+  `$targetDb.UserAccess` immediately after connecting and, if not `Multiple`, reset to MULTI_USER
+  right away (disconnecting whatever was holding it) before anything else runs.
+
 ## [1.9.13.0] — 2026-07-14
 
 ### Fix: Invoke-sqmRestoreDatabase — AG secondaries not seeded, Export-DbaUser single-user conflict

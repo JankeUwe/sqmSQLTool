@@ -522,10 +522,13 @@ Restores a database from a backup file, with support for single-server and Alway
 
 The function performs a controlled database restore. It automatically detects whether the target
 database belongs to an AlwaysOn availability group and removes it from the AG if so (including
-deletion on secondary replicas). Database users are exported before the restore (for later
-recovery). Optionally a backup of the original database can be created. After the restore,
-users are recovered, orphaned users are repaired, non-existent Windows logins are removed,
-and the database owner is set to the SA account (regardless of its name).
+deletion on secondary replicas). By default, once the restore completes, the database is
+automatically re-added to the AG (Add-DbaAgDatabase with SeedingMode Automatic), which also
+reseeds the secondaries - use -NoRejoinAvailabilityGroup to leave it standalone instead. Database
+users are exported before the restore (for later recovery). Optionally a backup of the original
+database can be created. After the restore, users are recovered, orphaned users are repaired,
+non-existent Windows logins are removed, and the database owner is set to the SA account
+(regardless of its name).
 
 The function can also restore a sequence of backups (Full + Diff + Logs) using the `-BackupFiles`
 parameter, which accepts a list of backup files in the correct order (Full, then Diff, then Logs).
@@ -533,8 +536,17 @@ parameter, which accepts a list of backup files in the correct order (Full, then
 Before user export and before the restore, the configured PBM policy (DefaultPolicy) is
 temporarily disabled to avoid restrictions during user creation. It is re-enabled after completion.
 
-If the database is in use before the restore, it is automatically set to single-user mode
-(and switched back to multi-user after the restore).
+If the database is in use, it is automatically set to single-user mode after the user export
+(and switched back to multi-user after the restore) - single-user is applied only after the
+export, not before, since Export-DbaUser needs its own connection to the database and would
+otherwise fail with "database is already open and can only have one user at a time".
+
+AG-membership is normally auto-detected at the start of the run. If a previous run already
+removed the database from the AG but failed before rejoining it, a retry would no longer
+auto-detect it as an AG database and would silently skip secondary cleanup and rejoin/reseed
+entirely. Use `-AvailabilityGroupName` to force AG-aware handling regardless of current live
+membership. Every rejoin attempt (success and failure) is also written to the Windows
+Application Event Log (source "sqmAlwaysOn", same source as Repair-sqmAlwaysOnDatabases).
 
 **Parameters:**
 
@@ -559,6 +571,10 @@ The export file is stored temporarily in the %TEMP% directory.
 - **-KeepAlwaysOn** - Optional: If the database is part of an AG, it is not removed from the AG.
 Note: Restoring an AG database is only possible after removing it from the AG.
 Use this parameter only if the database is already outside the AG.
+- **-AvailabilityGroupName** - Optional: Explicitly declares which AG the database belongs to (or should end up in after
+the restore), instead of relying solely on live AG-membership detection at the start of the run.
+Use this when the database was already removed from the AG by a previous, incompletely finished
+run, or when restoring a brand-new database straight into an existing AG.
 - **-WithNoRecovery** - Optional: Performs the restore with NORECOVERY so the database remains in restoring state
 (for additional log backups). By default RECOVERY is used (database online).
 - **-ContinueWithNoRecovery** - Optional: When set, the last restore is also performed with NORECOVERY (e.g. when
@@ -573,7 +589,7 @@ outside the AG after the restore instead.
 - **-Confirm** - Request confirmation before critical actions (removing from AG, restore).
 - **-WhatIf** - Shows what would happen without making changes.
 
-**Examples (3):**
+**Examples (4):**
 
 ```powershell
 # Simple restore of a full backup file
@@ -592,6 +608,11 @@ Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFiles $backupSequence -Dat
 ```powershell
 # Restore with new name and forced Single-User mode
 Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\OldDB.bak" -DatabaseName "OldDB" -NewDatabaseName "NewDB" -ForceSingleUser
+
+```powershell
+# Retry after a previous run already removed the database from the AG but did not get to
+# rejoin it - force it explicitly to guarantee the secondaries get reseeded.
+Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\Arena.bak" -DatabaseName "Arena" -AvailabilityGroupName "AG_Prod"
 
 ### Invoke-sqmUserDatabaseBackup
 

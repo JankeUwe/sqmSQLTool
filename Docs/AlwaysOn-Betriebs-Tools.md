@@ -101,6 +101,13 @@ Logins oder Datenbanken auf einem Read-Only-Secondary).
   wenn die Datenbank noch Mitglied einer AG ist (Restore ist innerhalb einer AG nicht möglich) —
   nur für den Fall gedacht, dass die Datenbank bereits außerhalb der AG liegt. Eine evtl.
   konfigurierte PBM-Policy wird für den Vorgang temporär deaktiviert und danach wieder aktiviert.
+  Ist ein vorheriger Lauf bereits so weit gekommen, dass die Datenbank aus der AG entfernt wurde,
+  dann aber vor dem Rejoin abgebrochen ist, erkennt ein erneuter Aufruf die AG-Zugehörigkeit nicht
+  mehr automatisch (die Datenbank ist ja schon kein AG-Mitglied mehr) — mit `-AvailabilityGroupName`
+  lässt sich das erzwingen, damit Secondary-Cleanup und Rejoin/Reseed trotzdem laufen. Jeder
+  Rejoin-Versuch (Erfolg wie Fehlschlag) wird zusätzlich ins Windows-Eventlog geschrieben (Quelle
+  „sqmAlwaysOn", dieselbe wie bei Repair-sqmAlwaysOnDatabases), damit ein ausbleibendes Reseed nicht
+  unbemerkt bleibt, selbst wenn niemand die zurückgegebenen Ergebnisobjekte prüft.
 
 ## Logins synchron halten
 
