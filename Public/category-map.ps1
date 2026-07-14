@@ -125,6 +125,7 @@ $categoryMap = @{
     'Set-sqmMaxMemory'                    = 'Configuration Management'
     'Set-sqmSqlPolicyState'               = 'Login & User Security'
     'Set-sqmSqlTlsCertificate'            = 'Certificates & TLS Security'
+    'Set-sqmSsasDeploymentMode'           = 'Analysis Services (SSAS)'
     'Set-sqmSsrsConfiguration'            = 'SSRS Configuration'
     'Set-sqmSsrsHttpsCertificate'         = 'Certificates & TLS Security'
     'Set-sqmTcpPort'                      = 'Configuration Management'

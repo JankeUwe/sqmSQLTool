@@ -41,7 +41,7 @@ $script:sqmModuleConfig = @{
 	InstallSourcePath        = ''
 	# Throttle fuer den On-Import-Update-Check (Stunden zwischen Netz-Pruefungen).
 	UpdateCheckIntervalHours = 24
-	ModuleVersion         = '1.9.9.1'
+	ModuleVersion         = '1.9.10.0'
 	Language              = 'en-US'
 	# Check-Profil: 'Auto' = FI-TS wenn erkannt, 'FiTs' = immer, 'Generic' = nie FI-TS-Checks
 	CheckProfile          = 'Auto'

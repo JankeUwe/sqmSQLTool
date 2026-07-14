@@ -1,5 +1,16 @@
 # sqmSQLTool — Changelog
 
+## [1.9.10.0] — 2026-07-13
+
+### Feature: Set-sqmSsasDeploymentMode
+
+- New function to correct an SSAS instance that was installed with the wrong SERVERMODE
+  (Tabular vs. Multidimensional). Locates `msmdsrv.ini` via the service command line, backs it
+  up, and updates the `<DeploymentMode>` element (0 = Multidimensional, 2 = Tabular), optionally
+  restarting the service. Refuses to proceed when existing database folders are found under the
+  instance's Data directory (the two modes use incompatible storage formats) unless `-Force` is
+  passed. Supports `-WhatIf`/`-Confirm`.
+
 ## [1.9.9.1] — 2026-07-12
 
 ### Fix: Get-sqmCertificateReport always reported "Database Master Key: FEHLT"
