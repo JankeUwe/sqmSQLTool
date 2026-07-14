@@ -1,5 +1,24 @@
 # sqmSQLTool — Changelog
 
+## [1.9.13.0] — 2026-07-14
+
+### Fix: Invoke-sqmRestoreDatabase — AG secondaries not seeded, Export-DbaUser single-user conflict
+
+- Rejoining the AG after a restore (which is what triggers `Add-DbaAgDatabase`'s automatic
+  seeding of the secondaries) was gated behind an opt-in `-RejoinAvailabilityGroup` switch, so by
+  default a restored AG database was left standalone and the secondaries never got the database
+  back at all. Replaced with `-NoRejoinAvailabilityGroup`: rejoining (and therefore reseeding the
+  secondaries) is now the default for any database that was removed from an AG for the restore.
+- Fixed `Export-DbaUser` failing with "Database '\<db\>' is already open and can only have one user
+  at a time" (surfaced as a WARNING, silently producing an incomplete/empty user export). The
+  database was being switched to `SINGLE_USER` *before* the user export step, but `Export-DbaUser`
+  opens its own SMO connection to script out users/permissions, which collides with single-user
+  mode. Single-user is now applied after the user export instead, right before the AG-removal/
+  restore steps that actually need it.
+- Corrected the AlwaysOn-Betriebs-Tools.md description, which incorrectly claimed `-KeepAlwaysOn`
+  triggers AG rejoin+reseeding after restore (it actually aborts the restore if the database is
+  still an AG member).
+
 ## [1.9.12.0] — 2026-07-14
 
 ### Feature: Compare-sqmServerConfiguration — per-login database mapping/roles, instance default language

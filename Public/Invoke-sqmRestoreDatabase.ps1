@@ -5,10 +5,13 @@ Restores a database from a backup file, with support for single-server and Alway
 .DESCRIPTION
 The function performs a controlled database restore. It automatically detects whether the target
 database belongs to an AlwaysOn availability group and removes it from the AG if so (including
-deletion on secondary replicas). Database users are exported before the restore (for later
-recovery). Optionally a backup of the original database can be created. After the restore,
-users are recovered, orphaned users are repaired, non-existent Windows logins are removed,
-and the database owner is set to the SA account (regardless of its name).
+deletion on secondary replicas). By default, once the restore completes, the database is
+automatically re-added to the AG (Add-DbaAgDatabase with SeedingMode Automatic), which also
+reseeds the secondaries - use -NoRejoinAvailabilityGroup to leave it standalone instead. Database
+users are exported before the restore (for later recovery). Optionally a backup of the original
+database can be created. After the restore, users are recovered, orphaned users are repaired,
+non-existent Windows logins are removed, and the database owner is set to the SA account
+(regardless of its name).
 
 The function can also restore a sequence of backups (Full + Diff + Logs) using the `-BackupFiles`
 parameter, which accepts a list of backup files in the correct order (Full, then Diff, then Logs).
@@ -16,8 +19,10 @@ parameter, which accepts a list of backup files in the correct order (Full, then
 Before user export and before the restore, the configured PBM policy (DefaultPolicy) is
 temporarily disabled to avoid restrictions during user creation. It is re-enabled after completion.
 
-If the database is in use before the restore, it is automatically set to single-user mode
-(and switched back to multi-user after the restore).
+If the database is in use, it is automatically set to single-user mode after the user export
+(and switched back to multi-user after the restore) - single-user is applied only after the
+export, not before, since Export-DbaUser needs its own connection to the database and would
+otherwise fail with "database is already open and can only have one user at a time".
 
 .PARAMETER SqlInstance
 Target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE"). Default: current computer name.
@@ -74,10 +79,11 @@ additional backups are to be applied manually).
 Forces the database into single-user mode before the restore (even if no active connections
 are detected). By default only switches when there are active connections.
 
-.PARAMETER RejoinAvailabilityGroup
-When set and the database was part of an AG, it is automatically re-added to the AG after
-the restore (Add-DbaAgDatabase with SeedingMode Automatic). Requires Automatic Seeding on the AG.
-Without this parameter, the database remains outside the AG after the restore.
+.PARAMETER NoRejoinAvailabilityGroup
+Optional: If the database was part of an AG (and removed from it for the restore), it is by
+default automatically re-added to the AG afterwards (Add-DbaAgDatabase with SeedingMode
+Automatic, which also seeds the secondaries). Use this switch to suppress that and leave the
+database outside the AG after the restore instead.
 
 .PARAMETER EnableException
 Switch to allow exceptions to pass through (by default errors are logged and returned as objects).
@@ -144,7 +150,7 @@ function Invoke-sqmRestoreDatabase
 		[Parameter(Mandatory = $false)]
 		[switch]$ForceSingleUser,
 		[Parameter(Mandatory = $false)]
-		[switch]$RejoinAvailabilityGroup,
+		[switch]$NoRejoinAvailabilityGroup,
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
@@ -251,48 +257,11 @@ function Invoke-sqmRestoreDatabase
 						throw "Datenbank ist Teil einer AG und KeepAlwaysOn wurde angegeben. Restore nicht moeglich."
 					}
 				}
-				
-				# ---- Datenbank in Single-User-Modus versetzen, falls noetig ----
+
+				# Aktive Verbindungen hier nur ermitteln (fuer spaeteren Single-User-Schritt) - NICHT
+				# schon jetzt in Single-User versetzen, das muss erst NACH dem User-Export (Schritt 3)
+				# passieren (siehe dort).
 				$activeConnections = $targetDb.ActiveConnections
-				if ($activeConnections -gt 0 -or $ForceSingleUser)
-				{
-					if ($activeConnections -gt 0)
-					{
-						Invoke-sqmLogging -Message "Datenbank '$DatabaseName' hat $activeConnections aktive Verbindungen. Setze in Single-User-Modus." -FunctionName $functionName -Level "INFO"
-					}
-					else
-					{
-						Invoke-sqmLogging -Message "Erzwinge Single-User-Modus fuer Datenbank '$DatabaseName'." -FunctionName $functionName -Level "INFO"
-					}
-					$setSingleUserAction = "Setze Datenbank '$DatabaseName' in Single-User-Modus"
-					if ($PSCmdlet.ShouldProcess($DatabaseName, $setSingleUserAction))
-					{
-						try
-						{
-							$singleUserQuery = "ALTER DATABASE [$DatabaseName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;"
-							Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database master -Query $singleUserQuery -ErrorAction Stop
-							$wasSingleUser = $true
-							Invoke-sqmLogging -Message "Datenbank '$DatabaseName' jetzt im Single-User-Modus." -FunctionName $functionName -Level "INFO"
-							$results += [PSCustomObject]@{ Action = "SetSingleUser"; Status = "Success"; Message = "Datenbank in Single-User versetzt." }
-						}
-						catch
-						{
-							$errMsg = "Fehler beim Setzen des Single-User-Modus: $($_.Exception.Message)"
-							Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
-							if ($EnableException) { throw }
-							$results += [PSCustomObject]@{ Action = "SetSingleUser"; Status = "Failed"; Message = $errMsg }
-							return
-						}
-					}
-					else
-					{
-						$results += [PSCustomObject]@{ Action = "SetSingleUser"; Status = "Skipped"; Message = "WhatIf - Single-User uebersprungen." }
-					}
-				}
-				else
-				{
-					Invoke-sqmLogging -Message "Datenbank '$DatabaseName' hat keine aktiven Verbindungen." -FunctionName $functionName -Level "INFO"
-				}
 			}
 			else
 			{
@@ -362,7 +331,54 @@ function Invoke-sqmRestoreDatabase
 					$results += [PSCustomObject]@{ Action = "UserExport"; Status = "Skipped"; Message = "WhatIf - User-Export uebersprungen." }
 				}
 			}
-			
+
+			# ---- 3b. Datenbank in Single-User-Modus versetzen, falls noetig ----
+			# WICHTIG: Muss NACH dem User-Export (Schritt 3) laufen, nicht davor. Export-DbaUser
+			# oeffnet fuer das Scripting der Objekt-/Berechtigungs-DDL eine eigene SMO-Verbindung zur
+			# Datenbank; laeuft die Datenbank zu diesem Zeitpunkt schon in SINGLE_USER, schlaegt dieser
+			# zweite Connect mit "Database '<db>' is already open and can only have one user at a
+			# time" fehl (Export-DbaUser faengt den Fehler intern ab und meldet ihn nur als WARNING,
+			# der Export bricht dann aber unvollstaendig/leer ab).
+			if ($dbExists -and ($activeConnections -gt 0 -or $ForceSingleUser))
+			{
+				if ($activeConnections -gt 0)
+				{
+					Invoke-sqmLogging -Message "Datenbank '$DatabaseName' hat $activeConnections aktive Verbindungen. Setze in Single-User-Modus." -FunctionName $functionName -Level "INFO"
+				}
+				else
+				{
+					Invoke-sqmLogging -Message "Erzwinge Single-User-Modus fuer Datenbank '$DatabaseName'." -FunctionName $functionName -Level "INFO"
+				}
+				$setSingleUserAction = "Setze Datenbank '$DatabaseName' in Single-User-Modus"
+				if ($PSCmdlet.ShouldProcess($DatabaseName, $setSingleUserAction))
+				{
+					try
+					{
+						$singleUserQuery = "ALTER DATABASE [$DatabaseName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;"
+						Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database master -Query $singleUserQuery -ErrorAction Stop
+						$wasSingleUser = $true
+						Invoke-sqmLogging -Message "Datenbank '$DatabaseName' jetzt im Single-User-Modus." -FunctionName $functionName -Level "INFO"
+						$results += [PSCustomObject]@{ Action = "SetSingleUser"; Status = "Success"; Message = "Datenbank in Single-User versetzt." }
+					}
+					catch
+					{
+						$errMsg = "Fehler beim Setzen des Single-User-Modus: $($_.Exception.Message)"
+						Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+						if ($EnableException) { throw }
+						$results += [PSCustomObject]@{ Action = "SetSingleUser"; Status = "Failed"; Message = $errMsg }
+						return
+					}
+				}
+				else
+				{
+					$results += [PSCustomObject]@{ Action = "SetSingleUser"; Status = "Skipped"; Message = "WhatIf - Single-User uebersprungen." }
+				}
+			}
+			elseif ($dbExists)
+			{
+				Invoke-sqmLogging -Message "Datenbank '$DatabaseName' hat keine aktiven Verbindungen." -FunctionName $functionName -Level "INFO"
+			}
+
 			# ---- 4. Wenn AlwaysOn: Datenbank aus der AG entfernen (primaer) und von sekundaeren Replikaten loeschen ----
 			if ($isAGDatabase -and -not $KeepAlwaysOn)
 			{
@@ -677,8 +693,13 @@ WHERE dp.type IN ('U', 'G')
 				$results += [PSCustomObject]@{ Action = "SetDbOwner"; Status = "Skipped"; Message = "WhatIf - Setzen des Eigentuemers uebersprungen." }
 			}
 			
-			# ---- 10. Optional: Datenbank wieder in die AG aufnehmen ----
-			if ($RejoinAvailabilityGroup -and $isAGDatabase -and -not $KeepAlwaysOn)
+			# ---- 10. Datenbank wieder in die AG aufnehmen (inkl. Seeding der Secondaries) ----
+			# Standardverhalten: eine Datenbank, die aus einer AG entfernt wurde, wird nach dem
+			# Restore automatisch wieder aufgenommen, damit die Secondaries per Automatic Seeding
+			# neu versorgt werden - sonst bleiben sie nach einem AG-Restore ohne diese Datenbank
+			# zurueck. Mit -NoRejoinAvailabilityGroup kann das explizit unterdrueckt werden (z.B. um
+			# den Restore erst zu verifizieren, bevor die AG manuell wieder aufgebaut wird).
+			if ($isAGDatabase -and -not $KeepAlwaysOn -and -not $NoRejoinAvailabilityGroup)
 			{
 				$rejoinAction = "Fuge Datenbank '$finalDbName' wieder in AG '$($availabilityGroup.Name)' ein"
 				if ($PSCmdlet.ShouldProcess($finalDbName, $rejoinAction))

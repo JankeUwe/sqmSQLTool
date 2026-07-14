@@ -565,9 +565,10 @@ Use this parameter only if the database is already outside the AG.
 additional backups are to be applied manually).
 - **-ForceSingleUser** - Forces the database into single-user mode before the restore (even if no active connections
 are detected). By default only switches when there are active connections.
-- **-RejoinAvailabilityGroup** - When set and the database was part of an AG, it is automatically re-added to the AG after
-the restore (Add-DbaAgDatabase with SeedingMode Automatic). Requires Automatic Seeding on the AG.
-Without this parameter, the database remains outside the AG after the restore.
+- **-NoRejoinAvailabilityGroup** - Optional: If the database was part of an AG (and removed from it for the restore), it is by
+default automatically re-added to the AG afterwards (Add-DbaAgDatabase with SeedingMode Automatic,
+which also seeds the secondaries). Use this switch to suppress that and leave the database
+outside the AG after the restore instead.
 - **-EnableException** - Switch to allow exceptions to pass through (by default errors are logged and returned as objects).
 - **-Confirm** - Request confirmation before critical actions (removing from AG, restore).
 - **-WhatIf** - Shows what would happen without making changes.

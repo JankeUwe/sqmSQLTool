@@ -94,9 +94,13 @@ Logins oder Datenbanken auf einem Read-Only-Secondary).
   werden die Datenbank-User exportiert (zur späteren Wiederherstellung) und optional ein Backup
   des Originals erstellt. Nach dem Restore auf dem Primary werden User wiederhergestellt,
   verwaiste User repariert, nicht mehr existierende Windows-Logins entfernt und der DB-Owner auf
-  das SA-Konto gesetzt. Mit `-KeepAlwaysOn` wird die Datenbank danach wieder in die AG aufgenommen —
-  die Secondaries werden dann erneut per Automatic Seeding versorgt. Eine evtl. konfigurierte
-  PBM-Policy wird für den Vorgang temporär deaktiviert und danach wieder aktiviert.
+  das SA-Konto gesetzt. **Standardmäßig** wird die Datenbank danach automatisch wieder in die AG
+  aufgenommen — die Secondaries werden dann erneut per Automatic Seeding versorgt. Mit
+  `-NoRejoinAvailabilityGroup` bleibt die Datenbank stattdessen außerhalb der AG (z.B. um den
+  Restore erst zu verifizieren). `-KeepAlwaysOn` ist etwas anderes: Es bricht den Restore ab,
+  wenn die Datenbank noch Mitglied einer AG ist (Restore ist innerhalb einer AG nicht möglich) —
+  nur für den Fall gedacht, dass die Datenbank bereits außerhalb der AG liegt. Eine evtl.
+  konfigurierte PBM-Policy wird für den Vorgang temporär deaktiviert und danach wieder aktiviert.
 
 ## Logins synchron halten
 
