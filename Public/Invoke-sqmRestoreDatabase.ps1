@@ -263,11 +263,27 @@ function Invoke-sqmRestoreDatabase
 		# damit Restore- und Repair-Vorgaenge im selben Event-Log-Kanal auftauchen). Ein fehlgeschlagenes
 		# Rejoin/AutoSeed nach einem Restore ist eine kritische Betriebsstoerung und darf nicht nur im
 		# sqmSQLTool-Log verschwinden, sondern muss ueber das Eventlog (Monitoring/Alerting) sichtbar sein.
+		#
+		# WICHTIG: [System.Diagnostics.EventLog]::SourceExists() MUSS selbst in try/catch stehen, nicht
+		# nur das New-EventLog. Existiert die Quelle noch nicht, durchsucht SourceExists() ALLE
+		# Event-Logs - inklusive des Security-Logs, dessen Lesen erhoehte Rechte erfordert. Laeuft die
+		# Funktion unter einem niedrig privilegierten Konto (z.B. dem SQL-Agent-Dienstkonto
+		# 'NT SERVICE\SQLSERVERAGENT' in einem Agent-Job), wirft SourceExists() eine SecurityException
+		# ("Protokolle, auf die kein Zugriff moeglich war: Security"). Diese darf NIEMALS den ganzen
+		# Restore abbrechen - die Eventlog-Integration ist nur Best-Effort-Monitoring. Die spaeteren
+		# Write-EventLog-Aufrufe sind ohnehin -ErrorAction SilentlyContinue; kann die Quelle hier nicht
+		# geprueft/angelegt werden, verpuffen sie einfach.
 		$agEventLogSource = "sqmAlwaysOn"
-		if (-not [System.Diagnostics.EventLog]::SourceExists($agEventLogSource))
+		try
 		{
-			try { New-EventLog -LogName Application -Source $agEventLogSource -ErrorAction Stop }
-			catch { Write-Verbose "Eventlog-Quelle '$agEventLogSource' konnte nicht erstellt werden: $($_.Exception.Message)" }
+			if (-not [System.Diagnostics.EventLog]::SourceExists($agEventLogSource))
+			{
+				New-EventLog -LogName Application -Source $agEventLogSource -ErrorAction Stop
+			}
+		}
+		catch
+		{
+			Invoke-sqmLogging -Message "Eventlog-Quelle '$agEventLogSource' konnte nicht geprueft/erstellt werden (Restore laeuft trotzdem weiter): $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
 		}
 
 		$results = @()

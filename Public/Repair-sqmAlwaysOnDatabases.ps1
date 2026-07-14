@@ -68,19 +68,27 @@ function Repair-sqmAlwaysOnDatabases
 			throw "dbatools-Modul nicht gefunden."
 		}
 		
-		# Eventlog-Quelle sicherstellen
+		# Eventlog-Quelle sicherstellen.
+		# WICHTIG: [System.Diagnostics.EventLog]::SourceExists() MUSS selbst im try/catch stehen, nicht
+		# nur das New-EventLog. Existiert die Quelle noch nicht, durchsucht SourceExists() ALLE
+		# Event-Logs inkl. Security-Log (Lesen erfordert erhoehte Rechte). Laeuft diese Funktion unter
+		# einem niedrig privilegierten Konto (z.B. dem SQL-Agent-Dienstkonto 'NT SERVICE\SQLSERVERAGENT'
+		# in ihrem eigenen Agent-Job), wirft SourceExists() dann eine SecurityException und wuerde die
+		# gesamte Reparatur abbrechen. Auf Servern, auf denen die Quelle bereits existiert, tritt das
+		# nicht auf (SourceExists() kehrt sofort zurueck) - deshalb faellt es erst auf frischen Maschinen
+		# auf. Die Eventlog-Integration ist nur Best-Effort; schlaegt sie fehl, laeuft der Rest weiter.
 		$logSource = "sqmAlwaysOn"
-		if (-not [System.Diagnostics.EventLog]::SourceExists($logSource))
+		try
 		{
-			try
+			if (-not [System.Diagnostics.EventLog]::SourceExists($logSource))
 			{
 				New-EventLog -LogName Application -Source $logSource -ErrorAction Stop
 				Write-Verbose "Eventlog-Quelle '$logSource' wurde erstellt."
 			}
-			catch
-			{
-				Write-Warning "Eventlog-Quelle '$logSource' konnte nicht erstellt werden: $($_.Exception.Message)"
-			}
+		}
+		catch
+		{
+			Write-Warning "Eventlog-Quelle '$logSource' konnte nicht geprueft/erstellt werden (Reparatur laeuft trotzdem weiter): $($_.Exception.Message)"
 		}
 		
 		Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance (Force=$Force)" -FunctionName $functionName -Level "INFO"

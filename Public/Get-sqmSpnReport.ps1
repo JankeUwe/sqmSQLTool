@@ -55,6 +55,14 @@
     Optional filter on instance names (wildcards allowed).
     Example: 'MSSQLSERVER' for default instance only, 'SQL*' for named instances.
 
+.PARAMETER SqlCredential
+    Optional SQL credential used ONLY for the AlwaysOn-listener SPN check, which queries the
+    instance (sys.availability_group_listeners) via dbatools' Invoke-DbaQuery. The core SPN report
+    (service accounts, expected/existing MSSQLSvc SPNs) is WMI/CIM/registry- and setspn-based and
+    needs no SQL connection. If omitted, the listener query connects with the current Windows
+    identity; if dbatools is not available, the listener check is skipped and the rest of the
+    report is produced normally.
+
 .PARAMETER OutputPath
     Output directory for report and CSV.
     Default: module configuration (Get-sqmConfig -Key 'OutputPath').
@@ -104,6 +112,9 @@
     - Local administrator rights on the target computer for WMI queries
     - AD module (RSAT) is NOT required; domain resolution is performed via
       [System.DirectoryServices.ActiveDirectory.Domain]
+    - dbatools is required ONLY for the optional AlwaysOn-listener SPN check (Invoke-DbaQuery
+      against sys.availability_group_listeners); without it that check is skipped and the rest of
+      the report is still produced.
     - Set-Clipboard requires an interactive desktop session; in a non-interactive context
       (e.g. an unattended scheduled task) the clipboard copy is skipped with a WARNING logged -
       the SpnReport_SetSpnCommands_<Timestamp>.txt file is still written either way.
@@ -119,6 +130,9 @@ function Get-sqmSpnReport
 
 		[Parameter(Mandatory = $false)]
 		[string]$InstanceFilter = '*',
+
+		[Parameter(Mandatory = $false)]
+		[System.Management.Automation.PSCredential]$SqlCredential,
 
 		[Parameter(Mandatory = $false)]
 		[string]$OutputPath = (Get-sqmConfig -Key 'OutputPath'),
@@ -651,7 +665,22 @@ function Get-sqmSpnReport
 					# --------------------------------------------------------
 					try
 					{
-						$listenerQuery = @"
+						# SQL-Verbindungsziel fuer diese Instanz aufbauen. Get-sqmSpnReport arbeitet sonst
+						# rein ueber WMI/CIM/Registry und hatte bislang KEINE SQL-Verbindung - die
+						# Listener-Abfrage nutzte eine nie definierte Variable '$connParams', schlug daher
+						# immer fehl und wurde vom umgebenden catch stillschweigend als WARNING verschluckt
+						# (die AG-Listener-Pruefung lief also faktisch nie). Zielinstanz: Standardinstanz
+						# ueber den Hostnamen, benannte Instanz ueber Host\Instanz. -SqlCredential wird
+						# durchgereicht, falls angegeben. Ohne dbatools (Invoke-DbaQuery) wird die
+						# Listener-Pruefung sauber uebersprungen - der uebrige (setspn-basierte) Bericht
+						# braucht dbatools nicht.
+						if (Get-Command -Name Invoke-DbaQuery -ErrorAction SilentlyContinue)
+						{
+							$sqlTarget = if ($isDefaultInstance) { $hostName } else { "$hostName\$instanceName" }
+							$connParams = @{ SqlInstance = $sqlTarget }
+							if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
+
+							$listenerQuery = @"
 SELECT
     ag.name AS AvailabilityGroupName,
     agl.dns_name AS ListenerDNSName,
@@ -663,7 +692,13 @@ WHERE ag.group_id IN (
     WHERE is_local = 1
 )
 "@
-						$listeners = Invoke-DbaQuery @connParams -Query $listenerQuery -ErrorAction SilentlyContinue
+							$listeners = Invoke-DbaQuery @connParams -Query $listenerQuery -ErrorAction SilentlyContinue
+						}
+						else
+						{
+							$listeners = $null
+							Invoke-sqmLogging -Message "[$computer\$instanceName] dbatools (Invoke-DbaQuery) nicht verfuegbar - AlwaysOn-Listener-SPN-Pruefung wird uebersprungen." -FunctionName $functionName -Level "VERBOSE"
+						}
 
 						if ($listeners)
 						{

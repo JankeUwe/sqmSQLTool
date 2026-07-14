@@ -1,5 +1,47 @@
 # sqmSQLTool — Changelog
 
+## [1.9.22.0] — 2026-07-14
+
+### Fix: EventLog.SourceExists() SecurityException aborted the whole run under low-privilege accounts
+
+- Verified New-sqmRestoreDatabaseJob + Invoke-sqmRestoreDatabase end to end as a real SQL Agent
+  job on a standalone test instance (DEV01), running as NT SERVICE\SQLSERVERAGENT. The restore
+  itself worked (export → restore → user re-import → orphan repair → owner=sa, data verified), but
+  the run initially failed in the `begin` block with
+  "Ausnahme beim Aufrufen von SourceExists ... Protokolle, auf die kein Zugriff moeglich war:
+  Security" - a `System.Security.SecurityException`.
+- Root cause: `[System.Diagnostics.EventLog]::SourceExists()` scans ALL event logs - including the
+  Security log, which requires elevated rights - when the source does not yet exist. Under a
+  low-privilege account (e.g. the SQL Agent service account running the function's own Agent job)
+  that throws. In both `Invoke-sqmRestoreDatabase` (since 1.9.14.0) and `Repair-sqmAlwaysOnDatabases`
+  the `SourceExists()` call sat OUTSIDE the try/catch (only the `New-EventLog` inside was guarded),
+  so the exception aborted the entire operation. It only surfaced on machines where the
+  `sqmAlwaysOn` event source did not already exist (on servers where a prior elevated run created
+  it, `SourceExists()` returns immediately and never scans Security) - which is why it wasn't seen
+  before on established production servers.
+- Both functions now wrap the `SourceExists()`/`New-EventLog` block in try/catch. Event-log
+  integration is best-effort; if the source can't be checked or created, a WARNING is logged and
+  the restore/repair continues. The later `Write-EventLog` calls were already
+  `-ErrorAction SilentlyContinue`.
+- The other functions using `SourceExists()` (Compare-sqmAlwaysOnLogins, Compare-sqmAlwaysOnRoles,
+  Sync-sqmLoginsToAlwaysOn, Invoke-sqmTempSysadminAction) already had it inside try/catch and were
+  not affected.
+
+### Fix: Get-sqmSpnReport — AlwaysOn-listener SPN check never actually ran (undefined $connParams)
+
+- The AlwaysOn-listener SPN check queried the instance via `Invoke-DbaQuery @connParams`, but
+  `$connParams` was never defined anywhere in the function - Get-sqmSpnReport is otherwise purely
+  WMI/CIM/registry- and setspn-based and had no SQL-connection concept. The splat of a
+  non-existent variable meant `Invoke-DbaQuery` was called without its mandatory `-SqlInstance`,
+  always threw a parameter-binding error, and the surrounding try/catch swallowed it as a
+  WARNING - so the entire "check AG listener SPNs" feature (documented in the function's help)
+  had silently never worked.
+- Added a `-SqlCredential` parameter and now build `$connParams` properly for the listener query:
+  the SQL target is the host name for a default instance or Host\Instance for a named instance,
+  with `-SqlCredential` forwarded when supplied. The block is guarded by a check for
+  `Invoke-DbaQuery` (dbatools) and skips cleanly (with a VERBOSE note) when dbatools isn't present,
+  since the core setspn-based report doesn't need it.
+
 ## [1.9.21.0] — 2026-07-14
 
 ### Feature: New-sqmRestoreDatabaseJob — generate an on-demand SQL Agent job for a restore
