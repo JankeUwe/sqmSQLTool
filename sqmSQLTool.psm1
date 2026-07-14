@@ -169,8 +169,12 @@ else
 	catch
 	{
 		# dbatools nicht via PSModulePath gefunden - FITS-Fallback: lokaler Modulpfad
-		$fitsFallback = 'W:\75084-Datenbanken\MSSQL\SQLSources\Modules'
-		if (Test-Path $fitsFallback)
+		$fitsFallback = @(
+			'W:\75084-Datenbanken\MSSQL\SQLSources\Modules',
+			'\\tsclient\W\75084-Datenbanken\MSSQL\SQLSources\Modules'
+		) | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+		if ($fitsFallback)
 		{
 			$dbaDirs = @(Get-ChildItem -Path $fitsFallback -Directory -Filter 'dbatools*' -ErrorAction SilentlyContinue)
 			if ($dbaDirs.Count -gt 0)
