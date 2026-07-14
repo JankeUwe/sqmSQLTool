@@ -1,5 +1,29 @@
 # sqmSQLTool — Changelog
 
+## [1.9.19.0] — 2026-07-14
+
+### Fix: Invoke-sqmRestoreDatabase — every operation now always targets the Primary for an AG database
+
+- Restructured so the "working instance" for a run is resolved exactly once, right after AG
+  detection, instead of being decided ad hoc (and inconsistently) at each step:
+  - For an AG-managed database, the working instance is always the AG's Primary replica
+    (`AvailabilityGroup.PrimaryReplicaServerName`) - restoring or altering a database against a
+    Secondary was never meaningful. Previously, `Restore-DbaDatabase` and every step downstream of
+    it (user import, orphan-user repair, stale-login removal, owner assignment, the MULTI_USER
+    revert) ran against whatever instance the function happened to be called with, which only
+    worked by coincidence when that happened to be the Primary.
+  - For a non-AG database, the working instance is simply the given `-SqlInstance` - unchanged.
+  - AG membership/topology itself is still discovered via the given `-SqlInstance` (that view is
+    available cluster-wide from any replica), but everything else - the database-exists/
+    already-single-user check, the optional pre-restore backup, user export, single-user mode, the
+    restore, and all post-restore cleanup - now consistently uses the resolved working instance.
+- `-BackupBeforeRestore` no longer excludes AG-managed databases. It now behaves identically
+  whether or not the database is AG-managed, always running against the working instance -
+  previously it silently did nothing for an AG database regardless of whether the switch was
+  passed, which was confusing.
+- The temporary PBM policy disable/re-enable (around user export/import) now also targets the
+  working instance, for the same reason - it needs to apply wherever the actual DDL runs.
+
 ## [1.9.18.0] — 2026-07-14
 
 ### Fix: Invoke-sqmRestoreDatabase — replaced the 1.9.17.0 fallback with the actual root-cause fix

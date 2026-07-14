@@ -89,7 +89,14 @@ Logins oder Datenbanken auf einem Read-Only-Secondary).
   Datenbank ONLINE bestehen. Ergebnis: keine verwaisten „Restoring"-Datenbanken auf den
   Secondaries.
 
-- **Invoke-sqmRestoreDatabase** — Gehört die Zieldatenbank zu einer AG, wird sie **vor dem
+- **Invoke-sqmRestoreDatabase** — Egal ob AG-Datenbank oder nicht: Backup, User-Export,
+  Single-User-Modus, Restore und Cleanup laufen immer gegen dieselbe, einmal zu Laufbeginn
+  ermittelte „Arbeits-Instanz" — bei einer AG-Datenbank ist das immer die Primary (gegen eine
+  Secondary restoren/ändern ergibt keinen Sinn), sonst einfach die übergebene `-SqlInstance`. Die
+  AG-Zugehörigkeit/-Topologie selbst wird über `-SqlInstance` als Einstiegspunkt ermittelt (das ist
+  clusterweit von jeder Replica aus abrufbar), aber die eigentliche Arbeit läuft danach immer auf
+  der Primary. `-BackupBeforeRestore` verhält sich dabei identisch, egal ob AG oder nicht.
+  Gehört die Zieldatenbank zu einer AG, wird sie **vor dem
   Restore automatisch aus der AG entfernt und auf den Secondaries gelöscht**. Vor dem Restore
   werden die Datenbank-User exportiert (zur späteren Wiederherstellung) und optional ein Backup
   des Originals erstellt. Nach dem Restore auf dem Primary werden User wiederhergestellt,

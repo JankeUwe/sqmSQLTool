@@ -530,11 +530,22 @@ database can be created. After the restore, users are recovered, orphaned users 
 non-existent Windows logins are removed, and the database owner is set to the SA account
 (regardless of its name).
 
+AG or not, the function behaves identically apart from the AG-specific steps themselves (remove
+from AG, delete on secondaries, rejoin/reseed). Every operation - the optional pre-restore backup,
+user export, single-user mode, the restore itself, user re-import, and cleanup - always targets a
+single "working instance" determined once at the start of the run: for an AG-managed database this
+is always the AG's Primary replica (restoring or altering a database against a Secondary is not
+meaningful), never whichever instance happened to be passed in; for a non-AG database it is simply
+the given -SqlInstance. AG membership/topology itself is looked up via -SqlInstance as the entry
+point (that view is available cluster-wide from any replica), but all actual work then happens on
+the working instance.
+
 The function can also restore a sequence of backups (Full + Diff + Logs) using the `-BackupFiles`
 parameter, which accepts a list of backup files in the correct order (Full, then Diff, then Logs).
 
 Before user export and before the restore, the configured PBM policy (DefaultPolicy) is
-temporarily disabled to avoid restrictions during user creation. It is re-enabled after completion.
+temporarily disabled (on the working instance) to avoid restrictions during user creation. It is
+re-enabled after completion.
 
 If the database is in use, it is automatically set to single-user mode after the user export
 (and switched back to multi-user after the restore) - single-user is applied only after the
@@ -566,7 +577,10 @@ should genuinely stay standalone (e.g. a scratch/test restore).
 
 **Parameters:**
 
-- **-SqlInstance** - Target SQL Server instance (e.g. "localhost", "SQL01\INSTANCE"). Default: current computer name.
+- **-SqlInstance** - Entry-point SQL Server instance (e.g. "localhost", "SQL01\INSTANCE") used to discover AG
+membership/topology. Default: current computer name. For an AG-managed database, the actual work
+(backup, export, restore, cleanup) always runs against the AG's Primary replica instead - see
+DESCRIPTION.
 - **-SqlCredential** - Alternative credentials for the target instance.
 - **-BackupFile** - Path to the full backup file (.bak). Can also be an array for striped backups.
 For sequential restore (Full + Diff + Logs) use `-BackupFiles`.
@@ -580,7 +594,9 @@ adjusted accordingly (physical files use the new name as base).
 directory of the target instance is used (BackupDirectory or DefaultFile).
 - **-NewLogFilePath** - Optional: Target directory for the log file (.ldf). If not specified, the default directory
 of the target instance is used.
-- **-BackupBeforeRestore** - Optional: Creates a full backup of the existing database before the restore (if present).
+- **-BackupBeforeRestore** - Optional: Creates a full backup of the existing database before the restore (if present) - AG or
+not, this behaves identically, always running against the working instance (the AG's Primary for
+an AG-managed database).
 The backup is stored in the default backup directory named "DatabaseName_preRestore_YYYYMMDD_HHmmss.bak".
 - **-NoUserExport** - Optional: Skips export of database users (users are always exported by default).
 The export file is stored temporarily in the %TEMP% directory.
