@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Vergleicht Konfiguration, Logins und migrationsrelevante Objekte zwischen zwei SQL-Server-Instanzen.
 
