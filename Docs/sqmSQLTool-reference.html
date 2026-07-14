@@ -146,7 +146,7 @@
 	<!-- SIDEBAR -->
 	<div class="psdb-st-sidebar">
 	<input class="psdb-st-sidebar-search" type="text" placeholder="Funktion suchen…" oninput="psstSearch(this.value)">
-						<div class="psdb-st-nav-group" id="nav-alwayson">
+							<div class="psdb-st-nav-group" id="nav-alwayson">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-alwayson-list')">
 	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">18</span>
 	</div>
@@ -210,9 +210,10 @@
 
 	<div class="psdb-st-nav-group" id="nav-sicherheit">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-sicherheit-list')">
-	<span>🔒 Security</span><span class="psdb-st-nav-count">13</span>
+	<span>🔒 Security</span><span class="psdb-st-nav-count">14</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-sicherheit-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-enablesqmmonitoringaccess')">Enable-sqmMonitoringAccess</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-findsqmaduser')">Find-sqmADUser</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmadaccountstatus')">Get-sqmADAccountStatus</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmadgroupmembers')">Get-sqmADGroupMembers</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmadgroupmembersrecursive')">Get-sqmADGroupMembersRecursive</span></li>
@@ -319,9 +320,10 @@
 
 	<div class="psdb-st-nav-group" id="nav-cluster-&-dienste">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-cluster-&-dienste-list')">
-	<span>🖥️ Cluster & Services</span><span class="psdb-st-nav-count">3</span>
+	<span>🖥️ Cluster & Services</span><span class="psdb-st-nav-count">4</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-cluster-&-dienste-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmclusterinfo')">Get-sqmClusterInfo</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-setsqmssasdeploymentmode')">Set-sqmSsasDeploymentMode</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmssasdirectorypermissions')">Test-sqmSsasDirectoryPermissions</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-testsqmssispackagecompatibility')">Test-sqmSSISPackageCompatibility</span></li></ul>
 	</div>
@@ -396,7 +398,7 @@
 
 	<!-- CONTENT -->
 	<div class="psdb-st-content" id="psdb-st-content">
-						<section class="psdb-st-section" id="cat-alwayson">
+							<section class="psdb-st-section" id="cat-alwayson">
 	<h2 class="psdb-st-section-title">🔄 AlwaysOn</h2>
 
 	<div class="psdb-st-func-card" id="f-addsqmdatabasetoag">
@@ -1376,6 +1378,35 @@ Sync-sqmBackupExcludeTable -SqlInstance &quot;SQL01\INST1&quot;</pre><button cla
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Enable-sqmMonitoringAccess -ComputerName &quot;SQL01&quot; -MonitoringUser &quot;CORP\SvcMonitoring&quot; `
         -ServerRoleName &quot;MonRole&quot; -DatabaseRoleName &quot;MonDbRole&quot; `
         -PolicyName &quot;Enforce Password Policy&quot; -ContinueOnError</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-findsqmaduser">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Find-sqmADUser</span>
+	<span class="psdb-st-badge psdb-st-badge-sicherheit">Security</span>
+	</div>
+	<div class="psdb-st-func-desc">Searches Active Directory for user accounts by a wildcard name pattern.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Find-sqmADUser -Pattern &#39;so_*&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Find-sqmADUser -Pattern &#39;so_*&#39;
+
+    Findet alle Konten, deren SamAccountName mit &quot;so_&quot; beginnt.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Find-sqmADUser -Pattern &#39;svc-*&#39; -Domain &#39;contoso.com&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Find-sqmADUser -Pattern &#39;svc-*&#39; -Domain &#39;contoso.com&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Find-sqmADUser -Pattern &#39;*admin*&#39; -SearchBase &#39;OU=Admins,DC=contoso,DC=com&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Find-sqmADUser -Pattern &#39;*admin*&#39; -SearchBase &#39;OU=Admins,DC=contoso,DC=com&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">&#39;so_*&#39;, &#39;svc-*&#39; | Find-sqmADUser | Where-Object Enabled -eq $false</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    &#39;so_*&#39;, &#39;svc-*&#39; | Find-sqmADUser | Where-Object Enabled -eq $false</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -2967,6 +2998,30 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	</div>
 	</div>
 
+	<div class="psdb-st-func-card" id="f-setsqmssasdeploymentmode">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Set-sqmSsasDeploymentMode</span>
+	<span class="psdb-st-badge psdb-st-badge-monitoring">Cluster</span>
+	</div>
+	<div class="psdb-st-func-desc">Corrects the DeploymentMode of an SSAS instance (Multidimensional &lt;-&gt; Tabular) after installation.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Set-sqmSsasDeploymentMode -InstanceName &#39;MSSQLSERVER&#39; -Mode Tabular -RestartService</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmSsasDeploymentMode -InstanceName &#39;MSSQLSERVER&#39; -Mode Tabular -RestartService
+
+    Corrects a default instance that was installed as Multidimensional but should be Tabular,
+    and restarts the service immediately. Fails if databases already exist (no -Force).</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Set-sqmSsasDeploymentMode -InstanceName &#39;SSAS2019&#39; -Mode Multidimensional -WhatIf</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmSsasDeploymentMode -InstanceName &#39;SSAS2019&#39; -Mode Multidimensional -WhatIf
+
+    Shows what would be changed for the named instance without writing anything.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
 	<div class="psdb-st-func-card" id="f-testsqmssasdirectorypermissions">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Test-sqmSsasDirectoryPermissions</span>
@@ -3673,13 +3728,13 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Einzelne Laufwerke pruefen</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Einzelne Laufwerke pruefen
+	<div class="psdb-st-example-label"># Check individual drives</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Check individual drives
     Get-sqmDiskBlockSize -Drive &#39;F&#39;, &#39;G&#39;, &#39;H&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Automatisch alle SQL-Laufwerke der Instanz ermitteln und pruefen</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Automatisch alle SQL-Laufwerke der Instanz ermitteln und pruefen
+	<div class="psdb-st-example-label"># Automatically discover and check all SQL drives of the instance</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Automatically discover and check all SQL drives of the instance
     Get-sqmDiskBlockSize -SqlInstance &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
@@ -3688,8 +3743,8 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
     &#39;F&#39;,&#39;G&#39; | Get-sqmDiskBlockSize</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Nur Laufwerke mit falscher Blockgroesse anzeigen</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Nur Laufwerke mit falscher Blockgroesse anzeigen
+	<div class="psdb-st-example-label"># Only show drives with an incorrect block size</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Only show drives with an incorrect block size
     Get-sqmDiskBlockSize -SqlInstance &quot;SQL01&quot; | Where-Object { -not $_.IsRecommended }</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
@@ -3891,16 +3946,16 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">$pwd = New-sqmRandomSaPassword</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    $pwd = New-sqmRandomSaPassword
-    # Gibt SecureString zurueck</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+    # Returns a SecureString</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">$pwd = New-sqmRandomSaPassword -Length 24 -ExportPath &#39;C:\System\Passwords\sa.txt&#39;</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    $pwd = New-sqmRandomSaPassword -Length 24 -ExportPath &#39;C:\System\Passwords\sa.txt&#39;
-    # SecureString + DPAPI-Export nach C:\System\Passwords\sa.txt</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+    # SecureString + DPAPI export to C:\System\Passwords\sa.txt</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Klartext anzeigen (nur fuer Debugging):</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Klartext anzeigen (nur fuer Debugging):
+	<div class="psdb-st-example-label"># Show plain text (debugging only):</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Show plain text (debugging only):
     $pwd = New-sqmRandomSaPassword
     $cred = New-Object PSCredential(&#39;sa&#39;, $pwd)
     $cred.GetNetworkCredential().Password</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
@@ -3933,7 +3988,7 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	<span class="psdb-st-badge psdb-st-badge-sonstige">Other</span>
 	</div>
 	<div class="psdb-st-func-desc">WinForms GUI listing all sqmSQLTool functions grouped by category (category-map.ps1) with auto-generated input fields, live preview, and direct execution.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 3 examples</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Show-sqmToolGui</div>
@@ -3944,6 +3999,12 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	<div class="psdb-st-example-label">Show-sqmToolGui -Filter &#39;*AlwaysOn*&#39;</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Show-sqmToolGui -Filter &#39;*AlwaysOn*&#39;
     Opens the interface filtered directly to Always-On functions.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Show-sqmToolGui -Filter &#39;Datenbank restoren&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Show-sqmToolGui -Filter &#39;Datenbank restoren&#39;
+    Opens the interface with ranked suggestions for restoring a database, without needing to
+    know the function name (Invoke-sqmRestoreDatabase).</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -4097,6 +4158,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Export-sqmAlwaysOnConfiguration</td><td>Exports the complete AlwaysOn AG configuration for one or more SQL Server instances.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Export-sqmDatabaseDocumentation</td><td>Creates structured HTML and CSV documentation for all databases on a SQL Server instance.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Export-sqmServerConfiguration</td><td>Exports all SQL Server configuration settings to a JSON snapshot file.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Find-sqmADUser</td><td>Searches Active Directory for user accounts by a wildcard name pattern.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Find-sqmDatabaseObject</td><td>Searches all (or selected) databases on an instance for an object name.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmADAccountStatus</td><td>Checks the status of an Active Directory user account.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmADGroupMembers</td><td>Lists all members of an Active Directory group.</td></tr>
@@ -4202,6 +4264,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Set-sqmMaxMemory</td><td>Sets SQL Server &quot;max server memory (MB)&quot; to the recommended (or an explicit) value.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Set-sqmSqlPolicyState</td><td>Enables or disables a single Policy-Based Management policy on a SQL Server instance.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Set-sqmSqlTlsCertificate</td><td>Binds a Windows certificate from the Machine store to SQL Server as the TLS certificate.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Set-sqmSsasDeploymentMode</td><td>Corrects the DeploymentMode of an SSAS instance (Multidimensional &lt;-&gt; Tabular) after installation.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Set-sqmSsrsConfiguration</td><td>Configures SQL Server Reporting Services (SSRS) fully automatically.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Set-sqmSsrsHttpsCertificate</td><td>Binds a Windows certificate to SSRS or Power BI Report Server for HTTPS access.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Set-sqmTcpPort</td><td>Configures the TCP port of a SQL Server instance via the registry.</td></tr>

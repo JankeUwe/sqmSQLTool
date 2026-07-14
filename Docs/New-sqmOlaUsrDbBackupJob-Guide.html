@@ -1,0 +1,598 @@
+<title>New-sqmOlaUsrDbBackupJob — FITS DBA Guide</title>
+<style>
+  :root{
+    --bg:#EFF1EC;
+    --bg-raised:#FFFFFF;
+    --ink:#1A1F1C;
+    --ink-secondary:#4B564F;
+    --ink-muted:#7C8880;
+    --line:rgba(26,31,28,0.13);
+    --line-strong:rgba(26,31,28,0.24);
+    --accent:#1E6F5C;
+    --accent-ink:#0E4B3B;
+    --accent-soft:#DFEBE5;
+    --code-bg:#182420;
+    --code-ink:#DDEAE3;
+    --code-line:rgba(221,234,227,0.14);
+    --ok:#2E7D46;
+    --ok-soft:#E2F0E4;
+    --ok-ink:#1E5A30;
+    --warn:#9C6A15;
+    --warn-soft:#F4E8D3;
+    --warn-ink:#7A5210;
+    --err:#B23A2D;
+    --err-soft:#F6E1DD;
+    --err-ink:#8A2C21;
+    --neutral-soft:#E4E4DE;
+    --neutral-ink:#4B564F;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0E1613;
+      --bg-raised:#16211C;
+      --ink:#E9F1EC;
+      --ink-secondary:#A9B8AF;
+      --ink-muted:#79897F;
+      --line:rgba(233,241,236,0.12);
+      --line-strong:rgba(233,241,236,0.22);
+      --accent:#59C7A6;
+      --accent-ink:#EAFBF4;
+      --accent-soft:#173A31;
+      --code-bg:#0B1310;
+      --code-ink:#D9EAE1;
+      --code-line:rgba(217,234,225,0.10);
+      --ok:#5CB877;
+      --ok-soft:#193A24;
+      --ok-ink:#BEE8C8;
+      --warn:#D9A649;
+      --warn-soft:#3A2E13;
+      --warn-ink:#F2D9A3;
+      --err:#E08376;
+      --err-soft:#3A1D18;
+      --err-ink:#F5C6BD;
+      --neutral-soft:#232E28;
+      --neutral-ink:#A9B8AF;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0E1613;
+    --bg-raised:#16211C;
+    --ink:#E9F1EC;
+    --ink-secondary:#A9B8AF;
+    --ink-muted:#79897F;
+    --line:rgba(233,241,236,0.12);
+    --line-strong:rgba(233,241,236,0.22);
+    --accent:#59C7A6;
+    --accent-ink:#EAFBF4;
+    --accent-soft:#173A31;
+    --code-bg:#0B1310;
+    --code-ink:#D9EAE1;
+    --code-line:rgba(217,234,225,0.10);
+    --ok:#5CB877;
+    --ok-soft:#193A24;
+    --ok-ink:#BEE8C8;
+    --warn:#D9A649;
+    --warn-soft:#3A2E13;
+    --warn-ink:#F2D9A3;
+    --err:#E08376;
+    --err-soft:#3A1D18;
+    --err-ink:#F5C6BD;
+    --neutral-soft:#232E28;
+    --neutral-ink:#A9B8AF;
+  }
+  :root[data-theme="light"]{
+    --bg:#EFF1EC;
+    --bg-raised:#FFFFFF;
+    --ink:#1A1F1C;
+    --ink-secondary:#4B564F;
+    --ink-muted:#7C8880;
+    --line:rgba(26,31,28,0.13);
+    --line-strong:rgba(26,31,28,0.24);
+    --accent:#1E6F5C;
+    --accent-ink:#0E4B3B;
+    --accent-soft:#DFEBE5;
+    --code-bg:#182420;
+    --code-ink:#DDEAE3;
+    --code-line:rgba(221,234,227,0.14);
+    --ok:#2E7D46;
+    --ok-soft:#E2F0E4;
+    --ok-ink:#1E5A30;
+    --warn:#9C6A15;
+    --warn-soft:#F4E8D3;
+    --warn-ink:#7A5210;
+    --err:#B23A2D;
+    --err-soft:#F6E1DD;
+    --err-ink:#8A2C21;
+    --neutral-soft:#E4E4DE;
+    --neutral-ink:#4B564F;
+  }
+
+  *{box-sizing:border-box;}
+  body{margin:0;}
+  .doc{
+    font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);
+    background:var(--bg);
+    line-height:1.65;
+    padding:2.5rem 1.25rem 5rem;
+  }
+  .doc, .doc *{ -webkit-font-smoothing:antialiased; }
+  .frame{
+    max-width:1040px;
+    margin:0 auto;
+    display:grid;
+    grid-template-columns:230px minmax(0,1fr);
+    gap:3rem;
+    align-items:start;
+  }
+  @media (max-width:860px){
+    .frame{grid-template-columns:1fr;}
+    .toc{position:static !important; order:2;}
+  }
+
+  /* ---- Header ---- */
+  .kicker{
+    font-family:ui-monospace,"Cascadia Code","Consolas",monospace;
+    font-size:12.5px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin:0 0 0.6rem;
+  }
+  h1{
+    font-family:Georgia,"Iowan Old Style","Palatino Linotype",serif;
+    font-weight:500;
+    font-size:clamp(1.7rem,3vw,2.35rem);
+    line-height:1.18;
+    letter-spacing:-0.01em;
+    margin:0 0 0.7rem;
+    text-wrap:balance;
+    color:var(--ink);
+  }
+  .lede{
+    font-size:16.5px;
+    color:var(--ink-secondary);
+    max-width:62ch;
+    margin:0 0 1.4rem;
+  }
+  .cmdline{
+    font-family:ui-monospace,"Cascadia Code","Consolas",monospace;
+    font-size:13.5px;
+    background:var(--code-bg);
+    color:var(--code-ink);
+    border-radius:8px;
+    padding:0.85rem 1.1rem;
+    overflow-x:auto;
+    white-space:pre;
+    border:0.5px solid var(--code-line);
+  }
+  .cmdline .arg{ color:var(--accent); }
+  header.top{
+    border-bottom:0.5px solid var(--line);
+    padding-bottom:1.6rem;
+    margin-bottom:2.2rem;
+    grid-column:1/-1;
+  }
+
+  /* ---- TOC ---- */
+  .toc{
+    position:sticky;
+    top:2.2rem;
+    font-size:13px;
+  }
+  .toc-title{
+    font-family:ui-monospace,"Cascadia Code","Consolas",monospace;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    font-size:11px;
+    color:var(--ink-muted);
+    margin:0 0 0.7rem;
+  }
+  .toc ol{ list-style:none; margin:0; padding:0; counter-reset:toc; }
+  .toc li{ counter-increment:toc; margin:0 0 0.55rem; }
+  .toc a{
+    color:var(--ink-secondary);
+    text-decoration:none;
+    display:block;
+    padding-left:1.35rem;
+    position:relative;
+  }
+  .toc a::before{
+    content:counter(toc,decimal-leading-zero);
+    position:absolute;
+    left:0;
+    font-family:ui-monospace,"Cascadia Code","Consolas",monospace;
+    font-size:10.5px;
+    color:var(--ink-muted);
+    top:0.15rem;
+  }
+  .toc a:hover{ color:var(--accent); }
+
+  /* ---- Sections ---- */
+  section{ margin-bottom:2.6rem; scroll-margin-top:1.5rem; }
+  h2{
+    font-family:Georgia,"Iowan Old Style","Palatino Linotype",serif;
+    font-weight:500;
+    font-size:1.32rem;
+    margin:0 0 1rem;
+    color:var(--ink);
+    text-wrap:balance;
+  }
+  h3{
+    font-size:1.02rem;
+    font-weight:500;
+    margin:1.4rem 0 0.6rem;
+    color:var(--ink);
+  }
+  p{ margin:0 0 0.9rem; max-width:70ch; }
+  ul, ol.steps{ margin:0 0 1rem; padding-left:1.3rem; }
+  li{ margin-bottom:0.4rem; max-width:66ch; }
+  code{
+    font-family:ui-monospace,"Cascadia Code","Consolas",monospace;
+    font-size:0.88em;
+    background:var(--neutral-soft);
+    padding:0.1em 0.35em;
+    border-radius:4px;
+    color:var(--ink);
+  }
+  pre{
+    font-family:ui-monospace,"Cascadia Code","Consolas",monospace;
+    font-size:13px;
+    line-height:1.55;
+    background:var(--code-bg);
+    color:var(--code-ink);
+    border:0.5px solid var(--code-line);
+    border-radius:8px;
+    padding:1rem 1.15rem;
+    overflow-x:auto;
+    margin:0 0 1rem;
+  }
+  pre code{ background:none; padding:0; color:inherit; font-size:1em; }
+
+  /* ---- Callouts ---- */
+  .callout{
+    border:0.5px solid var(--line);
+    border-left:3px solid var(--border-c, var(--accent));
+    background:var(--bg-raised);
+    border-radius:8px;
+    padding:0.9rem 1.1rem;
+    margin:0 0 1.2rem;
+    font-size:14.5px;
+  }
+  .callout p:last-child{ margin-bottom:0; }
+  .callout.warn{ --border-c:var(--warn); }
+  .callout.warn .callout-label{ color:var(--warn-ink); }
+  .callout.info{ --border-c:var(--accent); }
+  .callout.info .callout-label{ color:var(--accent-ink); }
+  .callout-label{
+    display:block;
+    font-family:ui-monospace,"Cascadia Code","Consolas",monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    margin-bottom:0.35rem;
+    color:var(--accent-ink);
+  }
+
+  /* ---- Steps (real sequence) ---- */
+  ol.steps{ list-style:none; padding-left:0; counter-reset:step; }
+  ol.steps > li{
+    counter-increment:step;
+    position:relative;
+    padding-left:2.5rem;
+    margin-bottom:1.1rem;
+    max-width:68ch;
+  }
+  ol.steps > li::before{
+    content:counter(step);
+    position:absolute;
+    left:0; top:0.05rem;
+    width:1.7rem; height:1.7rem;
+    border-radius:50%;
+    background:var(--accent-soft);
+    color:var(--accent-ink);
+    font-family:ui-monospace,"Cascadia Code","Consolas",monospace;
+    font-size:12.5px;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:500;
+  }
+  ol.steps strong{ font-weight:500; color:var(--ink); }
+
+  /* ---- Tables ---- */
+  .twrap{ overflow-x:auto; margin:0 0 1.3rem; border:0.5px solid var(--line); border-radius:8px; }
+  table{ border-collapse:collapse; width:100%; font-size:13.5px; min-width:560px; }
+  th, td{ text-align:left; padding:0.55rem 0.8rem; border-bottom:0.5px solid var(--line); vertical-align:top; }
+  th{
+    font-family:ui-monospace,"Cascadia Code","Consolas",monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    color:var(--ink-muted);
+    font-weight:400;
+    background:var(--bg-raised);
+  }
+  tbody tr:last-child td{ border-bottom:none; }
+  td.mono, th.mono{ font-family:ui-monospace,"Cascadia Code","Consolas",monospace; font-variant-numeric:tabular-nums; font-size:13px; }
+  td.num{ font-variant-numeric:tabular-nums; }
+
+  /* ---- Status pills ---- */
+  .pill{
+    display:inline-block;
+    font-family:ui-monospace,"Cascadia Code","Consolas",monospace;
+    font-size:11.5px;
+    padding:0.15em 0.55em;
+    border-radius:5px;
+    font-weight:500;
+  }
+  .pill.ok{ background:var(--ok-soft); color:var(--ok-ink); }
+  .pill.warn{ background:var(--warn-soft); color:var(--warn-ink); }
+  .pill.err{ background:var(--err-soft); color:var(--err-ink); }
+  .pill.neutral{ background:var(--neutral-soft); color:var(--neutral-ink); }
+
+  .divider{ border:none; border-top:0.5px solid var(--line); margin:2.6rem 0; }
+
+  footer.doc-foot{
+    color:var(--ink-muted);
+    font-size:12.5px;
+    border-top:0.5px solid var(--line);
+    padding-top:1.2rem;
+    margin-top:2rem;
+    grid-column:1/-1;
+  }
+</style>
+
+<div class="doc">
+  <div class="frame">
+    <header class="top">
+      <p class="kicker">sqmSQLTool · Backup-Automatisierung · FITS-Umgebung</p>
+      <h1>New&#8209;sqmOlaUsrDbBackupJob<br>mit &#8209;Full &#8209;Log &#8209;UseExcludeTable</h1>
+      <p class="lede">Detaillierte Anleitung für FITS-DBAs: was der Aufruf konkret anlegt, wie die Ausschlusstabelle funktioniert, wie AlwaysOn-Sekundäre versorgt werden und wie man den Lauf verifiziert.</p>
+      <div class="cmdline">New-sqmOlaUsrDbBackupJob <span class="arg">-SqlInstance</span> "SQL01" <span class="arg">-Full</span> <span class="arg">-Log</span> <span class="arg">-UseExcludeTable</span></div>
+    </header>
+
+    <nav class="toc">
+      <p class="toc-title">Inhalt</p>
+      <ol>
+        <li><a href="#ueberblick">Kurzüberblick</a></li>
+        <li><a href="#voraussetzungen">Voraussetzungen</a></li>
+        <li><a href="#ablauf">Ablauf im Detail</a></li>
+        <li><a href="#exclude">Die Ausschlusstabelle pflegen</a></li>
+        <li><a href="#ergebnis">Was danach existiert</a></li>
+        <li><a href="#alwayson">AlwaysOn-Verhalten</a></li>
+        <li><a href="#wiederholung">Erneuter Lauf &amp; -Update</a></li>
+        <li><a href="#verifikation">Verifikation</a></li>
+        <li><a href="#parameter">Parameter-Referenz</a></li>
+        <li><a href="#varianten">Weitere Aufrufvarianten</a></li>
+        <li><a href="#troubleshooting">Troubleshooting</a></li>
+      </ol>
+    </nav>
+
+    <main>
+
+      <section id="ueberblick">
+        <h2>1. Kurzüberblick</h2>
+        <p>Mit dieser Kombination aus Schaltern werden auf der Instanz <code>SQL01</code> zwei SQL-Agent-Jobs für Ola Hallengrens <code>DatabaseBackup</code> angelegt bzw. aktualisiert:</p>
+        <ul>
+          <li>ein <strong>FULL</strong>-Job (Standard, wenn nicht anders angegeben: täglich um <code>21:15</code>)</li>
+          <li>ein <strong>LOG</strong>-Job (Standard: alle <code>15 Minuten</code>, jeden Tag)</li>
+        </ul>
+        <p>Kein <strong>DIFF</strong>-Job wird erstellt oder verändert — <code>-Diff</code> wurde nicht angegeben. <code>-UseExcludeTable</code> schaltet zusätzlich einen Mechanismus scharf, der einzelne Datenbanken zentral über eine Tabelle in <code>master</code> von der Datensicherung ausschließen kann, ohne die Jobs jemals manuell anfassen zu müssen.</p>
+        <div class="callout info">
+          <span class="callout-label">Wichtig für FITS</span>
+          <p>Die Job-Namen kommen aus der Modul-Konfiguration (<code>Get-sqmConfig</code>, Schlüssel <code>OlaJobNameFull</code> / <code>OlaJobNameLog</code>). In FITS-Umgebungen beginnen diese üblicherweise mit <code>"FITS "</code> — daran erkennt die Funktion automatisch, dass auch der Sync-Job <code>FITS BackupExclude - SYNC</code> statt <code>sqm BackupExclude - SYNC</code> heißen muss.</p>
+        </div>
+      </section>
+
+      <section id="voraussetzungen">
+        <h2>2. Voraussetzungen</h2>
+        <ul>
+          <li><strong>dbatools</strong>-Modul lokal auf der ausführenden Maschine installiert.</li>
+          <li><strong>Ola Hallengren Maintenance Solution</strong> bereits auf <code>SQL01</code> installiert (wird über <code>Test-sqmOlaInstallation -RequiredSet Backup</code> geprüft — fehlt sie, bricht die Funktion mit Fehler ab).</li>
+          <li>SQL-Agent sollte laufen; läuft er nicht, wird nur eine Warnung geloggt, die Jobs werden trotzdem angelegt.</li>
+          <li>Berechtigung, Agent-Jobs, Kategorien, Zeitpläne sowie eine Stored Procedure in <code>master</code> anzulegen.</li>
+          <li>sqmSQLTool-interne Abhängigkeiten: <code>Invoke-sqmLogging</code>, <code>Get-sqmConfig</code>, <code>Get-sqmSaLogin</code> — Teil des Moduls, keine separate Installation nötig.</li>
+        </ul>
+      </section>
+
+      <section id="ablauf">
+        <h2>3. Ablauf im Detail</h2>
+        <p>So arbeitet die Funktion den Aufruf intern ab — in dieser Reihenfolge:</p>
+        <ol class="steps">
+          <li><strong>Verbindung &amp; Ola-Prüfung.</strong> Verbindet sich mit <code>SQL01</code> und prüft über <code>Test-sqmOlaInstallation</code>, ob die Backup-Prozeduren vorhanden sind.</li>
+          <li><strong>Auto-Erkennung bestehender Einstellungen.</strong> Weil <code>-UseExcludeTable</code> gesetzt ist, sucht die Funktion zuerst nach einem bereits existierenden FULL-Job mit dem konfigurierten Namen:
+            <ul>
+              <li>Wird er gefunden, übernimmt sie dessen Startzeit, Backup-Verzeichnis und — falls <code>-Log</code> gesetzt — auch Startzeit/Intervall des bestehenden LOG-Jobs. So gehen bei einem erneuten Lauf keine bereits angepassten Zeitpläne verloren.</li>
+              <li>Wird <strong>kein</strong> bestehender Job gefunden, greifen die FITS-Standardwerte: FULL täglich <code>21:15</code>, LOG alle <code>15</code> Minuten.</li>
+            </ul>
+          </li>
+          <li><strong>Backup-Verzeichnis ermitteln.</strong> Ohne <code>-BackupDirectory</code> liest die Funktion den Registry-Wert <code>BackupDirectory</code> der Instanz aus (per <code>xp_instance_regread</code>) und hängt <code>\Usr-db</code> an. Wird <code>-BackupDirectory</code> explizit übergeben, gilt dieser Pfad unverändert als Ziel (kein automatisches Anhängen von <code>\Usr-db</code>).</li>
+          <li><strong>sqm_BackupExclude sicherstellen.</strong> <code>Sync-sqmBackupExcludeTable</code> legt/aktualisiert die Tabelle <code>master.dbo.sqm_BackupExclude</code>; <code>Register-sqmBackupExcludeTrigger</code> registriert einen serverweiten DDL-Trigger, der die Tabelle bei <code>CREATE_DATABASE</code>/<code>DROP_DATABASE</code> automatisch aktuell hält.</li>
+          <li><strong>Job-Kategorie.</strong> Die Kategorie <code>Database Maintenance</code> wird angelegt, falls sie noch nicht existiert.</li>
+          <li><strong>Für FULL und LOG je eine Hilfsprozedur anlegen.</strong> In <code>master</code> entsteht je Job eine Prozedur <code>sqm_Run_&lt;Jobname&gt;</code>, die zur Laufzeit die Ausschlussliste aus <code>sqm_BackupExclude</code> nachlädt und dann <code>master.dbo.DatabaseBackup</code> aufruft (Details siehe Abschnitt 4). Der eigentliche Job-Step ruft nur noch <code>EXEC master.dbo.[sqm_Run_...]</code> auf.</li>
+          <li><strong>Job, Step und Zeitplan anlegen.</strong> Für jeden angeforderten Backup-Typ wird ein Agent-Job mit Step, Output-Datei (<code>MaintenanceLog\DatabaseBackup_USR_&lt;Typ&gt;_...</code>) und wöchentlichem Zeitplan erstellt. Existiert der Job bereits und <code>-Update</code> fehlt, wird er unverändert übersprungen (<code>AlreadyExists</code>).</li>
+          <li><strong>Sync-Job für die Ausschlusstabelle.</strong> Da <code>CreateSyncJob</code> standardmäßig <code>$true</code> ist, wird zusätzlich <code>FITS BackupExclude - SYNC</code> angelegt — läuft alle 30 Minuten und ruft <code>Sync-sqmBackupExcludeTable</code> auf.</li>
+          <li><strong>AlwaysOn-Propagierung.</strong> Werden Verfügbarkeitsreplikate erkannt, ruft sich die Funktion rekursiv für jede Sekundärreplik selbst auf (Details siehe Abschnitt 6).</li>
+          <li><strong>Konfigurationsbericht schreiben.</strong> Ein Klartext-Report landet unter <code>MaintenanceLog\OlaUsrBackup_SQL01_&lt;Datum&gt;.txt</code> und wird zusätzlich ins zentrale Log-Verzeichnis kopiert, falls <code>CentralPath</code> konfiguriert ist.</li>
+        </ol>
+      </section>
+
+      <section id="exclude">
+        <h2>4. Die Ausschlusstabelle pflegen</h2>
+        <p>Kern von <code>-UseExcludeTable</code> ist <code>master.dbo.sqm_BackupExclude</code>. Jede Zeile steht für eine Datenbank auf der Instanz:</p>
+        <div class="twrap">
+          <table>
+            <thead><tr><th>Spalte</th><th>Bedeutung</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">IsActive</td><td><code>1</code> (Default bei neu entdeckter DB) = wird gesichert. <code>0</code> = von der Sicherung ausgeschlossen.</td></tr>
+              <tr><td class="mono">IsOrphaned</td><td><code>1</code>, wenn die Datenbank inzwischen von der Instanz gelöscht wurde. Zeilen werden nie gelöscht, nur markiert.</td></tr>
+              <tr><td class="mono">Reason</td><td>Freitext-Begründung, über das Formular editierbar.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Beim Ausführen des Jobs baut die generierte Prozedur die <code>@Databases</code>-Liste für Ola dynamisch zusammen:</p>
+        <pre><code>DECLARE @Databases NVARCHAR(MAX) = N'USER_DATABASES';
+-- alle Zeilen mit IsActive = 0 AND IsOrphaned = 0,
+-- deren Datenbank noch in sys.databases existiert,
+-- werden als '-DbName' angehängt:
+-- @Databases = 'USER_DATABASES,-AltDB1,-AltDB2'
+EXECUTE master.dbo.DatabaseBackup @Databases = @Databases, ...</code></pre>
+        <p>Das Minuszeichen ist Olas eigene Ausschluss-Syntax. Weil dieser Abgleich <strong>bei jedem Joblauf neu</strong> passiert, muss beim Ändern einer Ausschlussregel kein Job angefasst werden.</p>
+        <h3>Ausschlüsse ändern</h3>
+        <p>FITS-DBAs pflegen die Tabelle über das mitgelieferte Formular, nicht direkt per <code>UPDATE</code>-Statement:</p>
+        <pre><code>Show-sqmBackupExcludeForm -SqlInstance "SQL01"</code></pre>
+        <ol class="steps">
+          <li><strong>Sync &amp; Laden</strong> — führt <code>Sync-sqmBackupExcludeTable</code> aus und lädt das Grid neu.</li>
+          <li><strong>Haken setzen/entfernen</strong> bei <code>IsActive</code>, optional <code>Reason</code> anpassen. Verwaiste Einträge (<code>IsOrphaned=1</code>) sind farblich markiert.</li>
+          <li><strong>Speichern</strong> — schreibt nur geänderte Zeilen zurück.</li>
+        </ol>
+        <div class="callout warn">
+          <span class="callout-label">Nicht verwechseln</span>
+          <p><code>IsActive = 1</code> heißt „sichern“, nicht „aktiv ausgeschlossen“. Zum Ausschließen einer Datenbank muss der Haken <strong>entfernt</strong> werden.</p>
+        </div>
+      </section>
+
+      <section id="ergebnis">
+        <h2>5. Was danach auf SQL01 existiert</h2>
+        <div class="twrap">
+          <table>
+            <thead><tr><th>Objekt</th><th>Name / Ort</th></tr></thead>
+            <tbody>
+              <tr><td>SQL-Agent-Job FULL</td><td class="mono">Wert von <code>OlaJobNameFull</code>, z. B. <code>FITS UserDatabases-FULL</code></td></tr>
+              <tr><td>SQL-Agent-Job LOG</td><td class="mono">Wert von <code>OlaJobNameLog</code></td></tr>
+              <tr><td>SQL-Agent-Job Sync</td><td class="mono">FITS BackupExclude - SYNC</td></tr>
+              <tr><td>Stored Procedures</td><td class="mono">master.dbo.sqm_Run_&lt;Jobname&gt;</td></tr>
+              <tr><td>Ausschlusstabelle</td><td class="mono">master.dbo.sqm_BackupExclude</td></tr>
+              <tr><td>Audit-Historie</td><td class="mono">master.dbo.sqm_BackupExclude_History</td></tr>
+              <tr><td>DDL-Trigger</td><td class="mono">trg_sqm_BackupExclude_AutoSync (server-weit)</td></tr>
+              <tr><td>Backup-Ziel</td><td class="mono">&lt;BackupDirectory&gt;\Usr-db</td></tr>
+              <tr><td>Job-Output-Log</td><td class="mono">…\MaintenanceLog\DatabaseBackup_USR_&lt;Typ&gt;_$(STRTDT)_$(STRTTM).txt</td></tr>
+              <tr><td>Konfigurationsbericht</td><td class="mono">…\MaintenanceLog\OlaUsrBackup_SQL01_&lt;Datum&gt;.txt</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="alwayson">
+        <h2>6. AlwaysOn-Verhalten</h2>
+        <p>Nach dem Anlegen auf <code>SQL01</code> fragt die Funktion <code>sys.availability_replicas</code> ab. Für jede gefundene Sekundärreplik ruft sie sich <strong>selbst rekursiv</strong> auf — mit denselben effektiven Zeitplan-Werten und <code>-SkipAlwaysOnPropagation</code>, damit keine Endlosschleife entsteht.</p>
+        <p>Das bedeutet praktisch: FITS-DBAs führen den Befehl <strong>einmal gegen die Primary (oder den Listener)</strong> aus — Jobs, Prozedur und Sync-Job werden automatisch auf allen Sekundären gespiegelt.</p>
+        <div class="callout info">
+          <span class="callout-label">Auch bei erneutem Lauf</span>
+          <p>Die Propagierung feuert nicht nur bei neu erstellten Jobs, sondern auch bei <span class="pill neutral">Updated</span> und <span class="pill neutral">AlreadyExists</span>. Ein späterer <code>-Update</code>-Lauf auf der Primary bringt die Sekundären also zuverlässig auf denselben Stand nach.</p>
+        </div>
+      </section>
+
+      <section id="wiederholung">
+        <h2>7. Erneuter Lauf &amp; -Update</h2>
+        <ul>
+          <li>Existiert ein Job mit dem konfigurierten Namen bereits und <code>-Update</code> fehlt → Status <span class="pill neutral">AlreadyExists</span>, es wird nichts verändert.</li>
+          <li>Mit <code>-Update</code> wird nur der <strong>Step-Command</strong> und die Job-Beschreibung neu geschrieben (sicherer als Löschen/Neuanlegen) — der bestehende Zeitplan bleibt unangetastet, sofern nicht explizit ein Schedule-Parameter mitgegeben wird.</li>
+          <li>Bei <code>-UseExcludeTable</code> sorgt die Auto-Erkennung aus Abschnitt 3.2 zusätzlich dafür, dass Zeit und Verzeichnis eines bereits laufenden Jobs beim Re-Run automatisch übernommen werden.</li>
+        </ul>
+        <p>Für Routine-Wartung (z. B. nach einer sqmSQLTool-Aktualisierung) ist ein erneuter Lauf mit denselben Parametern plus <code>-Update</code> der empfohlene, idempotente Weg:</p>
+        <pre><code>New-sqmOlaUsrDbBackupJob -SqlInstance "SQL01" -Full -Log -UseExcludeTable -Update</code></pre>
+      </section>
+
+      <section id="verifikation">
+        <h2>8. Verifikation nach dem Lauf</h2>
+        <p>Der Rückgabewert ist ein Array mit einer Zeile pro angelegtem/aktualisiertem Objekt:</p>
+        <div class="twrap">
+          <table>
+            <thead><tr><th>BackupType</th><th>JobName</th><th>ScheduleDays / Zeit</th><th>JobStatus</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">FULL</td><td class="mono">FITS UserDatabases-FULL</td><td>EveryDay 21:15</td><td><span class="pill ok">Created</span></td></tr>
+              <tr><td class="mono">LOG</td><td class="mono">FITS UserDatabases-LOG</td><td>EveryDay 00:00, alle 15 Min.</td><td><span class="pill ok">Created</span></td></tr>
+              <tr><td class="mono">SYNC</td><td class="mono">FITS BackupExclude - SYNC</td><td>EveryDay (alle 30 Min.)</td><td><span class="pill ok">Created</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Zusätzliche manuelle Prüfungen mit dbatools:</p>
+        <pre><code># Jobs und Zeitplaene pruefen
+Get-DbaAgentJob -SqlInstance SQL01 -Job "FITS UserDatabases-FULL", "FITS UserDatabases-LOG"
+
+# letzte Auftragshistorie
+Get-DbaAgentJobHistory -SqlInstance SQL01 -Job "FITS UserDatabases-FULL"
+
+# aktuelle Ausschlussliste einsehen
+Invoke-DbaQuery -SqlInstance SQL01 -Database master `
+    -Query "SELECT * FROM sqm_BackupExclude WHERE IsActive = 0 AND IsOrphaned = 0"
+
+# generierte Prozedur ansehen
+Invoke-DbaQuery -SqlInstance SQL01 -Database master `
+    -Query "sp_helptext 'sqm_Run_FITS_UserDatabases_FULL'"</code></pre>
+        <p>Ergänzend: Konfigurationsbericht unter <code>MaintenanceLog\OlaUsrBackup_SQL01_&lt;Datum&gt;.txt</code> öffnen — enthält Backup-Verzeichnis, Datenbankfilter, Cleanup/Compress/Verify/CheckSum-Einstellungen und den Status jedes Jobs in Klartext.</p>
+      </section>
+
+      <section id="parameter">
+        <h2>9. Parameter-Referenz (relevante Auswahl)</h2>
+        <div class="twrap">
+          <table>
+            <thead><tr><th>Parameter</th><th>Default</th><th>Bedeutung</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">-SqlInstance</td><td class="mono">$env:COMPUTERNAME</td><td>Zielinstanz.</td></tr>
+              <tr><td class="mono">-Full / -Diff / -Log</td><td class="mono">—</td><td>Schalten die jeweiligen Jobtypen ein. Ohne jeden der drei Schalter: automatisch Full + Log.</td></tr>
+              <tr><td class="mono">-FullScheduleTime</td><td class="mono">21:15</td><td>Startzeit FULL, Format HH:mm.</td></tr>
+              <tr><td class="mono">-FullScheduleDays</td><td class="mono">EveryDay</td><td>Wochentage FULL.</td></tr>
+              <tr><td class="mono">-LogScheduleTime</td><td class="mono">00:00</td><td>Startzeit LOG.</td></tr>
+              <tr><td class="mono">-LogScheduleIntervalMinutes</td><td class="mono num">15</td><td>Wiederholung LOG innerhalb des Tages, 0 = einmalig.</td></tr>
+              <tr><td class="mono">-BackupDirectory</td><td class="mono">automatisch ermittelt</td><td>Bei expliziter Angabe: Pfad wird unverändert verwendet (kein <code>\Usr-db</code> angehängt).</td></tr>
+              <tr><td class="mono">-Databases</td><td class="mono">USER_DATABASES</td><td>Ola-Datenbankfilter, Basis für <code>-UseExcludeTable</code>.</td></tr>
+              <tr><td class="mono">-UseExcludeTable</td><td class="mono">Switch</td><td>Aktiviert die dynamische Ausschlussliste aus <code>sqm_BackupExclude</code>.</td></tr>
+              <tr><td class="mono">-CreateSyncJob</td><td class="mono">$true</td><td>Legt den 30-Minuten-Sync-Job an; mit <code>$false</code> unterdrückbar.</td></tr>
+              <tr><td class="mono">-CleanupTime</td><td class="mono num">48</td><td>Alter in Stunden, ab dem alte Backup-Dateien gelöscht werden. 0 = kein Cleanup.</td></tr>
+              <tr><td class="mono">-Compress / -Verify / -CheckSum / -LogToTable</td><td class="mono">Y</td><td>Direkt an Olas <code>DatabaseBackup</code> durchgereicht.</td></tr>
+              <tr><td class="mono">-OperatorName</td><td class="mono">—</td><td>SQL-Agent-Operator für E-Mail bei Fehlschlag.</td></tr>
+              <tr><td class="mono">-Update</td><td class="mono">Switch</td><td>Überschreibt Step-Command bestehender Jobs gleichen Namens.</td></tr>
+              <tr><td class="mono">-ContinueOnError</td><td class="mono">Switch</td><td>Bricht bei Fehlern eines Jobs nicht den gesamten Lauf ab.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="varianten">
+        <h2>10. Weitere Aufrufvarianten</h2>
+        <pre><code># Nur FULL, mit eigener Zeit und Operator
+New-sqmOlaUsrDbBackupJob -SqlInstance "SQL01" -Full `
+    -FullScheduleTime "22:00" -FullScheduleDays @('Sunday') `
+    -OperatorName "DBAs"
+
+# Alle drei Typen inkl. Ausschlusstabelle, bestehende Jobs ueberschreiben
+New-sqmOlaUsrDbBackupJob -SqlInstance "SQL01" -Full -Diff -Log `
+    -UseExcludeTable -Update
+
+# LOG allein, alle 15 Minuten taeglich
+New-sqmOlaUsrDbBackupJob -SqlInstance "SQL01" -Log `
+    -LogScheduleDays @('EveryDay') -LogScheduleTime "00:00" `
+    -LogScheduleIntervalMinutes 15 -Update
+
+# Testlauf ohne Aenderungen
+New-sqmOlaUsrDbBackupJob -SqlInstance "SQL01" -Full -Log -UseExcludeTable -WhatIf</code></pre>
+      </section>
+
+      <section id="troubleshooting">
+        <h2>11. Troubleshooting</h2>
+        <div class="callout warn">
+          <span class="callout-label">Job existiert, nichts passiert</span>
+          <p>Ohne <code>-Update</code> überspringt die Funktion vorhandene Jobs bewusst (<span class="pill neutral">AlreadyExists</span>). Für Änderungen immer <code>-Update</code> mitgeben.</p>
+        </div>
+        <div class="callout warn">
+          <span class="callout-label">Ausschluss wirkt nicht sofort</span>
+          <p>Prüfen, ob die Datenbank in <code>sqm_BackupExclude</code> wirklich <code>IsActive = 0</code> und <code>IsOrphaned = 0</code> hat und in <code>sys.databases</code> noch existiert — nur dann wird sie beim nächsten Joblauf ausgeschlossen. Ein manuelles <code>Sync-sqmBackupExcludeTable -SqlInstance SQL01</code> hilft bei Zweifeln.</p>
+        </div>
+        <div class="callout warn">
+          <span class="callout-label">Sekundärreplik hat abweichenden Job</span>
+          <p>Die Propagierung läuft nur, wenn <code>sys.availability_replicas</code> auf der Primary etwas liefert. Direkt gegen eine Sekundärreplik ausgeführte manuelle Läufe werden nicht automatisch zur Primary zurücksynchronisiert — Änderungen immer auf der Primary/dem Listener vornehmen.</p>
+        </div>
+        <div class="callout warn">
+          <span class="callout-label">SQL-Agent steht</span>
+          <p>Die Funktion legt Jobs auch bei gestopptem SQL-Agent an (nur Warnung im Log) — die Jobs laufen dann aber erst nach Start des Agent-Dienstes.</p>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="doc-foot">
+      Quelle: <code>SQL-Tools/sqmSQLTool/Public/New-sqmOlaUsrDbBackupJob.ps1</code> (inkl. <code>Sync-sqmBackupExcludeTable.ps1</code>, <code>Register-sqmBackupExcludeTrigger.ps1</code>, <code>Show-sqmBackupExcludeForm.ps1</code>).
+    </footer>
+  </div>
+</div>
