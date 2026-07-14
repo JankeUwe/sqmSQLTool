@@ -1,5 +1,21 @@
 # sqmSQLTool — Changelog
 
+## [1.9.12.0] — 2026-07-14
+
+### Feature: Compare-sqmServerConfiguration — per-login database mapping/roles, instance default language
+
+- `-CompareLogins` now also compares, per login, which databases it is mapped into as a database
+  user and which `db_*` roles it holds there (via `Get-DbaDbUser` + `Get-DbaDbRoleMember`) - the
+  standard post-migration login check beyond just the server-level SID/default-DB/roles
+  comparison already added in 1.9.11.0. A database where the mapping is missing entirely on one
+  side is Critical (broken access); a role-set difference where both sides are mapped is Warning.
+  Reported as one summary row per affected login, listing only the databases that actually
+  differ.
+- Instance property comparison now also includes the server's default language and default
+  full-text language configuration (`sys.configurations` 'default language' /
+  'default full-text language', via SMO `Configuration.DefaultLanguage` /
+  `DefaultFullTextLanguage`), complementing the already-existing per-login default language check.
+
 ## [1.9.11.0] — 2026-07-14
 
 ### Feature: Compare-sqmServerConfiguration — Logins, migration-relevant objects, HTML report

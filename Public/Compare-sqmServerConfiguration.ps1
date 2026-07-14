@@ -4,12 +4,14 @@
 
 .DESCRIPTION
     Vergleicht:
-    - Instance-Einstellungen (sp_configure: MaxMemory, MinMemory, MaxDop, CTP, xp_cmdshell, CLR;
-      Edition, ProductLevel, HostPlatform, IsClustered, IsHadrEnabled, BackupDirectory,
-      DefaultFile/Log, ErrorLogPath, MasterDBPath, LoginMode)
+    - Instance-Einstellungen (sp_configure: MaxMemory, MinMemory, MaxDop, CTP, xp_cmdshell, CLR,
+      Standardsprache/Volltextsprache; Edition, ProductLevel, HostPlatform, IsClustered,
+      IsHadrEnabled, BackupDirectory, DefaultFile/Log, ErrorLogPath, MasterDBPath, LoginMode)
     - Collation (Instance, immer ausgegeben - Mismatch ist Critical, da migrationsrelevant)
     - Logins (-CompareLogins): Vorhanden, SID, Standard-DB, Sprache, Deaktiviert-Status,
-      Server-Rollenmitgliedschaft, Passwort-Hash (nur SQL-Logins)
+      Server-Rollenmitgliedschaft, Passwort-Hash (nur SQL-Logins), sowie pro Login die
+      Datenbankzuordnung und Datenbankrollen (welche Datenbanken ist der Login als User gemappt,
+      welche db_*-Rollen dort - Standard-Migrationscheck gegen orphaned/fehlende Berechtigungen)
     - Migrationsrelevante Objekte (-IncludeMigrationObjects): Linked Servers, Credentials,
       SQL-Agent-Jobs, Endpoints, Database-Mail-Profile
     - Datenbanken (-CompareDatabases): Name, Owner, RecoveryModel, Collation
@@ -31,7 +33,8 @@
 
 .PARAMETER CompareLogins
     Wenn gesetzt, werden Server-Logins verglichen (Vorhanden, SID, Standard-DB, Sprache,
-    Deaktiviert-Status, Server-Rollen, Passwort-Hash).
+    Deaktiviert-Status, Server-Rollen, Passwort-Hash, Datenbankzuordnung und Datenbankrollen
+    je Datenbank).
 
 .PARAMETER IncludeSystemLogins
     Nur mit -CompareLogins relevant. Wenn gesetzt, werden auch Systemlogins (sa, ##MS_*,
@@ -161,6 +164,8 @@ function Compare-sqmServerConfiguration
 				CTP               = $cfg.CostThresholdForParallelism.ConfigValue
 				XpCmdShell        = $cfg.XPCmdShell.ConfigValue
 				ClrEnabled        = $cfg.IsSqlClrEnabled.ConfigValue
+				DefaultLanguage   = $cfg.DefaultLanguage.ConfigValue
+				DefaultFullTextLanguage = $cfg.DefaultFullTextLanguage.ConfigValue
 				BackupDirectory   = $srv.BackupDirectory
 				DefaultFile       = $srv.DefaultFile
 				DefaultLog        = $srv.DefaultLog
@@ -216,6 +221,34 @@ WHERE sp.type IN ('S','U','G')
 			foreach ($r in $rows) { $map[$r.LoginName.ToLowerInvariant()] = $r }
 			return $map
 		}
+
+		# Datenbankzuordnung + Datenbankrollen pro Login (Standard-DBA-Migrationscheck: Login
+		# existiert serverseitig, aber ist er auch in den erwarteten Datenbanken gemappt und hat
+		# dort dieselben Rollen wie vorher? Orphaned-User-Problem nach Migration).
+		# Rueckgabe: loginNameLower -> @{ DbName -> @(Rolle1, Rolle2, ...) }
+		function Get-LoginDbMap($inst)
+		{
+			$map = @{}
+			$users = Get-DbaDbUser -SqlInstance $inst -SqlCredential $SqlCredential -ExcludeSystemUser -ErrorAction Stop
+			foreach ($u in $users)
+			{
+				if ([string]::IsNullOrWhiteSpace($u.Login)) { continue }
+				$key = $u.Login.ToLowerInvariant()
+				if (-not $map.ContainsKey($key)) { $map[$key] = [ordered]@{} }
+				if (-not $map[$key].Contains($u.Database)) { $map[$key][$u.Database] = [System.Collections.Generic.List[string]]::new() }
+			}
+
+			$roleMembers = Get-DbaDbRoleMember -SqlInstance $inst -SqlCredential $SqlCredential -ErrorAction Stop
+			foreach ($r in $roleMembers)
+			{
+				if ([string]::IsNullOrWhiteSpace($r.Login)) { continue }
+				$key = $r.Login.ToLowerInvariant()
+				if (-not $map.ContainsKey($key)) { $map[$key] = [ordered]@{} }
+				if (-not $map[$key].Contains($r.Database)) { $map[$key][$r.Database] = [System.Collections.Generic.List[string]]::new() }
+				$map[$key][$r.Database].Add($r.Role)
+			}
+			return $map
+		}
 	}
 
 	process
@@ -256,6 +289,18 @@ WHERE sp.type IN ('S','U','G')
 
 					$srcLogins = Get-LoginMap $SourceInstance
 					$tgtLogins = Get-LoginMap $TargetInstance
+
+					$srcDbMap = $null
+					$tgtDbMap = $null
+					try
+					{
+						$srcDbMap = Get-LoginDbMap $SourceInstance
+						$tgtDbMap = Get-LoginDbMap $TargetInstance
+					}
+					catch
+					{
+						Invoke-sqmLogging -Message "Datenbankzuordnung/-rollen konnten nicht gelesen werden, wird uebersprungen: $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
+					}
 
 					$allNames = @{}
 					foreach ($k in $srcLogins.Keys) { $allNames[$k] = $srcLogins[$k].LoginName }
@@ -301,6 +346,42 @@ WHERE sp.type IN ('S','U','G')
 						if ([string]$s.ServerRoles -ne [string]$t.ServerRoles)
 						{
 							_AddResult 'Login' "$display - Server-Rollen" $s.ServerRoles $t.ServerRoles 'Warning'
+						}
+
+						# Datenbankzuordnung + Datenbankrollen (nur wenn Get-LoginDbMap erfolgreich war)
+						if ($srcDbMap -and $tgtDbMap)
+						{
+							$srcMap = $srcDbMap[$key]
+							$tgtMap = $tgtDbMap[$key]
+							if ($srcMap -or $tgtMap)
+							{
+								$allDbs = @()
+								if ($srcMap) { $allDbs += $srcMap.Keys }
+								if ($tgtMap) { $allDbs += $tgtMap.Keys }
+								$allDbs = $allDbs | Sort-Object -Unique
+
+								$srcParts = [System.Collections.Generic.List[string]]::new()
+								$tgtParts = [System.Collections.Generic.List[string]]::new()
+								$dbMappingCritical = $false
+
+								foreach ($db in $allDbs)
+								{
+									$sRoles = if ($srcMap -and $srcMap.Contains($db)) { ($srcMap[$db] | Sort-Object -Unique) -join ',' } else { $null }
+									$tRoles = if ($tgtMap -and $tgtMap.Contains($db)) { ($tgtMap[$db] | Sort-Object -Unique) -join ',' } else { $null }
+									if ($sRoles -ne $tRoles)
+									{
+										if ([string]::IsNullOrEmpty($sRoles) -or [string]::IsNullOrEmpty($tRoles)) { $dbMappingCritical = $true }
+										$srcParts.Add("$db=$(if ($sRoles) { $sRoles } else { '<nicht zugeordnet>' })")
+										$tgtParts.Add("$db=$(if ($tRoles) { $tRoles } else { '<nicht zugeordnet>' })")
+									}
+								}
+
+								if ($srcParts.Count -gt 0)
+								{
+									$mapStatus = if ($dbMappingCritical) { 'Critical' } else { 'Warning' }
+									_AddResult 'Login' "$display - Datenbankzuordnung/-rollen" ($srcParts -join '; ') ($tgtParts -join '; ') $mapStatus
+								}
+							}
 						}
 					}
 				}
