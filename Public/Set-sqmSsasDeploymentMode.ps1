@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Corrects the DeploymentMode of an SSAS instance (Multidimensional <-> Tabular) after installation.
 
