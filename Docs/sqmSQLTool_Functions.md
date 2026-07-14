@@ -2293,12 +2293,22 @@ Automatically determines all SQL Server services on the specified computer,
         MSSQLSvc/<ListenerName>:<Port>
         MSSQLSvc/<ListenerFQDN>:<Port>
 
-    Missing SPNs are prepared as ready-to-use setspn.exe commands
-    that can be handed to the AD team.
+    Missing SPNs are prepared as ready-to-use setspn.exe commands that can be handed to the AD
+    team. Each per-instance report includes a clean, comment-free "commands only" block (nothing
+    but the setspn -S commands plus a trailing setspn -L verification command) that can be
+    selected and copied as-is. Additionally, across ALL computers/instances processed in a single
+    call, every missing-SPN command is collected into one dedicated hand-off file AND copied
+    directly to the Windows clipboard (Set-Clipboard) - ready to paste straight into an email or
+    ticket for the AD team, with the setspn -L check command(s) for the affected account(s)
+    appended at the end.
 
     Output per instance:
         SpnReport_<Computer>_<Instance>_<Date>.txt   - Readable report including setspn commands
         SpnReport_<Computer>_<Instance>_<Date>.csv   - Machine-readable (one row per SPN)
+
+    Output for the whole call (only if at least one SPN is missing anywhere):
+        SpnReport_SetSpnCommands_<Timestamp>.txt     - Comment-free, copy-paste-ready command list
+                                                        for the AD team (also copied to clipboard)
 
 **Parameters:**
 
@@ -2310,7 +2320,7 @@ Automatically determines all SQL Server services on the specified computer,
 - **-Confirm** - Request confirmation before creating files.
 - **-WhatIf** - Shows which files would be created without writing them.
 
-**Examples (4):**
+**Examples (5):**
 
 ```powershell
 Get-sqmSpnReport
@@ -2332,6 +2342,11 @@ $result = Get-sqmSpnReport -ComputerName 'SQL01'
     $result.DetailRows | Where-Object Status -eq 'Missing' | Select-Object Spn, SetSpnCommand
 
     Returns only missing SPNs with the ready-to-use setspn command.
+
+```powershell
+'SQL01','SQL02','SQL03' | Get-sqmSpnReport
+    # Clipboard now holds every missing setspn command across all three servers plus the
+    # setspn -L check commands - paste directly into a ticket/email for the AD team.
 
 ### Test-sqmSQLFirewall
 

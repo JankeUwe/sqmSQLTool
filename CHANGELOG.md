@@ -1,5 +1,19 @@
 # sqmSQLTool — Changelog
 
+## [1.9.15.0] — 2026-07-14
+
+### Feature: Get-sqmSpnReport — copy-paste-ready setspn commands + clipboard hand-off for the AD team
+
+- Each per-instance report now includes a clean, comment-free "commands only" block (just the
+  missing `setspn -S` commands plus a trailing `setspn -L` verification command) that can be
+  selected and copied as-is, in addition to the existing annotated command list.
+- Across all computers/instances processed in a single call, every missing-SPN command is now
+  also collected into one dedicated hand-off file (`SpnReport_SetSpnCommands_<Timestamp>.txt`)
+  and copied directly to the Windows clipboard (`Set-Clipboard`) - ready to paste straight into an
+  email or ticket for the AD team, with `setspn -L` check commands for every affected (deduped)
+  account appended at the end. Clipboard failures (e.g. non-interactive session) are logged as a
+  WARNING without blocking the run; the file is still written either way.
+
 ## [1.9.14.0] — 2026-07-14
 
 ### Fix: Invoke-sqmRestoreDatabase — AG rejoin/reseed could be silently lost after a partial failure

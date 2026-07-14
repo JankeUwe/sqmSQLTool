@@ -31,12 +31,22 @@
         MSSQLSvc/<ListenerName>:<Port>
         MSSQLSvc/<ListenerFQDN>:<Port>
 
-    Missing SPNs are prepared as ready-to-use setspn.exe commands
-    that can be handed to the AD team.
+    Missing SPNs are prepared as ready-to-use setspn.exe commands that can be handed to the AD
+    team. Each per-instance report includes a clean, comment-free "commands only" block (nothing
+    but the setspn -S commands plus a trailing setspn -L verification command) that can be
+    selected and copied as-is. Additionally, across ALL computers/instances processed in a single
+    call, every missing-SPN command is collected into one dedicated hand-off file AND copied
+    directly to the Windows clipboard (Set-Clipboard) - ready to paste straight into an email or
+    ticket for the AD team, with the setspn -L check command(s) for the affected account(s)
+    appended at the end.
 
     Output per instance:
         SpnReport_<Computer>_<Instance>_<Date>.txt   - Readable report including setspn commands
         SpnReport_<Computer>_<Instance>_<Date>.csv   - Machine-readable (one row per SPN)
+
+    Output for the whole call (only if at least one SPN is missing anywhere):
+        SpnReport_SetSpnCommands_<Timestamp>.txt     - Comment-free, copy-paste-ready command list
+                                                        for the AD team (also copied to clipboard)
 
 .PARAMETER ComputerName
     Target computer. Default: local computer. Pipeline-capable.
@@ -82,6 +92,11 @@
 
     Returns only missing SPNs with the ready-to-use setspn command.
 
+.EXAMPLE
+    'SQL01','SQL02','SQL03' | Get-sqmSpnReport
+    # Clipboard now holds every missing setspn command across all three servers plus the
+    # setspn -L check commands - paste directly into a ticket/email for the AD team.
+
 .NOTES
     Prerequisites:
     - Invoke-sqmLogging, Get-sqmConfig
@@ -89,6 +104,9 @@
     - Local administrator rights on the target computer for WMI queries
     - AD module (RSAT) is NOT required; domain resolution is performed via
       [System.DirectoryServices.ActiveDirectory.Domain]
+    - Set-Clipboard requires an interactive desktop session; in a non-interactive context
+      (e.g. an unattended scheduled task) the clipboard copy is skipped with a WARNING logged -
+      the SpnReport_SetSpnCommands_<Timestamp>.txt file is still written either way.
 #>
 function Get-sqmSpnReport
 {
@@ -119,6 +137,14 @@ function Get-sqmSpnReport
 	{
 		$functionName = $MyInvocation.MyCommand.Name
 		$allResults   = [System.Collections.Generic.List[PSCustomObject]]::new()
+
+		# Sammelt ueber ALLE verarbeiteten Computer/Instanzen hinweg die reinen setspn-S-Kommandos
+		# (keine Kommentare/Bullets) fuer fehlende SPNs, plus die betroffenen SPN-Konten fuer die
+		# abschliessenden setspn -L Kontroll-Kommandos. Am Ende der Verarbeitung (siehe end-Block)
+		# wird daraus eine dedizierte, copy-paste-fertige Sammeldatei geschrieben UND der Inhalt in
+		# die Zwischenablage kopiert, damit das AD-Team die Kommandos direkt uebernehmen kann.
+		$allMissingSpnCommands = [System.Collections.Generic.List[string]]::new()
+		$allVerifyAccounts     = [System.Collections.Generic.List[string]]::new()
 
 		# setspn.exe verfuegbar?
 		$setspnCmd = Get-Command -Name 'setspn.exe' -ErrorAction SilentlyContinue
@@ -844,6 +870,18 @@ WHERE ag.group_id IN (
 							$lines.Add("  setspn -L `"$spnAccount`"")
 							$lines.Add("")
 							$lines.Add("  Berechtigung: Schreibrecht auf das Konto '$spnAccount' erforderlich.")
+
+							# Zusaetzlicher Block NUR mit den reinen Kommandos (keine Bullets/Beschreibung
+							# dazwischen), damit er sich 1:1 markieren+kopieren (STRG+C) und direkt an das
+							# AD-Team weitergeben laesst.
+							$lines.Add("")
+							$lines.Add("  ---- NUR BEFEHLE (markieren + kopieren fuer AD-Team) ----")
+							foreach ($r in $missingSpns) { $lines.Add("  $($r.SetSpnCommand)") }
+							$lines.Add("  setspn -L `"$spnAccount`"")
+							$lines.Add("  ---- ENDE ----")
+
+							foreach ($r in $missingSpns) { $allMissingSpnCommands.Add($r.SetSpnCommand) }
+							$allVerifyAccounts.Add($spnAccount)
 						}
 						else
 						{
@@ -976,6 +1014,68 @@ WHERE ag.group_id IN (
 
 	end
 	{
+		# ------------------------------------------------------------------
+		# Sammel-Kommandodatei + Zwischenablage fuer das AD-Team.
+		# Ueber ALLE in diesem Aufruf verarbeiteten Computer/Instanzen hinweg: eine dedizierte,
+		# copy-paste-fertige Datei mit ausschliesslich ausfuehrbaren setspn-Kommandos (keine
+		# Kommentare dazwischen), plus derselbe Inhalt direkt in der Windows-Zwischenablage, damit
+		# er ohne Umweg ueber die Datei an das AD-Team weitergegeben werden kann. Am Ende stehen die
+		# setspn -L Kontroll-Kommandos fuer jedes betroffene Konto (dedupliziert).
+		# ------------------------------------------------------------------
+		if ($allMissingSpnCommands.Count -gt 0)
+		{
+			$uniqueAccounts = @($allVerifyAccounts | Sort-Object -Unique)
+			$verifyCommands = $uniqueAccounts | ForEach-Object { "setspn -L `"$_`"" }
+
+			# Reine Kommandos (ohne jeglichen Kommentar) - das ist der Zwischenablage-Inhalt: in
+			# jeder Shell (cmd.exe oder PowerShell) direkt ausfuehrbar, ohne vorher etwas entfernen
+			# zu muessen.
+			$pureCommandBlock = @($allMissingSpnCommands) + @('') + @($verifyCommands)
+
+			try
+			{
+				($pureCommandBlock -join "`r`n") | Set-Clipboard -ErrorAction Stop
+				Invoke-sqmLogging -Message "$($allMissingSpnCommands.Count) setspn-Kommando(s) + $($verifyCommands.Count) Kontroll-Kommando(s) in die Zwischenablage kopiert." `
+								  -FunctionName $functionName -Level 'INFO'
+			}
+			catch
+			{
+				Invoke-sqmLogging -Message "Kopieren in die Zwischenablage fehlgeschlagen (evtl. keine interaktive Session): $($_.Exception.Message)" `
+								  -FunctionName $functionName -Level 'WARNING'
+			}
+
+			# Datei-Variante mit etwas Kontext oben drueber (die reinen Kommandos bleiben als
+			# zusammenhaengender Block erhalten, damit STRG+A/STRG+C in der Datei genauso funktioniert).
+			try
+			{
+				if (-not (Test-Path $OutputPath)) { New-Item -ItemType Directory -Path $OutputPath -Force -ErrorAction Stop | Out-Null }
+
+				$cmdLines = [System.Collections.Generic.List[string]]::new()
+				$cmdLines.Add("# sqmSQLTool - setspn-Sammelkommandos fuer das AD-Team")
+				$cmdLines.Add("# $(Get-sqmReportReference)")
+				$cmdLines.Add("# Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')")
+				$cmdLines.Add("# Enthaelt alle fehlenden setspn-Kommandos aus diesem Lauf ($($ComputerName -join ', ')).")
+				$cmdLines.Add("# Ab der naechsten Leerzeile: nur ausfuehrbare Kommandos, keine Kommentare mehr -")
+				$cmdLines.Add("# ab dort markieren und 1:1 kopieren.")
+				$cmdLines.Add("")
+				$cmdLines.AddRange([string[]]$pureCommandBlock)
+
+				$safeStamp = Get-Date -Format 'yyyy-MM-dd_HHmmss'
+				$setspnCmdFile = Join-Path $OutputPath "SpnReport_SetSpnCommands_${safeStamp}.txt"
+				$cmdLines | Out-File -FilePath $setspnCmdFile -Encoding UTF8 -Force
+				Invoke-sqmLogging -Message "setspn-Sammeldatei geschrieben: $setspnCmdFile" -FunctionName $functionName -Level 'INFO'
+			}
+			catch
+			{
+				Invoke-sqmLogging -Message "Konnte setspn-Sammeldatei nicht schreiben: $($_.Exception.Message)" -FunctionName $functionName -Level 'WARNING'
+			}
+		}
+		else
+		{
+			Invoke-sqmLogging -Message "Keine fehlenden SPNs ueber alle verarbeiteten Instanzen - keine Sammeldatei/Zwischenablage noetig." `
+							  -FunctionName $functionName -Level 'INFO'
+		}
+
 		Invoke-sqmLogging -Message "$functionName abgeschlossen. $($allResults.Count) Instanz(en) verarbeitet." `
 						  -FunctionName $functionName -Level 'INFO'
 		return $allResults
