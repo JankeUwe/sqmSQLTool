@@ -564,8 +564,18 @@ function Invoke-sqmRestoreDatabase
 				$primaryReplica = $replicas | Where-Object { $_.Role -eq 'Primary' } | Select-Object -First 1
 				$secondaryReplicas = $replicas | Where-Object { $_.Role -eq 'Secondary' }
 				$secondaryInstances = $secondaryReplicas | Select-Object -ExpandProperty Name
-				
-				if ($primaryReplica.Name -ne $SqlInstance)
+
+				# WICHTIG: Wenn $primaryReplica nicht ermittelt werden konnte (z.B. Role-Werte aus
+				# Get-DbaAgReplica passen aus irgendeinem Grund nicht zu 'Primary', AG gerade im
+				# Failover), darf $primaryInstance NIEMALS $null werden - das fuehrt spaeter (u.a. im
+				# Rejoin-Schritt im finally-Block) zu "Cannot bind parameter 'SqlInstance' because it
+				# is null". Fallback auf die verbundene Instanz, mit deutlicher Warnung im Log.
+				if (-not $primaryReplica -or -not $primaryReplica.Name)
+				{
+					Invoke-sqmLogging -Message "Primaere Replica der AG '$($availabilityGroup.Name)' konnte nicht eindeutig ermittelt werden (Role='Primary' nicht gefunden) - falle zurueck auf verbundene Instanz '$SqlInstance'. Falls das nicht die tatsaechliche Primary ist, schlagen nachfolgende AG-Schreiboperationen mit einer aussagekraeftigen Fehlermeldung fehl." -FunctionName $functionName -Level "WARNING"
+					$primaryInstance = $SqlInstance
+				}
+				elseif ($primaryReplica.Name -ne $SqlInstance)
 				{
 					Invoke-sqmLogging -Message "Aktuelle Instanz ist nicht primaer. Verbinde mit primaerer Instanz $($primaryReplica.Name) fuer AG-Operationen." -FunctionName $functionName -Level "INFO"
 					$primaryInstance = $primaryReplica.Name

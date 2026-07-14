@@ -1,5 +1,20 @@
 # sqmSQLTool — Changelog
 
+## [1.9.17.0] — 2026-07-14
+
+### Fix: Invoke-sqmRestoreDatabase — rejoin failed with "Cannot bind parameter 'SqlInstance' because it is null"
+
+- Found live while testing 1.9.16.0: if `Get-DbaAgReplica` didn't return a replica with
+  `Role -eq 'Primary'` (e.g. AG mid-transition, or SMO reporting a non-'Primary' role like
+  'Resolving'/'Unknown' at query time), `$primaryReplica` was `$null`, and
+  `$primaryReplica.Name -ne $SqlInstance` evaluated true (comparing `$null` to a real string),
+  so `$primaryInstance` was set to `$null` instead of falling back to the connected instance.
+  Every later AG operation using `$primaryInstance` - including the rejoin step - then failed with
+  "Cannot bind parameter 'SqlInstance' because it is null".
+- `$primaryInstance` can no longer end up `$null`: if the primary replica can't be positively
+  identified, it now falls back to the connected `$SqlInstance` with a clear WARNING logged,
+  instead of crashing on a null-parameter bind.
+
 ## [1.9.16.0] — 2026-07-14
 
 ### Fix: Invoke-sqmRestoreDatabase — AG rejoin could still be skipped by a later cleanup-step failure
