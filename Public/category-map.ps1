@@ -105,6 +105,7 @@ $categoryMap = @{
     'New-sqmAutoLoginSyncJob'             = 'SQL Agent & Proxy Jobs'
     'New-sqmAvailabilityGroup'            = 'Always On & Availability Groups'
     'New-sqmBackupMaintenanceJob'         = 'Backup & Recovery'
+    'New-sqmRestoreDatabaseJob'           = 'Backup & Recovery'
     'New-sqmCertificateRequest'           = 'Certificates & TLS Security'
     'New-sqmDistributedAvailabilityGroup' = 'Always On & Availability Groups'
     'New-sqmOlaMaintenanceJobs'           = 'Backup & Recovery'

@@ -1,5 +1,26 @@
 # sqmSQLTool — Changelog
 
+## [1.9.21.0] — 2026-07-14
+
+### Feature: New-sqmRestoreDatabaseJob — generate an on-demand SQL Agent job for a restore
+
+- New function that creates a SQL Agent job which runs `Invoke-sqmRestoreDatabase` with the given
+  parameters baked into a generated wrapper script (same wrapper/CmdExec pattern as
+  `New-sqmAlwaysOnRepairJob` / `New-sqmAutoLoginSyncJob`). Lets a restore run on the SQL server
+  itself as the Agent service account instead of interactively from a remote workstation.
+- Deliberately created **without a schedule** - a restore is on-demand, not recurring - so the job
+  is started manually (`Start-DbaAgentJob`) or via the function's `-StartJob` switch.
+- Mirrors the restore-relevant parameters of `Invoke-sqmRestoreDatabase` (`-BackupFile` /
+  `-BackupFiles`, `-DatabaseName`, `-NewDatabaseName`, file-path overrides, `-BackupBeforeRestore`,
+  `-NoUserExport`, `-KeepAlwaysOn`, `-AvailabilityGroupName`, `-WithNoRecovery`,
+  `-ContinueWithNoRecovery`, `-ForceSingleUser`, `-NoRejoinAvailabilityGroup`) plus job-management
+  parameters (`-JobName`, `-StepName`, `-Force`, `-StartJob`). The generated step uses
+  `-Confirm:$false -EnableException` so a restore failure makes the Agent job fail visibly.
+- Follows the module's existing job-auth convention: no SQL credential is embedded in the wrapper;
+  the job connects to the target via the Agent service account's Windows identity (which must be
+  sysadmin on the target, and on all replicas for an AG database).
+- Registered in `FunctionsToExport` and the GUI category map (Backup & Recovery).
+
 ## [1.9.20.0] — 2026-07-14
 
 ### Fix: Invoke-sqmRestoreDatabase — UserExport failing after 1.9.19.0's working-instance change
