@@ -1,5 +1,25 @@
 # sqmSQLTool — Changelog
 
+## [1.9.18.0] — 2026-07-14
+
+### Fix: Invoke-sqmRestoreDatabase — replaced the 1.9.17.0 fallback with the actual root-cause fix
+
+- The `$primaryInstance` null bug fixed in 1.9.17.0 was patched with a fallback rather than fixed
+  at the source. Root cause: primary-replica detection filtered `Get-DbaAgReplica`'s results by
+  `Role -eq 'Primary'`, but that per-replica `Role` value can transiently report something other
+  than exactly `'Primary'` (e.g. `'Resolving'`), so the filter can come back empty. This had
+  always been a latent bug in the original code - it just never surfaced when the function
+  happened to be run directly against the actual primary replica, which was the case for every
+  prior successful use of this function. It only got hit once a run went through a path where
+  that wasn't guaranteed.
+- Replaced the whole `Get-DbaAgReplica | Where-Object Role -eq 'Primary'/'Secondary'` pattern
+  (used both to determine the primary in the AG-removal step and to find secondaries for the
+  seeding-mode check in the rejoin step) with `AvailabilityGroup.PrimaryReplicaServerName` - a
+  dedicated SMO property on the AG object itself, and the authoritative source for "which replica
+  is primary" rather than something inferred from possibly-transient per-replica state. Secondaries
+  are now simply "every replica whose name isn't the primary", removing the dependency on `Role`
+  matching an exact string entirely.
+
 ## [1.9.17.0] — 2026-07-14
 
 ### Fix: Invoke-sqmRestoreDatabase — rejoin failed with "Cannot bind parameter 'SqlInstance' because it is null"

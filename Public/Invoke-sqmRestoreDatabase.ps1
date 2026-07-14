@@ -561,29 +561,25 @@ function Invoke-sqmRestoreDatabase
 			if ($isAGDatabase -and -not $KeepAlwaysOn)
 			{
 				$replicas = Get-DbaAgReplica -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $availabilityGroup.Name -ErrorAction Stop
-				$primaryReplica = $replicas | Where-Object { $_.Role -eq 'Primary' } | Select-Object -First 1
-				$secondaryReplicas = $replicas | Where-Object { $_.Role -eq 'Secondary' }
-				$secondaryInstances = $secondaryReplicas | Select-Object -ExpandProperty Name
 
-				# WICHTIG: Wenn $primaryReplica nicht ermittelt werden konnte (z.B. Role-Werte aus
-				# Get-DbaAgReplica passen aus irgendeinem Grund nicht zu 'Primary', AG gerade im
-				# Failover), darf $primaryInstance NIEMALS $null werden - das fuehrt spaeter (u.a. im
-				# Rejoin-Schritt im finally-Block) zu "Cannot bind parameter 'SqlInstance' because it
-				# is null". Fallback auf die verbundene Instanz, mit deutlicher Warnung im Log.
-				if (-not $primaryReplica -or -not $primaryReplica.Name)
+				# Primary-Ermittlung ueber AvailabilityGroup.PrimaryReplicaServerName statt ueber
+				# Get-DbaAgReplica + "Role -eq 'Primary'"-Filter: PrimaryReplicaServerName ist eine
+				# eigene, dedizierte SMO-Eigenschaft der AG selbst und damit die verlaessliche Quelle;
+				# die einzelnen Replica-Objekte koennen ihre Role transient anders melden (z.B.
+				# 'Resolving'), wodurch der Filter auf 'Primary' leer zurueckkommen und $primaryReplica
+				# $null werden kann - mit der alten Vergleichslogik ($null.Name -ne $SqlInstance ist
+				# immer wahr) wurde $primaryInstance dann faelschlich $null.
+				$primaryInstance = $availabilityGroup.PrimaryReplicaServerName
+				if ([string]::IsNullOrWhiteSpace($primaryInstance))
 				{
-					Invoke-sqmLogging -Message "Primaere Replica der AG '$($availabilityGroup.Name)' konnte nicht eindeutig ermittelt werden (Role='Primary' nicht gefunden) - falle zurueck auf verbundene Instanz '$SqlInstance'. Falls das nicht die tatsaechliche Primary ist, schlagen nachfolgende AG-Schreiboperationen mit einer aussagekraeftigen Fehlermeldung fehl." -FunctionName $functionName -Level "WARNING"
+					Invoke-sqmLogging -Message "AG '$($availabilityGroup.Name)': PrimaryReplicaServerName ist leer (AG evtl. gerade im Failover) - falle zurueck auf verbundene Instanz '$SqlInstance'." -FunctionName $functionName -Level "WARNING"
 					$primaryInstance = $SqlInstance
 				}
-				elseif ($primaryReplica.Name -ne $SqlInstance)
+				elseif ($primaryInstance -ne $SqlInstance)
 				{
-					Invoke-sqmLogging -Message "Aktuelle Instanz ist nicht primaer. Verbinde mit primaerer Instanz $($primaryReplica.Name) fuer AG-Operationen." -FunctionName $functionName -Level "INFO"
-					$primaryInstance = $primaryReplica.Name
+					Invoke-sqmLogging -Message "Aktuelle Instanz ist nicht primaer. Verbinde mit primaerer Instanz $primaryInstance fuer AG-Operationen." -FunctionName $functionName -Level "INFO"
 				}
-				else
-				{
-					$primaryInstance = $SqlInstance
-				}
+				$secondaryInstances = $replicas | Where-Object { $_.Name -ne $primaryInstance } | Select-Object -ExpandProperty Name
 				
 				if (-not $agDbCheck)
 				{
@@ -951,11 +947,14 @@ WHERE dp.type IN ('U', 'G')
 					{
 						Invoke-sqmLogging -Message $rejoinAction -FunctionName $functionName -Level "INFO"
 
-						# Pruefe SeedingMode aller Sekundaer-Replikate  - stelle Automatic Seeding sicher
+						# Pruefe SeedingMode aller Sekundaer-Replikate  - stelle Automatic Seeding sicher.
+						# Sekundaer = Name weicht von $primaryInstance ab (siehe Schritt 4) - nicht ueber
+						# "Role -eq 'Secondary'" gefiltert, da die Role transient anders melden kann
+						# (z.B. 'Resolving') und dann Replicas hier stillschweigend uebersprungen wuerden.
 						$agReplicas = Get-DbaAgReplica -SqlInstance $primaryInstance -SqlCredential $SqlCredential `
 							-AvailabilityGroup $availabilityGroup.Name -ErrorAction Stop
 
-						foreach ($replica in ($agReplicas | Where-Object { $_.Role -eq 'Secondary' }))
+						foreach ($replica in ($agReplicas | Where-Object { $_.Name -ne $primaryInstance }))
 						{
 							if ($replica.SeedingMode -ne 'Automatic')
 							{
