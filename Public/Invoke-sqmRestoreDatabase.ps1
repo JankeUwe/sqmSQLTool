@@ -398,16 +398,40 @@ function Invoke-sqmRestoreDatabase
 				# die einzelnen Replica-Objekte koennen ihre Role transient anders melden (z.B.
 				# 'Resolving'), wodurch ein Role-Filter leer zurueckkommen kann.
 				$primaryInstance = $availabilityGroup.PrimaryReplicaServerName
+
+				# Kurzname (ohne Domaenen-Suffix) fuer den Vergleich - PrimaryReplicaServerName kann
+				# als FQDN, mit anderer Gross-/Kleinschreibung oder anders formatiert zurueckkommen als
+				# die vom Aufrufer uebergebene -SqlInstance, obwohl es dieselbe Maschine ist. Ist es
+				# dieselbe Maschine, wird bewusst die EXAKTE, vom Aufrufer uebergebene Zeichenkette
+				# weiterverwendet statt der von der AG gemeldeten - ein reiner Formatunterschied kann
+				# sonst (z.B. bei Kerberos-Delegation) dazu fuehren, dass Export-DbaUser beim
+				# Aufzaehlen von Berechtigungen mit einer generischen SMO-/T-SQL-Ausnahme fehlschlaegt,
+				# obwohl genau dieselbe Instanz gemeint ist und der Restore mit der Original-Zeichenkette
+				# bereits nachweislich funktioniert hat.
+				$primaryShortName = ($primaryInstance -split '[.\\]')[0]
+				$sqlInstanceShortName = ($SqlInstance -split '[.\\]')[0]
+
+				# Immer geloggt (nicht nur bei erkanntem Unterschied) - falls trotz gleicher Maschine
+				# noch etwas schiefgeht, zeigt das Log exakt, welche rohen Zeichenketten verglichen
+				# wurden, statt hinterher raten zu muessen.
+				Invoke-sqmLogging -Message "Primary-Abgleich: PrimaryReplicaServerName='$primaryInstance' (Kurzname='$primaryShortName') vs. -SqlInstance='$SqlInstance' (Kurzname='$sqlInstanceShortName')." -FunctionName $functionName -Level "DEBUG"
+
 				if ([string]::IsNullOrWhiteSpace($primaryInstance))
 				{
 					Invoke-sqmLogging -Message "AG '$($availabilityGroup.Name)': PrimaryReplicaServerName ist leer (AG evtl. gerade im Failover) - falle zurueck auf verbundene Instanz '$SqlInstance'." -FunctionName $functionName -Level "WARNING"
 					$primaryInstance = $SqlInstance
 				}
-				elseif ($primaryInstance -ne $SqlInstance)
+				elseif ($primaryShortName -ieq $sqlInstanceShortName)
+				{
+					# Selbe Maschine wie -SqlInstance (nur evtl. anders formatiert) - Original-Zeichenkette
+					# beibehalten statt der von der AG gemeldeten.
+					$primaryInstance = $SqlInstance
+				}
+				else
 				{
 					Invoke-sqmLogging -Message "Aktuelle Instanz ist nicht primaer. Alle weiteren Schritte (Backup, Export, Restore, Cleanup) laufen gegen die primaere Instanz '$primaryInstance'." -FunctionName $functionName -Level "INFO"
 				}
-				$secondaryInstances = $replicas | Where-Object { $_.Name -ne $primaryInstance } | Select-Object -ExpandProperty Name
+				$secondaryInstances = $replicas | Where-Object { ($_.Name -split '[.\\]')[0] -ine $primaryShortName } | Select-Object -ExpandProperty Name
 				$workInstance = $primaryInstance
 			}
 			else

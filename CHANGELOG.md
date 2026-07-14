@@ -1,5 +1,26 @@
 # sqmSQLTool — Changelog
 
+## [1.9.20.0] — 2026-07-14
+
+### Fix: Invoke-sqmRestoreDatabase — UserExport failing after 1.9.19.0's working-instance change
+
+- Found live while testing 1.9.19.0 against an AG database run directly on the Primary:
+  `Export-DbaUser` failed with a generic SMO "exception occurred while trying to enumerate the
+  collection" / "exception occurred while executing a Transact-SQL statement" error that did not
+  happen before that change.
+- Suspected cause: `AvailabilityGroup.PrimaryReplicaServerName` can report the AG replica under a
+  different string form than the `-SqlInstance` value the caller passed in (FQDN vs short name,
+  different casing) even when it is the exact same machine - a pure formatting difference that can
+  still break Kerberos delegation for the permission-enumeration queries `Export-DbaUser` needs.
+  Since 1.9.19.0 started using that resolved name (`$workInstance`) instead of the caller's
+  original string for every operation, this surfaced for the first time.
+- The resolved primary name is now compared to `-SqlInstance` by short hostname (case-insensitive,
+  domain suffix stripped) rather than exact string equality; when they refer to the same machine,
+  the caller's original `-SqlInstance` string is kept for `$workInstance` instead of substituting
+  the AG-reported name, avoiding the format mismatch entirely.
+- Added an unconditional DEBUG log line recording both raw strings compared, so a recurrence gives
+  concrete evidence instead of requiring another guess.
+
 ## [1.9.19.0] — 2026-07-14
 
 ### Fix: Invoke-sqmRestoreDatabase — every operation now always targets the Primary for an AG database
