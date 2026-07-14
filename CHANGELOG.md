@@ -1,6 +1,27 @@
 # sqmSQLTool — Changelog
 
-## [1.9.10.0] — 2026-07-13
+## [1.9.11.0] — 2026-07-14
+
+### Feature: Compare-sqmServerConfiguration — Logins, migration-relevant objects, HTML report
+
+- `Compare-sqmServerConfiguration` previously only diffed a handful of sp_configure/instance
+  properties and (optionally) database name/owner/recovery model/collation, and returned raw
+  objects with no report. Extended for post-migration verification:
+  - New `-CompareLogins` switch: compares server logins between Source/Target (existence, SID,
+    default database/language, disabled state, server-role membership, and password hash for SQL
+    logins), with `-IncludeSystemLogins`, `-Login`, `-ExcludeLogin` filters matching the
+    conventions of `Compare-sqmAlwaysOnLogins`.
+  - New `-IncludeMigrationObjects` switch: compares Linked Servers, Credentials, SQL Agent Jobs,
+    Endpoints, and Database Mail profiles between the two instances.
+  - Instance property comparison extended with `ProductLevel`, `HostPlatform`, `IsClustered`,
+    `IsHadrEnabled`, `XpCmdShell`, `ClrEnabled`, `ErrorLogPath`, `MasterDBPath`.
+  - Every finding now carries a `Status` (OK/Warning/Critical) — missing logins/objects and SID or
+    password-hash mismatches are Critical, most config drift is Warning.
+  - Added TXT + HTML report output (shared `ConvertTo-sqmHtmlReport` theme) with `-OutputPath`,
+    `-NoOpen`, `-NoReport`, auto-opened like the other Compare-* functions.
+  - Fixed a latent bug in `-CompareDatabases`: the system-database filter checked
+    `-not $_.IsSystemObject`, but the helper's returned object never carried that property (always
+    `$null`), so master/model/msdb/tempdb were never actually excluded from the comparison.
 
 ### Feature: Set-sqmSsasDeploymentMode
 
