@@ -142,8 +142,14 @@ function New-sqmRestoreTestJob
 		[Parameter(Mandatory = $true)]
 		[string]$DatabaseName,
 
-		[Parameter(Mandatory = $true)]
+		[Parameter(Mandatory = $false)]
 		[string[]]$BackupFile,
+
+		[Parameter(Mandatory = $false)]
+		[switch]$IncludeChain,
+
+		[Parameter(Mandatory = $false)]
+		[string]$BackupRootPath,
 
 		[Parameter(Mandatory = $false)]
 		[string]$TestDatabaseName,
@@ -279,8 +285,18 @@ function New-sqmRestoreTestJob
 			$argParts.Add("-SqlInstance $(_q $SqlInstance)")
 			$argParts.Add("-DatabaseName $(_q $DatabaseName)")
 
-			$quoted = ($BackupFile | ForEach-Object { _q $_ }) -join ', '
-			$argParts.Add("-BackupFile @($quoted)")
+			# Ohne -BackupFile wird BEWUSST kein Pfad eingebacken: Invoke-sqmRestoreTest ermittelt
+			# die neueste Vollsicherung dann bei JEDEM Lauf selbst. Genau das braucht eine
+			# Ola-Umgebung - jede Sicherung traegt einen Zeitstempel im Namen, ein fest
+			# verdrahteter Pfad waere nach dem naechsten Backup-Lauf tot (und mit @CleanupTime
+			# womoeglich bereits geloescht).
+			if ($BackupFile -and $BackupFile.Count -gt 0)
+			{
+				$quoted = ($BackupFile | ForEach-Object { _q $_ }) -join ', '
+				$argParts.Add("-BackupFile @($quoted)")
+			}
+			if ($IncludeChain)   { $argParts.Add('-IncludeChain') }
+			if ($BackupRootPath) { $argParts.Add("-BackupRootPath $(_q $BackupRootPath)") }
 
 			if ($TestDatabaseName) { $argParts.Add("-TestDatabaseName $(_q $TestDatabaseName)") }
 			if ($DataFilePath)     { $argParts.Add("-DataFilePath $(_q $DataFilePath)") }

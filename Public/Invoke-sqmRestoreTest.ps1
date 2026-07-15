@@ -13,6 +13,20 @@ This function deliberately does NOT handle AlwaysOn. A restore test creates a th
 a copy must never be joined to an availability group. Use Invoke-sqmRestoreDatabase for productive,
 AG-aware restores.
 
+Determining the backup: -BackupFile is optional. Without it the newest FULL backup is looked up,
+first from the msdb backup history (Get-DbaDbBackupHistory), and if that yields nothing, by
+scanning the backup directory on the instance. This is what makes a recurring restore test work
+with Ola Hallengren: Ola timestamps every backup file, so a fixed path would break after the next
+backup run. The msdb history is preferred because it reports the path SQL Server actually wrote -
+independent of Ola's @DirectoryStructure/@FileName, which are configurable and often deviate from
+the default. The scan exists for the cases msdb cannot answer: Ola's own sp_delete_backuphistory
+job purges the history, and a test running on a different instance than the backup has no history
+at all. Use -IncludeChain to restore the full chain instead of just the newest full backup.
+
+Which backup was used, and how it was found, is recorded in the evidence (BackupSource:
+BackupHistory, DirectoryScan or Parameter) - an auditor must be able to see which backup the
+measurement refers to.
+
 Safety model - a restore test must never destroy existing data:
 
 1. The target database name must start with "RestoreTest_" (see -TestDatabaseName). Any other name
@@ -50,6 +64,21 @@ Alternative credentials for the target instance.
 .PARAMETER BackupFile
 Path(s) to the backup file(s), readable by the target instance. Accepts a single .bak, a striped
 set, or a full chain (Full + Diff + Logs) - dbatools determines the correct restore order itself.
+
+OPTIONAL: omit it and the newest full backup is determined automatically - see DESCRIPTION. For
+Ola Hallengren environments always omit it; every Ola backup carries a timestamp in its name, so a
+fixed path is stale after the next backup run (and possibly already deleted by Ola's @CleanupTime).
+
+.PARAMETER IncludeChain
+Restore the whole chain needed to reach the most recent point in time (last full + last diff + the
+log backups after it) instead of just the newest full backup. Only works via the msdb history: the
+LSN relationship between backups cannot be read off file names, so the directory-scan fallback can
+only ever return a full backup.
+
+.PARAMETER BackupRootPath
+Root directory for the directory-scan fallback. Default: module configuration "BackupDirectory",
+otherwise the instance's default backup directory. Ignored when -BackupFile is given or when the
+msdb history already answered.
 
 .PARAMETER DatabaseName
 Name of the source database as it appears in the backup. Used for the default test name and for
@@ -98,7 +127,16 @@ Do not open the report automatically after creation.
 Throw exceptions instead of returning a failure result object.
 
 .EXAMPLE
-# Standard restore test - test database is kept for further checks
+# Ola environment: newest full backup is determined automatically (msdb, scan as fallback).
+# This is the normal case - test database is kept for further checks.
+Invoke-sqmRestoreTest -SqlInstance "SQL01" -DatabaseName "Kunde"
+
+.EXAMPLE
+# Restore the whole chain (last full + diff + subsequent logs) instead of just the full backup
+Invoke-sqmRestoreTest -SqlInstance "SQL01" -DatabaseName "Kunde" -IncludeChain
+
+.EXAMPLE
+# Explicit backup file (no lookup)
 Invoke-sqmRestoreTest -SqlInstance "SQL01" -BackupFile "D:\Backup\Kunde_Full.bak" -DatabaseName "Kunde"
 
 .EXAMPLE
@@ -130,10 +168,14 @@ function Invoke-sqmRestoreTest
 		[string]$SqlInstance = $env:COMPUTERNAME,
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
-		[Parameter(Mandatory = $true)]
+		[Parameter(Mandatory = $false)]
 		[string[]]$BackupFile,
 		[Parameter(Mandatory = $true)]
 		[string]$DatabaseName,
+		[Parameter(Mandatory = $false)]
+		[switch]$IncludeChain,
+		[Parameter(Mandatory = $false)]
+		[string]$BackupRootPath,
 		[Parameter(Mandatory = $false)]
 		[string]$TestDatabaseName,
 		[Parameter(Mandatory = $false)]
@@ -257,6 +299,22 @@ function Invoke-sqmRestoreTest
 					-FunctionName $functionName -Level "WARNING"
 			}
 
+			# --- Backupdatei(en) bestimmen -------------------------------------------------
+			# Ohne -BackupFile wird die Sicherung selbst ermittelt. Das ist der Normalfall fuer
+			# Ola-Umgebungen: dort traegt jede Sicherung einen Zeitstempel im Namen, ein fest
+			# angegebener Pfad waere nach dem naechsten Backup-Lauf veraltet (und mit Olas
+			# @CleanupTime womoeglich schon geloescht).
+			$backupSource = 'Parameter'
+			$sourceInfo = $null
+			if (-not $BackupFile -or $BackupFile.Count -eq 0)
+			{
+				$discovered = Get-sqmRestoreTestBackupSource -Server $server -DatabaseName $DatabaseName `
+					-IncludeChain:$IncludeChain -BackupRootPath $BackupRootPath -FunctionName $functionName
+				$BackupFile = $discovered.Files
+				$backupSource = $discovered.Source
+				$sourceInfo = $discovered.Message
+			}
+
 			# --- Restore ausfuehren --------------------------------------------------------
 			$restoreParams = @{
 				SqlInstance		   = $server
@@ -367,6 +425,8 @@ function Invoke-sqmRestoreTest
 				Status					 = if ($restoreComplete) { 'Success' } else { 'Failed' }
 				BackupFile				 = ($BackupFile -join ', ')
 				BackupFilesCount		 = $BackupFile.Count
+				BackupSource			 = $backupSource
+				BackupSourceInfo		 = $sourceInfo
 				BackupSizeBytes			 = $backupSizeBytes
 				BackupSize				 = Format-sqmFileSize -Bytes $backupSizeBytes
 				CompressedBackupSizeBytes = $compressedSizeBytes
@@ -413,6 +473,117 @@ function Invoke-sqmRestoreTest
 			}
 		}
 	}
+}
+
+# Ermittelt die zu restaurierende(n) Backupdatei(en), wenn -BackupFile nicht angegeben wurde.
+#
+# Zwei Quellen, in dieser Reihenfolge:
+#   1. msdb-Sicherungshistorie (Get-DbaDbBackupHistory). Liefert den Pfad, den SQL Server
+#      tatsaechlich geschrieben hat - unabhaengig von Olas @DirectoryStructure/@FileName,
+#      die konfigurierbar sind und in der Praxis vom Default abweichen.
+#   2. Verzeichnis-Scan als Fallback, falls die Historie nichts hergibt (Olas
+#      sp_delete_backuphistory-Job raeumt sie regelmaessig, oder der Test laeuft auf einer
+#      anderen Instanz als das Backup).
+#
+# Der Scan laeuft ueber Get-DbaFile (xp_dirtree auf der Instanz), nicht ueber Get-ChildItem -
+# die Backupdateien liegen auf dem Datentraeger der SQL-Instanz, nicht auf dem ausfuehrenden
+# Rechner. Get-DbaFile liefert kein Aenderungsdatum, deshalb bestimmt der Zeitstempel IM
+# Dateinamen die Reihenfolge. Bei Olas Namensschema (_FULL_yyyyMMdd_HHmmss) ist die
+# lexikografische Sortierung identisch mit der chronologischen.
+function Get-sqmRestoreTestBackupSource
+{
+	[CmdletBinding()]
+	[OutputType([PSCustomObject])]
+	param (
+		[Parameter(Mandatory = $true)]
+		$Server,
+		[Parameter(Mandatory = $true)]
+		[string]$DatabaseName,
+		[Parameter(Mandatory = $false)]
+		[switch]$IncludeChain,
+		[Parameter(Mandatory = $false)]
+		[string]$BackupRootPath,
+		[Parameter(Mandatory = $false)]
+		[string]$FunctionName = 'Invoke-sqmRestoreTest'
+	)
+
+	# --- 1. msdb-Historie ---------------------------------------------------------------
+	try
+	{
+		$histParams = @{ SqlInstance = $Server; Database = $DatabaseName; ErrorAction = 'Stop' }
+		# -Last liefert die komplette, zum juengsten Zeitpunkt noetige Kette (Full + Diff + Logs);
+		# -LastFull nur die neueste Vollsicherung.
+		if ($IncludeChain) { $histParams['Last'] = $true } else { $histParams['LastFull'] = $true }
+
+		$history = @(Get-DbaDbBackupHistory @histParams)
+		if ($history.Count -gt 0)
+		{
+			# .Path ist ein String[] (gestripte Backups liefern mehrere Dateien je Sicherung).
+			$files = @($history | ForEach-Object { $_.Path })
+			if ($files.Count -gt 0)
+			{
+				$typeInfo = ($history | Group-Object Type | ForEach-Object { "$($_.Count)x $($_.Name)" }) -join ', '
+				Invoke-sqmLogging -Message "Backup aus msdb-Historie ermittelt ($typeInfo): $($files.Count) Datei(en)." `
+					-FunctionName $FunctionName -Level "INFO"
+				return [PSCustomObject]@{ Files = $files; Source = 'BackupHistory'; Message = $typeInfo }
+			}
+		}
+		Invoke-sqmLogging -Message "Keine Sicherungshistorie fuer '$DatabaseName' in msdb - versuche Verzeichnis-Scan." `
+			-FunctionName $FunctionName -Level "WARNING"
+	}
+	catch
+	{
+		Invoke-sqmLogging -Message "msdb-Historie nicht auswertbar ($($_.Exception.Message)) - versuche Verzeichnis-Scan." `
+			-FunctionName $FunctionName -Level "WARNING"
+	}
+
+	# --- 2. Fallback: Verzeichnis-Scan --------------------------------------------------
+	# Nur Vollsicherungen: eine Kette laesst sich ohne Historie nicht verlaesslich
+	# rekonstruieren (LSN-Zusammenhang ist am Dateinamen nicht ablesbar).
+	if ($IncludeChain)
+	{
+		Invoke-sqmLogging -Message "Ohne msdb-Historie kann keine Sicherungskette (-IncludeChain) bestimmt werden; der Scan liefert nur die neueste Vollsicherung." `
+			-FunctionName $FunctionName -Level "WARNING"
+	}
+
+	$root = $BackupRootPath
+	if ([string]::IsNullOrWhiteSpace($root)) { $root = Get-sqmConfig -Key 'BackupDirectory' 3>$null }
+	if ([string]::IsNullOrWhiteSpace($root))
+	{
+		try { $root = (Get-DbaDefaultPath -SqlInstance $Server -ErrorAction Stop).Backup } catch { }
+	}
+	if ([string]::IsNullOrWhiteSpace($root))
+	{
+		throw "Backupverzeichnis nicht ermittelbar. -BackupFile oder -BackupRootPath angeben."
+	}
+
+	Invoke-sqmLogging -Message "Verzeichnis-Scan nach Vollsicherung von '$DatabaseName' unter: $root" `
+		-FunctionName $FunctionName -Level "INFO"
+
+	$found = @(Get-DbaFile -SqlInstance $Server -Path $root -Depth 4 -FileType bak -ErrorAction Stop |
+		Select-Object -ExpandProperty Filename)
+
+	# Ola-Namensschema: <Server>_<DB>_FULL_<yyyyMMdd>_<HHmmss>[_<n>].bak
+	$dbPattern = [regex]::Escape($DatabaseName)
+	$rx = "_$dbPattern`_FULL_(?<ts>\d{8}_\d{6})"
+	$candidates = $found | Where-Object { $_ -match $rx }
+
+	if (-not $candidates)
+	{
+		throw "Keine Vollsicherung fuer '$DatabaseName' gefunden (weder in msdb noch unter '$root')."
+	}
+
+	# Nach Zeitstempel im Namen gruppieren und die juengste Gruppe nehmen - eine Gruppe
+	# kann mehrere Dateien enthalten (gestriptes Backup).
+	$newest = $candidates |
+		ForEach-Object { [PSCustomObject]@{ File = $_; Stamp = ([regex]::Match($_, $rx)).Groups['ts'].Value } } |
+		Group-Object Stamp | Sort-Object Name -Descending | Select-Object -First 1
+
+	$files = @($newest.Group | Select-Object -ExpandProperty File)
+	Invoke-sqmLogging -Message "Backup per Verzeichnis-Scan ermittelt (Zeitstempel $($newest.Name)): $($files.Count) Datei(en)." `
+		-FunctionName $FunctionName -Level "INFO"
+
+	return [PSCustomObject]@{ Files = $files; Source = 'DirectoryScan'; Message = "Zeitstempel $($newest.Name)" }
 }
 
 # Entfernt Restore-Test-Nachweise, die aelter als die Aufbewahrungsfrist sind.
@@ -528,6 +699,21 @@ function Write-sqmRestoreTestReport
 
 		$aufbewahrung = if ($Result.RetentionMonths -le 0) { 'unbegrenzt' } else { "$($Result.RetentionMonths) Monate" }
 
+		# Komprimierung nicht unterstellen: sind logische und physische Groesse gleich, ist das
+		# Backup unkomprimiert - ein "(komprimiert gelesen)" waere dann schlicht falsch, und der
+		# Nachweis geht an Auditoren.
+		$istKomprimiert = ($Result.CompressedBackupSizeBytes -gt 0) -and
+						  ($Result.CompressedBackupSizeBytes -lt $Result.BackupSizeBytes)
+		$physischNote = if ($istKomprimiert) { 'komprimiert gelesen' } else { 'unkomprimiert' }
+
+		$herkunft = switch ($Result.BackupSource)
+		{
+			'BackupHistory' { 'msdb-Sicherungshistorie' }
+			'DirectoryScan' { 'Verzeichnis-Scan' }
+			default		    { 'ausdruecklich angegeben' }
+		}
+		if ($Result.BackupSourceInfo) { $herkunft += " ($($Result.BackupSourceInfo))" }
+
 		# --- TXT ---------------------------------------------------------------------------
 		$lines = [System.Collections.Generic.List[string]]::new()
 		$lines.Add("# ================================================================")
@@ -542,7 +728,7 @@ function Write-sqmRestoreTestReport
 		$lines.Add("Testdatenbank       : $($Result.TestDatabase)")
 		$lines.Add("")
 		$lines.Add("Datenmenge (Backup) : $($Result.BackupSize)")
-		$lines.Add("davon physisch      : $($Result.CompressedBackupSize) (komprimiert gelesen)")
+		$lines.Add("davon physisch      : $($Result.CompressedBackupSize) ($physischNote)")
 		$lines.Add("Dauer               : $($Result.Duration) ($dauerSekunden s)")
 		$lines.Add("Datendurchsatz      : $($Result.Throughput)")
 		$lines.Add("")
@@ -553,6 +739,7 @@ function Write-sqmRestoreTestReport
 		$lines.Add("Aufgeraeumt         : $aufraeumen")
 		$lines.Add("Aufbewahrung        : $aufbewahrung")
 		$lines.Add("")
+		$lines.Add("Ermittelt ueber     : $herkunft")
 		$lines.Add("Backupquelle        : $($Result.BackupFile)")
 		$lines.Add("")
 		$lines.Add("Hinweis: Der Datendurchsatz bezieht sich auf die logische Datenmenge (BackupSize)")
@@ -577,7 +764,7 @@ function Write-sqmRestoreTestReport
 <table>
 <tr><th colspan="2">Kennzahlen</th></tr>
 <tr><td>Datenmenge (Backup)</td><td><strong>$($Result.BackupSize)</strong></td></tr>
-<tr><td>davon physisch gelesen</td><td>$($Result.CompressedBackupSize) (komprimiert)</td></tr>
+<tr><td>davon physisch gelesen</td><td>$($Result.CompressedBackupSize) ($physischNote)</td></tr>
 <tr><td>Dauer</td><td><strong>$($Result.Duration)</strong> ($dauerSekunden s)</td></tr>
 <tr><td>Datendurchsatz</td><td><strong>$($Result.Throughput)</strong></td></tr>
 </table>
@@ -591,6 +778,7 @@ function Write-sqmRestoreTestReport
 <tr><td>Wiederhergestellte Dateien</td><td>$($Result.RestoredFilesCount)</td></tr>
 <tr><td>Aufgeraeumt</td><td>$aufraeumen</td></tr>
 <tr><td>Aufbewahrung Nachweise</td><td>$aufbewahrung</td></tr>
+<tr><td>Backup ermittelt ueber</td><td>$(& $enc $herkunft)</td></tr>
 <tr><td>Backupquelle</td><td>$(& $enc $Result.BackupFile)</td></tr>
 </table>
 

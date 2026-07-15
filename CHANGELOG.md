@@ -39,6 +39,43 @@
   pointing `-OutputPath` at a shared directory cannot delete unrelated files. It runs after the
   current evidence has been written, so a failing cleanup cannot cost the new report.
 
+### Feature: Invoke-sqmRestoreTest — the backup to restore is determined automatically (Ola-ready)
+
+- `-BackupFile` is now OPTIONAL. Without it the newest FULL backup is looked up automatically:
+  msdb backup history first (Get-DbaDbBackupHistory -LastFull), directory scan as fallback.
+  `-IncludeChain` restores the whole chain (last full + diff + subsequent logs) instead.
+- This is what makes the recurring restore test usable with Ola Hallengren at all. Ola timestamps
+  every backup file, so the fixed path baked into the job wrapper would have been dead after the
+  next backup run - and possibly already deleted by Ola's @CleanupTime. New-sqmRestoreTestJob now
+  omits `-BackupFile` from the generated wrapper unless one was explicitly given, so every run
+  resolves the current backup itself.
+- msdb is preferred because it reports the path SQL Server actually wrote, independent of Ola's
+  @DirectoryStructure/@FileName. Verified on DEV01, whose structure is `<DB>\FULL\` - i.e. WITHOUT
+  the server-name level Ola's default would produce - which is exactly why a scan with hardcoded
+  assumptions is the wrong primary source.
+- The scan exists for what msdb cannot answer: Ola's own sp_delete_backuphistory job purges the
+  history, and a test running on a different instance than the backup has no history at all. It
+  goes through Get-DbaFile (xp_dirtree on the instance), not Get-ChildItem - the backup files sit
+  on the SQL Server's disk, not the executing machine. Get-DbaFile returns no timestamp, so
+  ordering comes from the timestamp IN the file name; with Ola's `_FULL_yyyyMMdd_HHmmss` scheme
+  lexicographic order equals chronological order. Files are grouped by that timestamp so a striped
+  backup returns all its parts.
+- `-IncludeChain` only works via msdb: the LSN relationship cannot be read off file names, so the
+  scan can only ever return a full backup. It logs a warning and degrades to full-only rather than
+  silently pretending a chain was tested.
+- The evidence records which backup was used AND how it was found (`BackupSource`: BackupHistory /
+  DirectoryScan / Parameter) - an auditor must be able to see which backup a measurement refers to.
+- Verified end to end against a real Ola installation on DEV01: newest of two same-day fulls picked
+  correctly, chain resolved as Full+Log, scan fallback picked the right file after the history was
+  removed, and an unknown database fails with a clear message instead of a confusing restore error.
+
+### Fix: Invoke-sqmRestoreTest — evidence claimed "komprimiert gelesen" for uncompressed backups
+
+- The report printed the physical size with a hardcoded "(komprimiert gelesen)" note. Ola on DEV01
+  writes uncompressed backups by default, so the evidence stated 213,08 MB "komprimiert gelesen"
+  next to an identical logical size - a plainly false statement in a document that goes to auditors.
+- Compression is now derived (physical < logical) and the note reads "unkomprimiert" accordingly.
+
 ### Feature: New-sqmRestoreTestJob — scheduled SQL Agent job for the recurring restore test
 
 - Generates a wrapper under the module's jobs folder and creates an Agent job running
