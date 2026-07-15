@@ -218,6 +218,11 @@ function Invoke-sqmRestoreTest
 			$RetentionMonths = if ($null -ne $cfgRetention -and $cfgRetention -match '^\d+$') { [int]$cfgRetention } else { 12 }
 		}
 
+		# Sprache des Nachweises: Modulkonfiguration 'Language' (Default en-US), aenderbar
+		# ueber Set-sqmConfig -Language de-DE. Steuert Beschriftungen UND Zahlformat.
+		$reportLang = Get-sqmConfig -Key 'Language' 3>$null
+		if ([string]::IsNullOrWhiteSpace($reportLang)) { $reportLang = 'en-US' }
+
 		if (-not $script:dbatoolsAvailable)
 		{
 			$errMsg = "dbatools-Modul nicht gefunden. Bitte installieren: Install-Module dbatools"
@@ -439,7 +444,17 @@ function Invoke-sqmRestoreTest
 			}
 
 			# --- Ergebnisobjekt ------------------------------------------------------------
-			$result = [PSCustomObject]@{
+			# Zahlformat an die Report-Sprache koppeln. Format-sqmFileSize/-TimeSpan formatieren
+			# ueber "{0:N2}" mit der AKTUELLEN Kultur - auf einem deutschen Windows kaeme sonst
+			# "213,08 MB" in einen englischen Nachweis, und das liest ein englischer Auditor als
+			# 213 TAUSEND. Die Kultur wird nur um die Formatierung gelegt und danach zurueckgesetzt.
+			$prevCulture = [System.Threading.Thread]::CurrentThread.CurrentCulture
+			try
+			{
+				try { [System.Threading.Thread]::CurrentThread.CurrentCulture = [System.Globalization.CultureInfo]::GetCultureInfo($reportLang) }
+				catch { }
+
+				$result = [PSCustomObject]@{
 				ComputerName			 = $server.ComputerName
 				InstanceName			 = $server.ServiceName
 				SqlInstance				 = $server.Name
@@ -452,15 +467,15 @@ function Invoke-sqmRestoreTest
 				BackupSource			 = $backupSource
 				BackupSourceInfo		 = $sourceInfo
 				BackupSizeBytes			 = $backupSizeBytes
-				BackupSize				 = if ($backupSizeBytes -gt 0) { Format-sqmFileSize -Bytes $backupSizeBytes } else { 'nicht ermittelbar' }
+				BackupSize				 = if ($backupSizeBytes -gt 0) { Format-sqmFileSize -Bytes $backupSizeBytes } else { _s 'RestoreTest_NotDeterminable' }
 				CompressedBackupSizeBytes = $compressedSizeBytes
-				CompressedBackupSize	 = if ($compressedSizeBytes -gt 0) { Format-sqmFileSize -Bytes $compressedSizeBytes } else { 'nicht ermittelbar' }
+				CompressedBackupSize	 = if ($compressedSizeBytes -gt 0) { Format-sqmFileSize -Bytes $compressedSizeBytes } else { _s 'RestoreTest_NotDeterminable' }
 				SizeSource				 = $sizeSource
 				DurationSeconds			 = [math]::Round($durationSeconds, 2)
 				Duration				 = Format-sqmTimeSpan -Seconds ([int][math]::Round($durationSeconds))
 				SqlReportedRestoreTime	 = $sqlReportedTime
 				ThroughputBytesPerSecond = $throughputBytesPerSecond
-				Throughput				 = if ($throughputBytesPerSecond -gt 0) { "$(Format-sqmFileSize -Bytes $throughputBytesPerSecond)/s" } else { 'nicht ermittelbar' }
+				Throughput				 = if ($throughputBytesPerSecond -gt 0) { "$(Format-sqmFileSize -Bytes $throughputBytesPerSecond)/s" } else { _s 'RestoreTest_NotDeterminable' }
 				RestoredFilesCount		 = $restoredFilesCount
 				TestDatabaseRemoved		 = $testDbRemoved
 				RetentionMonths			 = $RetentionMonths
@@ -473,15 +488,22 @@ function Invoke-sqmRestoreTest
 			}
 
 			# --- Nachweis schreiben (TXT + HTML) -------------------------------------------
-			$reportFiles = Write-sqmRestoreTestReport -Result $result -OutputPath $OutputPath -OutputHtml:$OutputHtml -FunctionName $functionName
-			$result.TxtReport  = $reportFiles.TxtFile
-			$result.HtmlReport = $reportFiles.HtmlFile
+				$reportFiles = Write-sqmRestoreTestReport -Result $result -OutputPath $OutputPath -OutputHtml:$OutputHtml -FunctionName $functionName
+				$result.TxtReport  = $reportFiles.TxtFile
+				$result.HtmlReport = $reportFiles.HtmlFile
 
-			# --- Aufbewahrung: alte Nachweise entfernen ------------------------------------
-			# Bewusst NACH dem Schreiben des aktuellen Nachweises: schlaegt das Aufraeumen fehl,
-			# ist der neue Nachweis trotzdem bereits sicher auf Platte.
-			$result.RemovedReports = Remove-sqmRestoreTestReportHistory -OutputPath $OutputPath `
-				-RetentionMonths $RetentionMonths -FunctionName $functionName
+				# --- Aufbewahrung: alte Nachweise entfernen --------------------------------
+				# Bewusst NACH dem Schreiben des aktuellen Nachweises: schlaegt das Aufraeumen
+				# fehl, ist der neue Nachweis trotzdem bereits sicher auf Platte.
+				$result.RemovedReports = Remove-sqmRestoreTestReportHistory -OutputPath $OutputPath `
+					-RetentionMonths $RetentionMonths -FunctionName $functionName
+			}
+			finally
+			{
+				# Kultur immer zuruecksetzen - auch wenn das Schreiben scheitert. Eine global
+				# verstellte Kultur wuerde sonst alles Nachfolgende in der Sitzung betreffen.
+				[System.Threading.Thread]::CurrentThread.CurrentCulture = $prevCulture
+			}
 
 			Invoke-sqmOpenReport -HtmlFile $reportFiles.HtmlFile -TxtFile $reportFiles.TxtFile -NoOpen:$NoOpen
 
@@ -800,65 +822,77 @@ function Write-sqmRestoreTestReport
 		$txtFile  = Join-Path $OutputPath "$baseName.txt"
 		$htmlFile = Join-Path $OutputPath "$baseName.html"
 
-		$ergebnis = if ($Result.Success) { 'ERFOLGREICH' } else { 'FEHLGESCHLAGEN' }
-		$aufraeumen = if ($Result.TestDatabaseRemoved) { 'Ja - Test-Datenbank entfernt' } else { 'Nein - Test-Datenbank bleibt erhalten' }
+		$ergebnis = if ($Result.Success) { _s 'RestoreTest_Successful' } else { _s 'RestoreTest_Failed' }
+		$aufraeumen = if ($Result.TestDatabaseRemoved) { _s 'RestoreTest_CleanedUpYes' } else { _s 'RestoreTest_CleanedUpNo' }
 
 		# Sekunden explizit ueber die Kultur formatieren. Die String-Interpolation eines [double]
 		# nutzt InvariantCulture (Punkt), waehrend Format-sqmFileSize ueber "{0:N2}" die aktuelle
-		# Kultur nutzt (im deutschen Umfeld Komma) - ungeformatiert stuenden im selben Nachweis
-		# "228,08 MB" und "2.02 s" nebeneinander.
+		# Kultur nutzt - ungeformatiert stuenden im selben Nachweis "213,08 MB" und "2.02 s"
+		# nebeneinander. Die Kultur setzt Invoke-sqmRestoreTest passend zur Report-Sprache.
 		$dauerSekunden = "{0:N2}" -f $Result.DurationSeconds
 
-		$aufbewahrung = if ($Result.RetentionMonths -le 0) { 'unbegrenzt' } else { "$($Result.RetentionMonths) Monate" }
+		$aufbewahrung = if ($Result.RetentionMonths -le 0) { _s 'RestoreTest_RetentionForever' }
+						else { _s 'RestoreTest_RetentionMonths' $Result.RetentionMonths }
 
 		# Komprimierung nicht unterstellen: sind logische und physische Groesse gleich, ist das
-		# Backup unkomprimiert - ein "(komprimiert gelesen)" waere dann schlicht falsch, und der
-		# Nachweis geht an Auditoren.
+		# Backup unkomprimiert - ein "komprimiert gelesen" waere dann schlicht falsch, und der
+		# Nachweis geht an Auditoren. Ohne ermittelte Groesse darf hier gar nichts behauptet werden.
 		$istKomprimiert = ($Result.CompressedBackupSizeBytes -gt 0) -and
 						  ($Result.CompressedBackupSizeBytes -lt $Result.BackupSizeBytes)
-		# Ohne ermittelte Groesse darf hier weder "komprimiert" noch "unkomprimiert" behauptet werden.
-		$physischNote = if ($Result.BackupSizeBytes -le 0) { 'unbekannt' }
-						elseif ($istKomprimiert) { 'komprimiert gelesen' }
-						else { 'unkomprimiert' }
+		$physischNote = if ($Result.BackupSizeBytes -le 0) { _s 'RestoreTest_SizeUnknown' }
+						elseif ($istKomprimiert) { _s 'RestoreTest_Compressed' }
+						else { _s 'RestoreTest_Uncompressed' }
 
 		$herkunft = switch ($Result.BackupSource)
 		{
-			'BackupHistory' { 'msdb-Sicherungshistorie' }
-			'DirectoryScan' { 'Verzeichnis-Scan' }
-			default		    { 'ausdruecklich angegeben' }
+			'BackupHistory' { _s 'RestoreTest_SourceHistory' }
+			'DirectoryScan' { _s 'RestoreTest_SourceScan' }
+			default		    { _s 'RestoreTest_SourceParameter' }
 		}
 		if ($Result.BackupSourceInfo) { $herkunft += " ($($Result.BackupSourceInfo))" }
 
 		# --- TXT ---------------------------------------------------------------------------
+		# Label-Breite wird berechnet, nicht fest verdrahtet: uebersetzte Beschriftungen haben
+		# andere Laengen ("Datenmenge (Backup)" vs "Data volume (backup)"), eine feste
+		# Spaltenbreite wuerde die Ausrichtung in der jeweils anderen Sprache zerlegen.
+		$rows = @(
+			@{ K = (_s 'RestoreTest_Status');         V = $ergebnis }
+			@{ K = (_s 'RestoreTest_SourceDatabase'); V = $Result.SourceDatabase }
+			@{ K = (_s 'RestoreTest_TestDatabase');   V = $Result.TestDatabase }
+			@{ Sep = $true }
+			@{ K = (_s 'RestoreTest_DataVolume');     V = $Result.BackupSize }
+			@{ K = (_s 'RestoreTest_PhysicallyRead'); V = "$($Result.CompressedBackupSize) ($physischNote)" }
+			@{ K = (_s 'RestoreTest_Duration');       V = "$($Result.Duration) ($dauerSekunden s)" }
+			@{ K = (_s 'RestoreTest_Throughput');     V = $Result.Throughput }
+			@{ Sep = $true }
+			@{ K = (_s 'RestoreTest_Start');          V = $Result.StartTime.ToString('yyyy-MM-dd HH:mm:ss') }
+			@{ K = (_s 'RestoreTest_End');            V = $Result.EndTime.ToString('yyyy-MM-dd HH:mm:ss') }
+			@{ K = (_s 'RestoreTest_BackupFiles');    V = $Result.BackupFilesCount }
+			@{ K = (_s 'RestoreTest_RestoredFiles');  V = $Result.RestoredFilesCount }
+			@{ K = (_s 'RestoreTest_CleanedUp');      V = $aufraeumen }
+			@{ K = (_s 'RestoreTest_Retention');      V = $aufbewahrung }
+			@{ Sep = $true }
+			@{ K = (_s 'RestoreTest_ResolvedVia');    V = $herkunft }
+			@{ K = (_s 'RestoreTest_BackupSource');   V = $Result.BackupFile }
+		)
+		$labelWidth = ($rows | Where-Object { -not $_.Sep } | ForEach-Object { $_.K.Length } |
+			Measure-Object -Maximum).Maximum
+
 		$lines = [System.Collections.Generic.List[string]]::new()
 		$lines.Add("# ================================================================")
-		$lines.Add("# sqmSQLTool - Nachweis Restore-Test")
+		$lines.Add("# $(_s 'RestoreTest_ReportHeadline')")
 		$lines.Add("# $(Get-sqmReportReference)")
-		$lines.Add("# Instanz      : $($Result.SqlInstance)")
-		$lines.Add("# Erstellt     : $timestamp")
+		$lines.Add("# $(_s 'RestoreTest_Instance') : $($Result.SqlInstance)")
+		$lines.Add("# $(_s 'RestoreTest_Created') : $timestamp")
 		$lines.Add("# ================================================================")
 		$lines.Add("")
-		$lines.Add("Ergebnis            : $ergebnis")
-		$lines.Add("Quelldatenbank      : $($Result.SourceDatabase)")
-		$lines.Add("Testdatenbank       : $($Result.TestDatabase)")
+		foreach ($row in $rows)
+		{
+			if ($row.Sep) { $lines.Add("") }
+			else { $lines.Add(("{0,-$labelWidth} : {1}" -f $row.K, $row.V)) }
+		}
 		$lines.Add("")
-		$lines.Add("Datenmenge (Backup) : $($Result.BackupSize)")
-		$lines.Add("davon physisch      : $($Result.CompressedBackupSize) ($physischNote)")
-		$lines.Add("Dauer               : $($Result.Duration) ($dauerSekunden s)")
-		$lines.Add("Datendurchsatz      : $($Result.Throughput)")
-		$lines.Add("")
-		$lines.Add("Start               : $($Result.StartTime.ToString('yyyy-MM-dd HH:mm:ss'))")
-		$lines.Add("Ende                : $($Result.EndTime.ToString('yyyy-MM-dd HH:mm:ss'))")
-		$lines.Add("Backupdateien       : $($Result.BackupFilesCount)")
-		$lines.Add("Wiederherg. Dateien : $($Result.RestoredFilesCount)")
-		$lines.Add("Aufgeraeumt         : $aufraeumen")
-		$lines.Add("Aufbewahrung        : $aufbewahrung")
-		$lines.Add("")
-		$lines.Add("Ermittelt ueber     : $herkunft")
-		$lines.Add("Backupquelle        : $($Result.BackupFile)")
-		$lines.Add("")
-		$lines.Add("Hinweis: Der Datendurchsatz bezieht sich auf die logische Datenmenge (BackupSize)")
-		$lines.Add("         und wird als Wall-Clock-Zeit ueber den gesamten Restore gemessen.")
+		$lines.Add((_s 'RestoreTest_ThroughputNote'))
 		$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
 		Invoke-sqmLogging -Message "TXT-Nachweis erstellt: $txtFile" -FunctionName $FunctionName -Level "INFO"
 
@@ -870,40 +904,39 @@ function Write-sqmRestoreTestReport
 
 			$body = @"
 <table>
-<tr><th colspan="2">Ergebnis</th></tr>
-<tr><td>Status</td><td class="$statusClass"><strong>$ergebnis</strong></td></tr>
-<tr><td>Quelldatenbank</td><td>$(& $enc $Result.SourceDatabase)</td></tr>
-<tr><td>Testdatenbank</td><td>$(& $enc $Result.TestDatabase)</td></tr>
+<tr><th colspan="2">$(& $enc (_s 'RestoreTest_SectionResult'))</th></tr>
+<tr><td>$(& $enc (_s 'RestoreTest_Status'))</td><td class="$statusClass"><strong>$ergebnis</strong></td></tr>
+<tr><td>$(& $enc (_s 'RestoreTest_SourceDatabase'))</td><td>$(& $enc $Result.SourceDatabase)</td></tr>
+<tr><td>$(& $enc (_s 'RestoreTest_TestDatabase'))</td><td>$(& $enc $Result.TestDatabase)</td></tr>
 </table>
 
 <table>
-<tr><th colspan="2">Kennzahlen</th></tr>
-<tr><td>Datenmenge (Backup)</td><td><strong>$($Result.BackupSize)</strong></td></tr>
-<tr><td>davon physisch gelesen</td><td>$($Result.CompressedBackupSize) ($physischNote)</td></tr>
-<tr><td>Dauer</td><td><strong>$($Result.Duration)</strong> ($dauerSekunden s)</td></tr>
-<tr><td>Datendurchsatz</td><td><strong>$($Result.Throughput)</strong></td></tr>
+<tr><th colspan="2">$(& $enc (_s 'RestoreTest_SectionMetrics'))</th></tr>
+<tr><td>$(& $enc (_s 'RestoreTest_DataVolume'))</td><td><strong>$($Result.BackupSize)</strong></td></tr>
+<tr><td>$(& $enc (_s 'RestoreTest_PhysicallyRead'))</td><td>$($Result.CompressedBackupSize) ($physischNote)</td></tr>
+<tr><td>$(& $enc (_s 'RestoreTest_Duration'))</td><td><strong>$($Result.Duration)</strong> ($dauerSekunden s)</td></tr>
+<tr><td>$(& $enc (_s 'RestoreTest_Throughput'))</td><td><strong>$($Result.Throughput)</strong></td></tr>
 </table>
 
 <table>
-<tr><th colspan="2">Details</th></tr>
-<tr><td>Instanz</td><td>$(& $enc $Result.SqlInstance)</td></tr>
-<tr><td>Start</td><td>$($Result.StartTime.ToString('yyyy-MM-dd HH:mm:ss'))</td></tr>
-<tr><td>Ende</td><td>$($Result.EndTime.ToString('yyyy-MM-dd HH:mm:ss'))</td></tr>
-<tr><td>Backupdateien</td><td>$($Result.BackupFilesCount)</td></tr>
-<tr><td>Wiederhergestellte Dateien</td><td>$($Result.RestoredFilesCount)</td></tr>
-<tr><td>Aufgeraeumt</td><td>$aufraeumen</td></tr>
-<tr><td>Aufbewahrung Nachweise</td><td>$aufbewahrung</td></tr>
-<tr><td>Backup ermittelt ueber</td><td>$(& $enc $herkunft)</td></tr>
-<tr><td>Backupquelle</td><td>$(& $enc $Result.BackupFile)</td></tr>
+<tr><th colspan="2">$(& $enc (_s 'RestoreTest_SectionDetails'))</th></tr>
+<tr><td>$(& $enc (_s 'RestoreTest_Instance'))</td><td>$(& $enc $Result.SqlInstance)</td></tr>
+<tr><td>$(& $enc (_s 'RestoreTest_Start'))</td><td>$($Result.StartTime.ToString('yyyy-MM-dd HH:mm:ss'))</td></tr>
+<tr><td>$(& $enc (_s 'RestoreTest_End'))</td><td>$($Result.EndTime.ToString('yyyy-MM-dd HH:mm:ss'))</td></tr>
+<tr><td>$(& $enc (_s 'RestoreTest_BackupFiles'))</td><td>$($Result.BackupFilesCount)</td></tr>
+<tr><td>$(& $enc (_s 'RestoreTest_RestoredFiles'))</td><td>$($Result.RestoredFilesCount)</td></tr>
+<tr><td>$(& $enc (_s 'RestoreTest_CleanedUp'))</td><td>$aufraeumen</td></tr>
+<tr><td>$(& $enc (_s 'RestoreTest_Retention'))</td><td>$aufbewahrung</td></tr>
+<tr><td>$(& $enc (_s 'RestoreTest_ResolvedVia'))</td><td>$(& $enc $herkunft)</td></tr>
+<tr><td>$(& $enc (_s 'RestoreTest_BackupSource'))</td><td>$(& $enc $Result.BackupFile)</td></tr>
 </table>
 
 <p style="color:#94a8c0;font-size:12px;">
-Der Datendurchsatz bezieht sich auf die logische Datenmenge (BackupSize) und wird als
-Wall-Clock-Zeit ueber den gesamten Restore gemessen.
+$(& $enc (_s 'RestoreTest_ThroughputNote'))
 </p>
 "@
 			$subtitle = "$($Result.SourceDatabase) -> $($Result.TestDatabase) | $($Result.SqlInstance) | $timestamp"
-			$htmlContent = ConvertTo-sqmHtmlReport -Title "Nachweis Restore-Test" -Subtitle $subtitle -BodyHtml $body
+			$htmlContent = ConvertTo-sqmHtmlReport -Title (_s 'RestoreTest_Title') -Subtitle $subtitle -BodyHtml $body
 			$htmlContent | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
 			Invoke-sqmLogging -Message "HTML-Nachweis erstellt: $htmlFile" -FunctionName $FunctionName -Level "INFO"
 		}

@@ -1,5 +1,31 @@
 # sqmSQLTool — Changelog
 
+## [1.9.24.0] — 2026-07-15
+
+### Feature: Invoke-sqmRestoreTest — evidence is now localized (en-US / de-DE)
+
+**BEHAVIOUR CHANGE:** the evidence report used to be German unconditionally. It now follows the
+module configuration key `Language`, whose default is `en-US` — so after this update the report is
+**English by default**. German output: `Set-sqmConfig -Language de-DE` (once per machine; the value
+is persisted). Everything else is unaffected — only this function's TXT/HTML evidence is localized.
+
+- First function in the module to actually use the localization infrastructure. `Get-sqmString`,
+  `_s`, `Private\Strings\de-DE.psd1` and `en-US.psd1` have shipped for a while but were used by
+  0 of 153 functions; the `Language` default of `en-US` was therefore never exercised. Restore-test
+  evidence is the natural first candidate: it is the output most likely to be handed to an
+  international auditor.
+- 36 new string keys per language file (`RestoreTest_*`). Verified that both files carry all keys
+  and that every key used in code exists in both.
+- Number formatting follows the report language, not the OS. Format-sqmFileSize/-TimeSpan format via
+  `"{0:N2}"` against the CURRENT culture, so on a German Windows an English report would have read
+  "213,08 MB" — which an English reader parses as 213 THOUSAND. The thread culture is now set to
+  the report language around the formatting and restored in a `finally`, so a failure cannot leave
+  the session's culture altered. Verified: en-US gives "213.08 MB", de-DE gives "213,08 MB", and
+  the session culture is unchanged afterwards.
+- The TXT label column width is now computed rather than hardcoded. Translated labels differ in
+  length ("Datenmenge (Backup)" vs "Data volume (backup)"), and the previously fixed padding would
+  have broken the alignment in whichever language it was not written for.
+
 ## [1.9.23.1] — 2026-07-15
 
 ### Fix: Invoke-sqmRestoreTest reported "0 B" for data volume and throughput in a real environment
