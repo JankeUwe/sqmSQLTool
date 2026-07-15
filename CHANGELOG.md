@@ -1,5 +1,31 @@
 # sqmSQLTool — Changelog
 
+## [1.9.23.1] — 2026-07-15
+
+### Fix: Invoke-sqmRestoreTest reported "0 B" for data volume and throughput in a real environment
+
+- Reported from a production environment: the evidence showed 0 B for data volume and throughput
+  even though the restore itself succeeded. Not reproducible on the lab instance, where
+  Restore-DbaDatabase returns BackupSize as a dbatools Size object.
+- Root cause: the size was read as `[long]$row.BackupSize.Byte`, guarded only by
+  `if ($row.BackupSize)`. That guard passes for ANY non-null value, but `.Byte` only exists on the
+  dbatools Size object. Where dbatools hands back a plain numeric value (or $null) instead -
+  version- and code-path-dependent - `.Byte` resolves to $null, `[long]$null` is 0, and the
+  measurement silently became 0 B. A restore test that documents "0 B" is worthless as evidence,
+  and it failed silently: Status still said Success.
+- `ConvertTo-sqmSizeBytes` now handles all shapes: Size object (.Byte), plain numeric value,
+  numeric string, $null, and anything unusable. Verified against each.
+- Added a fallback: if the restore result yields no usable size, it is read from the backup header
+  (RESTORE HEADERONLY), where BackupSize/CompressedBackupSize are plain Int64 and independent of
+  how dbatools types them. Deduplicated by BackupSetGUID, because every stripe of a striped backup
+  reports the same set with the same total size - summing naively would multiply the data volume.
+  The chain case (Full/Diff/Log) has distinct GUIDs and still sums correctly.
+- If the size cannot be determined at all, the evidence now says "nicht ermittelbar" instead of
+  "0 B", the physical-size note says "unbekannt" instead of claiming (un)compressed, and an ERROR
+  is logged. An unknown number must not masquerade as a measured zero.
+- The result object carries `SizeSource` (`RestoreResult`, `BackupHeader`, `Unknown`) so the origin
+  of the number is visible.
+
 ## [1.9.23.0] — 2026-07-15
 
 ### Feature: Invoke-sqmRestoreTest — auditable restore test (success, data volume, throughput, duration)

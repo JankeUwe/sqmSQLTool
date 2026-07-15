@@ -360,8 +360,32 @@ function Invoke-sqmRestoreTest
 			$compressedSizeBytes = 0L
 			foreach ($row in $resultRows)
 			{
-				if ($row.BackupSize)			{ $backupSizeBytes	  += [long]$row.BackupSize.Byte }
-				if ($row.CompressedBackupSize)  { $compressedSizeBytes += [long]$row.CompressedBackupSize.Byte }
+				$backupSizeBytes	 += ConvertTo-sqmSizeBytes $row.BackupSize
+				$compressedSizeBytes += ConvertTo-sqmSizeBytes $row.CompressedBackupSize
+			}
+
+			# Fallback auf den Backup-Header, wenn das Restore-Ergebnis keine Groesse hergibt.
+			# "0 B" in einem Nachweis ist wertlos - dann lieber die Zahl aus dem Header holen.
+			$sizeSource = 'RestoreResult'
+			if ($backupSizeBytes -le 0)
+			{
+				Invoke-sqmLogging -Message "Restore-Ergebnis lieferte keine verwertbare Backupgroesse - lese RESTORE HEADERONLY." `
+					-FunctionName $functionName -Level "WARNING"
+				$hdr = Get-sqmBackupHeaderSize -Server $server -Files $BackupFile -SqlCredential $SqlCredential -FunctionName $functionName
+				if ($hdr.BackupSizeBytes -gt 0)
+				{
+					$backupSizeBytes	 = $hdr.BackupSizeBytes
+					$compressedSizeBytes = $hdr.CompressedBackupSizeBytes
+					$sizeSource		     = 'BackupHeader'
+					Invoke-sqmLogging -Message "Backupgroesse aus dem Header ermittelt: $(Format-sqmFileSize -Bytes $backupSizeBytes) ueber $($hdr.SetCount) Sicherungssatz/-saetze." `
+						-FunctionName $functionName -Level "INFO"
+				}
+				else
+				{
+					$sizeSource = 'Unknown'
+					Invoke-sqmLogging -Message "Backupgroesse konnte nicht ermittelt werden - Datenmenge und Durchsatz werden im Nachweis als 'nicht ermittelbar' ausgewiesen." `
+						-FunctionName $functionName -Level "ERROR"
+				}
 			}
 
 			# Durchsatz auf Basis der BackupSize (logische Datenmenge).
@@ -428,14 +452,15 @@ function Invoke-sqmRestoreTest
 				BackupSource			 = $backupSource
 				BackupSourceInfo		 = $sourceInfo
 				BackupSizeBytes			 = $backupSizeBytes
-				BackupSize				 = Format-sqmFileSize -Bytes $backupSizeBytes
+				BackupSize				 = if ($backupSizeBytes -gt 0) { Format-sqmFileSize -Bytes $backupSizeBytes } else { 'nicht ermittelbar' }
 				CompressedBackupSizeBytes = $compressedSizeBytes
-				CompressedBackupSize	 = Format-sqmFileSize -Bytes $compressedSizeBytes
+				CompressedBackupSize	 = if ($compressedSizeBytes -gt 0) { Format-sqmFileSize -Bytes $compressedSizeBytes } else { 'nicht ermittelbar' }
+				SizeSource				 = $sizeSource
 				DurationSeconds			 = [math]::Round($durationSeconds, 2)
 				Duration				 = Format-sqmTimeSpan -Seconds ([int][math]::Round($durationSeconds))
 				SqlReportedRestoreTime	 = $sqlReportedTime
 				ThroughputBytesPerSecond = $throughputBytesPerSecond
-				Throughput				 = "$(Format-sqmFileSize -Bytes $throughputBytesPerSecond)/s"
+				Throughput				 = if ($throughputBytesPerSecond -gt 0) { "$(Format-sqmFileSize -Bytes $throughputBytesPerSecond)/s" } else { 'nicht ermittelbar' }
 				RestoredFilesCount		 = $restoredFilesCount
 				TestDatabaseRemoved		 = $testDbRemoved
 				RetentionMonths			 = $RetentionMonths
@@ -473,6 +498,93 @@ function Invoke-sqmRestoreTest
 			}
 		}
 	}
+}
+
+# Liest eine Groessenangabe aus einem dbatools-Wert als Bytes.
+#
+# Restore-DbaDatabase liefert BackupSize/CompressedBackupSize normalerweise als
+# dbatools-Size-Objekt (…Utility.Size) mit einer .Byte-Eigenschaft. Darauf darf man sich
+# aber NICHT verlassen: je nach dbatools-Version/Codepfad steht dort auch mal ein blanker
+# Zahlwert oder $null. Ein direktes "[long]$wert.Byte" ergibt dann still 0 - und im Nachweis
+# stand "0 B", obwohl der Restore lief. Diese Funktion deckt alle drei Faelle ab.
+function ConvertTo-sqmSizeBytes
+{
+	[CmdletBinding()]
+	[OutputType([long])]
+	param ([Parameter(Mandatory = $false)] $Value)
+
+	if ($null -eq $Value) { return 0L }
+
+	# 1. dbatools-Size-Objekt
+	$byteProp = $Value.PSObject.Properties['Byte']
+	if ($byteProp -and $null -ne $byteProp.Value)
+	{
+		try { return [long]$byteProp.Value } catch { }
+	}
+
+	# 2. Blanker Zahlwert (oder etwas, das sich dahin konvertieren laesst)
+	try { return [long]$Value } catch { }
+
+	# 3. Letzter Versuch: Zahl aus der Textdarstellung (z. B. "213,08 MB" -> nicht verwertbar,
+	#    aber "223429632" schon). Schlaegt das fehl, ist die Groesse schlicht unbekannt.
+	$asText = [string]$Value
+	$parsed = 0L
+	if ([long]::TryParse($asText, [ref]$parsed)) { return $parsed }
+
+	return 0L
+}
+
+# Liest die Backupgroesse direkt aus dem Backup-Header (RESTORE HEADERONLY).
+#
+# Fallback, wenn das Restore-Ergebnis keine verwertbare Groesse hergibt. Der Header liefert
+# BackupSize/CompressedBackupSize als schlichtes Int64 und ist damit unabhaengig davon, wie
+# dbatools die Werte gerade typisiert.
+#
+# Wichtig: bei einem gestripten Backup liefert JEDE Stripe-Datei denselben Backup-Satz mit
+# derselben Gesamtgroesse zurueck - stumpfes Summieren wuerde die Datenmenge vervielfachen.
+# Deshalb wird ueber BackupSetGUID entdupliziert: Stripes teilen sich eine GUID, die Saetze
+# einer Kette (Full/Diff/Log) haben verschiedene.
+function Get-sqmBackupHeaderSize
+{
+	[CmdletBinding()]
+	[OutputType([PSCustomObject])]
+	param (
+		[Parameter(Mandatory = $true)] $Server,
+		[Parameter(Mandatory = $true)] [string[]]$Files,
+		[Parameter(Mandatory = $false)] $SqlCredential,
+		[Parameter(Mandatory = $false)] [string]$FunctionName = 'Invoke-sqmRestoreTest'
+	)
+
+	$sets = @{}
+	foreach ($file in $Files)
+	{
+		try
+		{
+			$safe = $file.Replace("'", "''")
+			$rows = @(Invoke-DbaQuery -SqlInstance $Server -SqlCredential $SqlCredential -Database 'master' `
+					-Query "RESTORE HEADERONLY FROM DISK = N'$safe'" -As PSObject -ErrorAction Stop)
+			foreach ($row in $rows)
+			{
+				$key = if ($row.BackupSetGUID) { [string]$row.BackupSetGUID } else { "$file|$($row.Position)" }
+				if (-not $sets.ContainsKey($key))
+				{
+					$sets[$key] = [PSCustomObject]@{
+						Backup	   = ConvertTo-sqmSizeBytes $row.BackupSize
+						Compressed = ConvertTo-sqmSizeBytes $row.CompressedBackupSize
+					}
+				}
+			}
+		}
+		catch
+		{
+			Invoke-sqmLogging -Message "RESTORE HEADERONLY fuer '$file' fehlgeschlagen: $($_.Exception.Message)" `
+				-FunctionName $FunctionName -Level "WARNING"
+		}
+	}
+
+	$total = 0L; $comp = 0L
+	foreach ($s in $sets.Values) { $total += $s.Backup; $comp += $s.Compressed }
+	return [PSCustomObject]@{ BackupSizeBytes = $total; CompressedBackupSizeBytes = $comp; SetCount = $sets.Count }
 }
 
 # Ermittelt die zu restaurierende(n) Backupdatei(en), wenn -BackupFile nicht angegeben wurde.
@@ -704,7 +816,10 @@ function Write-sqmRestoreTestReport
 		# Nachweis geht an Auditoren.
 		$istKomprimiert = ($Result.CompressedBackupSizeBytes -gt 0) -and
 						  ($Result.CompressedBackupSizeBytes -lt $Result.BackupSizeBytes)
-		$physischNote = if ($istKomprimiert) { 'komprimiert gelesen' } else { 'unkomprimiert' }
+		# Ohne ermittelte Groesse darf hier weder "komprimiert" noch "unkomprimiert" behauptet werden.
+		$physischNote = if ($Result.BackupSizeBytes -le 0) { 'unbekannt' }
+						elseif ($istKomprimiert) { 'komprimiert gelesen' }
+						else { 'unkomprimiert' }
 
 		$herkunft = switch ($Result.BackupSource)
 		{
