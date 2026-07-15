@@ -1,5 +1,67 @@
 # sqmSQLTool — Changelog
 
+## [1.9.23.0] — 2026-07-15
+
+### Feature: Invoke-sqmRestoreTest — auditable restore test (success, data volume, throughput, duration)
+
+- New function for the recurring "prove your restores work" obligation: restores a backup into a
+  copy under a different name, measures the restore and writes the evidence as TXT + HTML into
+  `<OutputPath>\RestoreTest` (default `C:\System\WinSrvLog\MSSQL\RestoreTest`), using the module's
+  standard report helpers (ConvertTo-sqmHtmlReport, Get-sqmReportReference, Invoke-sqmOpenReport).
+- Deliberately a separate function rather than an extension of Invoke-sqmRestoreDatabase, and with
+  NO AlwaysOn handling: a restore test produces a throwaway copy, which must never be joined to an
+  availability group. Invoke-sqmRestoreDatabase remains the AG-aware productive restore.
+- Safety model - a restore test must never destroy existing data:
+  - The target name must start with `RestoreTest_` (rejected before a connection is even opened),
+    and must differ from the source database name.
+  - An existing target aborts the run unless `-AllowReplaceExistingTestDatabase` is given; only
+    then is WITH REPLACE used, and only for a `RestoreTest_`-prefixed name.
+  - If the target does not exist, the restore runs WITHOUT REPLACE, so SQL Server itself refuses
+    to overwrite anything should the name unexpectedly be taken.
+  - `-ReplaceDbNameInFile` renames the physical files, so the restore can never write over the
+    source database's data files.
+  - The `RestoreTest_` prefix is a code constant, not a config key - a settable guard is no guard.
+  - The optional `-RemoveTestDatabase` drop re-checks the prefix independently.
+- The test database is KEPT by default (customers frequently want to test against the copy);
+  `-RemoveTestDatabase` cleans up.
+- Duration and throughput are measured as wall-clock time around the restore, NOT taken from
+  dbatools' `DatabaseRestoreTime`: that value only has whole-second resolution. Verified on DEV01 -
+  SQL reported 00:00:01 for a restore that actually took 2.42s, which would have inflated the
+  documented throughput from a true 94 MB/s to 228 MB/s. The SQL-reported value is still carried in
+  the result object as `SqlReportedRestoreTime` for reference.
+- Data volume is reported as BackupSize (logical), formatted via Format-sqmFileSize (auto-scales to
+  MB/GB/TB). For compressed backups CompressedBackupSize (physically read bytes) is reported
+  alongside, since the two differ substantially and the distinction matters when the throughput
+  figure is questioned.
+- Evidence retention: new module config key `RestoreTestRetentionMonths` (default 12), overridable
+  per run via `-RetentionMonths`; 0 keeps evidence forever. The cleanup only ever touches files
+  matching this function's own naming pattern (`RestoreTest_*` AND extension `.txt`/`.html`), so
+  pointing `-OutputPath` at a shared directory cannot delete unrelated files. It runs after the
+  current evidence has been written, so a failing cleanup cannot cost the new report.
+
+### Feature: New-sqmRestoreTestJob — scheduled SQL Agent job for the recurring restore test
+
+- Generates a wrapper under the module's jobs folder and creates an Agent job running
+  Invoke-sqmRestoreTest, following New-sqmRestoreDatabaseJob's pattern (own arg-line builder with
+  single-quote escaping rather than the private _CreateCmdExecJobStep helper, which appends
+  `-Verbose -ContinueOnError` - parameters Invoke-sqmRestoreTest does not have - and quotes with
+  double quotes, interpolating `$` in paths).
+- Unlike New-sqmRestoreDatabaseJob (on-demand restore, deliberately unscheduled), a restore test is
+  a recurring obligation, so this job IS scheduled: Monthly on the 1st at 02:00 by default,
+  matching the usual audit cadence. `-ScheduleType Weekly/Daily`, `-NoSchedule` for manual starts.
+  `-ScheduleDayOfMonth` is capped at 28 so the schedule also fires in February.
+- A job run drops the test database by default (`-RemoveTestDatabase` is baked into the wrapper):
+  an unattended recurring job would otherwise leave a full-size copy behind on every run until the
+  volume fills up. `-KeepTestDatabase` opts out.
+- `-SqlCredential` creates job/step/schedule from a workstation but is deliberately NOT embedded
+  into the generated wrapper - the job runs under the SQL Agent service account's Windows identity;
+  a password in a script on disk would be the wrong trade.
+- The `RestoreTest_` prefix rule is validated at job-creation time, so an invalid
+  `-TestDatabaseName` fails immediately instead of at the first scheduled run months later.
+- The generated step uses `-Confirm:$false -EnableException -NoOpen`, so a failure makes the Agent
+  job go red (a restore test that silently does nothing is worse than none: no evidence while
+  everyone assumes the obligation is covered), and no browser is launched in a session-less context.
+
 ## [1.9.22.0] — 2026-07-14
 
 ### Fix: EventLog.SourceExists() SecurityException aborted the whole run under low-privilege accounts

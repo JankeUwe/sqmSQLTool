@@ -31,6 +31,10 @@ $script:sqmModuleConfig = @{
 	OlaJobNamePurgeJobHistory     = "DatabaseMaintenance-sp_purge_jobhistory"
 	OlaJobNameDeleteBackupHistory = "DatabaseMaintenance-sp_delete_backuphistory"
 	BackupDirectory       = $null
+	# Aufbewahrung der Restore-Test-Nachweise (Monate). Nachweise sind Auditmaterial und
+	# muessen ueber den Pruefzeitraum verfuegbar bleiben - Default 12 Monate. 0 = unbegrenzt
+	# aufbewahren (nie aufraeumen).
+	RestoreTestRetentionMonths = 12
 	HpuDomainGroupMap     = @()
 	SsrsInstallerPath     = $null
 	AutoUpdate            = $false
