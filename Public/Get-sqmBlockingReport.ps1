@@ -247,7 +247,7 @@ ORDER BY r.wait_time DESC
 				{
 					New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
 				}
-				$stamp = Get-Date -Format 'yyyyMMdd_HHmsqm'
+				$stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 				$safeInst = $SqlInstance -replace '\\', '_'
 
 				$csvFile = Join-Path $OutputPath "Blocking_${safeInst}_${stamp}.csv"

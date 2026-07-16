@@ -281,7 +281,7 @@ function Set-sqmDatabaseOwner
 					if (-not (Test-Path $OutputPath)) { New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null }
 					
 					$safeInst = $instance -replace '\\', '_'
-					$stamp = Get-Date -Format 'yyyyMMdd_HHmsqm'
+					$stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 					$csvFile = Join-Path $OutputPath ("OwnerChange_" + $safeInst + "_" + $stamp + ".csv")
 					
 					$instanceResults | Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force

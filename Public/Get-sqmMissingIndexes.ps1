@@ -213,7 +213,7 @@ ORDER BY ImpactScore DESC
 				if (-not (Test-Path $OutputPath)) { New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null }
 				
 				$safeInst = $SqlInstance -replace '\\', '_'
-				$stamp = Get-Date -Format 'yyyyMMdd_HHmsqm'
+				$stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 				$csvFile = Join-Path $OutputPath ("MissingIndexes_" + $safeInst + "_" + $stamp + ".csv")
 				
 				$results | Select-Object SqlInstance, DatabaseName, SchemaName, TableName,

@@ -175,7 +175,7 @@ function Install-sqmCertificate
 	{
 		try
 		{
-			$datestamp = Get-Date -Format 'yyyyMMdd_HHmsqm'
+			$datestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 			$certExt = [System.IO.Path]::GetExtension($CertFile).ToLower()
 			$isPfx = $certExt -in @('.pfx', '.p12')
 			$hasPvk = [bool]$PrivateKeyFile

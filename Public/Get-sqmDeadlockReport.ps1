@@ -236,7 +236,7 @@ ORDER BY EventTime DESC
 						{
 							New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
 						}
-						$timestamp = $dl.EventTime.ToString('yyyyMMdd_HHmsqm')
+						$timestamp = $dl.EventTime.ToString('yyyyMMdd_HHmmss')
 						$xdlFile = Join-Path $OutputPath "Deadlock_$(($SqlInstance -replace '\\', '_'))_${timestamp}_${index}.xdl"
 						# XDL braucht den reinen deadlock-Knoten ohne Event-Wrapper
 						$graphXml | Set-Content -Path $xdlFile -Encoding UTF8 -Force
@@ -265,7 +265,7 @@ ORDER BY EventTime DESC
 				$html = ConvertTo-sqmHtmlReport -Title "Deadlock Report - $SqlInstance" -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -BodyHtml $bodyHtml
 
 				$safeInst = $SqlInstance -replace '\\', '_'
-				$htmlFile = Join-Path $OutputPath "DeadlockReport_${safeInst}_$(Get-Date -Format 'yyyyMMdd_HHmsqm').html"
+				$htmlFile = Join-Path $OutputPath "DeadlockReport_${safeInst}_$(Get-Date -Format 'yyyyMMdd_HHmmss').html"
 				$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
 				Invoke-sqmLogging -Message "HTML-Bericht gespeichert: $htmlFile" -FunctionName $functionName -Level "INFO"
 

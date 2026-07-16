@@ -269,13 +269,13 @@ ORDER BY DurationSeconds DESC
 				{
 					New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
 				}
-				$csvFile = Join-Path $OutputPath "LongRunning_$(($SqlInstance -replace '\\', '_'))_$(Get-Date -Format 'yyyyMMdd_HHmsqm').csv"
+				$csvFile = Join-Path $OutputPath "LongRunning_$(($SqlInstance -replace '\\', '_'))_$(Get-Date -Format 'yyyyMMdd_HHmmss').csv"
 				# QueryPlanXml fuer CSV-Export ausschliessen (zu gross)
 				$results | Select-Object * -ExcludeProperty QueryPlanXml, FullBatch |
 				Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
 				Invoke-sqmLogging -Message "LongRunning-Snapshot gespeichert: $csvFile" -FunctionName $functionName -Level "INFO"
 
-				$htmlFile = Join-Path $OutputPath "LongRunning_$(($SqlInstance -replace '\\', '_'))_$(Get-Date -Format 'yyyyMMdd_HHmsqm').html"
+				$htmlFile = Join-Path $OutputPath "LongRunning_$(($SqlInstance -replace '\\', '_'))_$(Get-Date -Format 'yyyyMMdd_HHmmss').html"
 				$bodyHtml = ($results | Select-Object * -ExcludeProperty QueryPlanXml, FullBatch |
 							 ConvertTo-Html -Fragment -As Table | Out-String)
 				$html = ConvertTo-sqmHtmlReport -Title "Long Running Queries - $SqlInstance" -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -BodyHtml $bodyHtml

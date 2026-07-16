@@ -322,7 +322,7 @@ function Invoke-sqmFormatDrive64k
 
 	if ($hasData)
 	{
-		$timestamp    = Get-Date -Format 'yyyyMMdd_HHmsqm'
+		$timestamp    = Get-Date -Format 'yyyyMMdd_HHmmss'
 		$backupFolder = Join-Path $BackupPath "${DriveLetter}_${timestamp}"
 		$robocopyLog  = Join-Path $BackupPath "${DriveLetter}_${timestamp}_backup.log"
 		$result.BackupFolder = $backupFolder

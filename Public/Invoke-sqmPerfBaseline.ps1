@@ -146,7 +146,7 @@ function Invoke-sqmPerfBaseline
 			# ============================================================
 			if ($Action -eq 'Capture')
 			{
-				$ts    = Get-Date -Format 'yyyyMMdd_HHmsqm'
+				$ts    = Get-Date -Format 'yyyyMMdd_HHmmss'
 				$label = if ($BaselineName) { $BaselineName -replace '[^\w\-]', '_' } else { $ts }
 
 				# Wait Stats

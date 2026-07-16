@@ -1,5 +1,33 @@
 # sqmSQLTool — Changelog
 
+## [1.9.24.1] — 2026-07-16
+
+### Fix: corrupted timestamp format string in 19 functions, and lost report paths in Invoke-sqmQueryStore
+
+- The .NET format string `yyyyMMdd_HHmsqm` appeared in 21 places across 19 functions in `Public\` —
+  the residue of a search/replace for the `sqm` module prefix that ate the `mss` of `HHmmss`. It is
+  a legal format string, so nothing ever threw: `m` is minutes without zero-padding, `s` is seconds
+  without zero-padding, `q` is not a format specifier and is emitted literally. `18:12:05` became
+  `1812q1` instead of `181205` — seconds effectively lost, minutes unpadded, a stray `q` in the
+  filename. All 21 now read `yyyyMMdd_HHmmss`, matching the sibling functions that were never
+  corrupted.
+- **This was not only cosmetic.** `Invoke-sqmRestoreDatabase` (pre-restore safety backup) and
+  `Invoke-sqmUserDatabaseBackup` used the broken stamp for `.bak` FILENAMES. Because the format
+  collapses `HHmmss` to a value that no longer distinguishes seconds, two backups of the same
+  database inside the same minute produced an identical filename and the second silently overwrote
+  the first — including the safety backup taken immediately before a restore.
+- `Invoke-sqmQueryStore` additionally wrote both of its reports to the wrong place. Lines 603/641
+  interpolated `"$baseFile_TopQueries.csv"` and `"$baseFile_Issues.txt"`; an underscore is a legal
+  character in a PowerShell variable name, so these parsed as the single, undefined variables
+  `$baseFile_TopQueries` / `$baseFile_Issues`, expanded to empty, and the paths became literally
+  `.csv` and `.txt` in the process's current directory. `$OutputPath` was ignored (the directory was
+  created and left empty) and every database in the loop overwrote the previous one's file. Now
+  `"${baseFile}_..."`, the brace form already used on the adjacent line 598.
+- Both defects share a failure mode: legal syntax, no exception, wrong output. The QueryStore log
+  line had been printing `gespeichert: .csv` all along.
+- Verified: no occurrence of `HHmsqm` remains under `Public\`; no bare `$var_suffix` interpolation
+  remains; all files in `Public\` parse without errors and retain their UTF-8 BOM.
+
 ## [1.9.24.0] — 2026-07-15
 
 ### Feature: Invoke-sqmRestoreTest — evidence is now localized (en-US / de-DE)

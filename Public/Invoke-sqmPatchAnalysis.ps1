@@ -257,7 +257,7 @@ SELECT
 		if ($OutputPath -and $allResults.Count -gt 0)
 		{
 			if (-not (Test-Path $OutputPath)) { New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null }
-			$ts      = Get-Date -Format 'yyyyMMdd_HHmsqm'
+			$ts      = Get-Date -Format 'yyyyMMdd_HHmmss'
 			$csvFile = Join-Path $OutputPath "PatchAnalysis_${ts}.csv"
 			$allResults | Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
 			Invoke-sqmLogging -Message (_s 'PatchAnalysis_Saved' $csvFile) -FunctionName $functionName -Level "INFO"

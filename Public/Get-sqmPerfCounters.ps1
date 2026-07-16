@@ -196,7 +196,7 @@ ORDER BY object_name, counter_name
 			{
 				if (-not (Test-Path $OutputPath)) { New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null }
 				$safeInst = $SqlInstance -replace '[\\/:<>|]', '_'
-				$ts       = Get-Date -Format 'yyyyMMdd_HHmsqm'
+				$ts       = Get-Date -Format 'yyyyMMdd_HHmmss'
 				$csvFile  = Join-Path $OutputPath "PerfCounters_${safeInst}_${ts}.csv"
 				$results | Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
 				Invoke-sqmLogging -Message (_s 'PerfCounters_Saved' $csvFile) -FunctionName $functionName -Level "INFO"

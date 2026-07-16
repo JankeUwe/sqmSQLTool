@@ -366,7 +366,7 @@ WHERE  rs.is_local = 1
 			foreach ($db in $databases)
 			{
 				$dbName = $db.Name
-				$backupFile = Join-Path -Path $BackupPath -ChildPath "${dbName}_$(Get-Date -Format 'yyyyMMdd_HHmsqm').bak"
+				$backupFile = Join-Path -Path $BackupPath -ChildPath "${dbName}_$(Get-Date -Format 'yyyyMMdd_HHmmss').bak"
 
 				$backupParams = @{
 					SqlInstance    = $SqlInstance

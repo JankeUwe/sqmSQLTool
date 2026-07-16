@@ -751,7 +751,7 @@ ORDER BY file_offset DESC
 
 				$safeInst  = $SqlInstance -replace '[\\/:<>|]', '_'
 				$safeSess  = $SessionName -replace '[\\/:<>|]', '_'
-				$timestamp = Get-Date -Format 'yyyyMMdd_HHmsqm'
+				$timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 				$baseFile  = Join-Path $OutputPath "XE_${safeInst}_${safeSess}_${timestamp}"
 
 				# Rohdaten (Ereignisse) als CSV

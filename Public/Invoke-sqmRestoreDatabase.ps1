@@ -550,7 +550,7 @@ function Invoke-sqmRestoreDatabase
 			# uebersprungen, was verwirrend war, wenn -BackupBeforeRestore explizit angegeben wurde.
 			if ($BackupBeforeRestore -and $dbExists)
 			{
-				$backupFileName = "${DatabaseName}_preRestore_$(Get-Date -Format 'yyyyMMdd_HHmsqm').bak"
+				$backupFileName = "${DatabaseName}_preRestore_$(Get-Date -Format 'yyyyMMdd_HHmmss').bak"
 				$backupFileFull = Join-Path (Get-DbaDefaultPath -SqlInstance $workInstance -SqlCredential $SqlCredential).Backup $backupFileName
 				$backupParams = @{
 					SqlInstance   = $workInstance

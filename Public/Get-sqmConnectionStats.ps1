@@ -204,7 +204,7 @@ WHERE name = 'max connections'
 			{
 				if (-not (Test-Path $OutputPath)) { New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null }
 				$safeInst = $SqlInstance -replace '[\\/:<>|]', '_'
-				$ts       = Get-Date -Format 'yyyyMMdd_HHmsqm'
+				$ts       = Get-Date -Format 'yyyyMMdd_HHmmss'
 				$csvFile  = Join-Path $OutputPath "ConnectionStats_${safeInst}_${ts}.csv"
 				$grouped  | Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
 				Invoke-sqmLogging -Message (_s 'ConnStats_Saved' $csvFile) -FunctionName $functionName -Level "INFO"

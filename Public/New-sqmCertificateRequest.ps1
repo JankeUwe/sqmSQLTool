@@ -162,7 +162,7 @@ function New-sqmCertificateRequest
 	{
 		try
 		{
-			$datestamp = Get-Date -Format 'yyyyMMdd_HHmsqm'
+			$datestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 			$safeInstance = $SqlInstance -replace '\\', '_'
 			
 			# -------------------------------------------------------------------

@@ -215,7 +215,7 @@ WHERE c.name = '$($CertificateName -replace "'", "''")'
 			$expiryDate = (Get-Date).AddYears($ValidityYears).ToString('yyyyMMdd')
 			$subject = if ($existingCert.subject) { $existingCert.subject }
 			else { "CN=$NewCertificateName" }
-			$datestamp = Get-Date -Format 'yyyyMMdd_HHmsqm'
+			$datestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 			$oldRename = "$($CertificateName)_OLD_$(Get-Date -Format 'yyyyMMdd')"
 			
 			# Passwort-Pruefung: Private Key vorhanden ? Passwort fuer Backup Pflicht

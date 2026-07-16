@@ -470,7 +470,7 @@ function Write-sqmCertReport
 	}
 	
 	$instance = $InstanceResult.SqlInstance -replace '\\', '_'
-	$datestamp = Get-Date -Format 'yyyyMMdd_HHmsqm'
+	$datestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 	$baseName = "CertReport_${instance}_${datestamp}"
 	
 	# --- TXT-Bericht ---

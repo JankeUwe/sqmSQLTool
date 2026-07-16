@@ -594,13 +594,13 @@ ORDER BY variation_pct DESC
 
 				$safeInst  = $SqlInstance -replace '[\\/:<>|]', '_'
 				$safeDb    = $dbName -replace '[\\/:<>|]', '_'
-				$timestamp = Get-Date -Format 'yyyyMMdd_HHmsqm'
+				$timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 				$baseFile  = Join-Path $OutputPath "QS_${safeInst}_${safeDb}_${timestamp}"
 
 				# Top-Queries als CSV
 				if ($dbResult.TopQueries.Count -gt 0)
 				{
-					$csvFile = "$baseFile_TopQueries.csv"
+					$csvFile = "${baseFile}_TopQueries.csv"
 					$dbResult.TopQueries | Select-Object QueryId, TotalExecutions,
 						avg_duration_ms, max_duration_ms, avg_cpu_ms,
 						avg_logical_reads, avg_memory_mb, has_forced_plan, PlanCount,
@@ -638,7 +638,7 @@ ORDER BY variation_pct DESC
 						}
 					}
 
-					$txtFile = "$baseFile_Issues.txt"
+					$txtFile = "${baseFile}_Issues.txt"
 					$reportLines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
 					$dbResult.ReportFile = $txtFile
 					Invoke-sqmLogging -Message "[$dbName] Issues-Bericht gespeichert: $txtFile" -FunctionName $functionName -Level "INFO"
