@@ -142,14 +142,58 @@ function Get-sqmMachineType
 }
 
 # Liefert die Standard-Referenzzeile fuer Report-Header (TXT und HTML).
+# -SourceLabel erlaubt lokalisierten Reports (aktuell Invoke-sqmRestoreTest) ein
+# uebersetztes "Quelle:". Default bleibt Deutsch, damit die uebrigen - durchgehend
+# deutschen - Reports unveraendert bleiben.
 function Get-sqmReportReference
 {
 	[CmdletBinding()]
-	param ()
+	param (
+		[Parameter(Mandatory = $false)]
+		[string]$SourceLabel = 'Quelle:'
+	)
 	$ver = Get-sqmConfig -Key 'ModuleVersion'
 	if (-not $ver) { $ver = '' }
 	$verPart = if ($ver) { " v$ver" } else { '' }
-	return "Quelle: www.powershelldba.de | sqmSQLTool$verPart"
+	return "$SourceLabel www.powershelldba.de | sqmSQLTool$verPart"
+}
+
+# Wandelt eine sys.messages-Vorlage in eine Regex mit Capture-Group fuer den
+# ersten Platzhalter (bei Anmeldemeldungen der Benutzername).
+#
+# Hintergrund: Meldungstexte im ErrorLog sind lokalisiert, und zwar nicht nur in
+# der Wortwahl. Englisch quotet den Namen einfach ('x'), Deutsch doppelt ("x"),
+# und die Platzhalter-Syntax unterscheidet sich ebenfalls ('%.*ls' vs '%1!').
+# Eine fest verdrahtete Regex wuerde auf einer deutschen Instanz still nichts
+# finden. Darum wird die Regex aus der Vorlage der Instanz selbst gebaut.
+#
+# Rueckgabe: Regex-String oder $null, wenn die Vorlage keine Namensextraktion zulaesst.
+function ConvertTo-sqmMessageRegex
+{
+	[CmdletBinding()]
+	[OutputType([string])]
+	param (
+		[Parameter(Mandatory = $true)]
+		[AllowEmptyString()]
+		[string]$Template
+	)
+
+	if ([string]::IsNullOrWhiteSpace($Template)) { return $null }
+
+	$esc = [regex]::Escape($Template)
+	# Platzhalter im escapten Text: '%\.\*ls' (en) oder '%1!' (lokalisiert)
+	$phPattern = '%\\\.\\\*ls|%\d+!'
+	$parts = [regex]::Split($esc, $phPattern)
+
+	# Es braucht Text vor UND nach dem ersten Platzhalter, sonst ist die Grenze
+	# des Namens nicht bestimmbar und die Regex wuerde zu gierig matchen.
+	if ($parts.Count -lt 2) { return $null }
+	if ([string]::IsNullOrWhiteSpace($parts[0])) { return $null }
+	if ([string]::IsNullOrWhiteSpace($parts[1])) { return $null }
+
+	# Bewusst ohne ^-Anker: Get-DbaErrorLog liefert je nach Version
+	# unterschiedlich viel Vorspann im Text-Feld.
+	return $parts[0] + '(.+?)' + $parts[1]
 }
 
 # Oeffnet den erzeugten Report. Regel: HTML hat Vorrang, sonst TXT.
@@ -192,10 +236,14 @@ function ConvertTo-sqmHtmlReport
 		[Parameter(Mandatory = $true)]
 		[string]$BodyHtml,
 		[Parameter(Mandatory = $false)]
-		[string]$Subtitle = ''
+		[string]$Subtitle = '',
+		# Optional: fertige Referenzzeile (z. B. lokalisiert). Ohne Angabe der Standard.
+		[Parameter(Mandatory = $false)]
+		[string]$Reference = ''
 	)
 
-	$reference = Get-sqmReportReference
+	if ([string]::IsNullOrWhiteSpace($Reference)) { $Reference = Get-sqmReportReference }
+	$reference = $Reference
 	$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 
 	# Minimaler HtmlEncode-Helper (kein System.Web noetig)

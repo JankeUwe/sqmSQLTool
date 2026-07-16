@@ -14,13 +14,20 @@
     PSCredential for the connection.
 
 .PARAMETER OutputPath
-    Optional CSV export path.
+    Optional directory for reports (CSV + HTML). File names are generated.
+
+.PARAMETER NoOpen
+    Do not open the HTML report after creation.
 
 .PARAMETER EnableException
     Throw exceptions immediately.
 
 .EXAMPLE
     Get-sqmTempDbRecommendation -SqlInstance "SQL01"
+
+.EXAMPLE
+    # CSV + HTML report
+    Get-sqmTempDbRecommendation -SqlInstance "SQL01" -OutputPath "D:\Reports\TempDb"
 #>
 function Get-sqmTempDbRecommendation
 {
@@ -33,6 +40,8 @@ function Get-sqmTempDbRecommendation
 		[System.Management.Automation.PSCredential]$SqlCredential,
 		[Parameter(Mandatory = $false)]
 		[string]$OutputPath,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen,
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
@@ -107,7 +116,30 @@ function Get-sqmTempDbRecommendation
 				Recommendations  = ($messages -join ' ')
 			}
 			
-			if ($OutputPath) { $result | Export-Csv -Path $OutputPath -NoTypeInformation -Encoding UTF8 -Force }
+			if ($OutputPath)
+			{
+				if (-not (Test-Path $OutputPath)) { New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null }
+				$safeInst = $SqlInstance -replace '[\\/:<>|]', '_'
+				$ts	      = Get-Date -Format 'yyyyMMdd_HHmmss'
+
+				# Arrays fuer die Dateiausgabe flach machen (sonst "System.Object[]").
+				$flat = $result | Select-Object SqlInstance, Status, FileCount, RecommendedCount,
+					@{ n = 'FileSizesMB'; e = { $_.FileSizesMB -join ', ' } },
+					@{ n = 'GrowthMB'; e = { $_.GrowthMB -join ', ' } },
+					@{ n = 'Paths'; e = { ($_.Paths | Select-Object -Unique) -join ', ' } },
+					Recommendations
+
+				$csvFile = Join-Path $OutputPath "TempDbRecommendation_${safeInst}_${ts}.csv"
+				$flat | Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
+				Invoke-sqmLogging -Message "CSV exportiert nach $csvFile" -FunctionName $functionName -Level "INFO"
+
+				$htmlFile = Join-Path $OutputPath "TempDbRecommendation_${safeInst}_${ts}.html"
+				$bodyHtml = ($flat | ConvertTo-Html -Fragment -As List | Out-String)
+				ConvertTo-sqmHtmlReport -Title "TempDB Recommendation - $SqlInstance" -Subtitle "Status: $status  |  $fileCount von $idealFileCount empfohlenen Dateien" -BodyHtml $bodyHtml |
+				Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+				Invoke-sqmLogging -Message "HTML-Report gespeichert: $htmlFile" -FunctionName $functionName -Level "INFO"
+				Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
+			}
 			return $result
 		}
 		catch

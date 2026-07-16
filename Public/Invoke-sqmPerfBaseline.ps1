@@ -30,8 +30,11 @@
     Default: the most recent file in OutputPath.
 
 .PARAMETER OutputPath
-    Directory for baseline JSON files.
+    Directory for baseline JSON files and the HTML comparison report.
     Default: from module configuration + \PerfBaseline.
+
+.PARAMETER NoOpen
+    Do not open the HTML report after creation (-Action Compare).
 
 .PARAMETER EnableException
     Throw exceptions immediately.
@@ -73,6 +76,8 @@ function Invoke-sqmPerfBaseline
 		[string]$BaselineB,
 		[Parameter(Mandatory = $false)]
 		[string]$OutputPath,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen,
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
@@ -302,6 +307,46 @@ WHERE (
 					}
 				} | Sort-Object { [math]::Abs($_.Delta) } -Descending
 
+				# HTML-Vergleichsbericht
+				$htmlFile = $null
+				$ctrChanged = @($ctrDelta | Where-Object { $_.Delta -ne 0 })
+				if ($waitDelta.Count -gt 0 -or $ctrChanged.Count -gt 0)
+				{
+					$body = [System.Text.StringBuilder]::new()
+
+					[void]$body.AppendLine('<h2>Vergleich</h2>')
+					[void]$body.AppendLine(([PSCustomObject]@{
+								BaselineA = "$($snapA.BaselineName)  ($($snapA.CapturedAt))"
+								BaselineB = "$($snapB.BaselineName)  ($($snapB.CapturedAt))"
+							} | ConvertTo-Html -Fragment -As List | Out-String))
+
+					[void]$body.AppendLine("<h2>Wait Stats  - Zunahme B gegenueber A ($($waitDelta.Count))</h2>")
+					if ($waitDelta.Count -gt 0)
+					{
+						[void]$body.AppendLine(($waitDelta |
+								Select-Object WaitType, DeltaWaitSec, DeltaWaitingTasks, AvgWaitMsDelta |
+								ConvertTo-Html -Fragment -As Table | Out-String))
+					}
+					else { [void]$body.AppendLine('<p>Keine Zunahme der Wartezeiten.</p>') }
+
+					[void]$body.AppendLine("<h2>Perf Counter  - Veraenderungen ($($ctrChanged.Count))</h2>")
+					if ($ctrChanged.Count -gt 0)
+					{
+						[void]$body.AppendLine(($ctrChanged |
+								Select-Object Counter, ValueA, ValueB, Delta |
+								ConvertTo-Html -Fragment -As Table | Out-String))
+					}
+					else { [void]$body.AppendLine('<p>Keine Veraenderungen der Zaehler.</p>') }
+
+					$ts       = Get-Date -Format 'yyyyMMdd_HHmmss'
+					$htmlFile = Join-Path $OutputPath "PerfBaseline_Compare_${safeInst}_${ts}.html"
+					$subtitle = "Instanz: $SqlInstance  |  $($snapA.BaselineName) -> $($snapB.BaselineName)"
+					ConvertTo-sqmHtmlReport -Title "Perf Baseline Vergleich - $SqlInstance" -Subtitle $subtitle -BodyHtml $body.ToString() |
+					Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+					Invoke-sqmLogging -Message "HTML-Report gespeichert: $htmlFile" -FunctionName $functionName -Level "INFO"
+					Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
+				}
+
 				return [PSCustomObject]@{
 					Action       = 'Compare'
 					BaselineA    = $snapA.BaselineName
@@ -310,6 +355,7 @@ WHERE (
 					CapturedB    = $snapB.CapturedAt
 					WaitDeltas   = @($waitDelta)
 					CounterDeltas = @($ctrDelta)
+					HtmlFile     = $htmlFile
 				}
 			}
 		}

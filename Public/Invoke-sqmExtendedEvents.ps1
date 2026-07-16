@@ -69,7 +69,10 @@
     Number of top entries in diagnostic tables. Default: 25.
 
 .PARAMETER OutputPath
-    Directory for saved reports. Default: from module configuration + \XEvents.
+    Directory for saved reports (CSV + TXT + HTML). Default: from module configuration + \XEvents.
+
+.PARAMETER NoOpen
+    Do not open the HTML report after creation.
 
 .PARAMETER Create
     Create session.
@@ -157,6 +160,8 @@ function Invoke-sqmExtendedEvents
 		[int]$TopN = 25,
 		[Parameter(Mandatory = $false)]
 		[string]$OutputPath,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen,
 
 		# --- Aktions-Switches ---
 		[Parameter(Mandatory = $false)]
@@ -217,6 +222,7 @@ function Invoke-sqmExtendedEvents
 			EventCount     = 0
 			Diagnose       = $null
 			ReportFile     = $null
+			HtmlFile       = $null
 		}
 
 		Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance  - Session '$SessionName' (Template=$Template, TargetType=$TargetType)" -FunctionName $functionName -Level "INFO"
@@ -325,7 +331,6 @@ function Invoke-sqmExtendedEvents
 				$targetBlock = if ($TargetType -eq 'File')
 				{
 					$xelPattern = "$($TargetFilePath.TrimEnd('\'))\$SessionName"
-					$maxBytes   = $MaxFileSizeMB * 1024 * 1024
 					@"
     ADD TARGET package0.event_file (
         SET filename        = N'$xelPattern.xel',
@@ -336,10 +341,11 @@ function Invoke-sqmExtendedEvents
 				}
 				else
 				{
-					$maxBytes = $RingBufferMaxMB * 1024 * 1024
+					# max_memory des ring_buffer-Ziels wird in KB angegeben, nicht in Bytes.
+					$maxMemoryKb = $RingBufferMaxMB * 1024
 					@"
     ADD TARGET package0.ring_buffer (
-        SET max_memory = $maxBytes
+        SET max_memory = $maxMemoryKb
     )
 "@
 				}
@@ -421,8 +427,7 @@ WITH (
 				$statusSql = @"
 SELECT
     s.name                                              AS SessionName,
-    s.create_time                                       AS CreateTime,
-    CASE ds.create_time WHEN NULL THEN 'Stopped' ELSE 'Running' END AS SessionState,
+    CASE WHEN ds.create_time IS NULL THEN 'Stopped' ELSE 'Running' END AS SessionState,
     ds.create_time                                      AS StartedAt,
     t.target_name                                       AS TargetType,
     CAST(t.target_data AS XML)                          AS TargetDataXml,
@@ -610,7 +615,8 @@ ORDER BY file_offset DESC
 
 				$cutoff = (Get-Date).AddMinutes(-$LookbackMinutes)
 				$window = $result.Events | Where-Object {
-					$ts = $null
+					# $ts muss typisiert sein, sonst bindet [ref] nicht an die TryParse-Ueberladung.
+					$ts = [datetime]::MinValue
 					if ($_.Timestamp -and [datetime]::TryParse($_.Timestamp, [ref]$ts)) { $ts -ge $cutoff } else { $true }
 				}
 
@@ -865,6 +871,52 @@ ORDER BY file_offset DESC
 						$waitCsv = "${baseFile}_TopWaits.csv"
 						$result.Diagnose.TopWaits | Export-Csv -Path $waitCsv -NoTypeInformation -Encoding UTF8 -Force
 					}
+				}
+
+				# -------------------------------------------------------------
+				# HTML-BERICHT  - Issues + Top-Slow-Queries + Top-Waits
+				# -------------------------------------------------------------
+				$enc  = { param ($t) if ($null -eq $t) { '' } else { [string]$t -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;' } }
+				$body = [System.Text.StringBuilder]::new()
+
+				if ($result.Diagnose -and $result.Diagnose.Issues.Count -gt 0)
+				{
+					[void]$body.AppendLine("<h2>Erkannte Probleme ($($result.Diagnose.IssueCount))</h2>")
+					[void]$body.AppendLine('<table><tr><th>Severity</th><th>Kategorie</th><th>Problem</th><th>Detail</th></tr>')
+					$sorted = $result.Diagnose.Issues | Sort-Object { if ($_.Severity -eq 'Critical') { 0 } else { 1 } }
+					foreach ($issue in $sorted)
+					{
+						$cls = if ($issue.Severity -eq 'Critical') { 'crit' } else { 'warn' }
+						[void]$body.AppendLine(("<tr><td class='{0}'>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td></tr>" -f
+								$cls, (& $enc $issue.Severity), (& $enc $issue.Category),
+								(& $enc $issue.Description), (& $enc $issue.Detail)))
+					}
+					[void]$body.AppendLine('</table>')
+				}
+
+				if ($result.Diagnose -and $result.Diagnose.TopSlowQueries.Count -gt 0)
+				{
+					[void]$body.AppendLine("<h2>Top $TopN langsamste Queries</h2>")
+					[void]$body.AppendLine(($result.Diagnose.TopSlowQueries |
+							ConvertTo-Html -Fragment -As Table | Out-String))
+				}
+
+				if ($result.Diagnose -and $result.Diagnose.TopWaits.Count -gt 0)
+				{
+					[void]$body.AppendLine("<h2>Top $TopN Wait-Typen</h2>")
+					[void]$body.AppendLine(($result.Diagnose.TopWaits |
+							ConvertTo-Html -Fragment -As Table | Out-String))
+				}
+
+				if ($body.Length -gt 0)
+				{
+					$htmlFile = "${baseFile}_Report.html"
+					$subtitle = "Instanz: $SqlInstance  |  Session: $SessionName  |  Template: $Template  |  $($result.EventCount) Ereignis(se), Fenster ${LookbackMinutes} Min"
+					ConvertTo-sqmHtmlReport -Title "Extended Events Report - $SqlInstance" -Subtitle $subtitle -BodyHtml $body.ToString() |
+					Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+					$result.HtmlFile = $htmlFile
+					Invoke-sqmLogging -Message "HTML-Report gespeichert: $htmlFile" -FunctionName $functionName -Level "INFO"
+					Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
 				}
 			}
 

@@ -6,9 +6,13 @@
     Checks per login:
     - POLICY VIOLATIONS (CHECK_POLICY/EXPIRATION/MUST_CHANGE)
     - Password age and whether it was never changed
-    - Inactive / never-used logins
+    - Inactive logins (last access via Get-sqmLoginLastAccess)
     - Duplicate SIDs (failed migration)
     - AD-orphaned Windows logins (optional)
+
+    Inactivity is only reported when the last access can actually be proven. If
+    the instance does not record successful logins, that gap is reported once
+    for the instance instead of silently blaming individual logins.
 
     Output as TXT report and CSV (findings only) in the configured OutputPath.
 
@@ -44,6 +48,11 @@
 
 .PARAMETER CheckAdOrphans
     When set, AD orphan check is performed for Windows logins (requires AD module).
+
+.PARAMETER SkipAccessCheck
+    Skip the last-access determination entirely. Use when the account lacks the
+    rights it needs (VIEW SERVER STATE / xp_readerrorlog) or to speed the audit up.
+    No inactivity findings are produced in that case.
 
 .PARAMETER GenerateHtmlReport
     Generate HTML report in addition to TXT/CSV. Default: $true.
@@ -103,6 +112,8 @@ function Invoke-sqmLoginAudit
 		[switch]$ReportBuiltInAdmins = $true,
 		[Parameter(Mandatory = $false)]
 		[switch]$CheckAdOrphans,
+		[Parameter(Mandatory = $false)]
+		[switch]$SkipAccessCheck,
 		[Parameter(Mandatory = $false)]
 		[switch]$GenerateHtmlReport = $true,
 		[Parameter(Mandatory = $false)]
@@ -210,7 +221,6 @@ SELECT
     sp.is_disabled                          AS IsDisabled,
     sp.create_date                          AS CreateDate,
     sp.modify_date                          AS ModifyDate,
-    NULL                                    AS LastLogin,          -- sys.server_principals hat keine last_login-Spalte
     sp.default_database_name                AS DefaultDatabase,
     sl.is_policy_checked                    AS PolicyChecked,
     sl.is_expiration_checked                AS ExpirationChecked,
@@ -310,23 +320,62 @@ WHERE sp.type IN ('S','U','G')
 				}
 				
 				# 3. Inaktive Logins
-				foreach ($row in $filtered)
+				#
+				# Der letzte Zugriff wird ueber Get-sqmLoginLastAccess ermittelt. SQL Server
+				# haelt ihn nirgends vor, deshalb gibt es nur zwei ehrliche Aussagen:
+				#   - Zugriff belegt und aelter als die Schwelle -> 'Inactive'
+				#   - kein Nachweis                              -> KEINE Aussage ueber den Login
+				# Fehlender Nachweis ist kein Beleg fuer Nichtnutzung. Reicht die Datenlage
+				# grundsaetzlich nicht (z. B. AuditLevel protokolliert keine Erfolge), wird das
+				# einmal pro Instanz als Befund gemeldet - nicht pro Login, sonst uebertoent
+				# die Luecke jeden echten Befund.
+				if (-not $SkipAccessCheck)
 				{
-					$enabled = -not [bool]$row.IsDisabled
-					if ($row.LastLogin -and $row.LastLogin.Year -gt 1990)
+					$accessMap = @{ }
+					$accessUsable = $false
+					$coverageSince = $null
+					try
 					{
-						$inactiveDays = ($now - $row.LastLogin).TotalDays
-						if ($inactiveDays -gt $InactivityThresholdDays)
+						$accessParams = @{ SqlInstance = $instance; EnableException = $true }
+						if ($SqlCredential) { $accessParams['SqlCredential'] = $SqlCredential }
+						$accessRows = Get-sqmLoginLastAccess @accessParams
+
+						foreach ($a in $accessRows)
 						{
-							_AddFinding $row.LoginName 'Inactive' $row.LoginType $enabled 'Inactivity' ("Letzter Login vor $([math]::Round($inactiveDays, 0)) Tagen ($($row.LastLogin.ToString('yyyy-MM-dd'))). Schwelle: $InactivityThresholdDays Tage.") 'Warning' $row.IsSysadmin
+							$accessMap[([string]$a.LoginName).ToLowerInvariant()] = $a
+						}
+						$first = $accessRows | Select-Object -First 1
+						if ($first)
+						{
+							$accessUsable  = [bool]$first.ErrorLogUsable
+							$coverageSince = $first.CoverageSince
 						}
 					}
-					elseif (-not $row.IsDisabled -and $row.LoginType -eq 'SQL_LOGIN')
+					catch
 					{
-						$createDays = ($now - $row.CreateDate).TotalDays
-						if ($createDays -gt $InactivityThresholdDays)
+						Invoke-sqmLogging -Message "[$instance] Letzter Zugriff nicht ermittelbar: $($_.Exception.Message)" -FunctionName $functionName -Level 'WARNING'
+						$accessMap = $null
+					}
+
+					if ($null -ne $accessMap)
+					{
+						foreach ($row in $filtered)
 						{
-							_AddFinding $row.LoginName 'NeverUsed' $row.LoginType $true 'Inactivity' "Login seit $([math]::Round($createDays, 0)) Tagen nie verwendet (erstellt: $($row.CreateDate.ToString('yyyy-MM-dd')))." 'Warning' $row.IsSysadmin
+							$enabled = -not [bool]$row.IsDisabled
+							$acc = $accessMap[([string]$row.LoginName).ToLowerInvariant()]
+							if (-not $acc -or -not $acc.LastAccess) { continue }
+
+							$inactiveDays = ($now - $acc.LastAccess).TotalDays
+							if ($inactiveDays -gt $InactivityThresholdDays)
+							{
+								_AddFinding $row.LoginName 'Inactive' $row.LoginType $enabled 'Inactivity' ("Letzter Zugriff vor $([math]::Round($inactiveDays, 0)) Tagen ($($acc.LastAccess.ToString('yyyy-MM-dd')), Quelle: $($acc.Source)). Schwelle: $InactivityThresholdDays Tage.") 'Warning' $row.IsSysadmin
+							}
+						}
+
+						if (-not $accessUsable)
+						{
+							$covTxt = if ($coverageSince) { $coverageSince.ToString('yyyy-MM-dd HH:mm') } else { 'unbekannt' }
+							_AddFinding '(Instanz)' 'NoAccessTracking' '-' $true 'Inactivity' ("Inaktivitaet ist auf dieser Instanz nicht belegbar: erfolgreiche Anmeldungen werden nicht protokolliert (AuditLevel). Auswertbar sind nur laufende Sessions seit $covTxt. Fuer belastbare Aussagen Anmeldeueberwachung aktivieren.") 'Warning' $false
 						}
 					}
 				}
@@ -407,7 +456,7 @@ WHERE sp.type IN ('S','U','G')
 					$categories = @{
 						'Policy'	 = 'POLICY-VERSToeSSE (CHECK_POLICY/EXPIRATION/MUST_CHANGE)'
 						'Password'   = 'KENNWORTALTER'
-						'Inactivity' = 'INAKTIVE / NIE VERWENDETE LOGINS'
+						'Inactivity' = 'INAKTIVE LOGINS (belegter letzter Zugriff)'
 						'Integrity'  = 'INTEGRITaeTSPROBLEME (Doppelte SIDs)'
 						'Orphan'	 = 'AD-VERWAISTE LOGINS'
 					}

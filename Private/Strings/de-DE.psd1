@@ -98,6 +98,7 @@
     'Baseline_Comparing'            = "Vergleich: '{0}' vs '{1}'"
 
     # ── Invoke-sqmRestoreTest (Nachweis) ──────────────────────────────────────
+    'RestoreTest_SourceLabel'       = 'Quelle:'
     'RestoreTest_Title'             = 'Nachweis Restore-Test'
     'RestoreTest_ReportHeadline'    = 'sqmSQLTool - Nachweis Restore-Test'
     'RestoreTest_Instance'          = 'Instanz'

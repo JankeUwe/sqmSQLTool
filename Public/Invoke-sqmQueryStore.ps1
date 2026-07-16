@@ -78,7 +78,10 @@
     Number of plans per query at which a plan instability warning is issued. Default: 5.
 
 .PARAMETER OutputPath
-    Directory for reports (CSV + TXT). Default: from module configuration + \QueryStore.
+    Directory for reports (CSV + TXT + HTML). Default: from module configuration + \QueryStore.
+
+.PARAMETER NoOpen
+    Do not open the HTML report after creation.
 
 .PARAMETER EnableException
     Throw exceptions immediately.
@@ -175,6 +178,8 @@ function Invoke-sqmQueryStore
 		[Parameter(Mandatory = $false)]
 		[string]$OutputPath,
 		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen,
+		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
 
@@ -263,6 +268,7 @@ function Invoke-sqmQueryStore
 					Issues          = @()
 					IssueCount      = 0
 					ReportFile      = $null
+					HtmlFile        = $null
 				}
 
 				$dbConnParams = @{
@@ -642,6 +648,57 @@ ORDER BY variation_pct DESC
 					$reportLines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
 					$dbResult.ReportFile = $txtFile
 					Invoke-sqmLogging -Message "[$dbName] Issues-Bericht gespeichert: $txtFile" -FunctionName $functionName -Level "INFO"
+				}
+
+				# -------------------------------------------------------------------
+				# HTML-BERICHT  - Status + Issues + Top-Queries in einem Dokument
+				# -------------------------------------------------------------------
+				if ($dbResult.TopQueries.Count -gt 0 -or $dbResult.Issues.Count -gt 0)
+				{
+					$enc = { param ($t) if ($null -eq $t) { '' } else { [string]$t -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;' } }
+					$body = [System.Text.StringBuilder]::new()
+
+					if ($dbResult.QSOptions)
+					{
+						[void]$body.AppendLine('<h2>Query Store Status</h2>')
+						[void]$body.AppendLine(($dbResult.QSOptions |
+								Select-Object ActualState, CurrentStorageMB, MaxStorageMB, StoragePct,
+											  QueryCaptureMode, SizeBasedCleanupMode, MaxPlansPerQuery |
+								ConvertTo-Html -Fragment -As List | Out-String))
+					}
+
+					if ($dbResult.Issues.Count -gt 0)
+					{
+						[void]$body.AppendLine("<h2>Erkannte Probleme ($($dbResult.IssueCount))</h2>")
+						[void]$body.AppendLine('<table><tr><th>Severity</th><th>Kategorie</th><th>Problem</th><th>Detail</th></tr>')
+						$sorted = $dbResult.Issues | Sort-Object { if ($_.Severity -eq 'Critical') { 0 } else { 1 } }
+						foreach ($issue in $sorted)
+						{
+							$cls = if ($issue.Severity -eq 'Critical') { 'crit' } else { 'warn' }
+							[void]$body.AppendLine(("<tr><td class='{0}'>{1}</td><td>{2}</td><td>{3}</td><td>{4}</td></tr>" -f
+									$cls, (& $enc $issue.Severity), (& $enc $issue.Category),
+									(& $enc $issue.Description), (& $enc $issue.Detail)))
+						}
+						[void]$body.AppendLine('</table>')
+					}
+
+					if ($dbResult.TopQueries.Count -gt 0)
+					{
+						[void]$body.AppendLine("<h2>Top $TopN Queries (sortiert nach $OrderBy)</h2>")
+						[void]$body.AppendLine(($dbResult.TopQueries |
+								Select-Object QueryId, TotalExecutions, avg_duration_ms, max_duration_ms,
+											  avg_cpu_ms, avg_logical_reads, avg_memory_mb, PlanCount,
+											  has_forced_plan, QueryText |
+								ConvertTo-Html -Fragment -As Table | Out-String))
+					}
+
+					$htmlFile = "${baseFile}.html"
+					$subtitle = "Instanz: $SqlInstance  |  Datenbank: $dbName  |  Zeitraum: letzte ${LookbackHours}h"
+					ConvertTo-sqmHtmlReport -Title "Query Store Report - $dbName" -Subtitle $subtitle -BodyHtml $body.ToString() |
+					Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+					$dbResult.HtmlFile = $htmlFile
+					Invoke-sqmLogging -Message "[$dbName] HTML-Report gespeichert: $htmlFile" -FunctionName $functionName -Level "INFO"
+					Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
 				}
 
 				$allDbResults.Add($dbResult)

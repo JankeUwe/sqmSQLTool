@@ -26,7 +26,7 @@ function Test-sqmLoggingPath
 		}
 		
 		# KORREKTUR #11: Eindeutiger Dateiname verhindert Konflikte bei parallelen Aufrufen
-		$testFile = Join-Path $Path ".write_test_$(Get-Date -Format 'yyyyMMddHHmsqmfff')_$(Get-Random).tmp"
+		$testFile = Join-Path $Path ".write_test_$(Get-Date -Format 'yyyyMMddHHmmssfff')_$(Get-Random).tmp"
 		"Test" | Out-File -FilePath $testFile -ErrorAction Stop
 		Remove-Item -Path $testFile -Force -ErrorAction SilentlyContinue
 		

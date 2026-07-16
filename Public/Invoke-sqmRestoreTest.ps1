@@ -880,8 +880,9 @@ function Write-sqmRestoreTestReport
 
 		$lines = [System.Collections.Generic.List[string]]::new()
 		$lines.Add("# ================================================================")
+		$reportRef = Get-sqmReportReference -SourceLabel (_s 'RestoreTest_SourceLabel')
 		$lines.Add("# $(_s 'RestoreTest_ReportHeadline')")
-		$lines.Add("# $(Get-sqmReportReference)")
+		$lines.Add("# $reportRef")
 		$lines.Add("# $(_s 'RestoreTest_Instance') : $($Result.SqlInstance)")
 		$lines.Add("# $(_s 'RestoreTest_Created') : $timestamp")
 		$lines.Add("# ================================================================")
@@ -936,7 +937,8 @@ $(& $enc (_s 'RestoreTest_ThroughputNote'))
 </p>
 "@
 			$subtitle = "$($Result.SourceDatabase) -> $($Result.TestDatabase) | $($Result.SqlInstance) | $timestamp"
-			$htmlContent = ConvertTo-sqmHtmlReport -Title (_s 'RestoreTest_Title') -Subtitle $subtitle -BodyHtml $body
+			$htmlContent = ConvertTo-sqmHtmlReport -Title (_s 'RestoreTest_Title') -Subtitle $subtitle `
+				-BodyHtml $body -Reference $reportRef
 			$htmlContent | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
 			Invoke-sqmLogging -Message "HTML-Nachweis erstellt: $htmlFile" -FunctionName $FunctionName -Level "INFO"
 		}

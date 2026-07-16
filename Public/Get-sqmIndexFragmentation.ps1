@@ -27,13 +27,20 @@
     Show only indexes with at least this page count. Default: 0 (all indexes).
 
 .PARAMETER OutputPath
-    Optional CSV export path.
+    Optional directory for reports (CSV + HTML). File names are generated.
+
+.PARAMETER NoOpen
+    Do not open the HTML report after creation.
 
 .PARAMETER EnableException
     Throw exceptions immediately.
 
 .EXAMPLE
     Get-sqmIndexFragmentation -Database 'AdventureWorks' -MinFragmentationPercent 10
+
+.EXAMPLE
+    # CSV + HTML report
+    Get-sqmIndexFragmentation -Database 'AdventureWorks' -OutputPath 'D:\Reports\Frag'
 
 .EXAMPLE
     Get-sqmIndexFragmentation -SqlInstance 'SQL01' -MinFragmentationPercent 30
@@ -60,6 +67,8 @@ function Get-sqmIndexFragmentation {
         [int]$PageCountMin = 0,
         [Parameter(Mandatory = $false)]
         [string]$OutputPath,
+        [Parameter(Mandatory = $false)]
+        [switch]$NoOpen,
         [Parameter(Mandatory = $false)]
         [switch]$EnableException
     )
@@ -146,8 +155,21 @@ ORDER BY ips.avg_fragmentation_in_percent DESC
             }
 
             if ($OutputPath) {
-                $results | Export-Csv -Path $OutputPath -NoTypeInformation -Encoding UTF8 -Force
-                Invoke-sqmLogging -Message "CSV exportiert nach $OutputPath" -FunctionName $functionName -Level "INFO"
+                if (-not (Test-Path $OutputPath)) { New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null }
+                $safeInst = $SqlInstance -replace '[\\/:<>|]', '_'
+                $ts       = Get-Date -Format 'yyyyMMdd_HHmmss'
+
+                $csvFile = Join-Path $OutputPath "IndexFragmentation_${safeInst}_${ts}.csv"
+                $results | Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
+                Invoke-sqmLogging -Message "CSV exportiert nach $csvFile" -FunctionName $functionName -Level "INFO"
+
+                $htmlFile = Join-Path $OutputPath "IndexFragmentation_${safeInst}_${ts}.html"
+                $bodyHtml = ($results | ConvertTo-Html -Fragment -As Table | Out-String)
+                $subtitle = "Instanz: $SqlInstance  |  Datenbank: $Database  |  ab $MinFragmentationPercent% Fragmentierung  |  $($results.Count) Index/Indizes"
+                ConvertTo-sqmHtmlReport -Title "Index Fragmentation - $SqlInstance" -Subtitle $subtitle -BodyHtml $bodyHtml |
+                    Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+                Invoke-sqmLogging -Message "HTML-Report gespeichert: $htmlFile" -FunctionName $functionName -Level "INFO"
+                Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
             }
             return $results
         }

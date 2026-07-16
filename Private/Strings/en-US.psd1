@@ -98,6 +98,7 @@
     'Baseline_Comparing'            = "Comparing: '{0}' vs '{1}'"
 
     # ── Invoke-sqmRestoreTest (evidence report) ───────────────────────────────
+    'RestoreTest_SourceLabel'       = 'Source:'
     'RestoreTest_Title'             = 'Restore Test Evidence'
     'RestoreTest_ReportHeadline'    = 'sqmSQLTool - Restore Test Evidence'
     'RestoreTest_Instance'          = 'Instance'

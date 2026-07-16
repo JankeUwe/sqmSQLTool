@@ -1,5 +1,79 @@
 # sqmSQLTool — Changelog
 
+## [1.9.25.0] — 2026-07-16
+
+### Feature: Get-sqmLoginPermissions — Logins mit ihren Datenbankberechtigungen
+
+Login-zentrierter Berechtigungsreport: Serverrollen und explizite Serverrechte, dazu je Datenbank
+der zugeordnete User mit seinen Datenbankrollen und GRANT/DENY-Rechten. Eine flache Zeile je
+Berechtigung, damit sich das Ergebnis filtern und nach CSV/HTML exportieren laesst.
+
+- Die Zuordnung Login -> DB-User laeuft ueber die **SID, nicht ueber den Namen**. Beide duerfen
+  abweichen, und sie tun es in der Praxis: auf der Testinstanz haengt am Login `sqmTestLogin` der
+  User `sqmTestUser`. Ein Namensabgleich haette diese Berechtigung schlicht nicht gefunden.
+- DB-User ohne passenden Login werden mit `-IncludeOrphanedUsers` als verwaist ausgewiesen
+  (`IsOrphaned`), inklusive ihrer Rechte — sonst verschwindet genau der Fall, der sicherheitlich
+  interessant ist.
+- Alle UNION-Spalten tragen explizites `COLLATE DATABASE_DEFAULT`. Ohne das bricht die Abfrage mit
+  einem Sortierungskonflikt ab, weil `sys.database_principals.name` (sysname,
+  `Latin1_General_CI_AS_KS_WS`) und `permission_name` (`Latin1_General_CI_AS`) unterschiedlich
+  sortieren. Auf der Testinstanz war das reproduzierbar.
+- Nicht erreichbare oder offline Datenbanken werden mit Warnung uebersprungen statt den Lauf zu
+  killen.
+
+### Feature: Get-sqmLoginLastAccess — letzter Zugriff je Login, mit Quelle und Konfidenz
+
+SQL Server speichert einen "letzten Login" **nirgends** persistent. Die Funktion sammelt deshalb nur,
+was die Instanz wirklich belegen kann, und liefert zu jedem Wert `Source` und `Confidence` mit:
+
+- `Live` — `sys.dm_exec_sessions`, also nur bestehende Sessions. Jeder Dienstneustart setzt das
+  zurueck, weiter als `sqlserver_start_time` kann die Quelle nie zurueckblicken. Der Wert wird als
+  `CoverageSince` mitgegeben, damit ein leeres Ergebnis einordenbar bleibt.
+- `ErrorLog` — erfolgreiche Anmeldungen im Fehlerprotokoll. Nur verfuegbar bei `AuditLevel` 1 oder 3;
+  der **Default 2 protokolliert ausschliesslich Fehlversuche** und liefert hier nichts. Wird erkannt
+  und gemeldet, statt stillschweigend leer zu bleiben.
+- Ohne Nachweis: `LastAccess = $null`, `Confidence = 'Unknown'` plus `Note`. Das heisst
+  "nicht belegbar", **nicht** "nie benutzt" — die Unterscheidung wird bewusst nicht eingeebnet.
+
+Der ErrorLog-Parser ist sprachneutral: die Vorlagen fuer 18453/18454 kommen aus `sys.messages` der
+Instanz und werden zur Regex gebaut (`ConvertTo-sqmMessageRegex`, privat). Noetig, weil die Meldungen
+lokalisiert sind — Englisch quotet einfach (`user 'x'`), Deutsch doppelt (`Benutzer "x"`), und die
+Platzhalter unterscheiden sich (`%.*ls` vs `%1!`). Eine fest verdrahtete Regex haette auf jeder
+deutschen Instanz still nichts gefunden. Gegen die echten Vorlagen in Englisch, Deutsch und
+Franzoesisch geprueft, inkl. Namen mit Backslash und Apostroph; die Fehlermeldung 18456 matcht die
+Erfolgs-Regex nachweislich nicht.
+
+`DaysSince` rechnet gegen `GETDATE()` der Instanz, nicht gegen die Uhr des Clients — bei Zeitversatz
+kamen sonst negative Werte heraus (auf der Testinstanz reproduziert).
+
+Windows-**Gruppen**logins bekommen einen Hinweis: Mitglieder verbinden sich mit ihrem eigenen
+AD-Konto, die Session wird nie der Gruppe zugeordnet. Ein leerer Wert ist dort erwartbar.
+
+### Fix: Invoke-sqmLoginAudit meldete aktive Logins als "nie verwendet"
+
+**BEHAVIOUR CHANGE:** Die Abfrage lieferte `NULL AS LastLogin` — eine feste Konstante, keine Spalte.
+Damit war die Inaktivitaetspruefung tot und jeder Login fiel in den `elseif`-Zweig. Folge:
+
+- **Falsch positiv:** jeder aktivierte SQL-Login, der aelter als die Schwelle war, wurde als
+  "seit X Tagen nie verwendet" gemeldet — auch wenn er in derselben Sekunde verbunden war. Ein
+  gestern benutzter und ein nie benutzter Login waren nicht unterscheidbar.
+- **Falsch negativ:** Windows-Logins bekamen nie einen Inaktivitaetsbefund, weil der Zweig auf
+  `SQL_LOGIN` filterte. Ein seit Jahren toter Domaenen-Account blieb unauffaellig.
+
+Neu: der letzte Zugriff kommt aus `Get-sqmLoginLastAccess`. `Inactive` wird nur noch gemeldet, wenn
+der Zugriff **belegt** und aelter als die Schwelle ist — mit Datum und Quelle im Befund. Der
+Befundtyp `NeverUsed` entfaellt ersatzlos; er war nicht belegbar.
+
+Reicht die Datenlage grundsaetzlich nicht, meldet der Report das **einmal pro Instanz**
+(`NoAccessTracking`) statt pro Login. Ein Report, der auf einer Standardinstanz jeden Login
+anmeckert, uebertoent jeden echten Befund — die Luecke gehoert zur Instanz, nicht zum Login.
+Neuer Schalter `-SkipAccessCheck` fuer Konten ohne `VIEW SERVER STATE` / `xp_readerrorlog`.
+### Fix: letzter `HHmsqm`-Rest in `Private\`
+
+`Test-sqmLoggingPath` trug die Formatzeichenfolge `yyyyMMddHHmsqmfff` noch. Der Sweep in 1.9.24.1
+hatte nur `Public\` geprueft, deshalb blieb sie stehen. Auswirkung gering — der Name enthaelt
+zusaetzlich `Get-Random`, und die Datei wird sofort wieder geloescht —, aber es ist derselbe Defekt.
+
 ## [1.9.24.1] — 2026-07-16
 
 ### Fix: corrupted timestamp format string in 19 functions, and lost report paths in Invoke-sqmQueryStore
