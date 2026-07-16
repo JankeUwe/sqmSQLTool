@@ -179,6 +179,73 @@ Describe 'Get-sqmWaitStatistics' {
         }
     }
 
+    Context 'Snapshot-Vergleich' {
+        BeforeAll {
+            Mock -ModuleName sqmSQLTool Invoke-sqmLogging { }
+            InModuleScope sqmSQLTool { $script:dbatoolsAvailable = $true }
+        }
+
+        It 'SaveSnapshot liefert die Rohdaten zurueck' {
+            Mock -ModuleName sqmSQLTool Invoke-DbaQuery {
+                @(New-WaitRow 'CXPACKET' 100 5000 50 20 50.0)
+            }
+            $snap = Get-sqmWaitStatistics -SqlInstance 'TESTSERVER' -SaveSnapshot
+            $snap.wait_type    | Should -Be 'CXPACKET'
+            $snap.wait_time_ms | Should -Be 5000
+        }
+
+        # Die Schwellwerte muessen im Delta-Modus auf den Delta-Durchschnitt greifen,
+        # nicht auf den kumulierten - sonst haengt die Bewertung wieder an der Uptime.
+        It 'Delta-Modus bewertet den Delta-Durchschnitt (60 ms meldet den Engpass)' {
+            $before = @(New-WaitRow 'PAGEIOLATCH_SH' 100 1000 50 100 10.0)
+            Mock -ModuleName sqmSQLTool Invoke-DbaQuery {
+                @(New-WaitRow 'PAGEIOLATCH_SH' 200 7000 50 700 35.0)
+            }
+            $r = Get-sqmWaitStatistics -SqlInstance 'TESTSERVER' -SnapshotBefore $before -EnableException
+            $r.IsDelta        | Should -Be $true
+            $r.WaitTimeSec    | Should -Be 6.0
+            $r.AvgWaitMs      | Should -Be 60
+            $r.SignalWaitPct  | Should -Be 10
+            $r.Recommendation | Should -Match 'bottleneck|Engpass'
+        }
+
+        It 'Delta-Modus: niedriger Delta-Durchschnitt meldet keinen Engpass' {
+            $before = @(New-WaitRow 'PAGEIOLATCH_SH' 100 1000 50 100 10.0)
+            Mock -ModuleName sqmSQLTool Invoke-DbaQuery {
+                @(New-WaitRow 'PAGEIOLATCH_SH' 1100 3000 50 300 2.7)
+            }
+            $r = Get-sqmWaitStatistics -SqlInstance 'TESTSERVER' -SnapshotBefore $before -EnableException
+            $r.AvgWaitMs      | Should -Be 2
+            $r.Recommendation | Should -Match 'Inconspicuous|Unauffaellig'
+        }
+    }
+
+    Context 'Randfaelle' {
+        BeforeAll {
+            Mock -ModuleName sqmSQLTool Invoke-sqmLogging { }
+            InModuleScope sqmSQLTool { $script:dbatoolsAvailable = $true }
+        }
+
+        It 'Nur Idle-Waits: leeres Ergebnis statt Division durch Null' {
+            Mock -ModuleName sqmSQLTool Invoke-DbaQuery {
+                @(
+                    New-WaitRow 'SOS_WORK_DISPATCHER' 100 5000000 900 10 50000.0
+                    New-WaitRow 'QDS_ASYNC_QUEUE' 50 4000000 800 5 80000.0
+                )
+            }
+            $script:r = $null
+            { $script:r = Get-sqmWaitStatistics -SqlInstance 'TESTSERVER' -EnableException } | Should -Not -Throw
+            $script:r | Should -BeNullOrEmpty
+        }
+
+        It 'Wait mit wait_time_ms = 0 wirft nicht' {
+            Mock -ModuleName sqmSQLTool Invoke-DbaQuery {
+                @(New-WaitRow 'PAGEIOLATCH_SH' 5 0 0 0 0.0)
+            }
+            { Get-sqmWaitStatistics -SqlInstance 'TESTSERVER' -EnableException } | Should -Not -Throw
+        }
+    }
+
     Context 'Ausgabe' {
         BeforeAll {
             Mock -ModuleName sqmSQLTool Invoke-sqmLogging { }
