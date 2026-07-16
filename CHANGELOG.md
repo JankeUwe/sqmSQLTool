@@ -1,5 +1,57 @@
 # sqmSQLTool — Changelog
 
+## [1.9.26.0] — 2026-07-16
+
+### Fix: Get-sqmWaitStatistics wies Leerlauf als Wartezeit aus
+
+**BEHAVIOUR CHANGE:** Die Idle-Liste stammte aus einer Zeit vor SQL 2016 und kannte weder
+`SOS_WORK_DISPATCHER` (2019+) noch `QDS_*` (2016+), `PREEMPTIVE_XE_DISPATCHER` oder
+`MEMORY_ALLOCATION_EXT`. Trotz `IncludeIdle=False` landeten die im Report — und weil sie
+dauerhaft im Leerlauf mitlaufen, dominieren sie jede Summe. Auf einer echten 2022er
+Kundeninstanz (Top 25, 66.845.984 Sek. gesamt):
+
+- `SOS_WORK_DISPATCHER` allein **88,3 %** der ausgewiesenen Wartezeit, dazu `QDS_*` mit 3,4 %.
+- Damit war `WaitTimePct` wertlos: der eigentliche Befund — `CXCONSUMER`/`CXPACKET`/`CXSYNC_PORT` —
+  erschien als harmlose 6,6 %.
+
+Die Liste folgt jetzt der etablierten SQLskills-Ignore-Liste (Paul Randal), inklusive der Typen aus
+2016/2017/2019 (`QDS_*`, `SOS_WORK_DISPATCHER`, `PARALLEL_REDO_*`, `PVS_PREALLOCATE`,
+`PREEMPTIVE_XE_*`). Auf demselben Datensatz bleiben statt 66.845.984 noch **4.945.737 Sek.** echte
+Wartezeit uebrig, und Parallelismus steht mit **88,6 %** da, wo er hingehoert.
+
+Die Idle-Typen behalten ihre Kategorie und Empfehlung — mit `-IncludeIdle` sind sie weiterhin
+sinnvoll beschriftet, nur eben nicht mehr im Default-Report.
+
+`CXSYNC_PORT` wird als `Parallelism` gefuehrt statt als `Other`; mit 17,8 % der bereinigten
+Wartezeit gehoert es zum Befund und nicht in die Restkategorie.
+
+### Fix: Get-sqmWaitStatistics feuerte Empfehlungen auf die blosse Summe
+
+**BEHAVIOUR CHANGE:** Die Recommendation-Spalte bewertete kumulierte Summen. Die wachsen aber allein
+mit der Uptime, nicht mit dem Problem. Auf derselben Instanz:
+
+- `PAGEIOLATCH_SH` mit **2,05 ms** Durchschnitt -> "Disk I/O bottleneck". 2 ms ist gesundes Storage.
+- `SOS_SCHEDULER_YIELD` mit **0,12 ms** Durchschnitt -> "CPU pressure". Der instanzweite
+  Signal-Wait-Anteil lag bei **2,7 %**, also weit weg von CPU-Druck.
+
+Empfehlungen haengen jetzt an Schwellwerten, je nach dem, was den Wait-Typ tatsaechlich verraet:
+
+- **`MinAvgWaitMs`** — Durchschnittsdauer, fuer I/O, Locks, Latches, Netzwerk.
+  `PAGEIOLATCH_*` ab 10 ms, `WRITELOG` ab 5 ms, `LCK_M_*` ab 500 ms.
+- **`MinWaitPct`** — Anteil an der bereinigten Wartezeit, fuer Parallelismus und Memory. Dort sind
+  viele kurze Waits normal; weh tun sie erst in der Masse. Eine Durchschnittsschwelle haette hier
+  genau den echten Befund verschluckt (`CXPACKET` liegt bei 2,31 ms).
+- **`MinSignalWaitPct`** — instanzweiter Signal-Wait-Anteil, fuer `SOS_SCHEDULER_YIELD`. Das ist das
+  etablierte Mass fuer CPU-Druck; die absolute Summe sieht auf jeder Instanz mit genug Uptime gross aus.
+- Ohne Schwellwert wird immer gemeldet — `THREADPOOL` ist nie harmlos.
+
+Unterschreitet ein Wait seinen Schwellwert, bleibt die Zelle **nicht leer**, sondern nennt den
+gemessenen Wert und die Schwelle ("Unauffaellig: Durchschnitt 2,05 ms liegt unter dem Schwellwert
+von 10 ms"). Sonst raet der Leser, ob "unauffaellig" oder "nicht bewertet" gemeint ist.
+
+Neue Spalte **`SignalWaitPct`** je Wait, damit der Report die CPU-Bewertung selbst belegt. Der
+instanzweite Anteil steht im Log.
+
 ## [1.9.25.0] — 2026-07-16
 
 ### Feature: Get-sqmLoginPermissions — Logins mit ihren Datenbankberechtigungen

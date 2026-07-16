@@ -9,6 +9,7 @@
     'WaitStats_SnapshotCreated'     = 'Snapshot erstellt: {0} Wait Types.'
     'WaitStats_Saved'               = 'Wait Statistics gespeichert: {0}'
     'WaitStats_Completed'           = '{0} abgeschlossen: {1} Wait Types, Total {2} Sek.'
+    'WaitStats_SignalWaitPct'       = 'Signal-Wait-Anteil der Instanz: {0} % der relevanten Wartezeit.'
 
     'WaitRec_PAGEIOLATCH_SH'        = 'Disk I/O Engpass - Storage Performance pruefen, fehlende Indizes analysieren.'
     'WaitRec_PAGEIOLATCH_EX'        = 'Disk I/O Engpass beim Schreiben - Storage und Index-Fragmentierung pruefen.'
@@ -23,6 +24,7 @@
     'WaitRec_LCK_M_IS'             = 'Intent Shared Lock-Waits - Transaktionsdauer reduzieren.'
     'WaitRec_CXPACKET'             = 'Parallelismus-Waits - MAXDOP und Cost Threshold for Parallelism anpassen.'
     'WaitRec_CXCONSUMER'           = 'Parallele Consumer warten - MAXDOP Einstellung pruefen.'
+    'WaitRec_CXSYNC_PORT'          = 'Synchronisation der Exchange-Ports - MAXDOP und Cost Threshold for Parallelism pruefen.'
     'WaitRec_RESOURCE_SEMAPHORE'   = 'Memory Grant Wartezeit - Abfragen mit zu grossem Memory Grant, Index-Fragmentierung.'
     'WaitRec_RES_SEM_COMPILE'      = 'Kompilierungs-Speichermangel - zu viele gleichzeitige Kompilierungen.'
     'WaitRec_CMEMTHREAD'           = 'Speicher-Contention - evtl. NUMA-Ungleichgewicht oder max server memory zu niedrig.'
@@ -36,6 +38,10 @@
     'WaitRec_DBMIRROR_EVENTS_QUEUE'= 'Database Mirroring Queue - Netzwerklatenz zwischen Partnern pruefen.'
     'WaitRec_DBMIRRORING_CMD'      = 'Mirroring-Synchronisation - Netzwerkdurchsatz pruefen.'
     'WaitRec_ASYNC_NETWORK_IO'     = 'Client verarbeitet Daten zu langsam - Result Sets verkleinern, Paginierung erwaegen.'
+
+    'WaitRec_BelowAvgWaitMs'       = 'Unauffaellig: Durchschnitt {0} ms liegt unter dem Schwellwert von {1} ms - kein Handlungsbedarf.'
+    'WaitRec_BelowWaitPct'         = 'Unauffaellig: nur {0} % der relevanten Wartezeit (Schwellwert {1} %) - kein Handlungsbedarf.'
+    'WaitRec_BelowSignalWaitPct'   = 'Unauffaellig: Signal-Wait-Anteil der Instanz liegt bei {0} % und damit unter dem Schwellwert von {1} % - kein CPU-Druck.'
 
     # ── Get-sqmPerfCounters ────────────────────────────────────────────────────
     'PerfCounters_Starting'         = 'Starte {0} auf {1}'

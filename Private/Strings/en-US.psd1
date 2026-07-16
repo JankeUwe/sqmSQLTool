@@ -9,6 +9,7 @@
     'WaitStats_SnapshotCreated'     = 'Snapshot created: {0} wait types.'
     'WaitStats_Saved'               = 'Wait statistics saved: {0}'
     'WaitStats_Completed'           = '{0} completed: {1} wait types, total {2} sec.'
+    'WaitStats_SignalWaitPct'       = 'Signal wait share of the instance: {0} % of the relevant wait time.'
 
     'WaitRec_PAGEIOLATCH_SH'        = 'Disk I/O bottleneck - check storage performance and missing indexes.'
     'WaitRec_PAGEIOLATCH_EX'        = 'Disk I/O bottleneck on writes - check storage performance and index fragmentation.'
@@ -23,6 +24,7 @@
     'WaitRec_LCK_M_IS'             = 'Intent shared lock waits - reduce transaction duration.'
     'WaitRec_CXPACKET'             = 'Parallelism waits - tune MAXDOP and Cost Threshold for Parallelism.'
     'WaitRec_CXCONSUMER'           = 'Parallel consumer waits - review MAXDOP setting.'
+    'WaitRec_CXSYNC_PORT'          = 'Parallel exchange port synchronization - review MAXDOP and Cost Threshold for Parallelism.'
     'WaitRec_RESOURCE_SEMAPHORE'   = 'Memory grant waits - queries with excessive memory grants or index fragmentation.'
     'WaitRec_RES_SEM_COMPILE'      = 'Compilation memory shortage - too many concurrent compilations.'
     'WaitRec_CMEMTHREAD'           = 'Memory contention - possible NUMA imbalance or max server memory too low.'
@@ -36,6 +38,10 @@
     'WaitRec_DBMIRROR_EVENTS_QUEUE'= 'Database mirroring queue - check network latency between partners.'
     'WaitRec_DBMIRRORING_CMD'      = 'Mirroring synchronization - check network throughput.'
     'WaitRec_ASYNC_NETWORK_IO'     = 'Client processing data too slowly - reduce result set size, consider pagination.'
+
+    'WaitRec_BelowAvgWaitMs'       = 'Inconspicuous: average wait {0} ms is below the {1} ms threshold - no action required.'
+    'WaitRec_BelowWaitPct'         = 'Inconspicuous: only {0} % of the relevant wait time (threshold {1} %) - no action required.'
+    'WaitRec_BelowSignalWaitPct'   = 'Inconspicuous: signal wait share of the instance is {0} %, below the {1} % threshold - no CPU pressure.'
 
     # ── Get-sqmPerfCounters ────────────────────────────────────────────────────
     'PerfCounters_Starting'         = 'Starting {0} on {1}'

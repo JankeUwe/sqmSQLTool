@@ -7,6 +7,14 @@
     and returns the top-N waits with category and recommended action.
     Optional: snapshot comparison (before/after) via -SnapshotBefore/-SaveSnapshot.
 
+    The idle/background filter follows the established SQLskills ignore list
+    (Paul Randal), including the types introduced with SQL Server 2016/2017/2019
+    (SOS_WORK_DISPATCHER, QDS_*, PREEMPTIVE_XE_DISPATCHER, PARALLEL_REDO_*).
+
+    Recommendations are threshold based: a wait is only reported when its average
+    wait time (or its share of the relevant wait time) actually indicates a problem.
+    A large cumulative sum alone means nothing - it only reflects uptime.
+
 .PARAMETER SqlInstance
     SQL Server instance. Default: local computer name.
 
@@ -85,52 +93,101 @@ function Get-sqmWaitStatistics
 			throw $errMsg
 		}
 
+		# Idle-/Background-Waits nach der SQLskills-Ignore-Liste (Paul Randal).
+		# Diese Typen laufen dauerhaft im Leerlauf mit und haben nichts mit Last zu
+		# tun. Bleiben sie drin, frisst allein SOS_WORK_DISPATCHER auf einer 2022er
+		# Instanz ueber 80 % der ausgewiesenen Wartezeit und WaitTimePct wird wertlos.
 		$idleWaits = @(
-			'SLEEP_TASK','SLEEP_SYSTEMTASK','SLEEP_DBSTARTUP','SLEEP_DBTASK',
-			'SLEEP_TEMPDBSTARTUP','SLEEP_MASTERDBREADY','SLEEP_MASTERMDREADY',
-			'SLEEP_MASTERUPGRADED','SLEEP_MSDBSTARTUP','SLEEP_TEMPDBSTARTUP',
-			'SLEEP_WORKER_THREAD','WAITFOR','WAITFOR_TASKSHUTDOWN',
-			'BROKER_TO_FLUSH','BROKER_SLEEP','BROKER_EVENTHANDLER',
-			'SQLTRACE_BUFFER_FLUSH','SQLTRACE_INCREMENTAL_FLUSH_SLEEP',
-			'CLR_AUTO_EVENT','CLR_MANUAL_EVENT','CLR_SEMAPHORE',
-			'DISPATCHER_QUEUE_SEMAPHORE','XE_DISPATCHER_WAIT','XE_TIMER_EVENT',
-			'WAIT_XTP_OFFLINE_CKPT_NEW_LOG','HADR_WORK_QUEUE','HADR_SLEEP_TASK',
-			'HADR_FILESTREAM_IOMGR_IOCOMPLETION','LAZYWRITER_SLEEP',
-			'LOGMGR_QUEUE','CHECKPOINT_QUEUE','REQUEST_FOR_DEADLOCK_SEARCH',
-			'RESOURCE_QUEUE','SERVER_IDLE_CHECK','SLEEP_DBSTARTUP',
-			'SNI_HTTP_ACCEPT','SP_SERVER_DIAGNOSTICS_SLEEP','ONDEMAND_TASK_QUEUE',
-			'WAIT_XTP_HOST_WAIT','WAIT_XTP_ONLINE_INDEX_BUILD',
-			'FT_IFTS_SCHEDULER_IDLE_WAIT','FT_IFTSHC_MUTEX','DIRTY_PAGE_POLL'
+			# Service Broker
+			'BROKER_EVENTHANDLER', 'BROKER_RECEIVE_WAITFOR', 'BROKER_TASK_STOP',
+			'BROKER_TO_FLUSH', 'BROKER_TRANSMITTER', 'BROKER_SLEEP',
+			# Checkpoint / Lazywriter / Log
+			'CHECKPOINT_QUEUE', 'CHKPT', 'DIRTY_PAGE_POLL', 'LAZYWRITER_SLEEP',
+			'LOGMGR_QUEUE', 'SLEEP_BPOOL_FLUSH', 'SLEEP_BUFFERPOOL_HELPLW',
+			# CLR
+			'CLR_AUTO_EVENT', 'CLR_MANUAL_EVENT', 'CLR_SEMAPHORE',
+			# Mirroring / AlwaysOn
+			'DBMIRROR_DBM_EVENT', 'DBMIRROR_EVENTS_QUEUE', 'DBMIRROR_WORKER_QUEUE',
+			'DBMIRRORING_CMD', 'HADR_CLUSAPI_CALL',
+			'HADR_FILESTREAM_IOMGR_IOCOMPLETION', 'HADR_LOGCAPTURE_WAIT',
+			'HADR_NOTIFICATION_DEQUEUE', 'HADR_TIMER_TASK', 'HADR_WORK_QUEUE',
+			'HADR_SLEEP_TASK', 'PARALLEL_REDO_DRAIN_WORKER', 'PARALLEL_REDO_LOG_CACHE',
+			'PARALLEL_REDO_TRAN_LIST', 'PARALLEL_REDO_WORKER_SYNC',
+			'PARALLEL_REDO_WORKER_WAIT_WORK', 'REDO_THREAD_PENDING_WORK',
+			# Full-Text
+			'FT_IFTS_SCHEDULER_IDLE_WAIT', 'FT_IFTSHC_MUTEX', 'FSAGENT',
+			# Query Store (SQL 2016+)
+			'QDS_ASYNC_QUEUE', 'QDS_CLEANUP_STALE_QUERIES_TASK_MAIN_LOOP_SLEEP',
+			'QDS_PERSIST_TASK_MAIN_LOOP_SLEEP', 'QDS_SHUTDOWN_QUEUE',
+			# Scheduler / Worker Idle (SOS_WORK_DISPATCHER: SQL 2019+)
+			'DISPATCHER_QUEUE_SEMAPHORE', 'EXECSYNC', 'KSOURCE_WAKEUP',
+			'MEMORY_ALLOCATION_EXT', 'ONDEMAND_TASK_QUEUE', 'REQUEST_FOR_DEADLOCK_SEARCH',
+			'RESOURCE_QUEUE', 'SERVER_IDLE_CHECK', 'SOS_WORK_DISPATCHER',
+			'SP_SERVER_DIAGNOSTICS_SLEEP', 'STARTUP_DEPENDENCY_MANAGER',
+			# Preemptive Background
+			'PREEMPTIVE_OS_FLUSHFILEBUFFERS', 'PREEMPTIVE_XE_DISPATCHER',
+			'PREEMPTIVE_XE_GETTARGETSTATE',
+			# Accelerated Database Recovery / Extensibility (SQL 2019+)
+			'PVS_PREALLOCATE', 'PWAIT_ALL_COMPONENTS_INITIALIZED',
+			'PWAIT_DIRECTLOGCONSUMER_GETNEXT', 'PWAIT_EXTENSIBILITY_CLEANUP_TASK',
+			# Sleep / Startup
+			'SLEEP_DBSTARTUP', 'SLEEP_DBTASK', 'SLEEP_DCOMSTARTUP',
+			'SLEEP_MASTERDBREADY', 'SLEEP_MASTERMDREADY', 'SLEEP_MASTERUPGRADED',
+			'SLEEP_MSDBSTARTUP', 'SLEEP_SYSTEMTASK', 'SLEEP_TASK',
+			'SLEEP_TEMPDBSTARTUP', 'SLEEP_WORKER_THREAD',
+			# Trace / Extended Events
+			'SQLTRACE_BUFFER_FLUSH', 'SQLTRACE_INCREMENTAL_FLUSH_SLEEP',
+			'SQLTRACE_WAIT_ENTRIES', 'XE_BUFFERMGR_ALLPROCESSED_EVENT',
+			'XE_DISPATCHER_JOIN', 'XE_DISPATCHER_WAIT', 'XE_LIVE_TARGET_TVF',
+			'XE_TIMER_EVENT',
+			# Sonstige
+			'SNI_HTTP_ACCEPT', 'VDI_CLIENT_OTHER', 'WAIT_FOR_RESULTS',
+			'WAITFOR', 'WAITFOR_TASKSHUTDOWN',
+			# In-Memory OLTP
+			'WAIT_XTP_CKPT_CLOSE', 'WAIT_XTP_HOST_WAIT',
+			'WAIT_XTP_OFFLINE_CKPT_NEW_LOG', 'WAIT_XTP_ONLINE_INDEX_BUILD',
+			'WAIT_XTP_RECOVERY'
 		)
 
-		# Kategorien und Empfehlungen aus Sprachdatei laden
+		# Kategorien, Empfehlungen und Schwellwerte.
+		#
+		# Ohne Schwellwert feuert jede Empfehlung auf die kumulierte Summe - und die
+		# waechst allein mit der Uptime. PAGEIOLATCH_SH mit 2 ms Durchschnitt ist
+		# gesundes Storage, auch wenn die Summe ueber Wochen auf 75.000 Sekunden
+		# klettert. Darum entscheidet:
+		#   MinAvgWaitMs     - Durchschnittsdauer je Wait (I/O, Locks, Latches, Netz)
+		#   MinWaitPct       - Anteil an der relevanten Wartezeit (Parallelismus, Memory:
+		#                      viele kurze Waits, die erst in der Masse weh tun)
+		#   MinSignalWaitPct - instanzweiter Signal-Wait-Anteil (CPU-Druck)
+		# Ohne Schwellwert-Key wird immer gemeldet (THREADPOOL ist nie harmlos).
 		$waitCategories = @{
-			'PAGEIOLATCH_SH'     = @{ Category = 'I/O';         Recommendation = (_s 'WaitRec_PAGEIOLATCH_SH') }
-			'PAGEIOLATCH_EX'     = @{ Category = 'I/O';         Recommendation = (_s 'WaitRec_PAGEIOLATCH_EX') }
-			'PAGEIOLATCH_UP'     = @{ Category = 'I/O';         Recommendation = (_s 'WaitRec_PAGEIOLATCH_UP') }
-			'WRITELOG'           = @{ Category = 'I/O';         Recommendation = (_s 'WaitRec_WRITELOG') }
-			'IO_COMPLETION'      = @{ Category = 'I/O';         Recommendation = (_s 'WaitRec_IO_COMPLETION') }
-			'ASYNC_IO_COMPLETION'= @{ Category = 'I/O';         Recommendation = (_s 'WaitRec_ASYNC_IO_COMPLETION') }
-			'LCK_M_X'            = @{ Category = 'Locking';     Recommendation = (_s 'WaitRec_LCK_M_X') }
-			'LCK_M_S'            = @{ Category = 'Locking';     Recommendation = (_s 'WaitRec_LCK_M_S') }
-			'LCK_M_U'            = @{ Category = 'Locking';     Recommendation = (_s 'WaitRec_LCK_M_U') }
-			'LCK_M_IX'           = @{ Category = 'Locking';     Recommendation = (_s 'WaitRec_LCK_M_IX') }
-			'LCK_M_IS'           = @{ Category = 'Locking';     Recommendation = (_s 'WaitRec_LCK_M_IS') }
-			'CXPACKET'           = @{ Category = 'Parallelism'; Recommendation = (_s 'WaitRec_CXPACKET') }
-			'CXCONSUMER'         = @{ Category = 'Parallelism'; Recommendation = (_s 'WaitRec_CXCONSUMER') }
-			'RESOURCE_SEMAPHORE' = @{ Category = 'Memory';      Recommendation = (_s 'WaitRec_RESOURCE_SEMAPHORE') }
-			'RESOURCE_SEMAPHORE_QUERY_COMPILE' = @{ Category = 'Memory'; Recommendation = (_s 'WaitRec_RES_SEM_COMPILE') }
-			'CMEMTHREAD'         = @{ Category = 'Memory';      Recommendation = (_s 'WaitRec_CMEMTHREAD') }
-			'SOS_SCHEDULER_YIELD'= @{ Category = 'CPU';         Recommendation = (_s 'WaitRec_SOS_SCHEDULER_YIELD') }
-			'THREADPOOL'         = @{ Category = 'CPU';         Recommendation = (_s 'WaitRec_THREADPOOL') }
-			'PAGELATCH_EX'       = @{ Category = 'Latch';       Recommendation = (_s 'WaitRec_PAGELATCH_EX') }
-			'PAGELATCH_SH'       = @{ Category = 'Latch';       Recommendation = (_s 'WaitRec_PAGELATCH_SH') }
-			'PAGELATCH_UP'       = @{ Category = 'Latch';       Recommendation = (_s 'WaitRec_PAGELATCH_UP') }
-			'LATCH_EX'           = @{ Category = 'Latch';       Recommendation = (_s 'WaitRec_LATCH_EX') }
-			'LATCH_SH'           = @{ Category = 'Latch';       Recommendation = (_s 'WaitRec_LATCH_SH') }
-			'DBMIRROR_EVENTS_QUEUE' = @{ Category = 'Network';  Recommendation = (_s 'WaitRec_DBMIRROR_EVENTS_QUEUE') }
-			'DBMIRRORING_CMD'    = @{ Category = 'Network';     Recommendation = (_s 'WaitRec_DBMIRRORING_CMD') }
-			'ASYNC_NETWORK_IO'   = @{ Category = 'Network';     Recommendation = (_s 'WaitRec_ASYNC_NETWORK_IO') }
+			'PAGEIOLATCH_SH'     = @{ Category = 'I/O';         MinAvgWaitMs = 10;      Recommendation = (_s 'WaitRec_PAGEIOLATCH_SH') }
+			'PAGEIOLATCH_EX'     = @{ Category = 'I/O';         MinAvgWaitMs = 10;      Recommendation = (_s 'WaitRec_PAGEIOLATCH_EX') }
+			'PAGEIOLATCH_UP'     = @{ Category = 'I/O';         MinAvgWaitMs = 10;      Recommendation = (_s 'WaitRec_PAGEIOLATCH_UP') }
+			'WRITELOG'           = @{ Category = 'I/O';         MinAvgWaitMs = 5;       Recommendation = (_s 'WaitRec_WRITELOG') }
+			'IO_COMPLETION'      = @{ Category = 'I/O';         MinAvgWaitMs = 10;      Recommendation = (_s 'WaitRec_IO_COMPLETION') }
+			'ASYNC_IO_COMPLETION'= @{ Category = 'I/O';         MinAvgWaitMs = 1000;    Recommendation = (_s 'WaitRec_ASYNC_IO_COMPLETION') }
+			'LCK_M_X'            = @{ Category = 'Locking';     MinAvgWaitMs = 500;     Recommendation = (_s 'WaitRec_LCK_M_X') }
+			'LCK_M_S'            = @{ Category = 'Locking';     MinAvgWaitMs = 500;     Recommendation = (_s 'WaitRec_LCK_M_S') }
+			'LCK_M_U'            = @{ Category = 'Locking';     MinAvgWaitMs = 500;     Recommendation = (_s 'WaitRec_LCK_M_U') }
+			'LCK_M_IX'           = @{ Category = 'Locking';     MinAvgWaitMs = 500;     Recommendation = (_s 'WaitRec_LCK_M_IX') }
+			'LCK_M_IS'           = @{ Category = 'Locking';     MinAvgWaitMs = 500;     Recommendation = (_s 'WaitRec_LCK_M_IS') }
+			'CXPACKET'           = @{ Category = 'Parallelism'; MinWaitPct = 5;         Recommendation = (_s 'WaitRec_CXPACKET') }
+			'CXCONSUMER'         = @{ Category = 'Parallelism'; MinWaitPct = 5;         Recommendation = (_s 'WaitRec_CXCONSUMER') }
+			'CXSYNC_PORT'        = @{ Category = 'Parallelism'; MinWaitPct = 5;         Recommendation = (_s 'WaitRec_CXSYNC_PORT') }
+			'RESOURCE_SEMAPHORE' = @{ Category = 'Memory';      MinWaitPct = 5;         Recommendation = (_s 'WaitRec_RESOURCE_SEMAPHORE') }
+			'RESOURCE_SEMAPHORE_QUERY_COMPILE' = @{ Category = 'Memory'; MinWaitPct = 5; Recommendation = (_s 'WaitRec_RES_SEM_COMPILE') }
+			'CMEMTHREAD'         = @{ Category = 'Memory';      MinWaitPct = 5;         Recommendation = (_s 'WaitRec_CMEMTHREAD') }
+			'SOS_SCHEDULER_YIELD'= @{ Category = 'CPU';         MinSignalWaitPct = 25;  Recommendation = (_s 'WaitRec_SOS_SCHEDULER_YIELD') }
+			'THREADPOOL'         = @{ Category = 'CPU';                                 Recommendation = (_s 'WaitRec_THREADPOOL') }
+			'PAGELATCH_EX'       = @{ Category = 'Latch';       MinAvgWaitMs = 5;       Recommendation = (_s 'WaitRec_PAGELATCH_EX') }
+			'PAGELATCH_SH'       = @{ Category = 'Latch';       MinAvgWaitMs = 5;       Recommendation = (_s 'WaitRec_PAGELATCH_SH') }
+			'PAGELATCH_UP'       = @{ Category = 'Latch';       MinAvgWaitMs = 5;       Recommendation = (_s 'WaitRec_PAGELATCH_UP') }
+			'LATCH_EX'           = @{ Category = 'Latch';       MinAvgWaitMs = 10;      Recommendation = (_s 'WaitRec_LATCH_EX') }
+			'LATCH_SH'           = @{ Category = 'Latch';       MinAvgWaitMs = 10;      Recommendation = (_s 'WaitRec_LATCH_SH') }
+			'DBMIRROR_EVENTS_QUEUE' = @{ Category = 'Network';  MinAvgWaitMs = 10;      Recommendation = (_s 'WaitRec_DBMIRROR_EVENTS_QUEUE') }
+			'DBMIRRORING_CMD'    = @{ Category = 'Network';     MinAvgWaitMs = 10;      Recommendation = (_s 'WaitRec_DBMIRRORING_CMD') }
+			'ASYNC_NETWORK_IO'   = @{ Category = 'Network';     MinAvgWaitMs = 10;      Recommendation = (_s 'WaitRec_ASYNC_NETWORK_IO') }
 		}
 
 		Invoke-sqmLogging -Message (_s 'WaitStats_Starting' $functionName, $SqlInstance, $TopN, $IncludeIdle) -FunctionName $functionName -Level "INFO"
@@ -198,15 +255,48 @@ ORDER BY wait_time_ms DESC
 			else { $workingSet | Where-Object { $_.wait_type -notin $idleWaits } }
 
 			$totalWaitMs = ($filtered | Measure-Object wait_time_ms -Sum).Sum
-			if ($totalWaitMs -eq 0) { $totalWaitMs = 1 }
+			if (-not $totalWaitMs -or $totalWaitMs -eq 0) { $totalWaitMs = 1 }
+
+			# Instanzweiter Signal-Wait-Anteil: Zeit, die runnable Tasks nach dem
+			# Wait noch auf einen Scheduler warten. Das ist das etablierte Mass fuer
+			# CPU-Druck - anders als die absolute SOS_SCHEDULER_YIELD-Summe, die auf
+			# jeder Instanz mit genug Uptime gross aussieht.
+			$totalSignalMs = ($filtered | Measure-Object signal_wait_time_ms -Sum).Sum
+			$signalWaitPct = [math]::Round($totalSignalMs * 100.0 / $totalWaitMs, 1)
 
 			$results = $filtered |
 				Sort-Object wait_time_ms -Descending |
 				Select-Object -First $TopN |
 				ForEach-Object {
-					$cat = if ($waitCategories.ContainsKey($_.wait_type)) { $waitCategories[$_.wait_type].Category } else { 'Other' }
-					$rec = if ($waitCategories.ContainsKey($_.wait_type)) { $waitCategories[$_.wait_type].Recommendation } else { '' }
-					$pct = [math]::Round($_.wait_time_ms * 100.0 / $totalWaitMs, 1)
+					$pct       = [math]::Round($_.wait_time_ms * 100.0 / $totalWaitMs, 1)
+					$avgWaitMs = [double]$_.avg_wait_ms
+					$rowSigPct = if ($_.wait_time_ms -gt 0) { [math]::Round($_.signal_wait_time_ms * 100.0 / $_.wait_time_ms, 1) } else { 0 }
+
+					$cat = 'Other'
+					$rec = ''
+					if ($waitCategories.ContainsKey($_.wait_type))
+					{
+						$meta = $waitCategories[$_.wait_type]
+						$cat  = $meta.Category
+
+						# Erster verletzter Schwellwert gewinnt und erklaert, warum hier
+						# nichts zu tun ist. Sonst raet der Leser, ob die leere Zelle
+						# "unauffaellig" oder "nicht bewertet" heisst.
+						$rec = if ($meta.ContainsKey('MinAvgWaitMs') -and $avgWaitMs -lt $meta.MinAvgWaitMs)
+						{
+							_s 'WaitRec_BelowAvgWaitMs' $avgWaitMs, $meta.MinAvgWaitMs
+						}
+						elseif ($meta.ContainsKey('MinWaitPct') -and $pct -lt $meta.MinWaitPct)
+						{
+							_s 'WaitRec_BelowWaitPct' $pct, $meta.MinWaitPct
+						}
+						elseif ($meta.ContainsKey('MinSignalWaitPct') -and $signalWaitPct -lt $meta.MinSignalWaitPct)
+						{
+							_s 'WaitRec_BelowSignalWaitPct' $signalWaitPct, $meta.MinSignalWaitPct
+						}
+						else { $meta.Recommendation }
+					}
+
 					[PSCustomObject]@{
 						WaitType             = $_.wait_type
 						Category             = $cat
@@ -216,6 +306,7 @@ ORDER BY wait_time_ms DESC
 						AvgWaitMs            = $_.avg_wait_ms
 						MaxWaitMs            = $_.max_wait_time_ms
 						SignalWaitMs         = $_.signal_wait_time_ms
+						SignalWaitPct        = $rowSigPct
 						ResourceWaitMs       = $_.resource_wait_time_ms
 						IsDelta              = [bool]$SnapshotBefore
 						Recommendation       = $rec
@@ -238,6 +329,7 @@ ORDER BY wait_time_ms DESC
 				Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
 			}
 
+			Invoke-sqmLogging -Message (_s 'WaitStats_SignalWaitPct' $signalWaitPct) -FunctionName $functionName -Level "INFO"
 			Invoke-sqmLogging -Message (_s 'WaitStats_Completed' $functionName, $results.Count, ([math]::Round($totalWaitMs/1000,1))) -FunctionName $functionName -Level "INFO"
 			return $results
 		}
