@@ -79,12 +79,74 @@ jobs:
           }
 
           Write-Host "Files to package: $($files.Count)"
-          $files | ForEach-Object { Write-Host "  - $($_.Name)" }
 
-          Compress-Archive -Path $files.FullName -DestinationPath $zipPath -Force
-          Write-Host "Created: $zipPath ($(Get-Item $zipPath).Length / 1KB KB)"
+          # Dateien in ein Staging-Verzeichnis kopieren und dabei die relativen
+          # Pfade erhalten. Compress-Archive plattet eine uebergebene DATEI-Liste
+          # ein: Public\Foo.ps1 landet als Foo.ps1 im Archiv-Root. sqmSQLTool.psm1
+          # laedt seine Funktionen aber per Get-ChildItem aus Public\ und Private\
+          # (mit -ErrorAction SilentlyContinue) - fehlen die Ordner, exportiert das
+          # Modul kommentarlos NULL Funktionen. Ein Verzeichnis-Glob erhaelt die
+          # Struktur.
+          $staging = "staging"
+          Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $staging -Force | Out-Null
+
+          foreach ($f in $files) {
+            $rel  = $f.FullName.Substring("$pwd\".Length)
+            $dest = Join-Path $staging $rel
+            $destDir = Split-Path $dest -Parent
+            if (-not (Test-Path $destDir)) {
+              New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+            }
+            Copy-Item -LiteralPath $f.FullName -Destination $dest
+          }
+
+          Compress-Archive -Path "$staging\*" -DestinationPath $zipPath -Force
+          Write-Host "Created: $zipPath ($([math]::Round((Get-Item $zipPath).Length / 1KB)) KB)"
           echo "zip_path=$zipPath"  >> $env:GITHUB_OUTPUT
           echo "zip_name=$zipName"  >> $env:GITHUB_OUTPUT
+
+      # ------------------------------------------------------------------
+      # 3b. ZIP-Struktur verifizieren
+      #     Das Archiv war ueber alle bisherigen Releases hinweg flach und damit
+      #     als Modul unbrauchbar, ohne dass es jemand gemerkt hat. Der Schritt
+      #     bricht den Release ab, statt das nochmal still passieren zu lassen.
+      # ------------------------------------------------------------------
+      - name: Verify ZIP layout
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path "${{ steps.package.outputs.zip_path }}"))
+          try {
+            $entries = $zip.Entries.FullName
+          } finally {
+            $zip.Dispose()
+          }
+
+          $srcPublic = (Get-ChildItem "Public" -Filter *.ps1 -Recurse -File).Count
+          $zipPublic = ($entries | Where-Object { $_ -like 'Public/*.ps1' }).Count
+          $zipPrivate = ($entries | Where-Object { $_ -like 'Private/*.ps1' }).Count
+          $hasManifest = $entries -contains 'sqmSQLTool.psd1'
+          $hasRootModule = $entries -contains 'sqmSQLTool.psm1'
+
+          Write-Host "Public/*.ps1  im Archiv: $zipPublic (Quelle: $srcPublic)"
+          Write-Host "Private/*.ps1 im Archiv: $zipPrivate"
+          Write-Host "sqmSQLTool.psd1 im Root: $hasManifest"
+          Write-Host "sqmSQLTool.psm1 im Root: $hasRootModule"
+
+          $errors = @()
+          if (-not $hasManifest)          { $errors += "sqmSQLTool.psd1 fehlt im Archiv-Root" }
+          if (-not $hasRootModule)        { $errors += "sqmSQLTool.psm1 fehlt im Archiv-Root" }
+          if ($zipPrivate -lt 1)          { $errors += "Private/ ist leer oder eingeplattet" }
+          if ($zipPublic -ne $srcPublic)  { $errors += "Public/ hat $zipPublic statt $srcPublic .ps1 - Struktur kaputt" }
+
+          if ($errors) {
+            Write-Host ""
+            Write-Host "❌ ZIP-Layout ungueltig:"
+            $errors | ForEach-Object { Write-Host "   - $_" }
+            exit 1
+          }
+          Write-Host "✅ ZIP-Layout ok"
 
       # ------------------------------------------------------------------
       # 4. Release mit ZIP Asset erstellen
