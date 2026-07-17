@@ -1,5 +1,25 @@
 # sqmSQLTool — Changelog
 
+## [1.9.26.1] — 2026-07-17
+
+### Fix: DiskFreeSpaceThresholdPct fehlte ausserhalb der FI-TS-Umgebung
+
+`DiskFreeSpaceThresholdPct` wurde ausschliesslich im FI-TS-Block gesetzt und fehlte in den
+neutralen Standardwerten — obwohl `Set-sqmConfig` den Schluessel als Parameter anbietet. Fuer
+alle Nutzer ausserhalb der FI-TS-Umgebung (also jeden, der ueber die PSGallery installiert)
+existierte er damit gar nicht im Config-Store: `Get-sqmConfig -Key 'DiskFreeSpaceThresholdPct'`
+lief in den Nicht-gefunden-Zweig, warnte und lieferte `$null`, was `[int]$null` zu **0** machte.
+
+- **`Get-sqmDiskInfoByDriveLetter`** war betroffen: mit Schwellwert 0 ist `$freePercent -lt 0`
+  nie wahr, `$extendNeededGB` blieb also fuer jedes Laufwerk auf 0. Die Berechnung "wie viele GB
+  muss erweitert werden" war ausserhalb FI-TS still wirkungslos.
+- **`Get-sqmServerHardwareReport`** fing den Wert bereits per `if ($diskThreshold -le 0) { 10 }`
+  ab (zwei Stellen) und war inhaltlich korrekt — setzte aber die ueberfluessige Warnung ab.
+- Die Warnung listete zudem bei jedem Aufruf saemtliche Konfigurationsschluessel ins Log.
+
+Der Schluessel steht jetzt mit Default `10` in den neutralen Standardwerten, analog zu den
+uebrigen `Check*`-Grenzwerten. Der Config-Store hat damit ausserhalb FI-TS 32 statt 31 Schluessel.
+
 ## [1.9.26.0] — 2026-07-16
 
 ### Fix: Get-sqmWaitStatistics wies Leerlauf als Wartezeit aus

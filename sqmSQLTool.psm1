@@ -53,6 +53,11 @@ $script:sqmModuleConfig = @{
 	CheckCostThresholdMin    = 50
 	CheckTempDbMaxFiles      = 8
 	CheckDiskBlockSize       = 65536
+	# Mindestanteil freier Plattenkapazitaet in Prozent. Ohne neutralen Default existiert der
+	# Schluessel ausserhalb der FI-TS-Umgebung nicht: Get-sqmConfig warnt dann und liefert $null,
+	# was zu Schwellwert 0 wird - die Erweiterungsberechnung in Get-sqmDiskInfoByDriveLetter
+	# meldet damit fuer jedes Laufwerk 0 GB.
+	DiskFreeSpaceThresholdPct = 10
 	# Monitoring-Zugang (Enable-sqmMonitoringAccess)
 	DefaultPolicy            = $null   # Policy die vor Setup deaktiviert wird, $null = kein Policy-Handling
 	DefaultMonitoringUser    = $null   # Windows-Login des Monitoring-Accounts, $null = Pflicht per Parameter
