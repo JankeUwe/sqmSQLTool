@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan Visualizer — SQL Server Execution Plans</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c232c; --line:#2a323c;
+    --ink:#e6edf3; --dim:#8b949e; --faint:#6e7681;
+    --accent:#58a6ff; --accent2:#1f6feb;
+    --good:#3fb950; --warn:#d29922; --bad:#f85149; --hot:#ff7b72;
+    --mono:'JetBrains Mono','SFMono-Regular',Consolas,'Liberation Mono',monospace;
+    --ui:'Segoe UI',system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:var(--ui);font-size:13px;
+    display:flex;flex-direction:column;overflow:hidden}
+
+  /* top bar */
+  .top{display:flex;align-items:center;gap:14px;padding:9px 14px;background:linear-gradient(180deg,#1b222b,#141a21);
+    border-bottom:1px solid var(--line);flex:0 0 auto}
+  .brand{font-weight:700;letter-spacing:.3px;font-size:14px;display:flex;align-items:center;gap:9px}
+  .brand .dot{width:11px;height:11px;border-radius:3px;background:linear-gradient(135deg,#58a6ff,#3fb950);box-shadow:0 0 10px #58a6ff66}
+  .brand small{color:var(--faint);font-weight:400;font-size:11px}
+  .top .spacer{flex:1}
+  .summary{display:flex;gap:18px;align-items:center;font-size:11.5px;color:var(--dim)}
+  .summary b{color:var(--ink);font-family:var(--mono);font-weight:600}
+  .summary .badge{font-size:10px;padding:2px 7px;border-radius:10px;border:1px solid var(--line);text-transform:uppercase;letter-spacing:.5px}
+  .badge.actual{color:var(--good);border-color:#2a5e34;background:#0f2515}
+  .badge.est{color:var(--accent);border-color:#1d3a5c;background:#0e1c2e}
+  button{font-family:var(--ui);font-size:12px;color:var(--ink);background:#21262d;border:1px solid var(--line);
+    padding:6px 11px;border-radius:6px;cursor:pointer;transition:.12s}
+  button:hover{background:#2d333b;border-color:#3d444d}
+  button.primary{background:var(--accent2);border-color:var(--accent2);color:#fff}
+  button.primary:hover{background:#388bfd}
+
+  /* layout */
+  .stmtbar{display:flex;gap:6px;align-items:center;padding:6px 14px;background:var(--panel);border-bottom:1px solid var(--line);
+    overflow-x:auto;flex:0 0 auto;min-height:0}
+  .stmtbar.hidden{display:none}
+  .stmt-chip{font-family:var(--mono);font-size:11px;white-space:nowrap;padding:4px 9px;border-radius:5px;
+    border:1px solid var(--line);background:#11161d;cursor:pointer;color:var(--dim)}
+  .stmt-chip.active{border-color:var(--accent);color:var(--ink);background:#10243b}
+  .stmt-chip b{color:var(--warn)}
+  .chipwarn{color:var(--warn);font-weight:700;cursor:help;margin-left:4px}
+
+  .tabs{display:flex;gap:2px;padding:0 14px;background:var(--panel);border-bottom:1px solid var(--line);flex:0 0 auto}
+  .tab{padding:9px 14px;font-size:12px;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab:hover{color:var(--ink)}
+  .tab.active{color:var(--ink);border-bottom-color:var(--accent)}
+
+  .body{flex:1;display:flex;min-height:0}
+  .stage{flex:1;position:relative;overflow:hidden;background:
+     radial-gradient(circle at 1px 1px, #1b222b 1px, transparent 0) 0 0/22px 22px, var(--bg)}
+  .scroll{position:absolute;inset:0;overflow:auto}
+  .zoombar{position:absolute;right:14px;bottom:14px;display:flex;gap:5px;z-index:5;
+    background:#161b22cc;backdrop-filter:blur(4px);padding:5px;border:1px solid var(--line);border-radius:8px}
+  .zoombar button{padding:4px 9px;font-family:var(--mono)}
+  .legend{position:absolute;left:14px;bottom:14px;z-index:5;font-size:10.5px;color:var(--dim);
+    background:#161b22cc;backdrop-filter:blur(4px);padding:8px 10px;border:1px solid var(--line);border-radius:8px;line-height:1.7}
+  .legend i{display:inline-block;width:26px;height:8px;border-radius:2px;vertical-align:middle;margin-right:6px}
+  .cmode{display:flex;align-items:center;gap:4px;margin-bottom:7px}
+  .cmode .cmode-l{color:var(--faint);margin-right:2px}
+  .cmbtn{font-family:var(--ui);font-size:10px;padding:2px 7px;border-radius:5px;background:#11161d;
+    border:1px solid var(--line);color:var(--dim);cursor:pointer}
+  .cmbtn:hover{color:var(--ink);border-color:#3d444d}
+  .cmbtn.active{background:#10243b;border-color:var(--accent);color:var(--ink)}
+  .cmbtn:disabled{opacity:.4;cursor:not-allowed}
+
+  /* details panel */
+  .side{width:340px;flex:0 0 auto;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;
+    display:flex;flex-direction:column;transition:width .16s ease}
+  .side.collapsed{width:0;border-left:none;overflow:hidden}
+  .side-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:var(--panel);z-index:3;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--faint)}
+  .side-head button{padding:2px 9px;font-size:14px;line-height:1;background:#21262d}
+  .side-body{flex:1;overflow-y:auto}
+  .side .ph{padding:30px 18px;color:var(--faint);font-size:12px;line-height:1.6}
+  #paneTab{display:none;position:absolute;right:0;top:96px;z-index:8;writing-mode:vertical-rl;
+    padding:12px 6px;border-radius:7px 0 0 7px;border:1px solid var(--line);border-right:none;background:#1c232c;
+    font-size:11px;letter-spacing:.6px;color:var(--dim)}
+  body.pane-collapsed #paneTab{display:block}
+  .awrap{padding:6px 0 30px}
+  .ahdr{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .atitle{font-size:14px;font-weight:600}
+  .amuted{color:var(--faint);font-size:11.5px}
+  .asec{border-bottom:1px solid var(--line)}
+  .asec>summary{list-style:none;cursor:pointer;padding:11px 16px;font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:9px;user-select:none}
+  .asec>summary::-webkit-details-marker{display:none}
+  .asec>summary:hover{background:#161d27}
+  .acount{min-width:22px;text-align:center;font-family:var(--mono);font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:9px;border:1px solid}
+  .abody{padding:4px 16px 16px}
+  .atable{border-collapse:collapse;width:100%;font-size:11.5px}
+  .atable th{text-align:right;color:var(--dim);font-weight:600;padding:5px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .atable th.l,.atable td.l{text-align:left}
+  .atable td{padding:4px 9px;border-bottom:1px solid #1a2029;font-family:var(--mono);text-align:right;vertical-align:top}
+  .atable td.l{font-family:var(--ui)}
+  .atable tr.rowwarn td{color:var(--warn)}
+  .atable code{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+  .aitem{padding:8px 0;border-bottom:1px solid #1a2029;font-size:12px;line-height:1.55}
+  .aitem:last-child{border-bottom:none}
+  .alist{margin:4px 0;padding-left:18px;font-size:12px;line-height:1.7}
+  .alist.links a{color:var(--accent);text-decoration:none}
+  .alist.links a:hover{text-decoration:underline}
+  .anote{font-size:10.5px;color:var(--faint);line-height:1.5;margin-top:8px;font-style:italic}
+  .nlink{color:var(--accent);cursor:pointer;font-family:var(--mono);font-size:11px}
+  .nlink:hover{text-decoration:underline}
+  .dbtag{display:inline-block;font-size:9px;letter-spacing:.5px;text-transform:uppercase;padding:1px 6px;border-radius:8px;
+    background:#10243b;color:var(--accent);border:1px solid #1d3a5c;font-family:var(--mono);vertical-align:middle}
+  .augbanner{padding:10px 16px;background:#0e1c2e;border-bottom:1px solid var(--line);font-size:11.5px;color:var(--dim);line-height:1.55}
+  .chip{display:inline-block;font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:6px;border:1px solid var(--line);background:#11161d;margin:2px 4px 2px 0}
+  .det-h{padding:13px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;
+    position:sticky;top:0;background:var(--panel);z-index:2}
+  .det-h .ico{width:30px;height:30px;flex:0 0 auto}
+  .det-h .t1{font-weight:600;font-size:13px}
+  .det-h .t2{font-size:11px;color:var(--dim)}
+  .det-sec{padding:10px 16px;border-bottom:1px solid var(--line)}
+  .det-sec h4{margin:0 0 7px;font-size:10px;letter-spacing:.7px;text-transform:uppercase;color:var(--faint);font-weight:600}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:11.5px}
+  .kv .k{color:var(--dim)}
+  .kv .v{font-family:var(--mono);text-align:right;word-break:break-word}
+  .kv .v.hot{color:var(--hot)}
+  .pill{font-size:10px;padding:1px 6px;border-radius:8px;background:#21262d;border:1px solid var(--line);font-family:var(--mono)}
+  .codeblk{font-family:var(--mono);font-size:10.5px;background:#0b0f14;border:1px solid var(--line);border-radius:6px;
+    padding:8px;white-space:pre-wrap;word-break:break-word;color:var(--dim);max-height:160px;overflow:auto;line-height:1.5}
+  .wbox{margin:6px 0 0;padding:7px 9px;border-radius:6px;font-size:11px;line-height:1.5}
+  .wbox.warn{background:#241c08;border:1px solid #5c4612;color:#e3b341}
+  .wbox.bad{background:#2a1011;border:1px solid #6b2326;color:#ff9b94}
+
+  /* grid view */
+  .gridwrap{position:absolute;inset:0;overflow:auto;display:none}
+  table.grid{border-collapse:collapse;width:100%;font-size:11.5px}
+  table.grid th{position:sticky;top:0;background:#1b222b;color:var(--dim);text-align:right;padding:7px 10px;
+    border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap;font-weight:600;user-select:none}
+  table.grid th:hover{color:var(--ink)}
+  table.grid th.l,table.grid td.l{text-align:left}
+  table.grid td{padding:5px 10px;border-bottom:1px solid #1a2029;font-family:var(--mono);text-align:right;white-space:nowrap}
+  table.grid tr{cursor:pointer}
+  table.grid tr:hover td{background:#161d27}
+  table.grid tr.sel td{background:#10243b}
+  .costcell{position:relative}
+  .costcell .bar{position:absolute;left:0;top:0;bottom:0;opacity:.22;border-radius:0 2px 2px 0}
+  .opname{display:flex;align-items:center;gap:7px}
+  .opname svg{flex:0 0 auto}
+
+  /* text/xml views */
+  .textwrap,.xmlwrap{position:absolute;inset:0;overflow:auto;display:none;padding:16px}
+  .textwrap pre,.xmlwrap pre{margin:0;font-family:var(--mono);font-size:12px;white-space:pre-wrap;word-break:break-word;
+    color:var(--dim);line-height:1.6}
+  .textwrap .sql-kw{color:var(--hot)}
+
+  /* input overlay */
+  .overlay{position:absolute;inset:0;background:#0d1117f2;backdrop-filter:blur(3px);z-index:20;
+    display:flex;align-items:center;justify-content:center;padding:30px}
+  .overlay.hidden{display:none}
+  .card{width:min(720px,100%);background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    box-shadow:0 24px 70px #000a;overflow:hidden}
+  .card .ch{padding:16px 20px;border-bottom:1px solid var(--line)}
+  .card .ch h2{margin:0 0 3px;font-size:16px}
+  .card .ch p{margin:0;color:var(--dim);font-size:12px}
+  .card .cb{padding:16px 20px}
+  textarea{width:100%;height:230px;background:#0b0f14;border:1px solid var(--line);border-radius:8px;color:var(--ink);
+    font-family:var(--mono);font-size:11.5px;padding:11px;resize:vertical;line-height:1.5}
+  textarea:focus{outline:none;border-color:var(--accent)}
+  .card .cf{display:flex;gap:9px;justify-content:flex-end;align-items:center;padding:0 20px 18px}
+  .card .cf .err{flex:1;color:var(--bad);font-size:12px}
+  .hint{font-size:11px;color:var(--faint);margin-top:8px;line-height:1.5}
+
+  /* node tooltip on diagram */
+  .node-g{cursor:pointer}
+  .node-g:hover .node-box{stroke:var(--accent)}
+  .node-box{stroke:var(--line);stroke-width:1.2px;fill:var(--panel2)}
+  .node-g.sel .node-box{stroke:var(--accent);stroke-width:2px;fill:#13202e}
+  .node-g.hot .node-box{stroke:var(--hot)}
+  .node-txt{font-family:var(--ui);font-size:11px;fill:var(--ink)}
+  .node-sub{font-family:var(--mono);font-size:9.5px;fill:var(--dim)}
+  .node-cost{font-family:var(--mono);font-size:9.5px;fill:var(--faint)}
+  .flow{fill:none;stroke:#3d4856}
+  ::-webkit-scrollbar{width:11px;height:11px}
+  ::-webkit-scrollbar-thumb{background:#2d333b;border-radius:6px;border:2px solid var(--bg)}
+  ::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="brand"><span class="dot"></span>Plan Visualizer <small>SQL Server execution plans V4</small></div>
+    <div class="spacer"></div>
+    <div class="summary" id="summary"></div>
+    <button id="btnSampleSerial">Serial sample</button>
+    <button id="btnSamplePar">Parallel sample</button>
+    <button id="btnSampleAug">Augmented sample</button>
+    <button id="btnOpenFile">Open file…</button>
+    <button class="primary" id="btnOpen">Paste plan…</button>
+    <input type="file" id="fileInput" accept=".sqlplan,.xml,.json,application/xml,text/xml,application/json" style="display:none">
+  </div>
+
+  <div class="stmtbar hidden" id="stmtbar"></div>
+
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-tab="diagram">Plan diagram</div>
+    <div class="tab" data-tab="grid">Operator grid</div>
+    <div class="tab" data-tab="diff">Est vs Actual</div>
+    <div class="tab" data-tab="analysis">Analysis</div>
+    <div class="tab" data-tab="text">Query text</div>
+    <div class="tab" data-tab="xml">Plan XML</div>
+  </div>
+
+  <div class="body">
+    <div class="stage">
+      <div class="scroll" id="scroll">
+        <svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+      <div class="gridwrap" id="gridwrap"></div>
+      <div class="gridwrap" id="diffwrap"></div>
+      <div class="gridwrap" id="analysiswrap"></div>
+      <div class="textwrap" id="textwrap"><pre id="textpre"></pre></div>
+      <div class="xmlwrap" id="xmlwrap"><pre id="xmlpre"></pre></div>
+
+      <div class="legend" id="legend">
+        <div class="cmode" id="cmode">
+          <span class="cmode-l">colour:</span>
+          <button class="cmbtn active" data-cm="est">est cost</button>
+          <button class="cmbtn" data-cm="actual">actual</button>
+          <button class="cmbtn" data-cm="mem">memory</button>
+        </div>
+        <div><i id="legGrad" style="background:linear-gradient(90deg,#3fb950,#d29922,#f85149)"></i> <span id="legTxt">estimated cost (low→high)</span></div>
+        <div>arrow thickness ∝ rows · click a node for details</div>
+      </div>
+      <div class="zoombar">
+        <button id="zout">−</button><button id="zfit">Fit</button><button id="z100">100%</button><button id="zin">+</button>
+      </div>
+    </div>
+    <button id="paneTab" title="Show operator pane">‹ Operator</button>
+    <div class="side" id="side">
+      <div class="side-head"><span>Operator</span><button id="paneToggle" title="Hide pane">›</button></div>
+      <div class="side-body" id="sideBody"><div class="ph">Select an operator in the diagram or grid to inspect its costs, cardinality, predicates and warnings.</div></div>
+    </div>
+  </div>
+
+  <!-- input overlay -->
+  <div class="overlay" id="overlay">
+    <div class="card">
+      <div class="ch"><h2>Open an execution plan</h2><p>Paste a <code>.sqlplan</code> / SHOWPLAN_XML document, or a <code>sqlplan-insights</code> JSON bundle from the PowerShell analyzer.</p></div>
+      <div class="cb">
+        <textarea id="ta" placeholder="&lt;ShowPlanXML ...&gt;   — or —   { &quot;schema&quot;: &quot;sqlplan-insights/1&quot;, &quot;planXml&quot;: &quot;...&quot;, &quot;dbInspection&quot;: { ... } }"></textarea>
+        <div class="hint">From SSMS: right-click the plan → <b>Save Execution Plan As…</b>. For live-database augmentation (index/stat inventory, stale stats, missing-index coverage, Query Store regressions), run <code>Get-SqlPlanInsights -InspectDatabase -OutFile plan.json</code> and open the resulting JSON here. Everything runs locally — nothing is uploaded, and this page never connects to a database.</div>
+      </div>
+      <div class="cf"><span class="err" id="err"></span><button id="btnSample2">Serial sample</button><button id="btnSample3">Parallel sample</button><button id="btnSample4">Augmented sample</button><button class="primary" id="btnParse">Visualize</button></div>
+    </div>
+  </div>
+
+<script>
+"use strict";
+const NS="http://schemas.microsoft.com/sqlserver/2004/07/showplan";
+const $=id=>document.getElementById(id);
+
+/* ---------- icon set ---------- */
+const CAT={
+  join:{c:'#e3853d',g:'<circle cx="8" cy="8" r="5" fill="none" stroke="#fff" stroke-width="1.6"/><circle cx="14" cy="8" r="5" fill="none" stroke="#fff" stroke-width="1.6"/>'},
+  hash:{c:'#d9772e',g:'<path d="M8 4 V16 M14 4 V16 M5 8 H17 M5 12 H17" stroke="#fff" stroke-width="1.6"/>'},
+  merge:{c:'#e09a3c',g:'<path d="M4 5 L10 10 L4 15 M18 5 L12 10 L18 15" stroke="#fff" stroke-width="1.6" fill="none"/>'},
+  scan:{c:'#3b82c4',g:'<ellipse cx="11" cy="5" rx="6" ry="2.3" fill="none" stroke="#fff" stroke-width="1.4"/><path d="M5 5 V15 a6 2.3 0 0 0 12 0 V5" fill="none" stroke="#fff" stroke-width="1.4"/><path d="M5 10 a6 2.3 0 0 0 12 0" fill="none" stroke="#fff" stroke-width="1.1"/>'},
+  seek:{c:'#2f9e8f',g:'<ellipse cx="10" cy="5" rx="5.5" ry="2.2" fill="none" stroke="#fff" stroke-width="1.4"/><path d="M4.5 5 V15 a5.5 2.2 0 0 0 11 0 V5" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="14" cy="14" r="3" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M16.2 16.2 L19 19" stroke="#fff" stroke-width="1.8"/>'},
+  lookup:{c:'#a371d6',g:'<circle cx="9" cy="9" r="5" fill="none" stroke="#fff" stroke-width="1.7"/><path d="M12.6 12.6 L17 17" stroke="#fff" stroke-width="2"/>'},
+  sort:{c:'#3fb07a',g:'<path d="M5 6 H16 M5 10 H12 M5 14 H8" stroke="#fff" stroke-width="1.7"/><path d="M18 5 V15 M15.5 12 L18 15 L20.5 12" stroke="#fff" stroke-width="1.5" fill="none"/>'},
+  agg:{c:'#3fb07a',g:'<path d="M14 4 H6 L11 10 L6 16 H14" stroke="#fff" stroke-width="1.7" fill="none" stroke-linejoin="round"/>'},
+  compute:{c:'#7d8590',g:'<text x="11" y="14" font-size="11" font-style="italic" font-family="serif" fill="#fff" text-anchor="middle">fx</text>'},
+  filter:{c:'#7d8590',g:'<path d="M4 5 H18 L12 11 V16 L10 17 V11 Z" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>'},
+  spool:{c:'#5a6b7d',g:'<ellipse cx="11" cy="6" rx="6" ry="2.2" fill="none" stroke="#fff" stroke-width="1.4"/><ellipse cx="11" cy="11" rx="6" ry="2.2" fill="none" stroke="#fff" stroke-width="1.4"/><ellipse cx="11" cy="16" rx="6" ry="2.2" fill="none" stroke="#fff" stroke-width="1.4"/>'},
+  par:{c:'#c9a227',g:'<path d="M11 4 V16 M11 16 L7 12 M11 16 L15 12 M4 6 H18" stroke="#fff" stroke-width="1.6" fill="none"/>'},
+  top:{c:'#7d8590',g:'<path d="M11 16 V5 M7 9 L11 5 L15 9" stroke="#fff" stroke-width="1.7" fill="none"/>'},
+  concat:{c:'#7d8590',g:'<path d="M6 5 V12 a5 5 0 0 0 10 0 V5" fill="none" stroke="#fff" stroke-width="1.7"/>'},
+  dml:{c:'#cf4b48',g:'<path d="M5 15 L13 7 L16 10 L8 18 H5 Z" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 7 L16 10" stroke="#fff" stroke-width="1.5"/>'},
+  stmt:{c:'#30363d',g:'<path d="M6 3 H13 L17 7 V19 H6 Z" fill="none" stroke="#fff" stroke-width="1.4"/><path d="M13 3 V7 H17 M8 11 H14 M8 14 H14" stroke="#fff" stroke-width="1.2"/>'},
+  generic:{c:'#7d8590',g:'<rect x="5" y="5" width="12" height="12" rx="2" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M8 9 H14 M8 12 H14" stroke="#fff" stroke-width="1.2"/>'}
+};
+function catOf(op){
+  const o=(op||'').toLowerCase();
+  if(o.includes('nested loops'))return'join';
+  if(o.includes('hash match')||o.includes('hash join'))return'hash';
+  if(o.includes('merge join')||o==='merge')return'merge';
+  if(o.includes('key lookup')||o.includes('rid lookup'))return'lookup';
+  if(o.includes('seek'))return'seek';
+  if(o.includes('scan'))return'scan';
+  if(o.includes('sort'))return'sort';
+  if(o.includes('aggregate'))return'agg';
+  if(o.includes('compute scalar'))return'compute';
+  if(o==='filter')return'filter';
+  if(o.includes('spool'))return'spool';
+  if(o.includes('parallelism')||o.includes('gather')||o.includes('distribute')||o.includes('repartition'))return'par';
+  if(o==='top')return'top';
+  if(o.includes('concatenation'))return'concat';
+  if(/insert|update|delete|merge\b/.test(o))return'dml';
+  if(['select','insert','update','delete'].includes(o))return'stmt';
+  return'generic';
+}
+function iconSVG(op,size){
+  const cat=CAT[catOf(op)]||CAT.generic;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 22 22"><rect x="0" y="0" width="22" height="22" rx="5" fill="${cat.c}"/>${cat.g}</svg>`;
+}
+
+/* ---------- parsing ---------- */
+function localQ(root,name){const set=new Set();const out=[];
+  for(const e of root.getElementsByTagNameNS(NS,name)){if(!set.has(e)){set.add(e);out.push(e);}}
+  for(const e of root.getElementsByTagName(name)){if(!set.has(e)){set.add(e);out.push(e);}}
+  return out;}
+function firstLocal(root,name){const a=root.getElementsByTagNameNS(NS,name);if(a.length)return a[0];const b=root.getElementsByTagName(name);return b.length?b[0]:null;}
+// elements with given localName that are NOT inside a nested RelOp
+function scoped(el,name){
+  const out=[];
+  (function walk(n){for(const c of n.children){if(c.localName==='RelOp')continue;if(c.localName===name)out.push(c);walk(c);}})(el);
+  return out;
+}
+function childRelOps(el){
+  const out=[];
+  (function walk(n){for(const c of n.children){if(c.localName==='RelOp'){out.push(c);}else walk(c);}})(el);
+  return out;
+}
+function num(el,a){const v=el&&el.getAttribute(a);return v==null||v===''?null:Number(v);}
+
+function buildNode(relOp){
+  const n={
+    nodeId:relOp.getAttribute('NodeId'),
+    phys:relOp.getAttribute('PhysicalOp')||'?',
+    log:relOp.getAttribute('LogicalOp')||'',
+    estRows:num(relOp,'EstimateRows'),
+    estRowsAll:num(relOp,'EstimatedRowsRead'),
+    estIO:num(relOp,'EstimateIO'),
+    estCPU:num(relOp,'EstimateCPU'),
+    estExec:num(relOp,'EstimateExecutions'),
+    avgRow:num(relOp,'AvgRowSize'),
+    subtree:num(relOp,'EstimatedTotalSubtreeCost'),
+    parallel:relOp.getAttribute('Parallel')==='1'||relOp.getAttribute('Parallel')==='true',
+    mode:relOp.getAttribute('EstimatedExecutionMode')||'',
+    obj:null,outputs:[],preds:[],seeks:[],warnings:[],
+    actualRows:null,actualExec:null,actualMode:'',
+    actualCPU:null,actualElapsed:null,actualReads:null,threads:[],
+    rowsRead:null,rebinds:null,rewinds:null,joinPred:null,manyToMany:false,bitmap:false,spill:null,
+    memFracIn:null,memFracOut:null,
+    children:[]
+  };
+  // object
+  const objs=scoped(relOp,'Object');
+  if(objs.length){const o=objs[0];
+    n.obj={db:o.getAttribute('Database'),schema:o.getAttribute('Schema'),table:o.getAttribute('Table'),
+      index:o.getAttribute('Index'),kind:o.getAttribute('IndexKind'),alias:o.getAttribute('Alias')};
+  }
+  // outputs
+  const ol=scoped(relOp,'OutputList')[0];
+  if(ol){for(const c of scoped(ol,'ColumnReference')){n.outputs.push(colName(c));}}
+  // predicates
+  for(const p of scoped(relOp,'Predicate')){const s=firstScalar(p);if(s)n.preds.push(s);}
+  for(const sp of scoped(relOp,'SeekPredicates')){for(const so of scoped(sp,'ScalarOperator')){if(so.getAttribute('ScalarString'))n.seeks.push(so.getAttribute('ScalarString'));}}
+  // warnings (+ spill detail)
+  for(const w of scoped(relOp,'Warnings')){
+    if(w.getAttribute('NoJoinPredicate')==='true')n.warnings.push({lvl:'bad',t:'No join predicate (Cartesian product)'});
+    for(const cn of scoped(w,'ColumnsWithNoStatistics'))n.warnings.push({lvl:'warn',t:'Columns with no statistics'});
+    for(const pc of scoped(w,'PlanAffectingConvert'))n.warnings.push({lvl:'warn',t:'Implicit conversion affecting cardinality: '+(pc.getAttribute('Expression')||'')});
+    // any element whose local name mentions "spill"
+    (function scan(el){for(const c of el.children){const ln=(c.localName||'').toLowerCase();
+      if(ln.includes('spill')){const pg=num(c,'SpilledPages'),lv=num(c,'SpillLevel');
+        n.spill=n.spill||{pages:0,level:0,names:[]};
+        if(!n.spill.names.includes(c.localName))n.spill.names.push(c.localName);
+        if(pg!=null&&pg>n.spill.pages)n.spill.pages=pg;
+        if(lv!=null&&lv>n.spill.level)n.spill.level=lv;
+        n.warnings.push({lvl:'bad',t:'Spill to tempdb'+(lv!=null?' (level '+lv+')':'')});}
+      scan(c);}})(w);
+    if(w.getAttribute('SpillOccurred')==='true'){n.spill=n.spill||{pages:0,level:0,names:['SpillOccurred']};}
+  }
+  // runtime (actual)
+  for(const rt of scoped(relOp,'RunTimeCountersPerThread')){
+    const r=num(rt,'ActualRows')||0, ex=num(rt,'ActualExecutions');
+    n.actualRows=(n.actualRows||0)+r;
+    if(ex!=null)n.actualExec=(n.actualExec||0)+ex;
+    n.actualMode=rt.getAttribute('ActualExecutionMode')||n.actualMode;
+    const cpu=num(rt,'ActualCPUms'),el=num(rt,'ActualElapsedms'),rd=num(rt,'ActualLogicalReads');
+    const rr=num(rt,'ActualRowsRead'),rb=num(rt,'ActualRebinds'),rw=num(rt,'ActualRewinds');
+    if(cpu!=null)n.actualCPU=(n.actualCPU||0)+cpu;
+    if(el!=null)n.actualElapsed=Math.max(n.actualElapsed||0,el);
+    if(rd!=null)n.actualReads=(n.actualReads||0)+rd;
+    if(rr!=null)n.rowsRead=(n.rowsRead||0)+rr;
+    if(rb!=null)n.rebinds=(n.rebinds||0)+rb;
+    if(rw!=null)n.rewinds=(n.rewinds||0)+rw;
+    n.threads.push({thread:num(rt,'Thread'),rows:r,exec:ex,cpu:cpu});
+  }
+  // RowsRead only meaningful on access operators (per the analyzer)
+  if(n.rowsRead!=null && !/Index Scan|Index Seek|Table Scan|Key Lookup|RID Lookup/i.test(n.phys)) n.rowsRead=null;
+  // per-operator share of the query memory grant (emitted on memory-consuming iterators: Sort, Hash, Window Aggregate, etc.)
+  const mf=scoped(relOp,'MemoryFractions')[0];
+  if(mf){n.memFracIn=num(mf,'Input');n.memFracOut=num(mf,'Output');}
+  // join predicate (probe residual / nested-loops predicate / merge residual)
+  const hash=scoped(relOp,'ProbeResidual')[0]; if(hash)n.joinPred=firstScalar(hash);
+  // many-to-many merge
+  const mrg=scoped(relOp,'Merge')[0]; if(mrg && (mrg.getAttribute('ManyToMany')==='1'||mrg.getAttribute('ManyToMany')==='true'))n.manyToMany=true;
+  // bitmap / index intersection
+  if(/Bitmap/i.test(n.phys))n.bitmap=true;
+  if(!n.bitmap && [...n.preds,...n.seeks,n.joinPred||''].some(s=>/PROBE\(|Opt_Bitmap/i.test(s||'')))n.bitmap=true;
+  n.children=childRelOps(relOp).map(buildNode);
+  // own cost
+  const childSub=n.children.reduce((s,c)=>s+(c.subtree||0),0);
+  n.ownCost=Math.max(0,(n.subtree||0)-childSub);
+  return n;
+}
+function colName(c){
+  const t=c.getAttribute('Table'),col=c.getAttribute('Column'),al=c.getAttribute('Alias');
+  return [al||t,col].filter(Boolean).join('.').replace(/[\[\]]/g,'')||col||'';
+}
+function firstScalar(el){const so=scoped(el,'ScalarOperator')[0];return so?so.getAttribute('ScalarString'):null;}
+
+function parseMissingIndexes(qp){
+  const res=[];
+  for(const grp of localQ(qp,'MissingIndexGroup')){
+    const impact=grp.getAttribute('Impact');
+    const mi=firstLocal(grp,'MissingIndex');if(!mi)continue;
+    const eq=[],ineq=[],incl=[];
+    for(const cg of localQ(mi,'ColumnGroup')){
+      const usage=cg.getAttribute('Usage');
+      const cols=localQ(cg,'Column').map(c=>c.getAttribute('Name'));
+      if(usage==='EQUALITY')eq.push(...cols);
+      else if(usage==='INEQUALITY')ineq.push(...cols);
+      else incl.push(...cols);
+    }
+    const tbl=`${mi.getAttribute('Schema')||''}.${mi.getAttribute('Table')||''}`.replace(/[\[\]]/g,'');
+    const keys=[...eq,...ineq].map(c=>c.replace(/[\[\]]/g,'')).join(', ');
+    const inc=incl.map(c=>c.replace(/[\[\]]/g,'')).join(', ');
+    let ddl=`CREATE NONCLUSTERED INDEX [IX_${(mi.getAttribute('Table')||'').replace(/[\[\]]/g,'')}_missing]\n  ON ${tbl} (${keys})`;
+    if(inc)ddl+=`\n  INCLUDE (${inc})`;
+    res.push({impact,ddl,tbl});
+  }
+  return res;
+}
+
+function parsePlan(xml){
+  xml=xml.replace(/^\uFEFF/,'').replace(/<\?xml[^>]*\?>/i,'').trim();
+  const doc=new DOMParser().parseFromString(xml,'text/xml');
+  const perr=doc.getElementsByTagName('parsererror');
+  if(perr.length)throw new Error('XML parse error — is this a valid execution plan? '+(perr[0].textContent||'').slice(0,120));
+  const sp=firstLocal(doc,'ShowPlanXML');
+  if(!sp)throw new Error('No <ShowPlanXML> root found. Paste a .sqlplan / SHOWPLAN_XML document.');
+  const version=sp.getAttribute('Version'),build=sp.getAttribute('Build');
+  let isActual=false;
+  const statements=[];
+  for(const st of localQ(doc,'StmtSimple')){
+    const qp=firstLocal(st,'QueryPlan');
+    const top=qp?childRelOps(qp)[0]:childRelOps(st)[0];
+    if(!top)continue;
+    const rootRel=buildNode(top);
+    const stype=st.getAttribute('StatementType')||'SELECT';
+    // synthetic statement node
+    const synth={nodeId:'',phys:stype,log:'',subtree:rootRel.subtree,ownCost:0,
+      estRows:rootRel.estRows,actualRows:rootRel.actualRows,children:[rootRel],
+      obj:null,outputs:[],preds:[],seeks:[],warnings:[],parallel:false,mode:'',statement:true};
+    const mem=firstLocal(qp||st,'MemoryGrantInfo');
+    const memGrant=mem?{serialReq:num(mem,'SerialRequiredMemory'),serialDes:num(mem,'SerialDesiredMemory'),
+      granted:num(mem,'GrantedMemory'),maxUsed:num(mem,'MaxUsedMemory'),
+      requested:num(mem,'RequestedMemory'),lastRequested:num(mem,'LastRequestedMemory'),
+      feedback:mem.getAttribute('IsMemoryGrantFeedbackAdjusted')}:null;
+    const qts=firstLocal(qp||st,'QueryTimeStats');
+    const timeStats=qts?{cpu:num(qts,'CpuTime'),elapsed:num(qts,'ElapsedTime'),udfCpu:num(qts,'UdfCpuTime'),udfElapsed:num(qts,'UdfElapsedTime')}:null;
+    const wsEl=firstLocal(qp||st,'WaitStats');
+    const waits=wsEl?localQ(wsEl,'Wait').map(w=>({type:w.getAttribute('WaitType'),ms:num(w,'WaitTimeMs'),count:num(w,'WaitCount')})):[];
+    const osu=firstLocal(qp||st,'OptimizerStatsUsage');
+    const statsUsage=osu?localQ(osu,'StatisticsInfo').map(s=>{const sch=(s.getAttribute('Schema')||'').replace(/[\[\]]/g,''),tbl=(s.getAttribute('Table')||'').replace(/[\[\]]/g,'');return{table:sch?sch+'.'+tbl:tbl,stat:(s.getAttribute('Statistics')||'').replace(/[\[\]]/g,''),mods:num(s,'ModificationCount'),sample:num(s,'SamplingPercent'),updated:s.getAttribute('LastUpdate')||''};}):[];
+    const missing=qp?parseMissingIndexes(qp):[];
+    if(allNodes(synth).some(n=>n.actualRows!=null))isActual=true;
+    // plan-affecting implicit conversions (statement scope)
+    const pacs=[];
+    for(const pc of localQ(st,'PlanAffectingConvert')){
+      let expr=pc.getAttribute('Expression')||pc.textContent||'';
+      if(expr.length>220)expr=expr.slice(0,220)+'…';
+      pacs.push({issue:pc.getAttribute('ConvertIssue')||pc.getAttribute('ConvertIssueType')||'Convert',expr});
+    }
+    // parameter-sensitive plan (dispatcher) detection
+    const psp=!!firstLocal(st,'Dispatcher')||localQ(st,'ParameterSensitivePredicate').length>0;
+    statements.push({
+      type:stype,
+      text:(st.getAttribute('StatementText')||'').trim(),
+      subtree:num(st,'StatementSubTreeCost')||rootRel.subtree||0,
+      root:synth,memGrant,timeStats,waits,statsUsage,missing,pacs,psp
+    });
+  }
+  if(!statements.length)throw new Error('No statements with a query plan were found in this document.');
+  return {version,build,isActual,statements};
+}
+function allNodes(root){const out=[];(function w(n){out.push(n);n.children.forEach(w);})(root);return out;}
+
+/* ---------- layout ---------- */
+const NW=158,NH=62,HGAP=66,VGAP=20,PAD=40;
+function layout(root){
+  let leafY=PAD;
+  const maxDepth={v:0};
+  (function place(n,depth){
+    n.x=PAD+depth*(NW+HGAP);
+    maxDepth.v=Math.max(maxDepth.v,depth);
+    if(!n.children.length){n.y=leafY+NH/2;leafY+=NH+VGAP;return;}
+    n.children.forEach(c=>place(c,depth+1));
+    n.y=(n.children[0].y+n.children[n.children.length-1].y)/2;
+  })(root,0);
+  return {w:PAD*2+(maxDepth.v+1)*NW+maxDepth.v*HGAP, h:Math.max(leafY+PAD-VGAP, PAD*2+NH)};
+}
+
+/* ---------- color scales ---------- */
+function costColor(p){ // p in 0..1
+  if(p<.5){const t=p/.5;return mix([63,185,80],[210,153,34],t);}
+  const t=(p-.5)/.5;return mix([210,153,34],[248,81,73],t);
+}
+function mix(a,b,t){return `rgb(${a.map((v,i)=>Math.round(v+(b[i]-v)*t)).join(',')})`;}
+function rowsWidth(r,maxR){if(!r||r<=0)return 1.5;const t=Math.log10(r+1)/Math.log10(maxR+1);return 1.5+t*16;}
+
+/* ---------- heatmap colour modes ----------
+   est    : optimizer EstimatedTotalSubtreeCost delta (ownCost / statement total)
+   actual : runtime evidence — ActualCPUms per operator (falls back to ActualRows
+            when the plan carries rows but no CPU counters). Matches the
+            "optimizer cost deliberately excluded" philosophy of the analysis grid.
+   mem    : per-operator share of the query memory grant (MemoryFractions);
+            spilled operators are pinned to max (they exceeded their grant).        */
+function colorCtx(nodes){
+  const real=nodes.filter(n=>!n.statement);
+  const total=(STMT&&STMT.root&&STMT.root.subtree)||1;
+  const sumCPU=real.reduce((s,n)=>s+(n.actualCPU||0),0);
+  const anyCPU=real.some(n=>n.actualCPU!=null);
+  const sumARows=real.reduce((s,n)=>s+(n.actualRows||0),0);
+  const anyARows=real.some(n=>n.actualRows!=null);
+  const anyMem=real.some(n=>(n.memFracIn!=null||n.memFracOut!=null||n.spill));
+  const granted=(STMT&&STMT.memGrant&&STMT.memGrant.granted)||0; // KB
+  const avail={est:true,actual:anyCPU||anyARows,mem:anyMem};
+  let mode=COLORMODE; if(!avail[mode])mode='est';
+  return {mode,total,sumCPU,sumARows,anyCPU,actualKind:anyCPU?'cpu':'rows',granted,avail};
+}
+function nodeWeight(n,ctx){
+  if(n.statement)return {cp:0,txt:''};
+  if(ctx.mode==='actual'){
+    if(ctx.actualKind==='cpu'){const cp=ctx.sumCPU>0?(n.actualCPU||0)/ctx.sumCPU:0;return {cp,txt:(cp*100).toFixed(0)+'%'};}
+    const cp=ctx.sumARows>0?(n.actualRows||0)/ctx.sumARows:0;return {cp,txt:(cp*100).toFixed(0)+'%'};
+  }
+  if(ctx.mode==='mem'){
+    let f=Math.max(n.memFracIn||0,n.memFracOut||0);
+    if(n.spill)f=Math.max(f,1);
+    let txt;
+    if(ctx.granted>0&&f>0){const kb=f*ctx.granted;txt=kb>=1024?(kb/1024).toFixed(kb<10240?1:0)+'MB':Math.round(kb)+'KB';}
+    else txt=f>0?(f*100).toFixed(0)+'%':(n.spill?'spill':'');
+    if(n.spill&&!/spill/.test(txt))txt=(txt?txt+' ':'')+'⚠';
+    return {cp:Math.min(1,f),txt};
+  }
+  const cp=(n.ownCost||0)/ctx.total;return {cp,txt:(cp*100).toFixed(0)+'%'};
+}
+function applyColorChrome(ctx){
+  const labels={est:'estimated cost (low→high)',
+    actual:ctx.actualKind==='cpu'?'actual CPU (low→high)':'actual rows (low→high)',
+    mem:'memory grant share (spill = max)'};
+  const lt=$('legTxt');if(lt)lt.textContent=labels[ctx.mode]||labels.est;
+  document.querySelectorAll('#cmode .cmbtn').forEach(b=>{
+    const m=b.dataset.cm;
+    b.disabled=!ctx.avail[m];
+    b.classList.toggle('active',m===ctx.mode);
+    b.title=ctx.avail[m]?'':(m==='actual'?'No runtime counters in this plan (estimated-only plan)':m==='mem'?'No per-operator memory fractions or spills in this plan':'');
+  });
+}
+
+/* ---------- state ---------- */
+let PLAN=null,STMT=null,SCALE=1,SELID=null,SORT={key:'cost',dir:-1},COLORMODE='est';
+
+function setSummary(){
+  if(!PLAN){$('summary').innerHTML='';return;}
+  const b=PLAN.isActual?'<span class="badge actual">actual</span>':'<span class="badge est">estimated</span>';
+  $('summary').innerHTML=`${b}
+    <span>cost <b>${(STMT.subtree||0).toFixed(4)}</b></span>
+    <span>operators <b>${allNodes(STMT.root).length-1}</b></span>
+    ${PLAN.version?`<span>SQL build <b>${PLAN.build||PLAN.version}</b></span>`:''}`;
+}
+
+/* ---------- diagram render ---------- */
+function renderDiagram(){
+  const root=STMT.root;
+  const size=layout(root);
+  const nodes=allNodes(root);
+  const total=root.subtree||1;
+  const ctx=colorCtx(nodes);
+  applyColorChrome(ctx);
+  const maxW=Math.max(0,...nodes.filter(x=>!x.statement).map(x=>nodeWeight(x,ctx).cp));
+  const maxR=Math.max(1,...nodes.map(n=>n.actualRows??n.estRows??0));
+  const svg=$('svg');
+  let edges='',boxes='';
+  // edges: child(right) -> parent(left)
+  for(const n of nodes){
+    for(const c of n.children){
+      const x1=c.x, y1=c.y;            // child left-ish (it sits to the right)
+      const x2=n.x+NW, y2=n.y;         // parent right edge
+      const r=c.actualRows??c.estRows??0;
+      const w=rowsWidth(r,maxR);
+      const mx=(x1+x2)/2;
+      edges+=`<path class="flow" stroke-width="${w.toFixed(2)}" d="M${x1} ${y1} C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}"/>`;
+      // arrowhead into parent (pointing left)
+      edges+=`<path d="M${x2} ${y2} l7 -4 v8 z" fill="#3d4856"/>`;
+    }
+  }
+  for(const n of nodes){
+    const w=nodeWeight(n,ctx);
+    const cp=w.cp;
+    const col=n.statement?'#30363d':costColor(Math.min(1,cp));
+    const hot=!n.statement && cp>0 && cp===maxW;
+    const sel=n.nodeId===SELID && SELID!=null && !(n.statement&&SELID==='');
+    const label=n.statement?n.phys:n.phys;
+    const sub=n.obj?objShort(n.obj):(n.log&&n.log!==n.phys?n.log:'');
+    const rowsTxt=fmt(n.statement?(n.actualRows??n.estRows):(n.actualRows??n.estRows));
+    const skew=skewFlag(n);
+    boxes+=`<g class="node-g ${sel?'sel':''} ${hot?'hot':''}" data-id="${n.nodeId}" transform="translate(${n.x},${n.y-NH/2})">
+      <rect class="node-box" width="${NW}" height="${NH}" rx="7"/>
+      <g transform="translate(8,9)">${iconSVG(n.phys,24)}</g>
+      ${n.parallel?`<g transform="translate(${NW-22},7)">${iconSVG('Parallelism',14)}</g>`:''}
+      <text class="node-txt" x="40" y="19">${esc(clip(label,16))}</text>
+      <text class="node-sub" x="40" y="32">${esc(clip(sub,18))}</text>
+      <text class="node-cost" x="40" y="45">${n.statement?'':(w.txt?'<tspan>'+w.txt+'</tspan> · ':'')}${rowsTxt} rows${skew?' <tspan fill="#ff7b72">⚠</tspan>':''}</text>
+      <rect x="6" y="${NH-7}" width="${NW-12}" height="4" rx="2" fill="#0b0f14"/>
+      <rect x="6" y="${NH-7}" width="${((NW-12)*Math.min(1,cp)).toFixed(1)}" height="4" rx="2" fill="${col}"/>
+    </g>`;
+  }
+  svg.setAttribute('viewBox',`0 0 ${size.w} ${size.h}`);
+  svg.style.width=(size.w*SCALE)+'px';svg.style.height=(size.h*SCALE)+'px';
+  svg.innerHTML=edges+boxes;
+  svg.querySelectorAll('.node-g').forEach(g=>g.addEventListener('click',()=>selectNode(g.getAttribute('data-id'))));
+}
+function objShort(o){if(!o)return'';const t=(o.table||'').replace(/[\[\]]/g,'');const i=(o.index||'').replace(/[\[\]]/g,'');return i?`${t}.${i}`:t;}
+function estTotal(n){if(n.estRows==null)return null;return n.estRows*(n.estExec==null?1:n.estExec);}
+function rowRatio(n){const et=estTotal(n);if(et==null||n.actualRows==null)return null;const hi=Math.max(et,n.actualRows),lo=Math.max(1,Math.min(et,n.actualRows));return hi/lo;}
+function skewFlag(n){if(n.statement)return false;const r=rowRatio(n);return r!=null&&r>=10;}
+function clip(s,n){s=s||'';return s.length>n?s.slice(0,n-1)+'…':s;}
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fmt(n){if(n==null)return'—';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'k';return Math.round(n).toLocaleString();}
+
+/* ---------- details ---------- */
+function findNode(id){return allNodes(STMT.root).find(n=>n.nodeId===id||(id===''&&n.statement));}
+function selectNode(id){SELID=id;if($('side').classList.contains('collapsed'))setPane(false);renderDiagram();renderGridSel();renderDetails(findNode(id));}
+function row(k,v,hot){return `<div class="k">${k}</div><div class="v ${hot?'hot':''}">${v}</div>`;}
+function renderDetails(n){
+  if(!n){$('sideBody').innerHTML='<div class="ph">Select an operator.</div>';return;}
+  const total=STMT.root.subtree||1;
+  const cp=((n.ownCost||0)/total*100);
+  let h=`<div class="det-h"><div class="ico">${iconSVG(n.phys,30)}</div>
+    <div><div class="t1">${esc(n.phys)}</div><div class="t2">${esc(n.log||(n.statement?'Statement':''))}${n.parallel?' · parallel':''}${n.mode?' · '+n.mode+' mode':''}</div></div></div>`;
+
+  if(n.obj){h+=`<div class="det-sec"><h4>Object</h4><div class="kv">
+    ${row('Table',esc((n.obj.table||'').replace(/[\[\]]/g,'')))}
+    ${n.obj.index?row('Index',esc((n.obj.index).replace(/[\[\]]/g,''))):''}
+    ${n.obj.kind?row('Kind',esc(n.obj.kind)):''}
+    ${n.obj.schema?row('Schema',esc((n.obj.schema).replace(/[\[\]]/g,''))):''}
+    ${n.obj.alias?row('Alias',esc((n.obj.alias).replace(/[\[\]]/g,''))):''}
+  </div></div>`;}
+
+  if(!n.statement){
+    h+=`<div class="det-sec"><h4>Cost</h4><div class="kv">
+      ${row('Operator cost',cp.toFixed(1)+'%')}
+      ${row('Operator (abs)',(n.ownCost||0).toFixed(5))}
+      ${row('Subtree cost',(n.subtree||0).toFixed(5))}
+      ${n.estIO!=null?row('I/O cost',n.estIO.toFixed(5)):''}
+      ${n.estCPU!=null?row('CPU cost',n.estCPU.toFixed(5)):''}
+    </div></div>`;
+  }
+
+  if(!n.statement && (n.memFracIn!=null||n.memFracOut!=null||n.spill)){
+    const g=(STMT.memGrant&&STMT.memGrant.granted)||0;
+    const f=Math.max(n.memFracIn||0,n.memFracOut||0);
+    const kb=g>0?f*g:0;
+    h+=`<div class="det-sec"><h4>Memory</h4><div class="kv">
+      ${n.memFracOut!=null?row('Grant fraction (out)',(n.memFracOut*100).toFixed(1)+'%'):''}
+      ${n.memFracIn!=null?row('Grant fraction (in)',(n.memFracIn*100).toFixed(1)+'%'):''}
+      ${kb>0?row('Approx. grant share',kb>=1024?(kb/1024).toFixed(1)+' MB':Math.round(kb)+' KB'):''}
+      ${n.spill?row('Spill','tempdb'+(n.spill.level?' (level '+n.spill.level+')':'')+(n.spill.pages?' · '+n.spill.pages.toLocaleString()+' pages':''),true):''}
+    </div></div>`;
+  }
+
+  const skew=skewFlag(n);
+  const et=estTotal(n), ratio=rowRatio(n);
+  h+=`<div class="det-sec"><h4>Cardinality</h4><div class="kv">
+    ${row('Est. rows / exec',fmtFull(n.estRows))}
+    ${(n.estExec!=null&&n.estExec!==1)?row('Est. rows (total)',fmtFull(et)):''}
+    ${n.actualRows!=null?row('Actual rows (total)',fmtFull(n.actualRows),skew):''}
+    ${n.estExec!=null?row('Est. executions',fmtFull(n.estExec)):''}
+    ${n.actualExec!=null?row('Actual executions',fmtFull(n.actualExec)):''}
+    ${ratio!=null?row('Est : Act ratio',ratio.toFixed(1)+'×',ratio>=10):''}
+    ${n.avgRow!=null?row('Avg row size',n.avgRow+' B'):''}
+  </div></div>`;
+
+  if(n.actualCPU!=null||n.actualElapsed!=null||n.actualReads!=null){
+    h+=`<div class="det-sec"><h4>Runtime</h4><div class="kv">
+      ${n.actualCPU!=null?row('CPU time',n.actualCPU.toLocaleString()+' ms'):''}
+      ${n.actualElapsed!=null?row('Elapsed (max thread)',n.actualElapsed.toLocaleString()+' ms'):''}
+      ${n.actualReads!=null?row('Logical reads',n.actualReads.toLocaleString()):''}
+    </div></div>`;
+  }
+
+  const th=(n.threads||[]).filter(t=>t.thread!=null);
+  if(th.length>1){
+    const rws=th.map(t=>t.rows),mx=Math.max(...rws,1),sum=rws.reduce((a,b)=>a+b,0),avg=sum/th.length,imbal=mx/Math.max(1,avg);
+    h+=`<div class="det-sec"><h4>Per-thread rows · DOP ${th.length}</h4>`;
+    for(const t of th){const w=(t.rows/mx*100).toFixed(0),hot=t.rows>avg*1.5;
+      h+=`<div style="display:flex;align-items:center;gap:8px;margin:3px 0;font-family:var(--mono);font-size:11px">
+        <span style="color:var(--faint);width:42px">Thr ${t.thread}</span>
+        <span style="flex:1;height:11px;background:#0b0f14;border-radius:3px;overflow:hidden">
+          <span style="display:block;height:100%;width:${w}%;background:${hot?'var(--bad)':'var(--accent)'}"></span></span>
+        <span style="width:56px;text-align:right">${fmt(t.rows)}</span></div>`;}
+    if(imbal>1.5)h+=`<div class="wbox warn" style="margin-top:6px">Uneven distribution — busiest thread carries ${imbal.toFixed(1)}× the average. Skewed work assignment limits the benefit of going parallel.</div>`;
+    h+=`</div>`;
+  }
+
+  if(n.seeks.length)h+=`<div class="det-sec"><h4>Seek predicate</h4><div class="codeblk">${esc(n.seeks.join('\n'))}</div></div>`;
+  if(n.preds.length)h+=`<div class="det-sec"><h4>Predicate</h4><div class="codeblk">${esc(n.preds.join('\n'))}</div></div>`;
+  if(n.outputs.length)h+=`<div class="det-sec"><h4>Output list (${n.outputs.length})</h4><div class="codeblk">${esc(n.outputs.join('\n'))}</div></div>`;
+
+  if(skew){const under=n.actualRows>et;
+    h+=`<div class="det-sec"><div class="wbox warn">Cardinality misestimate: optimizer expected ${fmt(et)} rows total, got ${fmt(n.actualRows)} (${ratio.toFixed(0)}× ${under?'under':'over'}-estimate). Check statistics freshness, parameter sniffing, or non-SARGable predicates.</div></div>`;}
+  for(const w of n.warnings){h+=`<div class="det-sec"><div class="wbox ${w.lvl}">${esc(w.t)}</div></div>`;}
+
+  $('sideBody').innerHTML=h;
+}
+function fmtFull(n){return n==null?'—':Number.isInteger(n)?n.toLocaleString():n.toLocaleString(undefined,{maximumFractionDigits:2});}
+
+/* ---------- grid ---------- */
+function renderGrid(){
+  const nodes=allNodes(STMT.root).filter(n=>!n.statement);
+  const total=STMT.root.subtree||1;
+  const cols=[
+    {k:'nodeId',t:'Node',l:true,f:n=>n.nodeId},
+    {k:'phys',t:'Operator',l:true,f:n=>`<span class="opname">${iconSVG(n.phys,18)}<span>${esc(n.phys)}</span></span>`,raw:n=>n.phys},
+    {k:'obj',t:'Object',l:true,f:n=>esc(objShort(n.obj)||n.log||''),raw:n=>objShort(n.obj)||''},
+    {k:'cost',t:'Cost %',f:n=>{const p=(n.ownCost||0)/total;return `<span class="costcell"><span class="bar" style="width:${(p*100).toFixed(1)}%;background:${costColor(Math.min(1,p))}"></span>${(p*100).toFixed(1)}</span>`;},raw:n=>(n.ownCost||0)/total},
+    {k:'subtree',t:'Subtree',f:n=>(n.subtree||0).toFixed(4),raw:n=>n.subtree||0},
+    {k:'estRows',t:'Est. rows',f:n=>fmt(n.estRows),raw:n=>n.estRows||0},
+    {k:'actualRows',t:'Act. rows',f:n=>n.actualRows==null?'—':fmt(n.actualRows),raw:n=>n.actualRows||-1},
+    {k:'estCPU',t:'CPU cost',f:n=>n.estCPU==null?'—':n.estCPU.toFixed(4),raw:n=>n.estCPU||0},
+    {k:'estIO',t:'I/O cost',f:n=>n.estIO==null?'—':n.estIO.toFixed(4),raw:n=>n.estIO||0},
+    {k:'actualExec',t:'Exec',f:n=>n.actualExec==null?'—':fmt(n.actualExec),raw:n=>n.actualExec||0},
+    {k:'actualCPU',t:'CPU ms',f:n=>n.actualCPU==null?'—':n.actualCPU.toLocaleString(),raw:n=>n.actualCPU||0},
+    {k:'actualElapsed',t:'Elapsed ms',f:n=>n.actualElapsed==null?'—':n.actualElapsed.toLocaleString(),raw:n=>n.actualElapsed||0},
+    {k:'actualReads',t:'Reads',f:n=>n.actualReads==null?'—':n.actualReads.toLocaleString(),raw:n=>n.actualReads||0},
+  ];
+  const sc=cols.find(c=>c.k===SORT.key)||cols[3];
+  nodes.sort((a,b)=>{const va=sc.raw?sc.raw(a):a[sc.key],vb=sc.raw?sc.raw(b):b[sc.key];
+    if(typeof va==='string')return SORT.dir*va.localeCompare(vb);return SORT.dir*((va||0)-(vb||0));});
+  let h='<table class="grid"><thead><tr>';
+  for(const c of cols)h+=`<th class="${c.l?'l':''}" data-k="${c.k}">${c.t}${SORT.key===c.k?(SORT.dir<0?' ▾':' ▴'):''}</th>`;
+  h+='</tr></thead><tbody>';
+  for(const n of nodes){h+=`<tr data-id="${n.nodeId}" class="${n.nodeId===SELID?'sel':''}">`;
+    for(const c of cols)h+=`<td class="${c.l?'l':''}">${c.f(n)}</td>`;h+='</tr>';}
+  h+='</tbody></table>';
+  $('gridwrap').innerHTML=h;
+  $('gridwrap').querySelectorAll('th').forEach(th=>th.addEventListener('click',()=>{
+    const k=th.getAttribute('data-k');if(SORT.key===k)SORT.dir*=-1;else{SORT.key=k;SORT.dir=-1;}renderGrid();}));
+  $('gridwrap').querySelectorAll('tr[data-id]').forEach(tr=>tr.addEventListener('click',()=>selectNode(tr.getAttribute('data-id'))));
+}
+function renderGridSel(){document.querySelectorAll('#gridwrap tr[data-id],#diffwrap tr[data-id]').forEach(tr=>tr.classList.toggle('sel',tr.getAttribute('data-id')===SELID));}
+
+function renderDiff(){
+  const nodes=allNodes(STMT.root).filter(n=>!n.statement);
+  if(!nodes.some(n=>n.actualRows!=null)){
+    $('diffwrap').innerHTML=`<div style="padding:40px;color:var(--faint);max-width:600px;line-height:1.7">
+      <h3 style="color:var(--ink);margin-top:0">No actual row counts in this plan</h3>
+      This is an estimated plan, so there's nothing to compare against. Capture an <b>actual</b> plan to use this view:
+      enable <b>Include Actual Execution Plan</b> in SSMS (Ctrl+M), or run <code>SET STATISTICS XML ON;</code> before the query, then re-open the plan here.</div>`;
+    return;
+  }
+  const rows=nodes.map(n=>({n,et:estTotal(n),at:n.actualRows,r:rowRatio(n)})).filter(x=>x.r!=null).sort((a,b)=>b.r-a.r);
+  const over10=rows.filter(x=>x.r>=10).length, worst=rows[0];
+  let h=`<div style="padding:12px 14px;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)">
+    Operators ranked by cardinality misestimate — estimated total (rows × executions) vs actual total rows.
+    ${over10?`<b style="color:var(--hot)">${over10} operator${over10>1?'s':''} off by ≥10×</b> — worst is <b style="color:var(--hot)">${worst.r.toFixed(0)}×</b> at node ${worst.n.nodeId} (${esc(worst.n.phys)}).`:`<b style="color:var(--good)">Estimates look healthy</b> — nothing off by ≥10×.`}</div>`;
+  h+='<table class="grid"><thead><tr><th class="l">Node</th><th class="l">Operator</th><th class="l">Object</th><th>Est total</th><th>Actual total</th><th>Exec</th><th>Ratio</th><th class="l">Direction</th></tr></thead><tbody>';
+  for(const x of rows){const n=x.n,col=x.r>=10?'var(--bad)':x.r>=2?'var(--warn)':'var(--good)',under=x.at>x.et;
+    h+=`<tr data-id="${n.nodeId}" class="${n.nodeId===SELID?'sel':''}">
+      <td class="l">${n.nodeId}</td>
+      <td class="l"><span class="opname">${iconSVG(n.phys,18)}<span>${esc(n.phys)}</span></span></td>
+      <td class="l">${esc(objShort(n.obj)||n.log||'')}</td>
+      <td>${fmt(x.et)}</td><td>${fmt(x.at)}</td><td>${n.actualExec==null?'—':fmt(n.actualExec)}</td>
+      <td style="color:${col};font-weight:600">${x.r.toFixed(1)}×</td>
+      <td class="l" style="color:${col}">${under?'▲ under-estimated':'▼ over-estimated'}</td></tr>`;}
+  h+='</tbody></table>';
+  $('diffwrap').innerHTML=h;
+  $('diffwrap').querySelectorAll('tr[data-id]').forEach(tr=>tr.addEventListener('click',()=>selectNode(tr.getAttribute('data-id'))));
+}
+
+/* ---------- text / xml ---------- */
+function renderText(){
+  let h=esc(STMT.text||'(no statement text)');
+  h=h.replace(/\b(SELECT|FROM|WHERE|JOIN|INNER|LEFT|RIGHT|OUTER|GROUP BY|ORDER BY|HAVING|ON|AND|OR|INSERT|UPDATE|DELETE|INTO|VALUES|SET|TOP|DISTINCT|AS|UNION|EXISTS)\b/g,'<span class="sql-kw">$1</span>');
+  $('textpre').innerHTML=h;
+  const old=$('textwrap').querySelector('.mi');if(old)old.remove();
+  if(STMT.missing&&STMT.missing.length){
+    let mi=`<div style="color:#3fb950;font-weight:600;margin-bottom:6px">Missing index suggestion${STMT.missing.length>1?'s':''}:</div>`;
+    for(const m of STMT.missing)mi+=`<div class="codeblk" style="max-height:none;margin-bottom:8px;color:#9fb6c9">/* Estimated impact: ${m.impact}% */\n${esc(m.ddl)};</div>`;
+    const d=document.createElement('div');d.className='mi';d.style.marginTop='18px';d.innerHTML=mi;$('textwrap').appendChild(d);
+  }
+}
+function renderXML(){$('xmlpre').textContent=PLAN._raw||'';}
+
+/* ---------- statements bar ---------- */
+function renderStmtBar(){
+  const bar=$('stmtbar');
+  if(PLAN.statements.length<2){bar.classList.add('hidden');return;}
+  bar.classList.remove('hidden');
+  bar.innerHTML=PLAN.statements.map((s,i)=>{
+    const mg=s.memGrant,flags=[];
+    if(mg&&mg.granted&&mg.maxUsed&&mg.granted>=2*mg.maxUsed)flags.push('over-grant '+(mg.granted/mg.maxUsed).toFixed(1)+'×');
+    if(allNodes(s.root).some(n=>n.spill))flags.push('tempdb spill');
+    const warn=flags.length?`<span class="chipwarn" title="${esc(flags.join(', '))}">⚠</span>`:'';
+    return `<div class="stmt-chip ${s===STMT?'active':''}" data-i="${i}">#${i+1} ${esc(s.type)} <b>${(s.subtree||0).toFixed(3)}</b>${warn}</div>`;
+  }).join('');
+  bar.querySelectorAll('.stmt-chip').forEach(c=>c.addEventListener('click',()=>{selectStmt(PLAN.statements[+c.getAttribute('data-i')]);}));
+}
+
+/* ---------- analysis engine (ported from executionPlanReport_v7.ps1) ---------- */
+const CE_RATIO=10, CE_MINROWS=10, LOOKUP_THRESHOLD=10000;
+const REF_LINKS=[
+  ['Cardinality estimation (Microsoft)','https://learn.microsoft.com/en-us/sql/relational-databases/performance/cardinality-estimation-sql-server'],
+  ['CE Feedback (Microsoft IQP)','https://learn.microsoft.com/en-us/sql/relational-databases/performance/intelligent-query-processing-cardinality-estimation-feedback'],
+  ['Implicit conversion is a SARGability problem (Erik Darling)','https://erikdarling.com/implicit-conversion-is-a-sargability-problem/'],
+  ['Why implicit conversions aren\u2019t SARGable (Erik Darling)','https://erikdarling.com/sargability-week-why-implicit-conversions-arent-sargable/'],
+  ['Bad guesses \u2192 bad choices (Erik Darling)','https://erikdarling.com/bad-guesses-and-bad-choices-better-living-through-indexes/'],
+  ['SSMS hides missing indexes (Brent Ozar)','https://www.brentozar.com/archive/2018/07/management-studio-hides-missing-indexes-from-you/'],
+  ['Expensive key lookups (Brent Ozar)','https://www.brentozar.com/blitzcache/expensive-key-lookups/'],
+  ['Expensive sorts (Brent Ozar)','https://www.brentozar.com/blitzcache/expensive-sorts/']
+];
+function nonSargableFlags(s){
+  if(!s)return null;const f=[];
+  if(/TRY_CONVERT\(/i.test(s))f.push('try_convert()');
+  if(/TRY_CAST\(/i.test(s))f.push('try_cast()');
+  if(/CONVERT\(/i.test(s))f.push('convert()');
+  if(/CONVERT_IMPLICIT/i.test(s))f.push('convert_implicit');
+  if(/\bISNULL\s*\(\s*\[?\w+\]?\.\[?\w+\]?/i.test(s))f.push('isnull()');
+  if(/\bABS\(/i.test(s))f.push('abs()');
+  if(/\b(LEFT|RIGHT|SUBSTRING)\(/i.test(s))f.push('string-fn');
+  if(/\b(LOWER|UPPER)\(/i.test(s))f.push('case-fn');
+  if(/\b(YEAR|MONTH|DAY|DATEPART|DATENAME|DATEADD|DATEDIFF)\(/i.test(s))f.push('date-fn');
+  if(/\bLIKE\s+N?'%[^']*'/i.test(s))f.push('leading-wildcard');
+  return f.length?f.join(','):null;
+}
+// raw ratio per the analyzer: max(est/act, act/est) using est-per-exec vs actual-total
+function ceRatioRaw(n){const e=n.estRows,a=n.actualRows;
+  if(e==null||a==null||e<0||a<0)return null;
+  if(e===0&&a===0)return 1;
+  if((e===0&&a>0)||(a===0&&e>0))return Infinity;
+  return Math.max(e/a,a/e);}
+function severityOf(n){
+  const e=n.estRows,a=n.actualRows,ratio=ceRatioRaw(n);
+  if(ratio==null||!isFinite(ratio)||e==null||a==null||!(e>0)||!(a>0))return null;
+  const scale=Math.log10(Math.max(e,a)+1);
+  const base=Math.log10(ratio)*(scale+1);
+  const touched=(n.rowsRead!=null&&n.rowsRead>0)?n.rowsRead:(a>0?a:e);
+  const cpuVol=Math.log10(touched+1);
+  let waste=1.0;
+  if(n.rowsRead!=null&&a>0){const wr=n.rowsRead/a;if(wr>1)waste=1+Math.log10(wr);}
+  return base*(cpuVol+1)*waste;
+}
+function isAccess(n){return /Index Scan|Index Seek|Table Scan|Key Lookup|RID Lookup/i.test(n.phys);}
+function isJoinOp(n){return /Nested Loops|Hash Match|Merge Join|Adaptive Join/i.test(n.phys)||/Join/i.test(n.log);}
+function predBlob(n){return [n.preds.join(' '),n.seeks.join(' '),n.joinPred||''].join(' ');}
+
+function analyzePlan(stmt){
+  const nodes=allNodes(stmt.root).filter(n=>!n.statement);
+  const hasRuntime=nodes.some(n=>n.actualRows!=null||n.rowsRead!=null||n.actualExec!=null);
+
+  // Cardinality issues
+  const ce=nodes.filter(n=>n.actualRows!=null&&n.estRows!=null&&n.actualRows>0&&n.estRows>0
+      &&(n.actualExec==null||n.actualExec>0))
+    .map(n=>({n,ratio:ceRatioRaw(n),sev:severityOf(n)}))
+    .filter(x=>x.ratio!=null&&isFinite(x.ratio)&&x.ratio>=CE_RATIO&&Math.max(x.n.actualRows,x.n.estRows)>=CE_MINROWS)
+    .map(x=>{
+      const n=x.n,likely=[];
+      const blob=predBlob(n);
+      if(/CONVERT_IMPLICIT/i.test(blob))likely.push('implicit conversion (CONVERT_IMPLICIT)');
+      const nf=nonSargableFlags(blob);
+      if(nf)for(const h of nf.split(',')){likely.push({'leading-wildcard':'leading-wildcard LIKE','date-fn':'date function on column','string-fn':'string function on column','case-fn':'UPPER/LOWER on column'}[h]||('non-sargable ('+h+')'));}
+      if(/Scan/i.test(n.phys))likely.push('scan (predicate may not be seekable)');
+      if(isJoinOp(n))likely.push('join choice sensitive to CE');
+      if(n.rowsRead!=null&&n.rowsRead>n.actualRows*10)likely.push('high read-to-return ratio');
+      if(n.rebinds!=null&&n.rebinds>0)likely.push('rebinds (possible repeated inner work)');
+      x.likely=[...new Set(likely)];return x;
+    }).sort((a,b)=>(b.sev||0)-(a.sev||0)).slice(0,50);
+
+  // Key lookups
+  const lookups=nodes.filter(n=>/Key Lookup|RID Lookup/i.test(n.phys))
+    .map(n=>({n,calls:n.actualExec??n.actualRows??n.estRows}))
+    .sort((a,b)=>(b.calls||0)-(a.calls||0));
+
+  // Spills (Sort / Hash Match with spill warnings)
+  const spills=nodes.filter(n=>n.spill&&/Sort|Hash Match/i.test(n.phys)).map(n=>{
+    let detail;
+    if(n.spill.pages>0){const mb=(n.spill.pages*8/1024).toFixed(2);
+      detail=`Spilled ${fmt(n.spill.pages)} pages (~${mb} MB) at level ${n.spill.level}. `+
+        (n.spill.pages>5000?'SEVERE — consider OPTION (MIN_GRANT_PERCENT = 5)+ to force a larger grant.':'Mild spill — check for stale stats causing an under-estimate.');
+    }else detail='Warnings: '+n.spill.names.join(', ');
+    return {n,detail};
+  });
+
+  // Parallelism skew (workers, total >= 5000, max/avg >= 5)
+  const skew=[];
+  for(const n of nodes){
+    const w=n.threads.filter(t=>t.thread!=null&&t.thread!==0&&t.rows>0);
+    if(w.length<2)continue;
+    const rows=w.map(t=>t.rows),total=rows.reduce((a,b)=>a+b,0);
+    if(total<5000)continue;
+    const mx=Math.max(...rows),avg=total/rows.length,ratio=avg>0?mx/avg:null;
+    if(ratio!=null&&ratio>=5)skew.push({n,max:mx,avg,ratio,threads:rows.length});
+  }
+
+  // SARGability signals (dedup by node+issue)
+  const sargSeen=new Set(),sarg=[];
+  for(const n of nodes){
+    for(const expr of [...n.seeks,...n.preds]){
+      if(!expr)continue;
+      const add=(issue)=>{const k=n.nodeId+'|'+issue;if(!sargSeen.has(k)){sargSeen.add(k);sarg.push({n,issue,expr:expr.length>180?expr.slice(0,180)+'…':expr});}};
+      if(/CONVERT_IMPLICIT/i.test(expr))add('implicit conversion');
+      if(/\bLIKE\s+N?'%[^']*'/i.test(expr))add('leading wildcard LIKE');
+      if(/\b(UPPER|LOWER|SUBSTRING|LEFT|RIGHT|DATEADD|DATEDIFF|DATEPART|DATENAME|YEAR|MONTH|DAY|TRY_CONVERT|TRY_CAST|CONVERT|CAST)\s*\(/i.test(expr))add('function on column');
+    }
+  }
+
+  // Operator red flags
+  const red=[];
+  for(const n of nodes){const rows=n.actualRows??n.estRows;
+    if(/Sort/i.test(n.phys)&&rows!=null&&rows>=100000)red.push({n,signal:'large sort',detail:`Sort on ~${fmt(rows)} rows — consider index/order, reduce rowset, or review grant/spill.`});
+    if(/Spool/i.test(n.phys))red.push({n,signal:'spool',detail:'Spool can indicate repeated work — check executions, correlated subqueries, and indexing.'});
+    if(/Table Spool/i.test(n.phys)&&n.actualExec!=null&&n.actualExec>=1000)red.push({n,signal:'high rebinds',detail:`Table Spool with ${fmt(n.actualExec)} executions — investigate nested-loops rebinds / parameter sensitivity.`});
+    if(/Hash Match/i.test(n.phys)&&rows!=null&&rows>=200000)red.push({n,signal:'large hash',detail:`Hash operator on ~${fmt(rows)} rows — check memory grant and tempdb spills.`});
+    if(/Bitmap/i.test(n.phys))red.push({n,signal:'bitmap / index intersection',detail:'Bitmap usage can indicate index intersection — a composite index may be better.'});
+  }
+
+  // Join checks
+  const sortsPresent=nodes.some(n=>/Sort/i.test(n.phys));
+  const joins=[];
+  for(const n of nodes.filter(isJoinOp)){const rows=n.actualRows??n.estRows;
+    if(/Nested Loops/i.test(n.phys)&&rows!=null&&rows>=100000)joins.push({n,signal:'large join output',detail:`Nested Loops output ~${fmt(rows)} rows. If the outer input is large, consider Hash/Merge or indexing to support seeks.`});
+    if(/Merge Join/i.test(n.phys)&&sortsPresent)joins.push({n,signal:'merge join + sort(s)',detail:'Merge Join wants ordered inputs and sorts are present — index the join keys to provide order and avoid sorts.'});
+    if(/Hash Match/i.test(n.phys)&&rows!=null&&rows>=200000)joins.push({n,signal:'large hash join',detail:`Hash join output ~${fmt(rows)} rows — check memory grant, spills, and predicate selectivity.`});
+    if(/Adaptive Join/i.test(n.phys))joins.push({n,signal:'adaptive join',detail:'Adaptive Join chosen — ensure stats are good; CE mismatches can flip the join type across executions.'});
+    if(n.manyToMany)joins.push({n,signal:'many-to-many merge join',detail:'Many-to-many Merge Join — builds worktables and can amplify rows/memory. Review join keys, order, and selectivity.'});
+  }
+
+  // Missing indexes (merge by table + keys, union includes)
+  const miGroups={};
+  for(const m of (stmt.missing||[])){
+    const keyMatch=m.ddl.match(/\(([^)]*)\)/);const keys=keyMatch?keyMatch[1]:'';
+    const incMatch=m.ddl.match(/INCLUDE \(([^)]*)\)/i);const inc=incMatch?incMatch[1].split(',').map(s=>s.trim()):[];
+    const k=m.tbl+'|'+keys;
+    if(!miGroups[k])miGroups[k]={tbl:m.tbl,keys,inc:new Set(inc),impact:m.impact?+m.impact:0,count:0};
+    inc.forEach(c=>miGroups[k].inc.add(c));
+    miGroups[k].impact=Math.max(miGroups[k].impact,m.impact?+m.impact:0);miGroups[k].count++;
+  }
+  const missing=Object.values(miGroups).map(g=>{
+    const incArr=[...g.inc].filter(Boolean).sort();
+    const ddl=`CREATE NONCLUSTERED INDEX [IX_Tune_${g.tbl.split('.').pop()}]\n  ON ${g.tbl} (${g.keys})`+(incArr.length?`\n  INCLUDE (${incArr.join(', ')})`:'')+';';
+    return {tbl:g.tbl,impact:g.impact,ddl,merged:g.count};
+  }).sort((a,b)=>b.impact-a.impact);
+
+  // Rewrite hints + suggestions
+  const rewrites=[];
+  if(nodes.some(n=>/TopN Sort/i.test(n.phys)))rewrites.push('TopN Sort detected — an index matching the ORDER BY (and filters) can avoid the sort.');
+  if(nodes.some(n=>/Window Spool|Sequence Project|Segment|Window Aggregate/i.test(n.phys)))rewrites.push('Windowing pattern detected — index to support ORDER BY / PARTITION BY, or reduce windowed rows.');
+  if(nodes.some(n=>/Table Spool|Index Spool/i.test(n.phys)))rewrites.push('Spool detected — often nested-loops rebinds/correlation. Rewrite correlated subqueries or add supporting indexes.');
+  if(sarg.length)rewrites.push('Non-SARGable predicate signals found — fix datatype mismatches, avoid functions on filtered columns, avoid leading-wildcard LIKE.');
+  if(nodes.some(n=>n.bitmap))rewrites.push('Bitmap/index-intersection signals — a composite index may outperform intersecting single-column indexes.');
+  if(stmt.psp)rewrites.push('Parameter Sensitive Plan optimization present — review plan variants if performance varies by parameter.');
+
+  const sug=[];
+  if(missing.length>1)sug.push(`Multiple missing-index suggestions (${missing.length}) — validate, de-dupe and merge before creating anything.`);
+  else if(missing.length===1)sug.push('Missing index suggestion found — validate against workload and existing indexes (SSMS hides/shows inconsistently).');
+  if(ce.length)sug.push('Cardinality mismatches found — focus on highest Severity first; check stats, datatypes, predicates and parameter sniffing.');
+  if(lookups.length){const painful=lookups.filter(l=>l.calls!=null&&l.calls>=LOOKUP_THRESHOLD);
+    sug.push(painful.length?'High-volume lookups detected (calls above threshold) — consider covering indexes or selecting fewer columns.':'Lookups detected — review call volume before changing indexes.');}
+  if(nodes.some(n=>/Sort/i.test(n.phys)))sug.push('Sort operators present — review ORDER BY; consider supporting indexes and memory grant/spills.');
+  if(nodes.some(n=>/Parallelism/i.test(n.phys)))sug.push('Parallelism present — if unstable, check skew/CXPACKET, MAXDOP and cost threshold.');
+  if(stmt.memGrant&&stmt.memGrant.granted&&stmt.memGrant.maxUsed&&stmt.memGrant.granted>=2*stmt.memGrant.maxUsed)sug.push('Memory over-grant detected — granted memory is well above what the query used; review for wasted grant and concurrency impact (see Memory grant).');
+  if(spills.length)sug.push('Spills detected in plan warnings — investigate Sort/Hash spills, memory grants and tempdb pressure.');
+  if(skew.length)sug.push('Parallelism skew detected — investigate data distribution and join keys; consider different join/order or filtered/composite indexes.');
+  if(joins.some(j=>j.signal.includes('many-to-many')))sug.push('Many-to-many Merge Join detected — check join predicates and indexing; can amplify work via worktables.');
+  if(stmt.pacs.length)sug.push('Plan-affecting implicit conversions detected — align datatypes to avoid conversion, CE issues and non-seekable predicates.');
+  if(!hasRuntime)sug.push('Plan appears to lack runtime statistics — capture an actual execution plan for better diagnostics.');
+  if(joins.length)sug.push('Join strategy checks flagged potential issues — review join types, input sizes and supporting indexes.');
+  if(red.length)sug.push('Operator red flags detected — review spools/sorts/hashes and rebind patterns.');
+  if(stmt.pacs.length||/CONVERT_IMPLICIT/i.test(nodes.map(predBlob).join(' ')))sug.push('Predicate implicit conversion(s) (CONVERT_IMPLICIT) — can prevent seeks and skew cardinality; align datatypes where possible.');
+
+  return {hasRuntime,ce,lookups,spills,skew,sarg,red,joins,missing,rewrites,sug,pacs:stmt.pacs,psp:stmt.psp,memGrant:stmt.memGrant,timeStats:stmt.timeStats,waits:stmt.waits,statsUsage:stmt.statsUsage};
+}
+
+/* ---------- analysis rendering ---------- */
+function sevBadge(s){if(s==null)return'—';const c=s>=6?'var(--bad)':s>=3?'var(--warn)':'var(--good)';return `<b style="color:${c}">${s.toFixed(2)}</b>`;}
+function aSection(title,count,bodyHtml,tone){
+  if(!count)return'';
+  const c=tone==='bad'?'var(--bad)':tone==='warn'?'var(--warn)':'var(--accent)';
+  return `<details open class="asec"><summary><span class="acount" style="background:${c}1a;color:${c};border-color:${c}66">${count}</span>${esc(title)}</summary><div class="abody">${bodyHtml}</div></details>`;
+}
+function f3(v){return v==null||v===''?'—':(+v).toFixed(3);}
+function yesno(v){return v?'<span style="color:var(--bad)">yes</span>':'<span style="color:var(--good)">no</span>';}
+function renderAugment(aug){
+  const m=aug.meta||{},db=aug.db;
+  let h=`<div class="augbanner"><span class="dbtag">live database</span> Inspection captured ${m.generatedAt?esc(String(m.generatedAt)):'(time n/a)'}${m.server?' from '+esc(String(m.server)):''}${m.database?' · '+esc(String(m.database)):''}${m.dop!=null?' · DOP '+esc(String(m.dop)):''}. These sections come from the server via the PowerShell analyzer — this page holds no connection.</div>`;
+  if(!db){h+=`<div class="amuted" style="padding:8px 16px">Bundle has no <code>dbInspection</code> block — run the analyzer with <code>-InspectDatabase</code> to populate index / statistics / Query Store sections.</div>`;return h;}
+  const tt=pick(db,'targetTables')||[];
+  if(tt.length)h+=aSection('Target tables (live DB)',tt.length,'<div class="aitem">'+tt.map(t=>`<span class="chip">${esc(String(t))}</span>`).join(' ')+'</div>','accent');
+  // Indexes
+  const idx=pick(db,'indexes')||[];
+  if(idx.length){let r='';for(const i of idx)r+=`<tr><td class="l">${esc(pick(i,'fullTable')||'')}</td><td class="l">${esc(pick(i,'indexName')||'')}</td><td class="l">${esc(pick(i,'typeDesc')||'')}${pick(i,'isPrimaryKey')?' · PK':''}</td><td class="l">${esc(pick(i,'keyCols')||'')}</td><td class="l">${esc(pick(i,'includeCols')||'')}</td><td>${fmt(pick(i,'userSeeks'))}</td><td>${fmt(pick(i,'userScans'))}</td><td>${fmt(pick(i,'userLookups'))}</td><td>${fmt(pick(i,'userUpdates'))}</td></tr>`;
+    h+=aSection('Index inventory (live DB)',idx.length,'<table class="atable"><thead><tr><th class="l">Table</th><th class="l">Index</th><th class="l">Type</th><th class="l">Keys</th><th class="l">Includes</th><th>Seeks</th><th>Scans</th><th>Lookups</th><th>Updates</th></tr></thead><tbody>'+r+'</tbody></table>','accent');}
+  // Statistics
+  const sts=pick(db,'stats')||[];
+  if(sts.length){let r='';for(const s of sts){const mr=pick(s,'modRatio');r+=`<tr><td class="l">${esc(pick(s,'fullTable')||'')}</td><td class="l">${esc(pick(s,'statsName')||'')}</td><td class="l">${esc(String(pick(s,'lastUpdated')||''))}</td><td>${fmt(pick(s,'rows'))}</td><td>${fmt(pick(s,'mods'))}</td><td${mr!=null&&mr>=0.2?' class="" style="color:var(--warn)"':''}>${f3(mr)}</td><td class="l">${esc(pick(s,'statsCols')||'')}</td></tr>`;}
+    h+=aSection('Statistics (live DB)',sts.length,'<table class="atable"><thead><tr><th class="l">Table</th><th class="l">Statistic</th><th class="l">Updated</th><th>Rows</th><th>Mods</th><th>ModRatio</th><th class="l">Cols</th></tr></thead><tbody>'+r+'</tbody></table>','accent');}
+  // Stale stats
+  const stale=pick(db,'staleStats')||[];
+  if(stale.length){let r='';for(const s of stale)r+=`<tr><td class="l">${esc(pick(s,'fullTable')||'')}</td><td class="l">${esc(pick(s,'statsName')||'')}</td><td class="l">${esc(String(pick(s,'lastUpdated')||''))}</td><td>${fmt(pick(s,'daysSinceUpdate'))}</td><td>${fmt(pick(s,'rows'))}</td><td>${fmt(pick(s,'mods'))}</td><td style="color:var(--bad)">${f3(pick(s,'modRatio'))}</td></tr>`;
+    h+=aSection('Stale statistics candidates (live DB)',stale.length,'<table class="atable"><thead><tr><th class="l">Table</th><th class="l">Statistic</th><th class="l">Updated</th><th>Days</th><th>Rows</th><th>Mods</th><th>ModRatio</th></tr></thead><tbody>'+r+'</tbody></table><div class="anote">High modification ratio + age suggests an UPDATE STATISTICS candidate — and a likely root cause for the cardinality mismatches above.</div>','warn');}
+  // Multi-column stat opportunities
+  const mco=pick(db,'multiColumnStatsOpportunities')||[];
+  if(mco.length){let r='';for(const o of mco){const nid=pick(o,'exampleNodeId');r+=`<tr><td class="l">${esc(pick(o,'fullTable')||'')}</td><td class="l">${esc(pick(o,'columns')||'')}</td><td class="l">${nid!=null?`<a class="nlink" data-id="${nid}">#${nid}</a>`:'—'}</td><td class="l"><code>${esc(pick(o,'examplePredicate')||'')}</code></td></tr>`;}
+    h+=aSection('Multi-column statistics opportunities (live DB)',mco.length,'<table class="atable"><thead><tr><th class="l">Table</th><th class="l">Columns</th><th class="l">Example node</th><th class="l">Predicate</th></tr></thead><tbody>'+r+'</tbody></table>','accent');}
+  // Missing-index coverage
+  const cov=pick(db,'missingIndexCoverage')||[];
+  if(cov.length){let r='';for(const c of cov)r+=`<tr><td class="l">${esc(pick(c,'fullTable')||'')}</td><td>${f3(pick(c,'impact'))}</td><td>${fmt(pick(c,'occurrences'))}</td><td class="l">${esc(pick(c,'suggestedKeys')||'')}</td><td class="l">${esc(pick(c,'suggestedIncludes')||'')}</td><td class="l">${yesno(pick(c,'coveredByExistingIndex'))}</td></tr>`;
+    h+=aSection('Missing-index coverage check (live DB)',cov.length,'<table class="atable"><thead><tr><th class="l">Table</th><th>Impact</th><th>Occurs</th><th class="l">Keys</th><th class="l">Includes</th><th class="l">Already covered?</th></tr></thead><tbody>'+r+'</tbody></table><div class="anote">Cross-checked against existing indexes on the server — "already covered = no" means the suggestion is genuinely new.</div>','accent');}
+  // Query Store
+  const qs=pick(db,'queryStore');
+  if(qs){
+    const reg=pick(qs,'regressions')||[];
+    if(reg.length){let r='';for(const g of reg)r+=`<tr><td>${fmt(pick(g,'queryId'))}</td><td class="l">${esc(pick(g,'objectName')||'(adhoc)')}</td><td class="l">${esc(pick(g,'regressedMetric')||'')}</td><td>${fmt(pick(g,'beforeMs'))} ms</td><td style="color:var(--bad)">${fmt(pick(g,'afterMs'))} ms</td><td>${fmt(pick(g,'goodPlanId'))}</td><td>${fmt(pick(g,'badPlanId'))}</td></tr>`;
+      h+=aSection('Query Store regressions (live DB)',reg.length,'<table class="atable"><thead><tr><th>Query</th><th class="l">Object</th><th class="l">Metric</th><th>Before</th><th>After</th><th>Good plan</th><th>Bad plan</th></tr></thead><tbody>'+r+'</tbody></table>','bad');}
+    const fps=pick(qs,'forcePlanScripts')||[];
+    if(fps.length){let b='';for(const s of fps)b+=`<div class="aitem"><div class="amuted">query ${fmt(pick(s,'queryId'))} → plan ${fmt(pick(s,'planId'))}</div><div class="codeblk" style="margin-top:5px">${esc(pick(s,'script')||'')}</div></div>`;
+      h+=aSection('Plan-forcing scripts (review before running)',fps.length,b+'<div class="anote">Generated for you to run manually — the tool never executes writes against a server.</div>','warn');}
+  }
+  return h;
+}
+function buildAugmentedSample(){
+  return JSON.stringify({
+    schema:"sqlplan-insights/1",
+    generatedAt:"2026-06-08T09:42:11Z",
+    server:"PROD-SQL-01", database:"AdventureWorks", dop:8, inspectedDatabase:true,
+    planXml: SAMPLE_PAR,
+    dbInspection:{
+      targetTables:["Sales.SalesOrderHeader","Sales.SalesOrderDetail"],
+      indexes:[
+        {fullTable:"Sales.SalesOrderHeader", indexName:"PK_SalesOrderHeader", typeDesc:"CLUSTERED", isPrimaryKey:true, keyCols:"SalesOrderID", includeCols:"", userSeeks:18420, userScans:12, userLookups:0, userUpdates:5120},
+        {fullTable:"Sales.SalesOrderHeader", indexName:"IX_SalesOrderHeader_CustomerID", typeDesc:"NONCLUSTERED", keyCols:"CustomerID", includeCols:"", userSeeks:90233, userScans:3, userLookups:0, userUpdates:5120},
+        {fullTable:"Sales.SalesOrderHeader", indexName:"IX_SalesOrderHeader_OrderDate_old", typeDesc:"NONCLUSTERED", keyCols:"OrderDate", includeCols:"", userSeeks:5, userScans:2280, userLookups:0, userUpdates:5120},
+        {fullTable:"Sales.SalesOrderDetail", indexName:"PK_SalesOrderDetail", typeDesc:"CLUSTERED", isPrimaryKey:true, keyCols:"SalesOrderID, SalesOrderDetailID", includeCols:"", userSeeks:120300, userScans:8, userLookups:121317, userUpdates:9800}
+      ],
+      stats:[
+        {fullTable:"Sales.SalesOrderHeader", statsName:"IX_SalesOrderHeader_OrderDate_old", lastUpdated:"2025-02-14", rows:48512, mods:46210, modRatio:0.952, statsCols:"OrderDate", autoCreated:false, noRecompute:false},
+        {fullTable:"Sales.SalesOrderHeader", statsName:"PK_SalesOrderHeader", lastUpdated:"2026-05-30", rows:48512, mods:120, modRatio:0.002, statsCols:"SalesOrderID"},
+        {fullTable:"Sales.SalesOrderDetail", statsName:"PK_SalesOrderDetail", lastUpdated:"2026-05-31", rows:121317, mods:310, modRatio:0.003, statsCols:"SalesOrderID, SalesOrderDetailID"}
+      ],
+      staleStats:[
+        {fullTable:"Sales.SalesOrderHeader", statsName:"IX_SalesOrderHeader_OrderDate_old", lastUpdated:"2025-02-14", rows:48512, mods:46210, modRatio:0.952, daysSinceUpdate:114, statsCols:"OrderDate"}
+      ],
+      multiColumnStatsOpportunities:[
+        {fullTable:"Sales.SalesOrderHeader", columns:"OrderDate, TerritoryID", statementId:1, exampleNodeId:3, examplePredicate:"[soh].[OrderDate]>='2014-01-01'"}
+      ],
+      missingIndexCoverage:[
+        {fullTable:"Sales.SalesOrderHeader", impact:38.4, occurrences:1, suggestedKeys:"OrderDate", suggestedIncludes:"TerritoryID, SalesOrderID", coveredByExistingIndex:false}
+      ],
+      queryStore:{
+        regressions:[
+          {queryId:8841, objectName:"(adhoc)", regressedMetric:"avg duration", beforeMs:42, afterMs:1180, goodPlanId:9001, badPlanId:9044}
+        ],
+        forcePlanScripts:[
+          {queryId:8841, planId:9001, script:"EXEC sys.sp_query_store_force_plan @query_id = 8841, @plan_id = 9001;"}
+        ]
+      }
+    }
+  });
+}
+function renderAnalysis(){
+  const a=analyzePlan(STMT);
+  const nodeLink=(n,label)=>`<a class="nlink" data-id="${n.nodeId}">${esc(label!=null?label:('#'+n.nodeId+' '+n.phys))}</a>`;
+  let h='<div class="awrap">';
+
+  const aug=PLAN&&PLAN.augment;
+  // header
+  const flagsTotal=a.ce.length+a.lookups.length+a.spills.length+a.skew.length+a.sarg.length+a.red.length+a.joins.length+a.pacs.length;
+  let sub=a.hasRuntime?'<span style="color:var(--good)">actual plan — runtime evidence available</span>':'<span style="color:var(--warn)">estimated plan — runtime heuristics limited</span>';
+  if(aug){const m=aug.meta;sub+=` · <span class="dbtag">augmented</span> ${m&&m.server?esc(m.server):''}${m&&m.database?' / '+esc(m.database):''}`;}
+  h+=`<div class="ahdr"><div><span class="atitle">Plan analysis</span> <span class="amuted">heuristics ported from executionPlanReport_v7.ps1</span></div>
+    <div class="amuted">${sub} · ${flagsTotal} signal${flagsTotal===1?'':'s'}</div></div>`;
+
+  // live-database augmentation (rendered first — these are the sections the browser can't compute)
+  if(aug)h+=renderAugment(aug);
+
+  if(flagsTotal===0&&!a.missing.length&&!a.rewrites.length){
+    h+=`<div class="amuted" style="padding:18px">No tuning signals tripped on this plan at the configured thresholds (CE ratio ≥ ${CE_RATIO}, ≥ ${CE_MINROWS} rows; lookup calls ≥ ${fmt(LOOKUP_THRESHOLD)}).</div>`;
+  }
+
+  // CE
+  if(a.ce.length){
+    let rows='<table class="atable"><thead><tr><th class="l">Node</th><th class="l">Object</th><th>Est</th><th>Act</th><th>Ratio</th><th>Severity</th><th class="l">Dir</th><th class="l">Likely contributors</th></tr></thead><tbody>';
+    for(const x of a.ce){const n=x.n,dir=n.actualRows>n.estRows?'▲ under':'▼ over';
+      rows+=`<tr><td class="l">${nodeLink(n)}</td><td class="l">${esc(objShort(n.obj)||n.log||'')}</td><td>${fmt(n.estRows)}</td><td>${fmt(n.actualRows)}</td><td><b style="color:var(--hot)">${x.ratio.toFixed(1)}×</b></td><td>${sevBadge(x.sev)}</td><td class="l">${dir}</td><td class="l amuted">${esc(x.likely.join('; '))}</td></tr>`;}
+    rows+='</tbody></table><div class="anote">Severity = log-scaled mismatch × CPU-volume × wasted-work (RowsRead÷ActRows). Runtime-evidence only — optimizer cost is deliberately excluded (Joe Chang).</div>';
+    h+=aSection('Cardinality estimate mismatches',a.ce.length,rows,'bad');
+  }
+  // Key lookups
+  if(a.lookups.length){
+    let rows='<table class="atable"><thead><tr><th class="l">Node</th><th class="l">Object</th><th>Lookup calls</th><th class="l"></th></tr></thead><tbody>';
+    for(const l of a.lookups){const painful=l.calls!=null&&l.calls>=LOOKUP_THRESHOLD;
+      rows+=`<tr><td class="l">${nodeLink(l.n)}</td><td class="l">${esc(objShort(l.n.obj)||'')}</td><td>${fmt(l.calls)}</td><td class="l">${painful?'<span style="color:var(--bad)">high volume — covering index?</span>':'<span class="amuted">review before indexing</span>'}</td></tr>`;}
+    rows+='</tbody></table><div class="anote">Calls = actual executions (rows driven into the lookup), not per-execution output.</div>';
+    h+=aSection('Key / RID lookups',a.lookups.length,rows,'warn');
+  }
+  // Spills
+  if(a.spills.length){let b='';for(const s of a.spills)b+=`<div class="aitem"><b>${nodeLink(s.n)}</b> — ${esc(s.detail)}</div>`;h+=aSection('TempDB spills',a.spills.length,b,'bad');}
+  if(a.memGrant&&(a.memGrant.granted||a.memGrant.maxUsed||a.memGrant.requested)){const g=a.memGrant;const kb=v=>v==null?'—':(v>=1024?(v/1024).toFixed(1)+' MB':v.toLocaleString()+' KB');const ratio=(g.granted&&g.maxUsed)?g.granted/g.maxUsed:null;let verdict='',tone='accent';if(ratio!=null){if(ratio>=2){verdict=`Over-grant — granted ${ratio.toFixed(1)}× the memory actually used (${kb(g.granted-g.maxUsed)} idle). Large grants can inhibit concurrency; a candidate for memory grant feedback or MIN_GRANT_PERCENT review.`;tone='warn';}else if(g.maxUsed>=g.granted){verdict='Grant fully consumed — usage reached or exceeded the granted amount; watch for spills under load.';tone='warn';}else{verdict='Grant broadly in line with usage.';}}let b=`<table class="atable"><thead><tr><th class="l">Requested</th><th class="l">Granted</th><th class="l">Max used</th><th class="l">Serial desired</th><th>Granted ÷ used</th></tr></thead><tbody><tr><td class="l">${kb(g.requested)}</td><td class="l">${kb(g.granted)}</td><td class="l">${kb(g.maxUsed)}</td><td class="l">${kb(g.serialDes)}</td><td>${ratio!=null?ratio.toFixed(1)+'×':'—'}</td></tr></tbody></table>`;if(verdict)b+=`<div class="aitem">${esc(verdict)}</div>`;if(g.feedback){const adj=/^Yes/i.test(g.feedback);b+=`<div class="aitem"><b>Memory grant feedback</b> — ${esc(g.feedback)}${g.lastRequested?' · last requested '+kb(g.lastRequested):''}${adj?' <span class="amuted">(grant being corrected across executions)</span>':''}</div>`;}h+=aSection('Memory grant',1,b,tone);}
+  if(a.timeStats&&(a.timeStats.cpu!=null||a.timeStats.elapsed!=null)){const ts=a.timeStats,cpu=ts.cpu,el=ts.elapsed;let note='',tone='accent';if(cpu!=null&&el!=null){const r=el/Math.max(cpu,1);if(r>=2){note=`Elapsed is ${r.toFixed(1)}× CPU — most of the wall-clock time was spent waiting rather than computing (see Top waits).`;tone='warn';}else if(r>=1.3){note=`Elapsed exceeds CPU by ${r.toFixed(1)}× — a meaningful share of the time was spent waiting (see Top waits).`;tone='warn';}else if(cpu>el*1.5){note='CPU exceeds elapsed — work was spread across parallel threads.';}else{note='CPU and elapsed are close — largely CPU-bound.';}}let b=`<table class="atable"><thead><tr><th class="l">CPU time</th><th class="l">Elapsed time</th>${ts.udfCpu?'<th class="l">UDF CPU</th><th class="l">UDF elapsed</th>':''}</tr></thead><tbody><tr><td class="l">${cpu!=null?cpu.toLocaleString()+' ms':'—'}</td><td class="l">${el!=null?el.toLocaleString()+' ms':'—'}</td>${ts.udfCpu?`<td class="l">${ts.udfCpu.toLocaleString()} ms</td><td class="l">${(ts.udfElapsed||0).toLocaleString()} ms</td>`:''}</tr></tbody></table>`;if(note)b+=`<div class="aitem">${esc(note)}</div>`;h+=aSection('Query time',1,b,tone);}
+  if(a.waits&&a.waits.length){const ws=a.waits.slice().sort((x,y)=>(y.ms||0)-(x.ms||0));const tot=ws.reduce((s,w)=>s+(w.ms||0),0);let rows='<table class="atable"><thead><tr><th class="l">Wait type</th><th>Time (ms)</th><th>Count</th><th>Share</th></tr></thead><tbody>';for(const w of ws){const share=tot>0?(w.ms||0)/tot*100:0;rows+=`<tr><td class="l">${esc(w.type||'')}</td><td>${(w.ms||0).toLocaleString()}</td><td>${(w.count||0).toLocaleString()}</td><td>${share.toFixed(0)}%</td></tr>`;}rows+='</tbody></table><div class="anote">Top waits recorded for this execution (actual plans only) — these explain the gap between elapsed and CPU time above.</div>';h+=aSection('Top waits',ws.length,rows,'accent');}
+  if(a.statsUsage&&a.statsUsage.length){const su=a.statsUsage;const isFlag=s=>(s.sample!=null&&s.sample<25)||(s.mods!=null&&s.mods>=1000);const notable=su.filter(isFlag);const tone=notable.length?'warn':'accent';let rows='<table class="atable"><thead><tr><th class="l">Table</th><th class="l">Statistic</th><th>Modifications</th><th>Sample %</th><th class="l">Last updated</th></tr></thead><tbody>';for(const s of su){rows+=`<tr${isFlag(s)?' class="rowwarn"':''}><td class="l">${esc(s.table||'')}</td><td class="l">${esc(s.stat||'')}</td><td>${s.mods!=null?s.mods.toLocaleString():'—'}</td><td>${s.sample!=null?s.sample.toFixed(1):'—'}</td><td class="l">${esc((s.updated||'').replace('T',' ').replace(/\.\d+$/,'')||'—')}</td></tr>`;}rows+='</tbody></table>';if(notable.length){const lowS=su.filter(s=>s.sample!=null&&s.sample<25).length,churn=su.filter(s=>s.mods!=null&&s.mods>=1000).length,bits=[];if(lowS)bits.push(lowS+' sampled below 25%');if(churn)bits.push(churn+' with significant modifications since last update');rows+=`<div class="aitem">${esc(bits.join('; '))} — estimate quality may be affected; consider UPDATE STATISTICS or a higher sample.</div>`;}rows+='<div class="anote">Statistics the optimiser used to compile this statement (from OptimizerStatsUsage).</div>';h+=aSection('Statistics used',su.length,rows,tone);}
+  // Skew
+  if(a.skew.length){let b='';for(const s of a.skew)b+=`<div class="aitem"><b>${nodeLink(s.n)}</b> — max thread ${fmt(s.max)} rows, avg ${fmt(s.avg)}, skew ${s.ratio.toFixed(1)}× across ${s.threads} threads.</div>`;h+=aSection('Parallelism skew',a.skew.length,b,'warn');}
+  // Implicit conversions
+  if(a.pacs.length){let b='';for(const p of a.pacs)b+=`<div class="aitem"><b>${esc(p.issue)}</b><div class="codeblk" style="margin-top:5px">${esc(p.expr)}</div></div>`;h+=aSection('Plan-affecting implicit conversions',a.pacs.length,b,'warn');}
+  // SARGability
+  if(a.sarg.length){let rows='<table class="atable"><thead><tr><th class="l">Node</th><th class="l">Issue</th><th class="l">Expression</th></tr></thead><tbody>';
+    for(const s of a.sarg)rows+=`<tr><td class="l">${nodeLink(s.n)}</td><td class="l">${esc(s.issue)}</td><td class="l"><code>${esc(s.expr)}</code></td></tr>`;
+    rows+='</tbody></table>';h+=aSection('Predicate SARGability signals',a.sarg.length,rows,'warn');}
+  // Join checks
+  if(a.joins.length){let b='';for(const j of a.joins)b+=`<div class="aitem"><b>${nodeLink(j.n)}</b> · <span class="amuted">${esc(j.signal)}</span> — ${esc(j.detail)}</div>`;h+=aSection('Join strategy checks',a.joins.length,b,'warn');}
+  // Red flags
+  if(a.red.length){let b='';for(const r of a.red)b+=`<div class="aitem"><b>${nodeLink(r.n)}</b> · <span class="amuted">${esc(r.signal)}</span> — ${esc(r.detail)}</div>`;h+=aSection('Operator red flags',a.red.length,b,'warn');}
+  // Missing indexes
+  if(a.missing.length){let b='';for(const m of a.missing)b+=`<div class="aitem"><div class="amuted">Impact ${m.impact?m.impact.toFixed(1):'?'}% · ${esc(m.tbl)}${m.merged>1?' · merged '+m.merged+' recs':''}</div><div class="codeblk" style="margin-top:5px">${esc(m.ddl)}</div></div>`;h+=aSection('Missing indexes (merged)',a.missing.length,b,'accent');}
+  // Rewrite hints
+  if(a.rewrites.length){let b='<ul class="alist">';for(const r of a.rewrites)b+=`<li>${esc(r)}</li>`;b+='</ul>';h+=aSection('Rewrite hints',a.rewrites.length,b,'accent');}
+  // Suggestions
+  if(a.sug.length){let b='<ul class="alist">';for(const s of a.sug)b+=`<li>${esc(s)}</li>`;b+='</ul>';h+=aSection('Suggestions',a.sug.length,b,'accent');}
+  // Links
+  let lk='<ul class="alist links">';for(const [t,u] of REF_LINKS)lk+=`<li><a href="${u}" target="_blank" rel="noopener">${esc(t)}</a></li>`;lk+='</ul>';
+  h+=`<details class="asec"><summary><span class="acount" style="background:#30363d;color:var(--dim);border-color:var(--line)">${REF_LINKS.length}</span>Reference reading</summary><div class="abody">${lk}</div></details>`;
+
+  h+=`<div class="anote" style="margin:14px 6px">Database-side checks from the original script — Query Store regression detection, index/stat inspection, plan-forcing scripts — need a live connection and aren\u2019t available in this browser tool.</div></div>`;
+  $('analysiswrap').innerHTML=h;
+  $('analysiswrap').querySelectorAll('.nlink').forEach(el=>el.addEventListener('click',()=>{selectNode(el.getAttribute('data-id'));showTab('diagram');}));
+}
+
+/* ---------- tabs / zoom ---------- */
+function showTab(t){
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===t));
+  $('scroll').style.display=t==='diagram'?'block':'none';
+  $('gridwrap').style.display=t==='grid'?'block':'none';
+  $('diffwrap').style.display=t==='diff'?'block':'none';
+  $('analysiswrap').style.display=t==='analysis'?'block':'none';
+  $('textwrap').style.display=t==='text'?'block':'none';
+  $('xmlwrap').style.display=t==='xml'?'block':'none';
+  $('legend').style.display=t==='diagram'?'block':'none';
+  document.querySelector('.zoombar').style.display=t==='diagram'?'flex':'none';
+  if(t==='grid')renderGrid();if(t==='diff')renderDiff();if(t==='analysis')renderAnalysis();if(t==='text')renderText();if(t==='xml')renderXML();
+}
+function applyZoom(){const svg=$('svg');const vb=svg.getAttribute('viewBox').split(' ');
+  svg.style.width=(vb[2]*SCALE)+'px';svg.style.height=(vb[3]*SCALE)+'px';}
+function fit(){const sc=$('scroll');const vb=$('svg').getAttribute('viewBox').split(' ');
+  SCALE=Math.min((sc.clientWidth-20)/vb[2],(sc.clientHeight-20)/vb[3],1.4);if(!isFinite(SCALE)||SCALE<=0)SCALE=1;applyZoom();}
+
+/* ---------- load ---------- */
+function selectStmt(s){STMT=s;SELID=null;setSummary();renderStmtBar();renderDiagram();fit();renderDetails(null);showTab('diagram');}
+// tolerant field accessor (accepts camelCase or PascalCase from ConvertTo-Json)
+function pick(o,...names){if(!o)return undefined;for(const n of names){if(o[n]!=null)return o[n];const lc=n.charAt(0).toLowerCase()+n.slice(1),uc=n.charAt(0).toUpperCase()+n.slice(1);if(o[lc]!=null)return o[lc];if(o[uc]!=null)return o[uc];}return undefined;}
+// route: a raw .sqlplan/.xml string, or a sqlplan-insights JSON bundle
+function loadFile(text){
+  const t=(text||'').replace(/^\uFEFF/,'').trim();
+  if(t.charAt(0)==='{'){
+    let b;try{b=JSON.parse(t);}catch(e){throw new Error('File looks like JSON but failed to parse: '+e.message);}
+    const xml=pick(b,'planXml','PlanXml','plan_xml');
+    if(!xml)throw new Error('JSON bundle has no "planXml" field — expected a sqlplan-insights export.');
+    const augment={
+      meta:{server:pick(b,'server'),database:pick(b,'database'),generatedAt:pick(b,'generatedAt'),dop:pick(b,'dop'),inspected:!!pick(b,'inspectedDatabase')},
+      analysis:pick(b,'analysis')||null,
+      db:pick(b,'dbInspection')||null
+    };
+    loadPlan(xml,augment);
+  }else{
+    loadPlan(t,null);
+  }
+}
+function loadPlan(xml,augment){
+  const p=parsePlan(xml);p._raw=xml.replace(/^\uFEFF/,'').replace(/<\?xml[^>]*\?>/i,'').trim();
+  p.augment=augment||null;
+  PLAN=p;$('overlay').classList.add('hidden');
+  // pick costliest statement first
+  STMT=p.statements.slice().sort((a,b)=>(b.subtree||0)-(a.subtree||0))[0];
+  setSummary();renderStmtBar();renderDiagram();fit();renderDetails(null);
+}
+
+/* ---------- events ---------- */
+$('btnOpen').onclick=()=>{$('overlay').classList.remove('hidden');$('err').textContent='';$('ta').focus();};
+$('btnParse').onclick=()=>{try{loadFile($('ta').value);}catch(e){$('err').textContent=e.message;}};
+$('btnSampleSerial').onclick=()=>loadPlan(SAMPLE_SERIAL);
+$('btnSamplePar').onclick=()=>loadPlan(SAMPLE_PAR);
+$('btnSampleAug').onclick=()=>loadFile(buildAugmentedSample());
+$('btnSample2').onclick=()=>loadPlan(SAMPLE_SERIAL);
+$('btnSample3').onclick=()=>loadPlan(SAMPLE_PAR);
+$('btnSample4').onclick=()=>loadFile(buildAugmentedSample());
+// open a .sqlplan/.xml/.json via the native file picker
+$('btnOpenFile').onclick=()=>$('fileInput').click();
+document.querySelectorAll('#cmode .cmbtn').forEach(b=>{
+  b.onclick=()=>{ if(b.disabled||!STMT)return; COLORMODE=b.dataset.cm; renderDiagram(); };
+});
+$('fileInput').onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{try{loadFile(String(rd.result));}catch(err){$('overlay').classList.remove('hidden');$('err').textContent=err.message;}};
+  rd.onerror=()=>{$('overlay').classList.remove('hidden');$('err').textContent='Could not read that file.';};
+  rd.readAsText(f);
+  e.target.value='';};
+// collapse / expand operator pane
+function setPane(collapsed){$('side').classList.toggle('collapsed',collapsed);document.body.classList.toggle('pane-collapsed',collapsed);
+  if(PLAN&&$('scroll').style.display!=='none')applyZoom();}
+$('paneToggle').onclick=()=>setPane(true);
+$('paneTab').onclick=()=>setPane(false);
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>showTab(t.dataset.tab)));
+$('zin').onclick=()=>{SCALE=Math.min(SCALE*1.2,3);applyZoom();};
+$('zout').onclick=()=>{SCALE=Math.max(SCALE/1.2,.2);applyZoom();};
+$('z100').onclick=()=>{SCALE=1;applyZoom();};
+$('zfit').onclick=fit;
+window.addEventListener('resize',()=>{if(PLAN&&$('scroll').style.display!=='none')applyZoom();});
+
+/* ---------- sample plan (actual, with skew + missing index) ---------- */
+const SAMPLE_SERIAL=`<ShowPlanXML xmlns="http://schemas.microsoft.com/sqlserver/2004/07/showplan" Version="1.539" Build="16.0.4135.4">
+ <BatchSequence><Batch><Statements>
+  <StmtSimple StatementText="SELECT c.CustomerID, c.AccountNumber, soh.SalesOrderID, sod.ProductID, sod.LineTotal&#10;FROM Sales.Customer c&#10;JOIN Sales.SalesOrderHeader soh ON soh.CustomerID = c.CustomerID&#10;JOIN Sales.SalesOrderDetail sod ON sod.SalesOrderID = soh.SalesOrderID&#10;WHERE soh.OrderDate >= '2014-01-01'&#10;ORDER BY sod.LineTotal DESC;" StatementId="1" StatementType="SELECT" StatementSubTreeCost="1.0000">
+   <QueryPlan CachedPlanSize="48" CompileTime="3" CompileCPU="3" CompileMemory="320">
+    <MissingIndexes>
+     <MissingIndexGroup Impact="42.18">
+      <MissingIndex Database="[AdventureWorks]" Schema="[Sales]" Table="[SalesOrderHeader]">
+       <ColumnGroup Usage="INEQUALITY"><Column Name="[OrderDate]" ColumnId="3"/></ColumnGroup>
+       <ColumnGroup Usage="INCLUDE"><Column Name="[CustomerID]" ColumnId="4"/><Column Name="[SalesOrderID]" ColumnId="1"/></ColumnGroup>
+      </MissingIndex>
+     </MissingIndexGroup>
+    </MissingIndexes>
+    <MemoryGrantInfo SerialRequiredMemory="512" SerialDesiredMemory="2816" GrantedMemory="3072" MaxUsedMemory="2944"/>
+    <RelOp NodeId="0" PhysicalOp="Sort" LogicalOp="Sort" EstimateRows="121317" EstimateIO="0.0112" EstimateCPU="0.85" AvgRowSize="35" EstimatedTotalSubtreeCost="1.0000" Parallel="0" EstimatedExecutionMode="Row">
+     <OutputList><ColumnReference Database="[AW]" Schema="[Sales]" Table="[c]" Column="CustomerID"/><ColumnReference Table="[sod]" Column="LineTotal"/></OutputList>
+     <RunTimeInformation><RunTimeCountersPerThread Thread="0" ActualRows="121317" ActualExecutions="1" ActualExecutionMode="Row"/></RunTimeInformation>
+     <Sort Distinct="0"><OrderBy><OrderByColumn Ascending="0"><ColumnReference Table="[sod]" Column="LineTotal"/></OrderByColumn></OrderBy>
+      <RelOp NodeId="1" PhysicalOp="Hash Match" LogicalOp="Inner Join" EstimateRows="121317" EstimateIO="0" EstimateCPU="0.13" AvgRowSize="35" EstimatedTotalSubtreeCost="0.8500" Parallel="0" EstimatedExecutionMode="Row">
+       <OutputList><ColumnReference Table="[c]" Column="CustomerID"/><ColumnReference Table="[sod]" Column="LineTotal"/></OutputList>
+       <RunTimeInformation><RunTimeCountersPerThread Thread="0" ActualRows="121317" ActualExecutions="1"/></RunTimeInformation>
+       <Hash><HashKeysBuild><ColumnReference Table="[soh]" Column="SalesOrderID"/></HashKeysBuild>
+        <RelOp NodeId="2" PhysicalOp="Index Seek" LogicalOp="Index Seek" EstimateRows="3200" EstimateIO="0.09" EstimateCPU="0.018" AvgRowSize="19" EstimatedTotalSubtreeCost="0.1500" Parallel="0" EstimatedExecutionMode="Row">
+         <OutputList><ColumnReference Table="[soh]" Column="SalesOrderID"/><ColumnReference Table="[soh]" Column="CustomerID"/></OutputList>
+         <RunTimeInformation><RunTimeCountersPerThread Thread="0" ActualRows="48512" ActualExecutions="1"/></RunTimeInformation>
+         <IndexScan Ordered="1" ScanDirection="FORWARD">
+          <Object Database="[AdventureWorks]" Schema="[Sales]" Table="[SalesOrderHeader]" Index="[IX_SalesOrderHeader_CustomerID]" Alias="[soh]" IndexKind="NonClustered"/>
+          <SeekPredicates><SeekPredicateNew><SeekKeys><Prefix><RangeColumns/><RangeExpressions><ScalarOperator ScalarString="[soh].[OrderDate] &gt;= '2014-01-01'"/></RangeExpressions></Prefix></SeekKeys></SeekPredicateNew></SeekPredicates>
+         </IndexScan></RelOp>
+        <RelOp NodeId="3" PhysicalOp="Nested Loops" LogicalOp="Inner Join" EstimateRows="121317" EstimateIO="0" EstimateCPU="0.04" AvgRowSize="31" EstimatedTotalSubtreeCost="0.5500" Parallel="0" EstimatedExecutionMode="Row">
+         <OutputList><ColumnReference Table="[sod]" Column="LineTotal"/></OutputList>
+         <RunTimeInformation><RunTimeCountersPerThread Thread="0" ActualRows="121317" ActualExecutions="1"/></RunTimeInformation>
+         <NestedLoops Optimized="0">
+          <RelOp NodeId="4" PhysicalOp="Index Seek" LogicalOp="Index Seek" EstimateRows="121317" EstimateIO="0.16" EstimateCPU="0.13" AvgRowSize="15" EstimatedTotalSubtreeCost="0.2000" Parallel="0" EstimatedExecutionMode="Row">
+           <OutputList><ColumnReference Table="[sod]" Column="SalesOrderID"/><ColumnReference Table="[sod]" Column="ProductID"/></OutputList>
+           <RunTimeInformation><RunTimeCountersPerThread Thread="0" ActualRows="121317" ActualExecutions="1"/></RunTimeInformation>
+           <IndexScan Ordered="1" ScanDirection="FORWARD">
+            <Object Database="[AdventureWorks]" Schema="[Sales]" Table="[SalesOrderDetail]" Index="[IX_SalesOrderDetail_SalesOrderID]" Alias="[sod]" IndexKind="NonClustered"/>
+            <SeekPredicates><SeekPredicateNew><SeekKeys><Prefix><RangeColumns><ColumnReference Table="[sod]" Column="SalesOrderID"/></RangeColumns><RangeExpressions><ScalarOperator ScalarString="[soh].[SalesOrderID]"/></RangeExpressions></Prefix></SeekKeys></SeekPredicateNew></SeekPredicates>
+           </IndexScan></RelOp>
+          <RelOp NodeId="5" PhysicalOp="Key Lookup" LogicalOp="Key Lookup" EstimateRows="1" EstimateExecutions="121317" EstimateIO="0.003" EstimateCPU="0.0001" AvgRowSize="20" EstimatedTotalSubtreeCost="0.3000" Parallel="0" EstimatedExecutionMode="Row">
+           <OutputList><ColumnReference Table="[sod]" Column="LineTotal"/></OutputList>
+           <RunTimeInformation><RunTimeCountersPerThread Thread="0" ActualRows="121317" ActualExecutions="121317"/></RunTimeInformation>
+           <IndexScan Lookup="1" Ordered="1" ScanDirection="FORWARD">
+            <Object Database="[AdventureWorks]" Schema="[Sales]" Table="[SalesOrderDetail]" Index="[PK_SalesOrderDetail]" Alias="[sod]" IndexKind="Clustered"/>
+            <SeekPredicates><SeekPredicateNew><SeekKeys><Prefix><RangeColumns><ColumnReference Table="[sod]" Column="SalesOrderDetailID"/></RangeColumns><RangeExpressions><ScalarOperator ScalarString="[sod].[SalesOrderDetailID]"/></RangeExpressions></Prefix></SeekKeys></SeekPredicateNew></SeekPredicates>
+           </IndexScan></RelOp>
+         </NestedLoops></RelOp>
+       </Hash></RelOp>
+     </Sort></RelOp>
+   </QueryPlan>
+  </StmtSimple>
+ </Statements></Batch></BatchSequence>
+</ShowPlanXML>`;
+
+// boot
+const SAMPLE_PAR=`<ShowPlanXML xmlns="http://schemas.microsoft.com/sqlserver/2004/07/showplan" Version="1.539" Build="16.0.4135.4">
+ <BatchSequence><Batch><Statements>
+  <StmtSimple StatementText="SELECT soh.TerritoryID, COUNT_BIG(*) AS Orders, SUM(sod.LineTotal) AS Revenue&#10;FROM Sales.SalesOrderHeader soh&#10;JOIN Sales.SalesOrderDetail sod ON sod.SalesOrderID = soh.SalesOrderID&#10;WHERE soh.OrderDate >= '2014-01-01'&#10;GROUP BY soh.TerritoryID;" StatementId="1" StatementType="SELECT" StatementSubTreeCost="2.0000">
+   <QueryPlan DegreeOfParallelism="8" CachedPlanSize="64">
+    <MissingIndexes><MissingIndexGroup Impact="38.40">
+      <MissingIndex Database="[AdventureWorks]" Schema="[Sales]" Table="[SalesOrderHeader]">
+       <ColumnGroup Usage="INEQUALITY"><Column Name="[OrderDate]" ColumnId="3"/></ColumnGroup>
+       <ColumnGroup Usage="INCLUDE"><Column Name="[TerritoryID]" ColumnId="6"/><Column Name="[SalesOrderID]" ColumnId="1"/></ColumnGroup>
+      </MissingIndex></MissingIndexGroup></MissingIndexes>
+    <MemoryGrantInfo SerialRequiredMemory="1024" SerialDesiredMemory="5120" GrantedMemory="9216" MaxUsedMemory="8800"/>
+    <RelOp NodeId="0" PhysicalOp="Parallelism" LogicalOp="Gather Streams" EstimateRows="200" EstimateIO="0" EstimateCPU="0.028" EstimateExecutions="1" AvgRowSize="23" EstimatedTotalSubtreeCost="2.0000" Parallel="1" EstimatedExecutionMode="Row">
+     <OutputList><ColumnReference Table="[soh]" Column="TerritoryID"/></OutputList>
+     <RunTimeInformation><RunTimeCountersPerThread Thread="0" ActualRows="843" ActualExecutions="1" ActualCPUms="2" ActualElapsedms="412" ActualLogicalReads="0"/></RunTimeInformation>
+     <Parallelism>
+      <RelOp NodeId="1" PhysicalOp="Hash Match" LogicalOp="Aggregate" EstimateRows="200" EstimateIO="0" EstimateCPU="0.11" EstimateExecutions="1" AvgRowSize="23" EstimatedTotalSubtreeCost="1.9000" Parallel="1" EstimatedExecutionMode="Row">
+       <OutputList><ColumnReference Table="[soh]" Column="TerritoryID"/></OutputList>
+       <RunTimeInformation>
+        <RunTimeCountersPerThread Thread="1" ActualRows="210" ActualExecutions="1" ActualCPUms="92" ActualElapsedms="390" ActualLogicalReads="0"/>
+        <RunTimeCountersPerThread Thread="2" ActualRows="198" ActualExecutions="1" ActualCPUms="88" ActualElapsedms="388" ActualLogicalReads="0"/>
+        <RunTimeCountersPerThread Thread="3" ActualRows="225" ActualExecutions="1" ActualCPUms="95" ActualElapsedms="395" ActualLogicalReads="0"/>
+        <RunTimeCountersPerThread Thread="4" ActualRows="210" ActualExecutions="1" ActualCPUms="90" ActualElapsedms="392" ActualLogicalReads="0"/>
+       </RunTimeInformation>
+       <MemoryFractions Input="0.12" Output="0.12"/>
+       <Hash>
+        <RelOp NodeId="2" PhysicalOp="Hash Match" LogicalOp="Inner Join" EstimateRows="121317" EstimateIO="0" EstimateCPU="0.42" EstimateExecutions="1" AvgRowSize="27" EstimatedTotalSubtreeCost="1.7000" Parallel="1" EstimatedExecutionMode="Row">
+         <OutputList><ColumnReference Table="[soh]" Column="TerritoryID"/><ColumnReference Table="[sod]" Column="LineTotal"/></OutputList>
+         <RunTimeInformation>
+          <RunTimeCountersPerThread Thread="1" ActualRows="30200" ActualExecutions="1" ActualCPUms="140" ActualElapsedms="300"/>
+          <RunTimeCountersPerThread Thread="2" ActualRows="30500" ActualExecutions="1" ActualCPUms="142" ActualElapsedms="300"/>
+          <RunTimeCountersPerThread Thread="3" ActualRows="30317" ActualExecutions="1" ActualCPUms="141" ActualElapsedms="300"/>
+          <RunTimeCountersPerThread Thread="4" ActualRows="30300" ActualExecutions="1" ActualCPUms="140" ActualElapsedms="300"/>
+         </RunTimeInformation>
+         <MemoryFractions Input="0.88" Output="0.88"/>
+         <Hash><HashKeysBuild><ColumnReference Table="[soh]" Column="SalesOrderID"/></HashKeysBuild>
+          <RelOp NodeId="3" PhysicalOp="Index Scan" LogicalOp="Index Scan" EstimateRows="3200" EstimateIO="0.18" EstimateCPU="0.06" EstimateExecutions="1" AvgRowSize="15" EstimatedTotalSubtreeCost="0.4500" Parallel="1" EstimatedExecutionMode="Row">
+           <OutputList><ColumnReference Table="[soh]" Column="SalesOrderID"/><ColumnReference Table="[soh]" Column="TerritoryID"/></OutputList>
+           <RunTimeInformation>
+            <RunTimeCountersPerThread Thread="1" ActualRows="44000" ActualExecutions="1" ActualCPUms="660" ActualElapsedms="700" ActualLogicalReads="2400"/>
+            <RunTimeCountersPerThread Thread="2" ActualRows="900" ActualExecutions="1" ActualCPUms="14" ActualElapsedms="60" ActualLogicalReads="80"/>
+            <RunTimeCountersPerThread Thread="3" ActualRows="612" ActualExecutions="1" ActualCPUms="9" ActualElapsedms="55" ActualLogicalReads="55"/>
+            <RunTimeCountersPerThread Thread="4" ActualRows="600" ActualExecutions="1" ActualCPUms="9" ActualElapsedms="50" ActualLogicalReads="50"/>
+            <RunTimeCountersPerThread Thread="5" ActualRows="600" ActualExecutions="1" ActualCPUms="9" ActualElapsedms="50" ActualLogicalReads="50"/>
+            <RunTimeCountersPerThread Thread="6" ActualRows="600" ActualExecutions="1" ActualCPUms="9" ActualElapsedms="50" ActualLogicalReads="50"/>
+            <RunTimeCountersPerThread Thread="7" ActualRows="600" ActualExecutions="1" ActualCPUms="9" ActualElapsedms="50" ActualLogicalReads="50"/>
+            <RunTimeCountersPerThread Thread="8" ActualRows="600" ActualExecutions="1" ActualCPUms="9" ActualElapsedms="50" ActualLogicalReads="50"/>
+           </RunTimeInformation>
+           <IndexScan Ordered="0">
+            <Object Database="[AdventureWorks]" Schema="[Sales]" Table="[SalesOrderHeader]" Index="[IX_SalesOrderHeader_OrderDate_old]" Alias="[soh]" IndexKind="NonClustered"/>
+            <Predicate><ScalarOperator ScalarString="[soh].[OrderDate]&gt;='2014-01-01'"/></Predicate>
+           </IndexScan></RelOp>
+          <RelOp NodeId="4" PhysicalOp="Clustered Index Scan" LogicalOp="Clustered Index Scan" EstimateRows="121317" EstimateIO="0.62" EstimateCPU="0.34" EstimateExecutions="1" AvgRowSize="19" EstimatedTotalSubtreeCost="1.1000" Parallel="1" EstimatedExecutionMode="Row">
+           <OutputList><ColumnReference Table="[sod]" Column="SalesOrderID"/><ColumnReference Table="[sod]" Column="LineTotal"/></OutputList>
+           <RunTimeInformation>
+            <RunTimeCountersPerThread Thread="1" ActualRows="30200" ActualExecutions="1" ActualCPUms="300" ActualElapsedms="520" ActualLogicalReads="1480"/>
+            <RunTimeCountersPerThread Thread="2" ActualRows="30500" ActualExecutions="1" ActualCPUms="305" ActualElapsedms="520" ActualLogicalReads="1490"/>
+            <RunTimeCountersPerThread Thread="3" ActualRows="30317" ActualExecutions="1" ActualCPUms="300" ActualElapsedms="520" ActualLogicalReads="1482"/>
+            <RunTimeCountersPerThread Thread="4" ActualRows="30300" ActualExecutions="1" ActualCPUms="300" ActualElapsedms="520" ActualLogicalReads="1481"/>
+           </RunTimeInformation>
+           <IndexScan Ordered="0">
+            <Object Database="[AdventureWorks]" Schema="[Sales]" Table="[SalesOrderDetail]" Index="[PK_SalesOrderDetail]" Alias="[sod]" IndexKind="Clustered"/>
+           </IndexScan></RelOp>
+         </Hash></RelOp>
+       </Hash></RelOp>
+     </Parallelism></RelOp>
+   </QueryPlan>
+  </StmtSimple>
+ </Statements></Batch></BatchSequence>
+</ShowPlanXML>`;
+
+loadPlan(SAMPLE_PAR);
+</script>
+</body>
+</html>

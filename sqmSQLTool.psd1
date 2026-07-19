@@ -120,6 +120,7 @@
 		'Get-sqmOperationStatus',
 		'Get-sqmOrphanedFiles',
 		'Get-sqmPerfCounters',
+		'Get-sqmPlanInsights',
 		'Get-sqmServerHardwareReport',
 		'Get-sqmSaLogin',
 		'Get-sqmServerSetting',
