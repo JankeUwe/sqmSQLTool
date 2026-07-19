@@ -4,11 +4,25 @@
 
 A comprehensive PowerShell module for SQL Server 2016+ administration, with specialized support for AlwaysOn Availability Groups, performance reporting, and security auditing.
 
-**Latest Release:** [v1.9.9.1](https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.9.9.1) | **Functions:** 144 | **Documentation:** [Full Reference](https://www.powershelldba.de/sqmsqltool/commands-en/)
+**Latest Release:** [v1.9.26.1](https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.9.26.1) | **Functions:** 156 | **Documentation:** [Full Reference](https://www.powershelldba.de/sqmsqltool/commands-en/)
 
 ---
 
-## 🎯 What''s New in v1.9.9.0
+## 🎯 What's New in v1.9.26
+
+### Execution Plan Analysis
+`Get-sqmPlanInsights` parses ShowPlan XML (.sqlplan/.xml) and reports cardinality-estimate mismatches, SARGability violations, parameter-sniffing risk, tempdb spills, and missing-index suggestions — with runtime-evidence-based severity scoring instead of relying on optimizer cost estimates:
+
+```powershell
+# Offline analysis of a saved plan
+Get-sqmPlanInsights -Path ".\slow-query.sqlplan"
+
+# With live Query Store telemetry and a JSON bundle for the visualizer
+Get-sqmPlanInsights -Path ".\slow-query.sqlplan" -ServerInstance "SQL01" `
+    -Database "AppDB" -InspectDatabase -OutFile ".\plan.json"
+```
+
+Pair it with the offline, self-contained **[Plan Visualizer](Tools/PlanVisualizer/plan_visualizer_V4.html)** (`Tools\PlanVisualizer\plan_visualizer_V4.html`) — drop the JSON bundle in for an interactive diagram with the same findings. No network calls, nothing leaves your machine.
 
 ### Enterprise AlwaysOn Login Synchronization
 Automatically synchronize SQL logins from primary to secondary replicas in AlwaysOn Availability Groups:
@@ -49,7 +63,7 @@ Import-Module ./sqmSQLTool/sqmSQLTool.psd1 -Force
 ### Verify Installation
 ```powershell
 Get-Command -Module sqmSQLTool | Measure-Object
-# Output: 124 functions
+# Output: 156 functions
 ```
 
 ---
@@ -64,6 +78,7 @@ Get-Command -Module sqmSQLTool | Measure-Object
 - `Complete-sqmListenerMigration` - Listener migration workflow
 
 ### Performance & Health
+- `Get-sqmPlanInsights` - Execution plan analysis: CE mismatches, SARGability, spills, missing indexes
 - `Get-sqmWaitStatistics` - SQL Server wait statistics
 - `Get-sqmDiskSpaceReport` - Disk utilization and growth trends
 - `Get-sqmMissingIndexes` - Index recommendations with CREATE statements
@@ -88,8 +103,8 @@ Get-Command -Module sqmSQLTool | Measure-Object
 ## 📚 Documentation
 
 ### Full Command Reference
-Complete documentation with examples for all 143 functions:
-- **HTML Reference**: https://www.powershelldba.de/tools/befehls-referenz
+Complete documentation with examples for all 156 functions:
+- **HTML Reference**: https://www.powershelldba.de/sqmsqltool/commands-en/
 - **GitHub Releases**: https://github.com/JankeUwe/sqmSQLTool/releases
 
 ---
