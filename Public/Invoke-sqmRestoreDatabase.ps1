@@ -455,6 +455,88 @@ function Invoke-sqmRestoreDatabase
 				$workInstance = $SqlInstance
 			}
 
+			# ---- Falls AlwaysOn: Datenbank aus der AG entfernen (primaer) und von sekundaeren Replikaten loeschen ----
+			# WICHTIG: Muss VOR jeder direkten ALTER DATABASE-Operation laufen (Normalize-to-Multi-User und
+			# Single-User-Schritt weiter unten) - SQL Server lehnt ALTER DATABASE SET SINGLE_USER/MULTI_USER/OFFLINE
+			# etc. grundsaetzlich ab, solange die Datenbank noch Mitglied einer Availability Group ist ('...cannot
+			# be performed on database ... because it is involved in a database mirroring session or an availability
+			# group'). Frueher lief dieser Schritt nach der Single-User-Behandlung, wodurch genau dieser Fehler
+			# ausgeloest wurde, sobald die Datenbank aktive Verbindungen hatte oder -ForceSingleUser gesetzt war.
+			# Primary/Secondaries wurden bereits oben (Arbeits-Instanz-Ermittlung) bestimmt.
+			if ($isAGDatabase -and -not $KeepAlwaysOn)
+			{
+				if (-not $agDbCheck)
+				{
+					# Ueber -AvailabilityGroupName erzwungen: Datenbank ist bereits kein AG-Mitglied mehr
+					# (z.B. Rest eines vorherigen, abgebrochenen Laufs) - nichts zu entfernen, aber
+					# Secondary-Cleanup und Rejoin/Reseed unten laufen trotzdem weiter.
+					Invoke-sqmLogging -Message "Datenbank ist aktuell kein AG-Mitglied mehr - AG-Entfernen wird uebersprungen." -FunctionName $functionName -Level "INFO"
+					$results += [PSCustomObject]@{ Action = "RemoveFromAG"; Status = "NotNeeded"; Message = "Datenbank war zu Laufbeginn bereits kein AG-Mitglied mehr." }
+				}
+				else
+				{
+					$removeAgAction = "Entferne Datenbank '$DatabaseName' aus der AG '$($availabilityGroup.Name)'"
+					if ($PSCmdlet.ShouldProcess($DatabaseName, $removeAgAction))
+					{
+						try
+						{
+							Invoke-sqmLogging -Message $removeAgAction -FunctionName $functionName -Level "INFO"
+							Remove-DbaAgDatabase -SqlInstance $primaryInstance -SqlCredential $SqlCredential -AvailabilityGroup $availabilityGroup.Name -Database $DatabaseName -ErrorAction Stop
+							Invoke-sqmLogging -Message "Datenbank erfolgreich aus AG entfernt." -FunctionName $functionName -Level "INFO"
+							$results += [PSCustomObject]@{ Action = "RemoveFromAG"; Status = "Success"; Message = "Datenbank aus AG entfernt." }
+						}
+						catch
+						{
+							$errMsg = "Fehler beim Entfernen aus AG: $($_.Exception.Message)"
+							Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+							Write-EventLog -LogName Application -Source $agEventLogSource -EventId 9010 -EntryType Error `
+								-Message "Invoke-sqmRestoreDatabase: Entfernen von '$DatabaseName' aus AG '$($availabilityGroup.Name)' auf '$primaryInstance' fehlgeschlagen: $errMsg" -ErrorAction SilentlyContinue
+							if ($EnableException) { throw }
+							$results += [PSCustomObject]@{ Action = "RemoveFromAG"; Status = "Failed"; Message = $errMsg }
+							return
+						}
+					}
+					else
+					{
+						$results += [PSCustomObject]@{ Action = "RemoveFromAG"; Status = "Skipped"; Message = "WhatIf - Entfernen aus AG uebersprungen." }
+					}
+				}
+
+				foreach ($secondary in $secondaryInstances)
+				{
+					$removeDbAction = "Loesche Datenbank '$DatabaseName' auf sekundaerem Knoten '$secondary'"
+					if ($PSCmdlet.ShouldProcess($DatabaseName, $removeDbAction))
+					{
+						try
+						{
+							Invoke-sqmLogging -Message $removeDbAction -FunctionName $functionName -Level "INFO"
+							$secondaryServer = Connect-DbaInstance -SqlInstance $secondary -SqlCredential $SqlCredential -ErrorAction Stop
+							if ($secondaryServer.Databases[$DatabaseName] -and $secondaryServer.Databases[$DatabaseName].IsAccessible)
+							{
+								Remove-DbaDatabase -SqlInstance $secondary -SqlCredential $SqlCredential -Database $DatabaseName -Confirm:$false -ErrorAction Stop
+								Invoke-sqmLogging -Message "Datenbank auf '$secondary' geloescht." -FunctionName $functionName -Level "INFO"
+								$results += [PSCustomObject]@{ Action = "RemoveFromSecondary"; Target = $secondary; Status = "Success"; Message = "Datenbank auf sekundaerem Knoten geloescht." }
+							}
+							else
+							{
+								Invoke-sqmLogging -Message "Datenbank auf '$secondary' nicht vorhanden." -FunctionName $functionName -Level "VERBOSE"
+							}
+						}
+						catch
+						{
+							$errMsg = "Fehler beim Loeschen auf '$secondary': $($_.Exception.Message)"
+							Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+							if ($EnableException) { throw }
+							$results += [PSCustomObject]@{ Action = "RemoveFromSecondary"; Target = $secondary; Status = "Failed"; Message = $errMsg }
+						}
+					}
+					else
+					{
+						$results += [PSCustomObject]@{ Action = "RemoveFromSecondary"; Target = $secondary; Status = "Skipped"; Message = "WhatIf - Loeschen uebersprungen." }
+					}
+				}
+			}
+
 			# ---- Vorbereitung: Policy temporaer deaktivieren (auf der Arbeits-Instanz) ----
 			if (-not [string]::IsNullOrWhiteSpace($policyName))
 			{
@@ -656,82 +738,6 @@ function Invoke-sqmRestoreDatabase
 			elseif ($dbExists)
 			{
 				Invoke-sqmLogging -Message "Datenbank '$DatabaseName' hat keine aktiven Verbindungen." -FunctionName $functionName -Level "INFO"
-			}
-
-			# ---- 4. Wenn AlwaysOn: Datenbank aus der AG entfernen (primaer) und von sekundaeren Replikaten loeschen ----
-			# Primary/Secondaries wurden bereits oben (Arbeits-Instanz-Ermittlung) bestimmt.
-			if ($isAGDatabase -and -not $KeepAlwaysOn)
-			{
-				if (-not $agDbCheck)
-				{
-					# Ueber -AvailabilityGroupName erzwungen: Datenbank ist bereits kein AG-Mitglied mehr
-					# (z.B. Rest eines vorherigen, abgebrochenen Laufs) - nichts zu entfernen, aber
-					# Secondary-Cleanup und Rejoin/Reseed unten laufen trotzdem weiter.
-					Invoke-sqmLogging -Message "Datenbank ist aktuell kein AG-Mitglied mehr - AG-Entfernen wird uebersprungen." -FunctionName $functionName -Level "INFO"
-					$results += [PSCustomObject]@{ Action = "RemoveFromAG"; Status = "NotNeeded"; Message = "Datenbank war zu Laufbeginn bereits kein AG-Mitglied mehr." }
-				}
-				else
-				{
-					$removeAgAction = "Entferne Datenbank '$DatabaseName' aus der AG '$($availabilityGroup.Name)'"
-					if ($PSCmdlet.ShouldProcess($DatabaseName, $removeAgAction))
-					{
-						try
-						{
-							Invoke-sqmLogging -Message $removeAgAction -FunctionName $functionName -Level "INFO"
-							Remove-DbaAgDatabase -SqlInstance $primaryInstance -SqlCredential $SqlCredential -AvailabilityGroup $availabilityGroup.Name -Database $DatabaseName -ErrorAction Stop
-							Invoke-sqmLogging -Message "Datenbank erfolgreich aus AG entfernt." -FunctionName $functionName -Level "INFO"
-							$results += [PSCustomObject]@{ Action = "RemoveFromAG"; Status = "Success"; Message = "Datenbank aus AG entfernt." }
-						}
-						catch
-						{
-							$errMsg = "Fehler beim Entfernen aus AG: $($_.Exception.Message)"
-							Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
-							Write-EventLog -LogName Application -Source $agEventLogSource -EventId 9010 -EntryType Error `
-								-Message "Invoke-sqmRestoreDatabase: Entfernen von '$DatabaseName' aus AG '$($availabilityGroup.Name)' auf '$primaryInstance' fehlgeschlagen: $errMsg" -ErrorAction SilentlyContinue
-							if ($EnableException) { throw }
-							$results += [PSCustomObject]@{ Action = "RemoveFromAG"; Status = "Failed"; Message = $errMsg }
-							return
-						}
-					}
-					else
-					{
-						$results += [PSCustomObject]@{ Action = "RemoveFromAG"; Status = "Skipped"; Message = "WhatIf - Entfernen aus AG uebersprungen." }
-					}
-				}
-
-				foreach ($secondary in $secondaryInstances)
-				{
-					$removeDbAction = "Loesche Datenbank '$DatabaseName' auf sekundaerem Knoten '$secondary'"
-					if ($PSCmdlet.ShouldProcess($DatabaseName, $removeDbAction))
-					{
-						try
-						{
-							Invoke-sqmLogging -Message $removeDbAction -FunctionName $functionName -Level "INFO"
-							$secondaryServer = Connect-DbaInstance -SqlInstance $secondary -SqlCredential $SqlCredential -ErrorAction Stop
-							if ($secondaryServer.Databases[$DatabaseName] -and $secondaryServer.Databases[$DatabaseName].IsAccessible)
-							{
-								Remove-DbaDatabase -SqlInstance $secondary -SqlCredential $SqlCredential -Database $DatabaseName -Confirm:$false -ErrorAction Stop
-								Invoke-sqmLogging -Message "Datenbank auf '$secondary' geloescht." -FunctionName $functionName -Level "INFO"
-								$results += [PSCustomObject]@{ Action = "RemoveFromSecondary"; Target = $secondary; Status = "Success"; Message = "Datenbank auf sekundaerem Knoten geloescht." }
-							}
-							else
-							{
-								Invoke-sqmLogging -Message "Datenbank auf '$secondary' nicht vorhanden." -FunctionName $functionName -Level "VERBOSE"
-							}
-						}
-						catch
-						{
-							$errMsg = "Fehler beim Loeschen auf '$secondary': $($_.Exception.Message)"
-							Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
-							if ($EnableException) { throw }
-							$results += [PSCustomObject]@{ Action = "RemoveFromSecondary"; Target = $secondary; Status = "Failed"; Message = $errMsg }
-						}
-					}
-					else
-					{
-						$results += [PSCustomObject]@{ Action = "RemoveFromSecondary"; Target = $secondary; Status = "Skipped"; Message = "WhatIf - Loeschen uebersprungen." }
-					}
-				}
 			}
 
 			# ---- 5. Restore der Datenbank(en) ----
