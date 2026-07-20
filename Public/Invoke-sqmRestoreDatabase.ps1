@@ -85,11 +85,28 @@ Example: @("C:\Backup\Full.bak", "C:\Backup\Diff.bak", "C:\Backup\Log1.trn", "C:
 Can be used instead of `-BackupFile`.
 
 .PARAMETER DatabaseName
-Name of the database to restore (as it appears in the backup file). Required to determine file names.
+Optional: name of the database as it appears in the backup file. If omitted, it is read directly
+from the backup's own header via RESTORE HEADERONLY - the backup already carries this name, so
+there is normally no need to type it again just to restore under the same name. Only pass this
+explicitly if you already know it and want to avoid the extra header-lookup round trip, or if
+you're piecing together a restore from files whose header you don't want to rely on. Used for
+logging, for looking up the existing database of that name (AG membership check, pre-restore
+backup, user export, single-user handling - only relevant when -NewDatabaseName is NOT used), and
+as the restore target if -NewDatabaseName is not given. It does NOT need to match anything for the
+restore itself to work - Restore-DbaDatabase reads the actual logical/physical file names straight
+out of the backup file regardless of this parameter.
 
 .PARAMETER NewDatabaseName
-Optional: New name for the database after the restore. If specified, logical file names are
-adjusted accordingly (physical files use the new name as base).
+Optional: restores the backup directly as a new/different database, e.g. as a copy alongside the
+original (-DatabaseName "arena" -NewDatabaseName "arena_copy" restores the "arena" backup as a
+brand-new "arena_copy" - "arena" itself is left completely untouched). This is NOT "restore over
+-DatabaseName, then rename" - there is no separate rename step; the restore writes directly to
+-NewDatabaseName in one operation, with logical/physical file names based on the new name. Because
+of this, once -NewDatabaseName is given, EVERY pre-restore safety check (AG membership, existence,
+-BackupBeforeRestore, user export, single-user handling) targets -NewDatabaseName instead of
+-DatabaseName - it is -NewDatabaseName that gets overwritten (-WithReplace) if it already exists,
+so it is -NewDatabaseName that needs to be backed up/exported/single-usered beforehand, not the
+untouched -DatabaseName.
 
 .PARAMETER NewDatabaseFilePath
 Optional: Target directory for database files (.mdf, .ndf). If not specified, the default
@@ -165,6 +182,12 @@ Shows what would happen without making changes.
 Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\AdventureWorks.bak" -DatabaseName "AdventureWorks"
 
 .EXAMPLE
+# -DatabaseName omitted entirely - read straight from the backup's own header (RESTORE
+# HEADERONLY) and restored under that same name. Equivalent to the example above, just without
+# having to type the name that's already inside the backup file.
+Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\AdventureWorks.bak"
+
+.EXAMPLE
 # Restore with Full + Diff + Logs
 $backupSequence = @(
     "D:\Backup\AdventureWorks_Full.bak",
@@ -212,7 +235,7 @@ function Invoke-sqmRestoreDatabase
 		[string[]]$BackupFile,
 		[Parameter(Mandatory = $true, ParameterSetName = 'Sequence')]
 		[string[]]$BackupFiles,
-		[Parameter(Mandatory = $true)]
+		[Parameter(Mandatory = $false)]
 		[string]$DatabaseName,
 		[Parameter(Mandatory = $false)]
 		[string]$NewDatabaseName,
@@ -257,7 +280,7 @@ function Invoke-sqmRestoreDatabase
 			throw $errMsg
 		}
 
-		Invoke-sqmLogging -Message "Starte $functionName auf Instanz: $SqlInstance fuer Datenbank '$DatabaseName'" -FunctionName $functionName -Level "INFO"
+		Invoke-sqmLogging -Message "Starte $functionName auf Instanz: $SqlInstance" -FunctionName $functionName -Level "INFO"
 
 		# Eventlog-Quelle fuer AG-relevante Aktionen (dieselbe Quelle wie Repair-sqmAlwaysOnDatabases,
 		# damit Restore- und Repair-Vorgaenge im selben Event-Log-Kanal auftauchen). Ein fehlgeschlagenes
@@ -288,7 +311,6 @@ function Invoke-sqmRestoreDatabase
 
 		$results = @()
 		$tempDir = [System.IO.Path]::GetTempPath()
-		$userExportFile = Join-Path $tempDir "UserExport_${DatabaseName}_$(Get-Date -Format 'yyyyMMddHHmmss').sql"
 		$isAGDatabase = $false
 		$availabilityGroup = $null
 		$primaryInstance = $null
@@ -297,11 +319,6 @@ function Invoke-sqmRestoreDatabase
 		$wasSingleUser = $false
 		$originalDbStatus = $null
 		$restoreSucceeded = $false
-		# Sicherer Default, falls die Funktion vor Schritt 5 abbricht (z.B. Fehler bei AG-Entfernen)
-		# und $wasSingleUser bereits true ist (z.B. durch die Bereits-Single-User-Normalisierung in
-		# Schritt 1) - der finally-Block braucht fuer den MULTI_USER-Revert einen gueltigen Namen,
-		# nicht $null. Schritt 5 ueberschreibt dies bei Bedarf mit $NewDatabaseName.
-		$finalDbName = $DatabaseName
 
 		# Policy-Kontrolle
 		$policyName = Get-sqmConfig -Key 'DefaultPolicy' 3>$null
@@ -328,6 +345,52 @@ function Invoke-sqmRestoreDatabase
 			# (Entfernen/Secondary-Cleanup/Rejoin) kommen bei einer AG-Datenbank zusaetzlich dazu.
 			$server = Connect-DbaInstance -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction Stop
 
+			# ---- -DatabaseName aus dem Backup-Header lesen, falls nicht angegeben ----
+			# -DatabaseName steht bereits im Backup selbst (RESTORE HEADERONLY liest ihn direkt aus der
+			# .bak/.trn-Datei) - der Aufrufer muss ihn nicht redundant selbst tippen, wenn ohnehin unter
+			# demselben Namen wiederhergestellt werden soll. -DatabaseName bleibt aber weiterhin
+			# explizit angebbar (z.B. wenn der Aufrufer den Namen schon kennt und die Instanz nicht
+			# extra fuer den Header-Lookup ansprechen will). Bei der 'Sequence'-Parameterset wird nur
+			# die ERSTE Datei (das Full-Backup) fuer den Header-Lookup verwendet - die weiteren Dateien
+			# sind Diff/Log, keine eigenstaendigen Backups mit eigenem Header. Bei 'SingleFile' kann
+			# -BackupFile ein gestreiftes Backup ueber mehrere physische Dateien sein - dort gehoeren
+			# ALLE Dateien zum selben Backup-Set und muessen gemeinsam in die DISK-Klausel.
+			if (-not $PSBoundParameters.ContainsKey('DatabaseName') -or [string]::IsNullOrWhiteSpace($DatabaseName))
+			{
+				$headerLookupFiles = if ($PSCmdlet.ParameterSetName -eq 'Sequence') { @($backupFileList[0]) } else { @($backupFileList) }
+				$diskClause = ($headerLookupFiles | ForEach-Object { "DISK = N'$($_.Replace("'", "''"))'" }) -join ', '
+				try
+				{
+					$headerInfo = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database 'master' `
+						-Query "RESTORE HEADERONLY FROM $diskClause" -ErrorAction Stop
+					$detectedName = ($headerInfo | Select-Object -First 1).DatabaseName
+					if ([string]::IsNullOrWhiteSpace($detectedName))
+					{
+						throw "RESTORE HEADERONLY lieferte keinen DatabaseName-Wert."
+					}
+					$DatabaseName = $detectedName
+					Invoke-sqmLogging -Message "-DatabaseName nicht angegeben - aus Backup-Header gelesen: '$DatabaseName'." -FunctionName $functionName -Level "INFO"
+				}
+				catch
+				{
+					$errMsg = "-DatabaseName wurde nicht angegeben und konnte nicht aus dem Backup-Header gelesen werden: $($_.Exception.Message)"
+					Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+					if ($EnableException) { throw }
+					$results += [PSCustomObject]@{ Action = "ReadBackupHeader"; Status = "Failed"; Message = $errMsg }
+					return
+				}
+			}
+
+			# Name der tatsaechlichen Zieldatenbank auf der Instanz - bei -NewDatabaseName ist das NICHT
+			# $DatabaseName (die bleibt unberuehrt liegen), sondern der neue Name. Muss VOR allen
+			# Pre-Restore-Pruefungen (AG-Mitgliedschaft, Existenz, BackupBeforeRestore, User-Export,
+			# Single-User-Handling) feststehen, denn genau diese Zieldatenbank wird gleich per
+			# -WithReplace ueberschrieben - nicht $DatabaseName. Beispiel: -DatabaseName arena
+			# -NewDatabaseName arena_copy darf niemals Pruefungen/Sicherung gegen die (unberuehrte)
+			# 'arena' fahren, sondern gegen 'arena_copy'.
+			$finalDbName = if ($NewDatabaseName) { $NewDatabaseName } else { $DatabaseName }
+			$userExportFile = Join-Path $tempDir "UserExport_${finalDbName}_$(Get-Date -Format 'yyyyMMddHHmmss').sql"
+
 			# Pruefen, ob die Datenbank in einer AG ist. Laeuft UNABHAENGIG davon, ob die Datenbank
 			# unter diesem Namen bereits existiert: eine Datenbank, die noch nie existiert hat
 			# (Erst-Restore einer neuen Anwendung), muss der Richtlinie "alle Datenbanken muessen in
@@ -336,7 +399,7 @@ function Invoke-sqmRestoreDatabase
 			# terminierenden Parameter-Binding-Fehler aus, den -ErrorAction SilentlyContinue NICHT abfaengt.
 			# Daher Mitgliedschaft ueber Get-DbaAgDatabase pruefen und das AG-Objekt (mit .Name) anschliessend
 			# ueber den AG-Namen nachladen.
-			$agDbCheck = Get-DbaAgDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $DatabaseName -ErrorAction SilentlyContinue
+			$agDbCheck = Get-DbaAgDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $finalDbName -ErrorAction SilentlyContinue
 			if ($agDbCheck)
 			{
 				$isAGDatabase = $true
@@ -475,13 +538,13 @@ function Invoke-sqmRestoreDatabase
 				}
 				else
 				{
-					$removeAgAction = "Entferne Datenbank '$DatabaseName' aus der AG '$($availabilityGroup.Name)'"
-					if ($PSCmdlet.ShouldProcess($DatabaseName, $removeAgAction))
+					$removeAgAction = "Entferne Datenbank '$finalDbName' aus der AG '$($availabilityGroup.Name)'"
+					if ($PSCmdlet.ShouldProcess($finalDbName, $removeAgAction))
 					{
 						try
 						{
 							Invoke-sqmLogging -Message $removeAgAction -FunctionName $functionName -Level "INFO"
-							Remove-DbaAgDatabase -SqlInstance $primaryInstance -SqlCredential $SqlCredential -AvailabilityGroup $availabilityGroup.Name -Database $DatabaseName -Confirm:$false -ErrorAction Stop
+							Remove-DbaAgDatabase -SqlInstance $primaryInstance -SqlCredential $SqlCredential -AvailabilityGroup $availabilityGroup.Name -Database $finalDbName -Confirm:$false -ErrorAction Stop
 							Invoke-sqmLogging -Message "Datenbank erfolgreich aus AG entfernt." -FunctionName $functionName -Level "INFO"
 							$results += [PSCustomObject]@{ Action = "RemoveFromAG"; Status = "Success"; Message = "Datenbank aus AG entfernt." }
 						}
@@ -490,7 +553,7 @@ function Invoke-sqmRestoreDatabase
 							$errMsg = "Fehler beim Entfernen aus AG: $($_.Exception.Message)"
 							Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 							Write-EventLog -LogName Application -Source $agEventLogSource -EventId 9010 -EntryType Error `
-								-Message "Invoke-sqmRestoreDatabase: Entfernen von '$DatabaseName' aus AG '$($availabilityGroup.Name)' auf '$primaryInstance' fehlgeschlagen: $errMsg" -ErrorAction SilentlyContinue
+								-Message "Invoke-sqmRestoreDatabase: Entfernen von '$finalDbName' aus AG '$($availabilityGroup.Name)' auf '$primaryInstance' fehlgeschlagen: $errMsg" -ErrorAction SilentlyContinue
 							if ($EnableException) { throw }
 							$results += [PSCustomObject]@{ Action = "RemoveFromAG"; Status = "Failed"; Message = $errMsg }
 							return
@@ -504,16 +567,16 @@ function Invoke-sqmRestoreDatabase
 
 				foreach ($secondary in $secondaryInstances)
 				{
-					$removeDbAction = "Loesche Datenbank '$DatabaseName' auf sekundaerem Knoten '$secondary'"
-					if ($PSCmdlet.ShouldProcess($DatabaseName, $removeDbAction))
+					$removeDbAction = "Loesche Datenbank '$finalDbName' auf sekundaerem Knoten '$secondary'"
+					if ($PSCmdlet.ShouldProcess($finalDbName, $removeDbAction))
 					{
 						try
 						{
 							Invoke-sqmLogging -Message $removeDbAction -FunctionName $functionName -Level "INFO"
 							$secondaryServer = Connect-DbaInstance -SqlInstance $secondary -SqlCredential $SqlCredential -ErrorAction Stop
-							if ($secondaryServer.Databases[$DatabaseName] -and $secondaryServer.Databases[$DatabaseName].IsAccessible)
+							if ($secondaryServer.Databases[$finalDbName] -and $secondaryServer.Databases[$finalDbName].IsAccessible)
 							{
-								Remove-DbaDatabase -SqlInstance $secondary -SqlCredential $SqlCredential -Database $DatabaseName -Confirm:$false -ErrorAction Stop
+								Remove-DbaDatabase -SqlInstance $secondary -SqlCredential $SqlCredential -Database $finalDbName -Confirm:$false -ErrorAction Stop
 								Invoke-sqmLogging -Message "Datenbank auf '$secondary' geloescht." -FunctionName $functionName -Level "INFO"
 								$results += [PSCustomObject]@{ Action = "RemoveFromSecondary"; Target = $secondary; Status = "Success"; Message = "Datenbank auf sekundaerem Knoten geloescht." }
 							}
@@ -568,12 +631,12 @@ function Invoke-sqmRestoreDatabase
 			# ---- Datenbank-Status auf der Arbeits-Instanz ermitteln ----
 			$workServer = if ($workInstance -eq $SqlInstance) { $server }
 			else { Connect-DbaInstance -SqlInstance $workInstance -SqlCredential $SqlCredential -ErrorAction Stop }
-			$targetDb = $workServer.Databases[$DatabaseName]
+			$targetDb = $workServer.Databases[$finalDbName]
 			$dbExists = $targetDb -ne $null
 
 			if ($dbExists)
 			{
-				Invoke-sqmLogging -Message "Datenbank '$DatabaseName' existiert auf $workInstance." -FunctionName $functionName -Level "INFO"
+				Invoke-sqmLogging -Message "Datenbank '$finalDbName' existiert auf $workInstance." -FunctionName $functionName -Level "INFO"
 
 				# Datenbank kann bereits VOR diesem Aufruf in SINGLE_USER/RESTRICTED_USER stehen (z.B.
 				# Rest eines vorherigen, abgebrochenen Restores oder manuell durch einen DBA gesetzt).
@@ -588,17 +651,17 @@ function Invoke-sqmRestoreDatabase
 				$originalDbStatus = $targetDb.UserAccess
 				if ($originalDbStatus -ne [Microsoft.SqlServer.Management.Smo.DatabaseUserAccess]::Multiple)
 				{
-					$normalizeAction = "Datenbank '$DatabaseName' ist bereits im Modus '$originalDbStatus' - setze auf MULTI_USER zurueck (fremde Session wird getrennt)"
+					$normalizeAction = "Datenbank '$finalDbName' ist bereits im Modus '$originalDbStatus' - setze auf MULTI_USER zurueck (fremde Session wird getrennt)"
 					Invoke-sqmLogging -Message $normalizeAction -FunctionName $functionName -Level "WARNING"
-					if ($PSCmdlet.ShouldProcess($DatabaseName, $normalizeAction))
+					if ($PSCmdlet.ShouldProcess($finalDbName, $normalizeAction))
 					{
 						try
 						{
 							Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database master `
-								-Query "ALTER DATABASE [$DatabaseName] SET MULTI_USER WITH ROLLBACK IMMEDIATE;" -ErrorAction Stop
+								-Query "ALTER DATABASE [$finalDbName] SET MULTI_USER WITH ROLLBACK IMMEDIATE;" -ErrorAction Stop
 							$wasSingleUser = $true
 							$targetDb.Refresh()
-							Invoke-sqmLogging -Message "Datenbank '$DatabaseName' auf MULTI_USER zurueckgesetzt." -FunctionName $functionName -Level "INFO"
+							Invoke-sqmLogging -Message "Datenbank '$finalDbName' auf MULTI_USER zurueckgesetzt." -FunctionName $functionName -Level "INFO"
 							$results += [PSCustomObject]@{ Action = "NormalizeToMultiUser"; Status = "Success"; Message = "War '$originalDbStatus', auf MULTI_USER zurueckgesetzt." }
 						}
 						catch
@@ -623,7 +686,7 @@ function Invoke-sqmRestoreDatabase
 			}
 			else
 			{
-				Invoke-sqmLogging -Message "Datenbank '$DatabaseName' existiert nicht auf $workInstance." -FunctionName $functionName -Level "INFO"
+				Invoke-sqmLogging -Message "Datenbank '$finalDbName' existiert nicht auf $workInstance." -FunctionName $functionName -Level "INFO"
 			}
 
 			# ---- 2. Optional: Backup der vorhandenen Datenbank ----
@@ -632,18 +695,18 @@ function Invoke-sqmRestoreDatabase
 			# uebersprungen, was verwirrend war, wenn -BackupBeforeRestore explizit angegeben wurde.
 			if ($BackupBeforeRestore -and $dbExists)
 			{
-				$backupFileName = "${DatabaseName}_preRestore_$(Get-Date -Format 'yyyyMMdd_HHmmss').bak"
+				$backupFileName = "${finalDbName}_preRestore_$(Get-Date -Format 'yyyyMMdd_HHmmss').bak"
 				$backupFileFull = Join-Path (Get-DbaDefaultPath -SqlInstance $workInstance -SqlCredential $SqlCredential).Backup $backupFileName
 				$backupParams = @{
 					SqlInstance   = $workInstance
 					SqlCredential = $SqlCredential
-					Database	  = $DatabaseName
+					Database	  = $finalDbName
 					Path		  = $backupFileFull
 					Type		  = 'Full'
 					Confirm	      = $false
 					ErrorAction   = 'Stop'
 				}
-				if ($PSCmdlet.ShouldProcess($DatabaseName, "Backup der Datenbank '$DatabaseName' nach $backupFileFull"))
+				if ($PSCmdlet.ShouldProcess($finalDbName, "Backup der Datenbank '$finalDbName' nach $backupFileFull"))
 				{
 					try
 					{
@@ -670,12 +733,12 @@ function Invoke-sqmRestoreDatabase
 			# ---- 3. Export der Datenbank-User (immer, es sei denn NoUserExport) ----
 			if (-not $NoUserExport -and $dbExists)
 			{
-				if ($PSCmdlet.ShouldProcess($DatabaseName, "Export der Datenbank-User nach $userExportFile"))
+				if ($PSCmdlet.ShouldProcess($finalDbName, "Export der Datenbank-User nach $userExportFile"))
 				{
 					try
 					{
-						Invoke-sqmLogging -Message "Exportiere User der Datenbank '$DatabaseName' nach $userExportFile" -FunctionName $functionName -Level "INFO"
-						Export-DbaUser -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $DatabaseName -FilePath $userExportFile -Confirm:$false -ErrorAction Stop
+						Invoke-sqmLogging -Message "Exportiere User der Datenbank '$finalDbName' nach $userExportFile" -FunctionName $functionName -Level "INFO"
+						Export-DbaUser -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -FilePath $userExportFile -Confirm:$false -ErrorAction Stop
 						Invoke-sqmLogging -Message "User-Export erfolgreich." -FunctionName $functionName -Level "INFO"
 						$results += [PSCustomObject]@{ Action = "UserExport"; Status = "Success"; Message = "Exportdatei: $userExportFile" }
 					}
@@ -705,21 +768,21 @@ function Invoke-sqmRestoreDatabase
 			{
 				if ($activeConnections -gt 0)
 				{
-					Invoke-sqmLogging -Message "Datenbank '$DatabaseName' hat $activeConnections aktive Verbindungen. Setze in Single-User-Modus." -FunctionName $functionName -Level "INFO"
+					Invoke-sqmLogging -Message "Datenbank '$finalDbName' hat $activeConnections aktive Verbindungen. Setze in Single-User-Modus." -FunctionName $functionName -Level "INFO"
 				}
 				else
 				{
-					Invoke-sqmLogging -Message "Erzwinge Single-User-Modus fuer Datenbank '$DatabaseName'." -FunctionName $functionName -Level "INFO"
+					Invoke-sqmLogging -Message "Erzwinge Single-User-Modus fuer Datenbank '$finalDbName'." -FunctionName $functionName -Level "INFO"
 				}
-				$setSingleUserAction = "Setze Datenbank '$DatabaseName' in Single-User-Modus"
-				if ($PSCmdlet.ShouldProcess($DatabaseName, $setSingleUserAction))
+				$setSingleUserAction = "Setze Datenbank '$finalDbName' in Single-User-Modus"
+				if ($PSCmdlet.ShouldProcess($finalDbName, $setSingleUserAction))
 				{
 					try
 					{
-						$singleUserQuery = "ALTER DATABASE [$DatabaseName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;"
+						$singleUserQuery = "ALTER DATABASE [$finalDbName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;"
 						Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database master -Query $singleUserQuery -ErrorAction Stop
 						$wasSingleUser = $true
-						Invoke-sqmLogging -Message "Datenbank '$DatabaseName' jetzt im Single-User-Modus." -FunctionName $functionName -Level "INFO"
+						Invoke-sqmLogging -Message "Datenbank '$finalDbName' jetzt im Single-User-Modus." -FunctionName $functionName -Level "INFO"
 						$results += [PSCustomObject]@{ Action = "SetSingleUser"; Status = "Success"; Message = "Datenbank in Single-User versetzt." }
 					}
 					catch
@@ -738,15 +801,14 @@ function Invoke-sqmRestoreDatabase
 			}
 			elseif ($dbExists)
 			{
-				Invoke-sqmLogging -Message "Datenbank '$DatabaseName' hat keine aktiven Verbindungen." -FunctionName $functionName -Level "INFO"
+				Invoke-sqmLogging -Message "Datenbank '$finalDbName' hat keine aktiven Verbindungen." -FunctionName $functionName -Level "INFO"
 			}
 
 			# ---- 5. Restore der Datenbank(en) ----
 			# Laeuft immer gegen die Arbeits-Instanz ($workInstance) - bei einer AG-Datenbank ist das
 			# die Primary, alles andere ergibt keinen Sinn (Restore gegen eine Secondary ist nicht
-			# moeglich).
-			$finalDbName = if ($NewDatabaseName) { $NewDatabaseName }
-			else { $DatabaseName }
+			# moeglich). $finalDbName wurde bereits im begin-Block bestimmt (vor allen Pre-Restore-
+			# Pruefungen), hier nicht erneut berechnen.
 			$restoreCount = 0
 			$totalFiles = $backupFileList.Count
 
