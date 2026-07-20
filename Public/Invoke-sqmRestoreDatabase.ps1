@@ -481,7 +481,7 @@ function Invoke-sqmRestoreDatabase
 						try
 						{
 							Invoke-sqmLogging -Message $removeAgAction -FunctionName $functionName -Level "INFO"
-							Remove-DbaAgDatabase -SqlInstance $primaryInstance -SqlCredential $SqlCredential -AvailabilityGroup $availabilityGroup.Name -Database $DatabaseName -ErrorAction Stop
+							Remove-DbaAgDatabase -SqlInstance $primaryInstance -SqlCredential $SqlCredential -AvailabilityGroup $availabilityGroup.Name -Database $DatabaseName -Confirm:$false -ErrorAction Stop
 							Invoke-sqmLogging -Message "Datenbank erfolgreich aus AG entfernt." -FunctionName $functionName -Level "INFO"
 							$results += [PSCustomObject]@{ Action = "RemoveFromAG"; Status = "Success"; Message = "Datenbank aus AG entfernt." }
 						}
@@ -640,6 +640,7 @@ function Invoke-sqmRestoreDatabase
 					Database	  = $DatabaseName
 					Path		  = $backupFileFull
 					Type		  = 'Full'
+					Confirm	      = $false
 					ErrorAction   = 'Stop'
 				}
 				if ($PSCmdlet.ShouldProcess($DatabaseName, "Backup der Datenbank '$DatabaseName' nach $backupFileFull"))
@@ -674,7 +675,7 @@ function Invoke-sqmRestoreDatabase
 					try
 					{
 						Invoke-sqmLogging -Message "Exportiere User der Datenbank '$DatabaseName' nach $userExportFile" -FunctionName $functionName -Level "INFO"
-						Export-DbaUser -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $DatabaseName -FilePath $userExportFile -ErrorAction Stop
+						Export-DbaUser -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $DatabaseName -FilePath $userExportFile -Confirm:$false -ErrorAction Stop
 						Invoke-sqmLogging -Message "User-Export erfolgreich." -FunctionName $functionName -Level "INFO"
 						$results += [PSCustomObject]@{ Action = "UserExport"; Status = "Success"; Message = "Exportdatei: $userExportFile" }
 					}
@@ -764,6 +765,7 @@ function Invoke-sqmRestoreDatabase
 					DatabaseName  = $finalDbName
 					WithReplace   = $true
 					NoRecovery    = (-not $useRecovery)
+					Confirm	      = $false
 					ErrorAction   = 'Stop'
 				}
 				# Hinweis: Restore-DbaDatabase kennt KEINE Parameter -NewDatabaseName/-DatabaseFilePath/-LogFilePath.
@@ -895,7 +897,7 @@ function Invoke-sqmRestoreDatabase
 				try
 				{
 					Invoke-sqmLogging -Message $orphanFixAction -FunctionName $functionName -Level "INFO"
-					$repairResult = Repair-DbaDbOrphanUser -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -ErrorAction Stop
+					$repairResult = Repair-DbaDbOrphanUser -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -Confirm:$false -ErrorAction Stop
 					$repairedCount = if ($repairResult) { @($repairResult).Count } else { 0 }
 					Invoke-sqmLogging -Message "Verwaiste User repariert: $repairedCount." -FunctionName $functionName -Level "INFO"
 					$results += [PSCustomObject]@{ Action = "FixOrphans"; Status = "Success"; Message = "Repair-DbaDbOrphanUser: $repairedCount User repariert." }
@@ -969,7 +971,7 @@ WHERE dp.type IN ('U', 'G')
 						throw "sa-Login (SID 0x01) nicht gefunden."
 					}
 					$saName = $saNameRow.name
-					Set-DbaDbOwner -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -TargetLogin $saName -ErrorAction Stop
+					Set-DbaDbOwner -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -TargetLogin $saName -Confirm:$false -ErrorAction Stop
 					Invoke-sqmLogging -Message "Datenbankeigentuemer auf '$saName' gesetzt." -FunctionName $functionName -Level "INFO"
 					$results += [PSCustomObject]@{ Action = "SetDbOwner"; Status = "Success"; Message = "Eigentuemer: $saName" }
 				}
@@ -1055,7 +1057,7 @@ WHERE dp.type IN ('U', 'G')
 								Set-DbaAgReplica -SqlInstance $primaryInstance -SqlCredential $SqlCredential `
 									-AvailabilityGroup $availabilityGroup.Name `
 									-Replica $replica.Name `
-									-SeedingMode Automatic -ErrorAction Stop
+									-SeedingMode Automatic -Confirm:$false -ErrorAction Stop
 
 								# Secondary-Seite: GRANT CREATE ANY DATABASE
 								Invoke-DbaQuery -SqlInstance $replica.Name -SqlCredential $SqlCredential `
@@ -1079,6 +1081,7 @@ WHERE dp.type IN ('U', 'G')
 							-AvailabilityGroup $availabilityGroup.Name `
 							-Database $finalDbName `
 							-SeedingMode Automatic `
+							-Confirm:$false `
 							-ErrorAction Stop
 
 						Invoke-sqmLogging -Message "Datenbank '$finalDbName' erfolgreich in AG '$($availabilityGroup.Name)' aufgenommen." `
