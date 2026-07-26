@@ -2,23 +2,25 @@
 
 ## [1.9.26.1] — 2026-07-17
 
-### Fix: DiskFreeSpaceThresholdPct fehlte ausserhalb der FI-TS-Umgebung
+### Fix: DiskFreeSpaceThresholdPct fehlte ausserhalb der kundenspezifischen Umgebung
 
-`DiskFreeSpaceThresholdPct` wurde ausschliesslich im FI-TS-Block gesetzt und fehlte in den
-neutralen Standardwerten — obwohl `Set-sqmConfig` den Schluessel als Parameter anbietet. Fuer
-alle Nutzer ausserhalb der FI-TS-Umgebung (also jeden, der ueber die PSGallery installiert)
-existierte er damit gar nicht im Config-Store: `Get-sqmConfig -Key 'DiskFreeSpaceThresholdPct'`
-lief in den Nicht-gefunden-Zweig, warnte und lieferte `$null`, was `[int]$null` zu **0** machte.
+`DiskFreeSpaceThresholdPct` wurde ausschliesslich in einem kundenspezifischen Konfigurationsblock
+gesetzt und fehlte in den neutralen Standardwerten — obwohl `Set-sqmConfig` den Schluessel als
+Parameter anbietet. Fuer alle Nutzer ausserhalb dieser Umgebung (also jeden, der ueber die
+PSGallery installiert) existierte er damit gar nicht im Config-Store:
+`Get-sqmConfig -Key 'DiskFreeSpaceThresholdPct'` lief in den Nicht-gefunden-Zweig, warnte und
+lieferte `$null`, was `[int]$null` zu **0** machte.
 
 - **`Get-sqmDiskInfoByDriveLetter`** war betroffen: mit Schwellwert 0 ist `$freePercent -lt 0`
   nie wahr, `$extendNeededGB` blieb also fuer jedes Laufwerk auf 0. Die Berechnung "wie viele GB
-  muss erweitert werden" war ausserhalb FI-TS still wirkungslos.
+  muss erweitert werden" war ausserhalb dieser kundenspezifischen Umgebung still wirkungslos.
 - **`Get-sqmServerHardwareReport`** fing den Wert bereits per `if ($diskThreshold -le 0) { 10 }`
   ab (zwei Stellen) und war inhaltlich korrekt — setzte aber die ueberfluessige Warnung ab.
 - Die Warnung listete zudem bei jedem Aufruf saemtliche Konfigurationsschluessel ins Log.
 
 Der Schluessel steht jetzt mit Default `10` in den neutralen Standardwerten, analog zu den
-uebrigen `Check*`-Grenzwerten. Der Config-Store hat damit ausserhalb FI-TS 32 statt 31 Schluessel.
+uebrigen `Check*`-Grenzwerten. Der Config-Store hat damit ausserhalb dieser Umgebung 32 statt 31
+Schluessel.
 
 ## [1.9.26.0] — 2026-07-16
 
@@ -789,7 +791,7 @@ instead of a wildcard, e.g. "restore a database" or "disk is full".
 ### Bugfix
 
 **`Copy-sqmLogins`** — narrowed the policy-disable window to just the actual copy call
-- Background: `Sync-sqmLoginsToAlwaysOn` failed in FI-TS environments with "Policy 'New
+- Background: `Sync-sqmLoginsToAlwaysOn` failed in certain customer environments with "Policy 'New
   Login_Enforce Passwort Policy' has been violated". `Copy-sqmLogins -Force` (default `$true`)
   passes `-Force` through to dbatools' `Copy-DbaLogin`, which does DROP + CREATE instead of ALTER
   for logins that already exist - every sync run therefore triggers a real `CREATE_LOGIN` event,
@@ -977,19 +979,21 @@ instead of a wildcard, e.g. "restore a database" or "disk is full".
 **`New-sqmOlaUsrDbBackupJob`**
 - New: parameter `-CreateSyncJob` (`[bool]`, default `$true`).
   When `-UseExcludeTable` is active, a SQL Agent job is automatically created
-  (`sqm BackupExclude - SYNC` or `FITS BackupExclude - SYNC` in FI-TS environments). The job runs
-  every 30 minutes via a `pwsh` CmdExec step and calls `Sync-sqmBackupExcludeTable -SqlInstance
-  '.'`. Ensures `IsActive` changes from `Show-sqmBackupExcludeForm` are propagated to all AG
-  secondaries without manual intervention. The job is updated on `-Update`; with
-  `-CreateSyncJob $false` it is not created. Job name is derived from the FULL job prefix
-  (`FITS *` → FITS, otherwise standard). AG propagation: secondaries also get the sync job
+  (`sqm BackupExclude - SYNC` by default, or using a customer-specific job-name prefix where one
+  is configured). The job runs every 30 minutes via a `pwsh` CmdExec step and calls
+  `Sync-sqmBackupExcludeTable -SqlInstance '.'`. Ensures `IsActive` changes from
+  `Show-sqmBackupExcludeForm` are propagated to all AG secondaries without manual intervention.
+  The job is updated on `-Update`; with `-CreateSyncJob $false` it is not created. Job name is
+  derived from the configured job-name prefix (a customer-specific prefix is reused where set,
+  otherwise the standard prefix applies). AG propagation: secondaries also get the sync job
   (recursive call with `CreateSyncJob = $CreateSyncJob` set).
 
 **`New-sqmOlaUsrDbBackupJob`** — fixed a configuration bug (v1.8.4.0)
 - Fix: `Set-sqmConfig` previously wrote the entire `$globalConfig` to `config.json`, which meant
-  that on FI-TS machines the OlaHH job names from an earlier non-FITS session overwrote the FITS
-  names. Fix (A): `Set-sqmConfig` now only saves explicitly passed keys (merge). Fix (B): in
-  `sqmSQLTool.psm1`, `config.json` is loaded before the FI-TS block - the FI-TS override always
+  that on machines using a customer-specific job-name prefix, the OlaHH job names from an earlier
+  default-prefix session could overwrite the customer-specific names. Fix (A): `Set-sqmConfig`
+  now only saves explicitly passed keys (merge). Fix (B): in `sqmSQLTool.psm1`, `config.json` is
+  loaded before the customer-specific configuration block - the customer-specific override always
   wins.
 
 ## [1.8.3.0] — 2026-06-29
