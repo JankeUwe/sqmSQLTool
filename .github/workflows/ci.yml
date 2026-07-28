@@ -46,6 +46,13 @@ jobs:
           if ($bad) { throw "Missing UTF-8 BOM: $($bad -join ', ')" }
           Write-Host 'BOM check passed.'
 
+      # Splat hashtable carrying a common parameter plus the same parameter passed explicitly.
+      # Windows PowerShell 5.1 rejects it (ParameterAlreadyBound), PowerShell 7 tolerates it,
+      # so it survives PS 7 testing and only fails on the deployment platform.
+      - name: Duplicate parameter binding check
+        shell: pwsh
+        run: ./Tools/Test-DuplicateParameterBinding.ps1
+
   test-ps51:
     name: Import (Windows PowerShell 5.1)
     runs-on: windows-latest
