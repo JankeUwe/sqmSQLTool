@@ -136,7 +136,10 @@
 		{
 			# --- CIM session setup ---
 			$isLocal = $ComputerName -in @($env:COMPUTERNAME, 'localhost', '127.0.0.1', '.')
-			$cimBase = @{ ErrorAction = 'Stop' }
+			# Note: NO ErrorAction in this splat hashtable. Every call below passes -ErrorAction
+			# explicitly; having both is a duplicate parameter binding that Windows PowerShell 5.1
+			# rejects outright (ParameterAlreadyBound) while PS 7 silently tolerates it.
+			$cimBase = @{ }
 
 			if ($isLocal)
 			{

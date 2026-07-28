@@ -224,7 +224,10 @@ function Copy-sqmLogins
 		$saLoginName = $null
 		try
 		{
-			$saLoginName = (Invoke-DbaQuery @srcConnParams -Query "SELECT SUSER_SNAME(0x01) AS n" -ErrorAction Stop).n
+			# Kein explizites -ErrorAction: $srcConnParams traegt bereits ErrorAction = 'Stop'.
+			# Beides zusammen ist unter Windows PowerShell 5.1 eine doppelte Parameterbindung
+			# (ParameterAlreadyBound), die PS 7 stillschweigend toleriert.
+			$saLoginName = (Invoke-DbaQuery @srcConnParams -Query "SELECT SUSER_SNAME(0x01) AS n").n
 			if (-not [string]::IsNullOrWhiteSpace($saLoginName))
 			{
 				$systemLoginPatterns += $saLoginName
@@ -232,7 +235,13 @@ function Copy-sqmLogins
 								  -FunctionName $functionName -Level 'INFO'
 			}
 		}
-		catch { }
+		catch
+		{
+			# Faellt die Erkennung aus, wird ein umbenanntes 'sa' NICHT ausgeschlossen. Das ist
+			# sicherheitsrelevant und darf nicht still passieren.
+			Invoke-sqmLogging -Message "'sa'-Erkennung ueber SID 0x01 fehlgeschlagen: $($_.Exception.Message). Ein umbenanntes 'sa' wird moeglicherweise NICHT vom Abgleich ausgeschlossen." `
+							  -FunctionName $functionName -Level 'WARNING'
+		}
 
 		# Dynamisch alle sysadmin-Accounts ermitteln (handhaben umbenannte 'sa' / weitere sysadmins)
 		$sysAdminLogins = @()

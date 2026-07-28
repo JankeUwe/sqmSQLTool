@@ -213,7 +213,10 @@
 		try
 		{
 			# CIM-Session
-			$cimBase = @{ ErrorAction = 'Stop' }
+			# Hinweis: KEIN ErrorAction in dieser Splat-Hashtable. Jeder Aufruf unten setzt
+			# -ErrorAction explizit; beides zusammen ist unter Windows PowerShell 5.1 eine
+			# doppelte Parameterbindung (ParameterAlreadyBound), die PS 7 stillschweigend toleriert.
+			$cimBase = @{ }
 			$cimSession = $null
 			if ($isLocal)
 			{

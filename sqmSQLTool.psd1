@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.9.26.1'
+	ModuleVersion		   = '1.9.26.2'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
@@ -47,7 +47,12 @@
 	ProcessorArchitecture  = 'None'
 	
 	# Modules that must be imported into the global environment prior to importing this module
-	RequiredModules	       = @("dbatools")
+	#
+	# dbatools MaximumVersion 2.999.999: dbatools 3.0 is announced as a C# module (binary
+	# cmdlets instead of PowerShell functions) and is likely to change return objects/behavior.
+	# The cap stops Update-Module dbatools from silently jumping to an incompatible major
+	# version before this module has been tested and cleared against it.
+	RequiredModules	       = @(@{ ModuleName = "dbatools"; MaximumVersion = "2.999.999" })
 	
 	# Assemblies that must be loaded prior to importing this module
 	RequiredAssemblies	   = @()

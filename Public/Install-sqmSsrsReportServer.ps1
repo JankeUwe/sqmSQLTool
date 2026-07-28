@@ -322,7 +322,10 @@ function Install-sqmSsrsReportServer
         $ssrsAlreadyInstalled = $false
         try
         {
-            $cimParams = @{ Namespace = 'root\Microsoft\SqlServer\ReportServer'; ErrorAction = 'Stop' }
+            # Hinweis: KEIN ErrorAction in dieser Splat-Hashtable. Der Get-CimInstance-Aufruf
+            # unten setzt -ErrorAction explizit; beides zusammen ist unter Windows PowerShell 5.1
+            # eine doppelte Parameterbindung (ParameterAlreadyBound), die PS 7 toleriert.
+            $cimParams = @{ Namespace = 'root\Microsoft\SqlServer\ReportServer' }
             if (-not $isLocal)
             {
                 $sessionOpts         = New-CimSessionOption -Protocol Wsman
@@ -333,12 +336,16 @@ function Install-sqmSsrsReportServer
             }
             $nsCheck = Get-CimInstance @cimParams -ClassName '__NAMESPACE' -ErrorAction SilentlyContinue
             $ssrsAlreadyInstalled = $null -ne $nsCheck
-            if (isset $checkSession) { Remove-CimSession $checkSession -ErrorAction SilentlyContinue }
+            if ($checkSession) { Remove-CimSession $checkSession -ErrorAction SilentlyContinue }
         }
         catch
         {
-            # Namespace nicht vorhanden = SSRS nicht installiert, das ist der Normalfall
+            # Namespace nicht vorhanden = SSRS nicht installiert, das ist der Normalfall.
+            # Jede andere Ursache (WinRM nicht erreichbar, fehlende Rechte) landet hier ebenfalls
+            # und wuerde SSRS faelschlich als "nicht installiert" melden - deshalb protokollieren.
             $ssrsAlreadyInstalled = $false
+            Invoke-sqmLogging -Message "SSRS-Vorhandenseinspruefung nicht moeglich, es wird 'nicht installiert' angenommen: $($_.Exception.Message)" `
+                              -FunctionName $functionName -Level 'WARNING'
         }
 
         if ($ssrsAlreadyInstalled -and -not $Force)

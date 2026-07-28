@@ -253,7 +253,10 @@ ORDER BY DurationSeconds DESC
 						$planQuery = "SELECT query_plan FROM sys.dm_exec_query_plan($(
 							'0x' + [System.BitConverter]::ToString($row.PlanHandle).Replace('-', '')
 						))"
-						$planResult = Invoke-DbaQuery @connParams -Query $planQuery -ErrorAction SilentlyContinue
+						# Kein explizites -ErrorAction: $connParams traegt bereits ErrorAction = 'Stop'
+						# (doppelte Bindung crasht unter Windows PowerShell 5.1). Ein fehlender Plan
+						# ist hier unkritisch und wird vom catch unten ohnehin verschluckt.
+						$planResult = Invoke-DbaQuery @connParams -Query $planQuery
 						if ($planResult) { $entry.QueryPlanXml = $planResult.query_plan }
 					}
 					catch { <# Plan nicht verfuegbar - ignorieren #> }

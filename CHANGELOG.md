@@ -1,5 +1,53 @@
 # sqmSQLTool — Changelog
 
+## [1.9.26.2] — 2026-07-28
+
+### Fix: doppelte Parameterbindung brach 11 Aufrufe unter Windows PowerShell 5.1 ab
+
+Elf Aufrufstellen in fuenf Funktionen splatteten eine Hashtable, die bereits
+`ErrorAction = 'Stop'` trug, und setzten am selben Aufruf zusaetzlich ein explizites
+`-ErrorAction`. Windows PowerShell 5.1 lehnt das mit `ParameterBindingException`
+(`ParameterAlreadyBound`) ab, PowerShell 7 toleriert es stillschweigend — der Fehler ueberlebt
+also jeden Test unter PS 7 und schlaegt erst auf der Zielplattform zu, die das Manifest mit
+`PowerShellVersion = '5.1'` deklariert. Derselbe Fehler hatte in `sqmDataTransfer` 0.1.17.1
+jeden regulaeren Resume-Lauf abgebrochen.
+
+Betroffen waren `Set-sqmSsrsConfiguration` (4), `Set-sqmSsrsHttpsCertificate` (4),
+`Install-sqmSsrsReportServer` (1), `Copy-sqmLogins` (1) und `Get-sqmLongRunningQueries` (1).
+Bei den drei SSRS-Funktionen existierte die Splat-Hashtable praktisch nur, um `ErrorAction` zu
+transportieren; dort ist der Schluessel entfallen, das explizite `-ErrorAction` je Aufruf bleibt.
+Bei `Copy-sqmLogins` und `Get-sqmLongRunningQueries` wird umgekehrt der redundante explizite
+Parameter weggelassen, weil dort weitere Aufrufstellen auf dem Hashtable-Wert aufsetzen.
+
+Am gravierendsten war `Copy-sqmLogins`: die Ermittlung des `sa`-Kontos ueber die well-known SID
+`0x01` — die dafuer sorgt, dass auch ein **umbenanntes** `sa` vom Login-Abgleich ausgeschlossen
+wird — stand in einem `try` mit leerem `catch { }`. Unter PowerShell 5.1 scheiterte die Bindung,
+der leere catch verschluckte den Fehler, und ein umbenanntes `sa` wurde ohne jede Meldung in den
+Abgleich aufgenommen.
+
+### Fix: `isset` in Install-sqmSsrsReportServer war kein PowerShell
+
+Die Aufraeumzeile der SSRS-Vorhandenseinspruefung lautete `if (isset $checkSession)`. `isset`
+ist PHP und im Modul nirgends definiert, der Aufruf warf also zwingend. Da er im selben `try`
+stand wie die Pruefung selbst, landete jeder Lauf im `catch` und das Ergebnis war immer
+"SSRS ist nicht installiert" — unter PowerShell 7 wegen `isset`, unter 5.1 schon eine Zeile
+frueher wegen der doppelten Bindung. Korrigiert zu `if ($checkSession)`.
+
+### Stille catch-Bloecke an zwei sicherheitsrelevanten Stellen protokollieren jetzt
+
+Beide oben genannten Fehler konnten nur deshalb unbemerkt bleiben, weil ein leerer bzw.
+pauschaler `catch` sie in ein harmlos aussehendes Ergebnis verwandelt hat. Die `sa`-Erkennung in
+`Copy-sqmLogins` und die Vorhandenseinspruefung in `Install-sqmSsrsReportServer` setzen im
+Fehlerfall jetzt eine WARNING ab, die benennt, welche Annahme stattdessen gilt. Das Verhalten
+selbst bleibt unveraendert.
+
+### Neu: Tools/Test-DuplicateParameterBinding.ps1
+
+AST-basierte Pruefung, die genau dieses Muster modulweit findet — inklusive nachtraeglicher
+Index-Zuweisungen (`$p['ErrorAction'] = 'Stop'`), aller Common Parameter und der
+Parameter-Abkuerzungen (`-ea`, `-wa`). Haengt im Pre-Push-Hook und als eigener Schritt in der CI.
+Ein reiner Import-Test findet diese Fehlerklasse nicht, da sie erst zur Aufrufzeit auftritt.
+
 ## [1.9.26.1] — 2026-07-17
 
 ### Fix: DiskFreeSpaceThresholdPct fehlte ausserhalb der kundenspezifischen Umgebung
