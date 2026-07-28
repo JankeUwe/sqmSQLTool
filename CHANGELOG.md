@@ -1,5 +1,44 @@
 # sqmSQLTool — Changelog
 
+## [1.9.29.0] — 2026-07-28
+
+### Fix: der Splunk-Status beschrieb den falschen Server
+
+`Invoke-sqmSplunkConfiguration -Mode Test` wurde ohne Zielangabe aufgerufen und prueft damit den
+Rechner, auf dem der Bericht ERZEUGT wird. Bei einem Bericht ueber eine entfernte Instanz stand im
+Ergebnis also der Zustand einer voellig anderen Maschine, ohne dass das erkennbar war - im
+Protokoll sichtbar als "=== DEV03 ===" waehrend ueber DEV01 berichtet wurde.
+
+Laeuft die berichtete Instanz auf dem lokalen Rechner, wird weiterhin lokal geprueft. Sonst wird der
+Zielrechner ueber `-ComputerList` adressiert. Zusaetzlich wird das Ergebnis jetzt streng bewertet:
+schlaegt die Remoteverbindung fehl, liefert die Funktion trotzdem ein Objekt mit
+`IsConfigured = $false` zurueck. Das allein auszuwerten hiesse, "nicht erreichbar" als "nicht
+konfiguriert" zu melden. Gemeldet wird deshalb nur dann ein Zustand, wenn die Antwort auch
+nachweislich vom gefragten Rechner kommt und einen auswertbaren Status hat, sonst
+"Nicht ermittelbar" mit Grund.
+
+### Neu: Abschnitt CLUSTER & HOCHVERFUEGBARKEIT
+
+Vollstaendig ueber die SQL-Verbindung, ohne WinRM, und damit garantiert von der berichteten
+Instanz:
+
+- Failover Cluster (FCI) ja/nein, bei ja mit virtuellem Namen, aktivem Knoten und allen Knoten aus
+  `sys.dm_os_cluster_nodes` samt Status
+- AlwaysOn aktiviert ja/nein
+- WSFC-Name, Quorumtyp und -zustand aus `sys.dm_hadr_cluster`, dazu alle Clustermitglieder aus
+  `sys.dm_hadr_cluster_members` mit Typ, Zustand und Stimmenzahl - auch die Knoten, auf denen diese
+  Instanz gar nicht laeuft
+- jede Availability Group mit allen Replikaten: Rolle, Verfuegbarkeitsmodus, Failovermodus und
+  Synchronisierungszustand
+- alle Listener mit DNS-Name und Port
+
+Damit beantwortet der Bericht auch die Frage nach weiteren Knoten, ohne dass man sich dafuer auf
+einen der beteiligten Server verbinden muss.
+
+**Getestet** gegen SQL 2022 auf DEV01: Einzelinstanz ohne AlwaysOn wird korrekt als solche
+ausgewiesen, der Splunk-Abschnitt meldet nicht mehr faelschlich den lokalen Rechner. Der Cluster-
+und AG-Zweig selbst konnte mangels verfuegbarem Cluster nicht durchgespielt werden.
+
 ## [1.9.28.0] — 2026-07-28
 
 ### Fix: Sicherungen wurden als fehlend gemeldet, obwohl gesichert wurde

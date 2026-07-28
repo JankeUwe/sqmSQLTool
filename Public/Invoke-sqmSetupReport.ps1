@@ -441,6 +441,110 @@ SELECT name FROM sys.databases WHERE name IN ('SSISDB', 'ReportServer', 'ReportS
                 $featureList += 'Analysis Services (SSAS): nicht ermittelbar (nur ueber die Dienste des Rechners feststellbar, WinRM zu ' + $hostName + ' nicht moeglich)'
             }
 
+            # ==========================================
+            # CLUSTER UND HOCHVERFUEGBARKEIT
+            # ==========================================
+            # Vollstaendig ueber die SQL-Verbindung: Failover-Cluster-Knoten, WSFC-Mitglieder,
+            # Availability Groups mit allen Replikaten und Listenern. Kein WinRM noetig, und die
+            # Angaben stammen garantiert von der berichteten Instanz.
+            $clusterList = @()
+            try
+            {
+                $ha = Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException -Query @"
+SELECT CONVERT(int, SERVERPROPERTY('IsClustered'))                          AS IsClustered,
+       CONVERT(int, ISNULL(SERVERPROPERTY('IsHadrEnabled'), 0))             AS IsHadrEnabled,
+       CONVERT(nvarchar(128), SERVERPROPERTY('MachineName'))                AS MachineName,
+       CONVERT(nvarchar(128), SERVERPROPERTY('ComputerNamePhysicalNetBIOS')) AS PhysicalNode
+"@
+                $isClustered = [int]$ha.IsClustered -eq 1
+                $isHadr = [int]$ha.IsHadrEnabled -eq 1
+
+                $clusterList += "Failover Cluster (FCI): $(if ($isClustered) { "ja - virtueller Name '$($ha.MachineName)', aktiver Knoten '$($ha.PhysicalNode)'" } else { 'nein (Einzelinstanz)' })"
+
+                if ($isClustered)
+                {
+                    try
+                    {
+                        $nodes = @(Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException `
+                                -Query "SELECT NodeName, status_description FROM sys.dm_os_cluster_nodes ORDER BY NodeName")
+                        $clusterList += "FCI-Knoten ($($nodes.Count)): $(($nodes | ForEach-Object { "$($_.NodeName) [$($_.status_description)]" }) -join ', ')"
+                    }
+                    catch { $clusterList += 'FCI-Knoten: nicht lesbar' }
+                }
+
+                $clusterList += "AlwaysOn Availability Groups: $(if ($isHadr) { 'aktiviert' } else { 'nicht aktiviert' })"
+
+                if ($isHadr)
+                {
+                    # WSFC-Ebene: Clustername, Quorum und ALLE Mitglieder - auch die Knoten, auf
+                    # denen diese Instanz gar nicht laeuft.
+                    try
+                    {
+                        $wsfc = Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException `
+                            -Query "SELECT cluster_name, quorum_type_desc, quorum_state_desc FROM sys.dm_hadr_cluster"
+                        if ($wsfc) { $clusterList += "WSFC: '$($wsfc.cluster_name)', Quorum $($wsfc.quorum_type_desc) ($($wsfc.quorum_state_desc))" }
+
+                        $members = @(Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException -Query @"
+SELECT member_name, member_type_desc, member_state_desc, number_of_quorum_votes
+FROM sys.dm_hadr_cluster_members ORDER BY member_name
+"@)
+                        if ($members.Count -gt 0)
+                        {
+                            $clusterList += "WSFC-Mitglieder ($($members.Count)): $(($members | ForEach-Object { "$($_.member_name) [$($_.member_type_desc), $($_.member_state_desc), $($_.number_of_quorum_votes) Stimme(n)]" }) -join ', ')"
+                        }
+                    }
+                    catch { $clusterList += "WSFC-Informationen nicht lesbar: $($_.Exception.Message)" }
+
+                    # Availability Groups samt Replikaten - das sind die 'weiteren Nodes' aus Sicht
+                    # der Hochverfuegbarkeit.
+                    try
+                    {
+                        $agRows = @(Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException -Query @"
+SELECT ag.name                          AS AGName,
+       ar.replica_server_name           AS ReplicaServer,
+       ISNULL(ars.role_desc, 'UNKNOWN') AS RoleDesc,
+       ar.availability_mode_desc        AS AvailabilityMode,
+       ar.failover_mode_desc            AS FailoverMode,
+       ISNULL(ars.synchronization_health_desc, 'UNKNOWN') AS SyncHealth
+FROM sys.availability_groups ag
+JOIN sys.availability_replicas ar ON ar.group_id = ag.group_id
+LEFT JOIN sys.dm_hadr_availability_replica_states ars ON ars.replica_id = ar.replica_id
+ORDER BY ag.name, ar.replica_server_name
+"@)
+                        if ($agRows.Count -eq 0)
+                        {
+                            $clusterList += 'Availability Groups: AlwaysOn ist aktiviert, es ist aber keine AG eingerichtet.'
+                        }
+                        else
+                        {
+                            foreach ($grp in ($agRows | Group-Object AGName))
+                            {
+                                $clusterList += "AG '$($grp.Name)' - $($grp.Count) Replikat(e):"
+                                foreach ($rep in $grp.Group)
+                                {
+                                    $clusterList += "    $($rep.ReplicaServer): $($rep.RoleDesc), $($rep.AvailabilityMode), Failover $($rep.FailoverMode), Zustand $($rep.SyncHealth)"
+                                }
+                            }
+                        }
+
+                        $listeners = @(Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException -Query @"
+SELECT ag.name AS AGName, l.dns_name, l.port
+FROM sys.availability_group_listeners l
+JOIN sys.availability_groups ag ON ag.group_id = l.group_id
+"@)
+                        foreach ($lsn in $listeners)
+                        {
+                            $clusterList += "Listener AG '$($lsn.AGName)': $($lsn.dns_name):$($lsn.port)"
+                        }
+                    }
+                    catch { $clusterList += "Availability Groups nicht lesbar: $($_.Exception.Message)" }
+                }
+            }
+            catch
+            {
+                $clusterList += "Cluster-/AlwaysOn-Status nicht ermittelbar: $($_.Exception.Message)"
+            }
+
             # ---- Monitoring-Registry-Schluessel (Invoke-sqmMonitoringKey) ----
             try
             {
@@ -516,25 +620,62 @@ SELECT name FROM sys.databases WHERE name IN ('SSISDB', 'ReportServer', 'ReportS
             }
 
             # Splunk Status (via Invoke-sqmSplunkConfiguration -Test)
-            $splunkStatus = 'Not configured'
+            #
+            # Der Aufruf lief frueher IMMER ohne Zielangabe und hat damit den Rechner geprueft, auf
+            # dem der Bericht erzeugt wird - bei einem Bericht ueber eine entfernte Instanz stand im
+            # Ergebnis also der Zustand des falschen Servers, ohne dass das erkennbar war. Jetzt wird
+            # der lokale Weg nur noch benutzt, wenn die Zielinstanz auch wirklich hier laeuft;
+            # andernfalls wird der Zielrechner adressiert, und ist der nicht erreichbar, steht das
+            # ausdruecklich da statt eines fremden Messwerts.
+            $splunkStatus = 'Nicht ermittelbar'
+            $isLocalHost = $hostName -and (@($env:COMPUTERNAME, 'localhost', '.', '127.0.0.1') -contains $hostName -or
+                $hostName -ieq $env:COMPUTERNAME)
             try
             {
-                $splunkResult = Invoke-sqmSplunkConfiguration -Mode Test -ErrorAction SilentlyContinue
-                if ($splunkResult)
+                $splunkResult = if ($isLocalHost)
                 {
-                    if ($splunkResult.IsConfigured)
-                    {
-                        $splunkStatus = "Configured (service: $($splunkResult.ServiceStatus))"
-                    }
-                    else
-                    {
-                        $splunkStatus = 'Not configured'
-                    }
+                    Invoke-sqmSplunkConfiguration -Mode Test -ErrorAction SilentlyContinue
+                }
+                else
+                {
+                    Invoke-sqmSplunkConfiguration -Mode Test -ComputerList @($hostName) -ErrorAction Stop |
+                        Select-Object -First 1
+                }
+
+                $geprueftAuf = if ($isLocalHost) { $env:COMPUTERNAME } else { $hostName }
+
+                # Status statt nur IsConfigured auswerten: schlaegt die Remoteverbindung fehl,
+                # liefert die Funktion trotzdem ein Objekt mit IsConfigured = $false zurueck. Das
+                # allein auszuwerten hiesse, "nicht erreichbar" als "nicht konfiguriert" zu melden -
+                # also wieder eine Aussage ueber einen Server, den wir nie gesehen haben.
+                $antwortVonZiel = -not $splunkResult.ComputerName -or
+                    ($splunkResult.ComputerName -split '\.')[0] -ieq ($geprueftAuf -split '\.')[0]
+
+                if (-not $splunkResult)
+                {
+                    $splunkStatus = "Nicht ermittelbar (keine Antwort von $geprueftAuf)"
+                }
+                elseif (-not $antwortVonZiel)
+                {
+                    $splunkStatus = "Nicht ermittelbar (Antwort kam von '$($splunkResult.ComputerName)', gefragt war '$geprueftAuf')"
+                }
+                elseif ($splunkResult.Status -eq 'Success' -or $splunkResult.IsConfigured)
+                {
+                    $splunkStatus = "Konfiguriert auf $geprueftAuf (Dienst: $($splunkResult.ServiceStatus))"
+                }
+                elseif ($splunkResult.Status -eq 'NotConfigured')
+                {
+                    $splunkStatus = "Nicht konfiguriert auf $geprueftAuf"
+                }
+                else
+                {
+                    $grund = if ([string]::IsNullOrWhiteSpace($splunkResult.Status)) { 'keine auswertbare Rueckmeldung' } else { "Status: $($splunkResult.Status)" }
+                    $splunkStatus = "Nicht ermittelbar auf $geprueftAuf ($grund)"
                 }
             }
             catch
             {
-                $splunkStatus = 'Error checking Splunk'
+                $splunkStatus = "Nicht ermittelbar (kein Zugriff auf $hostName)"
             }
 
             # ==========================================
@@ -597,6 +738,7 @@ SELECT name FROM sys.databases WHERE name IN ('SSISDB', 'ReportServer', 'ReportS
                 -BackupDetails $backupDetails `
                 -ServerFacts $serverFacts `
                 -FeatureList $featureList `
+                -ClusterList $clusterList `
                 -MaxMemStatus $maxMemStatus `
                 -MaxMemColor $maxMemColor `
                 -Sysadmins $sysadmins `
@@ -664,6 +806,7 @@ function _Build-ModernReportHtml
         [string[]]$BackupDetails,
         [string[]]$ServerFacts,
         [string[]]$FeatureList,
+        [string[]]$ClusterList,
         [string]$MaxMemStatus,
         [string]$MaxMemColor,
         [string[]]$Sysadmins,
@@ -827,6 +970,11 @@ function _Build-ModernReportHtml
   <div class="section-title">SERVER</div>
   <div class="info-block">
     <p>$(_HtmlList $ServerFacts 'Nicht ermittelbar')</p>
+  </div>
+
+  <div class="section-title">CLUSTER &amp; HOCHVERFUEGBARKEIT</div>
+  <div class="info-block">
+    <p>$(_HtmlList $ClusterList 'Nicht ermittelbar')</p>
   </div>
 
   <div class="section-title">INSTALLIERTE KOMPONENTEN</div>
