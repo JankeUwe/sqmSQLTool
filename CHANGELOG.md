@@ -1,5 +1,40 @@
 # sqmSQLTool — Changelog
 
+## [1.9.27.1] — 2026-07-28
+
+### Fix: -Confirm:$false an Export-DbaUser hat jeden Restore verhindert
+
+`Invoke-sqmRestoreDatabase` ist beim User-Export gescheitert und hat den Lauf danach beendet, ohne
+dass ein Restore stattgefunden hat:
+
+```
+UserExport  Failed  Fehler beim Export der User: Es wurde kein Parameter gefunden,
+                    der dem Parameternamen "Confirm" entspricht.
+```
+
+Ursache war 1.9.26.0 ("pass -Confirm:$false to every nested dbatools cmdlet explicitly"): der
+Parameter wurde pauschal an jeden genesteten dbatools-Aufruf gehaengt. `Export-DbaUser` unterstuetzt
+ShouldProcess aber nicht (geprueft gegen dbatools 2.8.2), und der Aufruf schlaegt damit sofort mit
+einer ParameterBindingException fehl. Da der `catch` des User-Exports den Lauf per `return`
+beendet, war der Restore als Ganzes blockiert - die Meldung liess das nur nicht erkennen.
+
+`-Confirm:$false` entfaellt an dieser Stelle. Unterdrueckte Rueckfragen laufen jetzt zusaetzlich
+zentral ueber `$ConfirmPreference = 'None'` im begin-Block, das wirkt auf jedes Cmdlet unabhaengig
+davon, ob es den Parameter ueberhaupt kennt, und ist gegen kuenftige dbatools-Versionen robust. Die
+uebrigen acht Aufrufstellen wurden geprueft, dort ist `-Confirm` jeweils vorhanden
+(`Remove-DbaAgDatabase`, `Remove-DbaDatabase`, `Repair-DbaDbOrphanUser`, `Set-DbaDbOwner`,
+`Set-DbaAgReplica`, `Add-DbaAgDatabase`, `Set-sqmSqlPolicyState`).
+
+Ein neuer Test scannt die Datei per AST und meldet jeden Befehl, der `-Confirm` erhaelt, obwohl das
+aufgeloeste Cmdlet den Parameter nicht kennt. Per Mutation gegengeprueft: mit dem alten Aufruf
+wieder eingebaut schlaegt er fehl.
+
+**Getestet gegen eine echte Instanz (DEV01, SQL 2022, ohne AlwaysOn), unter Windows PowerShell
+5.1:** Backup mit definiertem Inhalt gezogen, Datenbank danach veraendert, `Invoke-sqmRestoreDatabase`
+ausgefuehrt, Inhalt exakt auf den Backup-Stand zurueck, acht Schritte ohne Fehlschlag
+(UserExport, RestoreStep, UserImport, FixOrphans, RemoveOrphanWindowsLogins, SetDbOwner),
+Datenbank danach ONLINE und MULTI_USER.
+
 ## [1.9.27.0] — 2026-07-28
 
 ### Fix: AG-Erkennung konnte "nicht ermittelbar" nicht von "keine AG" unterscheiden

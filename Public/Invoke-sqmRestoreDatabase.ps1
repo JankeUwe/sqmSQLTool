@@ -267,6 +267,13 @@ function Invoke-sqmRestoreDatabase
 	{
 		$functionName = $MyInvocation.MyCommand.Name
 
+		# Rueckfragen genesteter Cmdlets zentral unterdruecken, statt an jedem Aufruf einzeln
+		# -Confirm:$false zu haengen. Der Umweg ueber den Parameter ist versionsabhaengig und damit
+		# zerbrechlich: Export-DbaUser etwa unterstuetzt ShouldProcess in dbatools 2.8.2 nicht, ein
+		# -Confirm:$false laesst den Aufruf dort mit "Es wurde kein Parameter gefunden" scheitern.
+		# $ConfirmPreference wirkt dagegen auf jedes Cmdlet, egal ob es den Parameter kennt.
+		$ConfirmPreference = 'None'
+
 		if (-not $PSBoundParameters.ContainsKey('SqlInstance') -or [string]::IsNullOrWhiteSpace($SqlInstance))
 		{
 			$SqlInstance = $env:COMPUTERNAME
@@ -772,7 +779,13 @@ function Invoke-sqmRestoreDatabase
 					try
 					{
 						Invoke-sqmLogging -Message "Exportiere User der Datenbank '$finalDbName' nach $userExportFile" -FunctionName $functionName -Level "INFO"
-						Export-DbaUser -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -FilePath $userExportFile -Confirm:$false -ErrorAction Stop
+						# KEIN -Confirm:$false: Export-DbaUser unterstuetzt ShouldProcess nicht (geprueft
+						# gegen dbatools 2.8.2) und wirft dann "Es wurde kein Parameter gefunden, der dem
+						# Parameternamen 'Confirm' entspricht". Der catch unten beendet den Lauf mit
+						# return - der Restore ist danach also gar nicht mehr gelaufen. Unterdrueckte
+						# Rueckfragen kommen fuer dieses Cmdlet ueber $ConfirmPreference = 'None' im
+						# begin-Block, das wirkt unabhaengig davon, ob ein Cmdlet den Parameter kennt.
+						Export-DbaUser -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -FilePath $userExportFile -ErrorAction Stop
 						Invoke-sqmLogging -Message "User-Export erfolgreich." -FunctionName $functionName -Level "INFO"
 						$results += [PSCustomObject]@{ Action = "UserExport"; Status = "Success"; Message = "Exportdatei: $userExportFile" }
 					}

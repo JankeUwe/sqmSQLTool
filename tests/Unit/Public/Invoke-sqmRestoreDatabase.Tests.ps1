@@ -116,6 +116,38 @@ Describe 'Invoke-sqmRestoreDatabase - AG-Erkennung' {
         $source | Should -Not -Match 'Get-DbaAgDatabase\s+-SqlInstance'
     }
 
+    It 'uebergibt -Confirm nur an Befehle, die ShouldProcess ueberhaupt unterstuetzen' {
+        # Regression 1.9.27.1: -Confirm:$false wurde pauschal an JEDES genestete dbatools-Cmdlet
+        # gehaengt. Export-DbaUser unterstuetzt ShouldProcess nicht (dbatools 2.8.2) und scheiterte
+        # mit "Es wurde kein Parameter gefunden, der dem Parameternamen 'Confirm' entspricht".
+        # Da der catch des User-Exports den Lauf per return beendet, lief der Restore danach
+        # ueberhaupt nicht mehr - ohne dass die Meldung erkennen liess, woran es lag.
+        $path = "$PSScriptRoot\..\..\..\Public\Invoke-sqmRestoreDatabase.ps1"
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$null, [ref]$null)
+        $commands = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.CommandAst] }, $true)
+
+        $offenders = @()
+        foreach ($command in $commands)
+        {
+            $name = $command.GetCommandName()
+            if (-not $name) { continue }
+
+            $passesConfirm = $command.CommandElements | Where-Object {
+                $_ -is [System.Management.Automation.Language.CommandParameterAst] -and $_.ParameterName -eq 'Confirm'
+            }
+            if (-not $passesConfirm) { continue }
+
+            # Nur beurteilen, was hier auch aufloesbar ist - ein unbekannter Name sagt nichts aus.
+            $resolved = Get-Command $name -ErrorAction SilentlyContinue
+            if ($resolved -and -not $resolved.Parameters.ContainsKey('Confirm'))
+            {
+                $offenders += "$name (Zeile $($command.Extent.StartLineNumber))"
+            }
+        }
+
+        ($offenders -join ', ') | Should -BeNullOrEmpty
+    }
+
     It 'bricht ab, bevor irgendetwas passiert, wenn die AG-Zugehoerigkeit nicht ermittelbar ist' {
         InModuleScope sqmSQLTool {
             $fakeBackup = Join-Path ([System.IO.Path]::GetTempPath()) 'sqmRestoreTest_dummy.bak'
