@@ -395,20 +395,31 @@ function Invoke-sqmRestoreDatabase
 			# unter diesem Namen bereits existiert: eine Datenbank, die noch nie existiert hat
 			# (Erst-Restore einer neuen Anwendung), muss der Richtlinie "alle Datenbanken muessen in
 			# AlwaysOn sein" genauso unterliegen wie eine bereits vorhandene, standalone Datenbank.
-			# WICHTIG: Get-DbaAvailabilityGroup hat KEINEN -Database-Parameter. Ein -Database loest einen
-			# terminierenden Parameter-Binding-Fehler aus, den -ErrorAction SilentlyContinue NICHT abfaengt.
-			# Daher Mitgliedschaft ueber Get-DbaAgDatabase pruefen und das AG-Objekt (mit .Name) anschliessend
-			# ueber den AG-Namen nachladen.
-			$agDbCheck = Get-DbaAgDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $finalDbName -ErrorAction SilentlyContinue
-			if ($agDbCheck)
+			# Mitgliedschaft ueber die Katalogsichten, NICHT ueber SMO mit unterdruecktem Fehler.
+			# Get-sqmDatabaseAgMembership unterscheidet "keine AG", "nicht Mitglied" und "konnte ich
+			# nicht ermitteln" und wirft im dritten Fall. Genau das fehlte hier: der frueher genutzte
+			# Get-DbaAgDatabase-Aufruf mit -ErrorAction SilentlyContinue lieferte bei fehlenden Rechten,
+			# einer stolpernden SMO-Enumeration oder einer Verbindung zur falschen Instanz dasselbe
+			# leere Ergebnis wie bei einer echten Standalone-Datenbank. Die Funktion lief dann in den
+			# Standalone-Pfad, uebersprang das Entfernen aus der AG und scheiterte erst Schritte
+			# spaeter an ALTER DATABASE und RESTORE, die SQL Server bei einer AG-Datenbank ablehnt.
+			$agMembership = Get-sqmDatabaseAgMembership -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $finalDbName
+			if ($agMembership.IsAgDatabase)
 			{
 				$isAGDatabase = $true
-				$agName = ($agDbCheck | Select-Object -First 1).AvailabilityGroup
+				$agName = $agMembership.AvailabilityGroupName
 				if ($AvailabilityGroupName -and $AvailabilityGroupName -ne $agName)
 				{
 					Invoke-sqmLogging -Message "Hinweis: -AvailabilityGroupName '$AvailabilityGroupName' weicht von der live erkannten AG '$agName' ab - verwende die live erkannte AG." -FunctionName $functionName -Level "WARNING"
 				}
 				$availabilityGroup = Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $agName -ErrorAction SilentlyContinue
+				if (-not $availabilityGroup)
+				{
+					# Die Mitgliedschaft steht per Katalogsicht fest - ohne das AG-Objekt koennten
+					# Entfernen, Secondary-Cleanup und Rejoin aber nicht laufen. Weitermachen wuerde
+					# die Datenbank standalone zuruecklassen, deshalb hier abbrechen.
+					throw "'$finalDbName' ist laut Katalogsicht Mitglied der Availability Group '$agName', das AG-Objekt konnte auf '$SqlInstance' aber nicht geladen werden. Ohne dieses Objekt sind Entfernen und Rejoin nicht moeglich - Abbruch, damit die Datenbank nicht standalone zurueckbleibt."
+				}
 				Invoke-sqmLogging -Message "Datenbank ist Mitglied der AG '$($availabilityGroup.Name)'." -FunctionName $functionName -Level "INFO"
 				if (-not $KeepAlwaysOn)
 				{
@@ -447,7 +458,16 @@ function Invoke-sqmRestoreDatabase
 				# beizutreten (z.B. Non-Cluster-Instanz) - bleibt standalone. Bei 2+ AGs ist die
 				# Zuordnung nicht eindeutig - Abbruch, -AvailabilityGroupName muss explizit angegeben
 				# werden.
-				$instanceAgs = @(Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction SilentlyContinue)
+				# Ist AlwaysOn auf der Instanz gar nicht aktiviert, gibt es auch keine AG zum Beitreten.
+				# Der Aufruf wuerde dann nur die Warnung "Availability Group (HADR) is not configured
+				# for the instance" ins Log schreiben, die im Betrieb wie ein Problem aussieht, aber der
+				# voellig normale Zustand einer Einzelinstanz ist.
+				$instanceAgs = if ($agMembership.HadrEnabled)
+				{
+					@(Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction SilentlyContinue)
+				}
+				else { @() }
+
 				if ($instanceAgs.Count -eq 1)
 				{
 					$availabilityGroup = $instanceAgs[0]
@@ -497,8 +517,22 @@ function Invoke-sqmRestoreDatabase
 
 				if ([string]::IsNullOrWhiteSpace($primaryInstance))
 				{
-					Invoke-sqmLogging -Message "AG '$($availabilityGroup.Name)': PrimaryReplicaServerName ist leer (AG evtl. gerade im Failover) - falle zurueck auf verbundene Instanz '$SqlInstance'." -FunctionName $functionName -Level "WARNING"
-					$primaryInstance = $SqlInstance
+					# Zuerst der Wert aus sys.dm_hadr_availability_replica_states (role = 1), den
+					# Get-sqmDatabaseAgMembership oben mitgeliefert hat. Der Rueckfall auf die
+					# verbundene Instanz ist nur die letzte Reissleine: ist -SqlInstance ein
+					# SEKUNDAERReplikat, laufen Restore und ALTER DATABASE dort erneut ins Leere,
+					# also erst alles andere versuchen.
+					if ($agMembership -and -not [string]::IsNullOrWhiteSpace($agMembership.PrimaryReplica))
+					{
+						$primaryInstance = $agMembership.PrimaryReplica
+						Invoke-sqmLogging -Message "AG '$($availabilityGroup.Name)': PrimaryReplicaServerName ist leer - verwende die per DMV ermittelte Primary '$primaryInstance'." -FunctionName $functionName -Level "WARNING"
+					}
+					else
+					{
+						Invoke-sqmLogging -Message "AG '$($availabilityGroup.Name)': PrimaryReplicaServerName ist leer und die Primary liess sich auch per DMV nicht ermitteln (AG evtl. gerade im Failover) - falle zurueck auf verbundene Instanz '$SqlInstance'. Ist das ein Sekundaerreplikat, schlagen Restore und ALTER DATABASE fehl." -FunctionName $functionName -Level "WARNING"
+						$primaryInstance = $SqlInstance
+					}
+					$primaryShortName = ($primaryInstance -split '[.\\]')[0]
 				}
 				elseif ($primaryShortName -ieq $sqlInstanceShortName)
 				{

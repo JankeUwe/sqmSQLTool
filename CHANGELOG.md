@@ -1,5 +1,64 @@
 # sqmSQLTool — Changelog
 
+## [1.9.27.0] — 2026-07-28
+
+### Fix: AG-Erkennung konnte "nicht ermittelbar" nicht von "keine AG" unterscheiden
+
+`Invoke-sqmRestoreDatabase` ist bei einer Datenbank, die nachweislich Mitglied einer Availability
+Group war, in den Standalone-Pfad gelaufen. Es hat das Entfernen aus der AG uebersprungen und ist
+erst mehrere Schritte spaeter an den Operationen gescheitert, die SQL Server bei einer AG-Datenbank
+grundsaetzlich ablehnt:
+
+```
+[Invoke-DbaQuery] The operation cannot be performed on database "amb" because it is involved in
+a database mirroring session or an availability group. ALTER DATABASE statement failed.
+[Restore-DbaDatabase] RESTORE cannot operate on database 'amb' because it is configured for
+database mirroring or has joined an availability group.
+```
+
+Ursache war die Erkennung selbst:
+
+```powershell
+$agDbCheck = Get-DbaAgDatabase -SqlInstance $SqlInstance -Database $finalDbName -ErrorAction SilentlyContinue
+if ($agDbCheck) { ... }
+```
+
+Fehlende Rechte (`VIEW ANY DEFINITION`), eine stolpernde SMO-Enumeration oder eine Verbindung zu
+einer anderen Instanz als gemeint liefern alle dasselbe leere Ergebnis wie eine echte
+Standalone-Datenbank. Der unterdrueckte Fehler machte aus "konnte ich nicht feststellen"
+stillschweigend ein "ist in keiner AG" - und ausgerechnet daran haengt der Schritt, der den Restore
+ueberhaupt erst moeglich macht.
+
+Neu ist die private Hilfsfunktion `Get-sqmDatabaseAgMembership`. Sie fragt direkt die
+Katalogsichten (`sys.availability_databases_cluster` fuer die Mitgliedschaft, clusterweit von jedem
+Replikat lesbar, und `sys.dm_hadr_availability_replica_states` fuer die aktuelle Primary) und
+beantwortet drei Zustaende statt zwei: AlwaysOn nicht aktiviert, aktiviert aber kein Mitglied, und
+nicht ermittelbar. Der dritte Fall wirft jetzt, statt den Lauf auf einer falschen Annahme
+fortzusetzen. Steht die Mitgliedschaft per Katalogsicht fest, laesst sich das SMO-AG-Objekt aber
+nicht laden, bricht die Funktion ebenfalls ab, statt die Datenbank am Ende standalone
+zurueckzulassen.
+
+### Primary-Rueckfall zeigte auf die verbundene Instanz statt auf die Primary
+
+War `AvailabilityGroup.PrimaryReplicaServerName` leer (etwa waehrend eines Failovers), fiel die
+Funktion auf die verbundene Instanz zurueck. Ist das ein Sekundaerreplikat, scheitern Restore und
+`ALTER DATABASE` dort aus demselben Grund erneut. Jetzt wird zuerst die per DMV ermittelte Primary
+verwendet und erst danach, mit deutlicher Warnung, die verbundene Instanz.
+
+### Weniger Rauschen im Log auf Einzelinstanzen
+
+Die Pruefung "hat die Instanz genau eine AG, der die Datenbank beitreten soll" rief
+`Get-DbaAvailabilityGroup` auch dann auf, wenn AlwaysOn auf der Instanz gar nicht aktiviert ist.
+Das erzeugte bei jedem Restore auf einer Einzelinstanz die Warnung "Availability Group (HADR) is
+not configured for the instance", die im Betrieb wie ein Problem aussieht, aber der Normalzustand
+ist. Der Aufruf entfaellt jetzt in diesem Fall.
+
+**Getestet:** Erkennung auf einer Instanz ohne AlwaysOn (sauberes "nein", kein Abbruch), Fehlerfall
+auf einer nicht erreichbaren Instanz (Ausnahme statt stillem "nein"), beide Katalogabfragen gegen
+SQL 2022, sowie der vollstaendige Standalone-Pfad von `Invoke-sqmRestoreDatabase` bis zum
+Restore-Schritt. Der AG-Pfad selbst liess sich mangels verfuegbarer Availability Group nicht
+durchspielen.
+
 ## [1.9.26.2] — 2026-07-28
 
 ### Fix: doppelte Parameterbindung brach 11 Aufrufe unter Windows PowerShell 5.1 ab
