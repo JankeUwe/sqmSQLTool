@@ -99,12 +99,90 @@ function Invoke-sqmSetupReport
             $saStatus = if ($saIsRenamed -and $saDisabled) { 'OK (renamed & disabled)' } elseif ($saIsRenamed) { 'OK (renamed)' } elseif ($saDisabled) { 'WARNING (disabled only)' } else { 'CRITICAL (not renamed)' }
             $saStatusColor = if ($saName -ne 'sa' -or $saDisabled) { 'green' } else { 'red' }
 
-            # Backup Jobs Status
-            $backupJobs = Get-DbaAgentJob -SqlInstance $server -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*backup*' -or $_.Name -like '*bkp*' }
-            $backupJobCount = @($backupJobs).Count
-            $backupJobsEnabled = @($backupJobs | Where-Object { $_.IsEnabled }).Count
-            $backupJobStatus = if ($backupJobCount -eq 0) { 'NO BACKUP JOBS' } elseif ($backupJobsEnabled -eq $backupJobCount) { "OK ($backupJobCount jobs)" } else { "WARNING ($backupJobsEnabled/$backupJobCount enabled)" }
-            $backupStatusColor = if ($backupJobCount -gt 0 -and $backupJobsEnabled -eq $backupJobCount) { 'green' } else { 'orange' }
+            # Backup-Status aus der TATSAECHLICHEN Sicherungshistorie, nicht aus Jobnamen.
+            #
+            # Vorher wurden ausschliesslich SQL Agent-Jobs gezaehlt, deren Name 'backup' oder 'bkp'
+            # enthaelt. Wird ueber ein externes Werkzeug gesichert (TDP/TSM, Netzwerk-Backupserver,
+            # zentraler Scheduler), gibt es solche Jobs nicht - der Bericht meldete dann
+            # "NO BACKUP JOBS", obwohl jede Nacht sauber gesichert wurde. msdb.dbo.backupset
+            # enthaelt dagegen JEDE Sicherung, unabhaengig davon, wer sie ausgeloest hat, auch die
+            # ueber Virtual Device Interface laufenden Sicherungen von TDP/TSM.
+            $backupJobStatus = 'Nicht ermittelbar'
+            $backupStatusColor = 'orange'
+            $backupDetails = @()
+            try
+            {
+                $backupRows = @(Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException -Query @"
+SELECT d.name                                                            AS DatabaseName,
+       d.recovery_model_desc                                             AS RecoveryModel,
+       MAX(CASE WHEN b.type = 'D' THEN b.backup_finish_date END)         AS LastFull,
+       MAX(CASE WHEN b.type = 'L' THEN b.backup_finish_date END)         AS LastLog
+FROM sys.databases d
+LEFT JOIN msdb.dbo.backupset b
+       ON b.database_name = d.name
+      AND b.is_copy_only = 0
+WHERE d.database_id <> 2          -- tempdb wird nie gesichert
+  AND d.state = 0                 -- nur ONLINE
+  AND d.is_read_only = 0
+GROUP BY d.name, d.recovery_model_desc
+"@)
+
+                $totalDbs = $backupRows.Count
+                $neverBackedUp = @($backupRows | Where-Object { -not $_.LastFull -or $_.LastFull -is [System.DBNull] })
+                $staleBackups = @($backupRows | Where-Object {
+                        $_.LastFull -and $_.LastFull -isnot [System.DBNull] -and
+                        (New-TimeSpan -Start $_.LastFull -End (Get-Date)).TotalDays -gt 7
+                    })
+
+                if ($totalDbs -eq 0)
+                {
+                    $backupJobStatus = 'Keine zu sichernden Datenbanken'
+                    $backupStatusColor = 'green'
+                }
+                elseif ($neverBackedUp.Count -gt 0)
+                {
+                    $backupJobStatus = "CRITICAL ($($neverBackedUp.Count) von $totalDbs ohne Vollsicherung)"
+                    $backupStatusColor = 'red'
+                    $backupDetails += "Ohne Vollsicherung: $(($neverBackedUp | Select-Object -ExpandProperty DatabaseName) -join ', ')"
+                }
+                elseif ($staleBackups.Count -gt 0)
+                {
+                    $backupJobStatus = "WARNING ($($staleBackups.Count) von $totalDbs aelter als 7 Tage)"
+                    $backupStatusColor = 'orange'
+                    $backupDetails += "Aelter als 7 Tage: $(($staleBackups | Select-Object -ExpandProperty DatabaseName) -join ', ')"
+                }
+                else
+                {
+                    $oldest = ($backupRows | Measure-Object -Property LastFull -Minimum).Minimum
+                    $oldestDays = if ($oldest) { [math]::Floor((New-TimeSpan -Start $oldest -End (Get-Date)).TotalDays) } else { 0 }
+                    $backupJobStatus = "OK ($totalDbs von $totalDbs gesichert, aelteste $oldestDays Tag(e))"
+                    $backupStatusColor = 'green'
+                }
+            }
+            catch
+            {
+                # Nicht als "keine Backups" durchgehen lassen - unbekannt ist unbekannt.
+                $backupJobStatus = 'Nicht ermittelbar'
+                $backupStatusColor = 'orange'
+                $backupDetails += "Sicherungshistorie nicht lesbar: $($_.Exception.Message)"
+            }
+
+            # Agent-Jobs nur noch als Zusatzinformation, nicht mehr als Bewertungsgrundlage.
+            try
+            {
+                $backupJobs = @(Get-DbaAgentJob -SqlInstance $server -ErrorAction SilentlyContinue |
+                        Where-Object { $_.Name -like '*backup*' -or $_.Name -like '*bkp*' -or $_.Name -like '*sicherung*' })
+                if ($backupJobs.Count -gt 0)
+                {
+                    $enabledJobs = @($backupJobs | Where-Object { $_.IsEnabled }).Count
+                    $backupDetails += "Agent-Jobs mit Backup-Bezug: $($backupJobs.Count) ($enabledJobs aktiv)"
+                }
+                else
+                {
+                    $backupDetails += 'Keine Agent-Jobs mit Backup-Bezug (bei externer Sicherung normal)'
+                }
+            }
+            catch { }
 
             # Max Memory (synchronized with Test-sqmMaxMemory logic)
             # WICHTIG: sowohl max server memory (ConfigValue) als auch SMO Server.PhysicalMemory
@@ -244,34 +322,150 @@ ORDER BY sp.name
             # SERVICE ACCOUNTS & INFRASTRUCTURE
             # ==========================================
 
-            # Service Accounts
+            # Dienstkonten aus sys.dm_server_services, also von der TATSAECHLICH berichteten Instanz.
+            #
+            # Vorher lief das ueber Get-Service/Win32_Service OHNE -ComputerName. Beides fragt damit
+            # den Rechner ab, auf dem das Skript laeuft - bei einem Bericht ueber eine entfernte
+            # Instanz wurde also das Dienstkonto des LOKALEN Rechners ausgewiesen. Auf einem Host mit
+            # mehreren Instanzen kam durch "Select-Object -First 1" zusaetzlich eine beliebige davon
+            # heraus. Die DMV liefert genau die Dienste der verbundenen Instanz, ohne WinRM.
             $serviceAccounts = @()
             try
             {
-                # SQL Server Service
-                $sqlSvc = Get-Service -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "MSSQL|SQL Server" -and $_.Name -notmatch "Agent|Browser" } | Select-Object -First 1
-                if ($sqlSvc)
+                $svcRows = @(Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException -Query @"
+SELECT servicename, service_account, status_desc, startup_type_desc
+FROM sys.dm_server_services
+"@)
+                foreach ($svc in $svcRows)
                 {
-                    $svcInfo = Get-CimInstance -ClassName Win32_Service -Filter "Name='$($sqlSvc.Name)'" -ErrorAction SilentlyContinue
-                    if ($svcInfo)
-                    {
-                        $serviceAccounts += "SQL Server: $($svcInfo.StartName)"
-                    }
+                    $serviceAccounts += "$($svc.servicename): $($svc.service_account) [$($svc.status_desc), Start: $($svc.startup_type_desc)]"
                 }
+            }
+            catch
+            {
+                $serviceAccounts += "Dienstkonten nicht ermittelbar (sys.dm_server_services): $($_.Exception.Message)"
+            }
+            if ($serviceAccounts.Count -eq 0) { $serviceAccounts = @('Unable to determine') }
 
-                # SQL Agent Service
-                $agentSvc = Get-Service -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "SQLSERVERAGENT|SQLAgent" } | Select-Object -First 1
-                if ($agentSvc)
+            # ==========================================
+            # SERVERFAKTEN UND INSTALLIERTE KOMPONENTEN
+            # ==========================================
+            # Alles, was ueber die SQL-Verbindung geht, wird auch darueber geholt: das funktioniert
+            # unabhaengig von WinRM und trifft garantiert die berichtete Instanz. Nur was es
+            # SQL-seitig nicht gibt (SSAS/SSRS/SSIS als Hostdienste, Registry), braucht WinRM - und
+            # schlaegt das fehl, steht dort "nicht ermittelbar" statt "nicht installiert".
+            $hostName = if ($server.ComputerNamePhysicalNetBIOS) { $server.ComputerNamePhysicalNetBIOS } else { ($SqlInstance -split '[\\,]')[0] }
+
+            $serverFacts = @()
+            try
+            {
+                $facts = Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException -Query @"
+SELECT CONVERT(nvarchar(128), SERVERPROPERTY('Collation'))       AS Collation,
+       CONVERT(int, SERVERPROPERTY('IsFullTextInstalled'))       AS IsFullTextInstalled,
+       CONVERT(nvarchar(128), SERVERPROPERTY('Edition'))         AS Edition,
+       CONVERT(nvarchar(128), SERVERPROPERTY('ProductVersion'))  AS ProductVersion,
+       si.cpu_count                                              AS CpuCount,
+       si.hyperthread_ratio                                      AS HyperthreadRatio,
+       si.scheduler_count                                        AS SchedulerCount,
+       CONVERT(bigint, si.physical_memory_kb)                    AS PhysicalMemoryKb
+FROM sys.dm_os_sys_info si
+"@
+                $ramGb = [math]::Round([int64]$facts.PhysicalMemoryKb / 1024 / 1024, 1)
+                # hyperthread_ratio ist die Zahl der logischen Prozessoren JE physischem Paket,
+                # nicht das Hyperthreading-Verhaeltnis im umgangssprachlichen Sinn. cpu_count
+                # geteilt durch diesen Wert ergibt daher die Zahl der SOCKEL, nicht die der Kerne.
+                $sockets = if ([int]$facts.HyperthreadRatio -gt 0) { [int]$facts.CpuCount / [int]$facts.HyperthreadRatio } else { $null }
+
+                $serverFacts += "Collation: $($facts.Collation)"
+                $serverFacts += "Edition: $($facts.Edition) ($($facts.ProductVersion))"
+                $serverFacts += "CPU: $($facts.CpuCount) logische Prozessoren$(if ($sockets) { " auf $sockets Sockel" }), $($facts.SchedulerCount) Scheduler"
+                $serverFacts += "OS-RAM: $ramGb GB"
+            }
+            catch
+            {
+                $serverFacts += "Serverfakten nicht ermittelbar: $($_.Exception.Message)"
+            }
+
+            # ---- Installierte Komponenten ----
+            $featureList = @()
+
+            # Volltextsuche: rein SQL-seitig feststellbar, daher immer belastbar.
+            try
+            {
+                $ftInstalled = [int](Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException `
+                        -Query "SELECT CONVERT(int, SERVERPROPERTY('IsFullTextInstalled')) AS FT").FT
+                $featureList += "Volltextsuche: $(if ($ftInstalled -eq 1) { 'installiert' } else { 'nicht installiert' })"
+            }
+            catch { $featureList += 'Volltextsuche: nicht ermittelbar' }
+
+            # SSIS/SSAS/SSRS sind Hostdienste, nicht Teil der Instanz - primaer ueber die Dienste
+            # des Zielrechners, das braucht WinRM.
+            $hostServices = $null
+            try { $hostServices = @(Get-DbaService -ComputerName $hostName -ErrorAction Stop) } catch { $hostServices = $null }
+
+            if ($hostServices)
+            {
+                foreach ($feature in @(
+                        @{ Label = 'Integration Services (SSIS)'; Type = 'SSIS' },
+                        @{ Label = 'Analysis Services (SSAS)'; Type = 'SSAS' },
+                        @{ Label = 'Reporting Services (SSRS)'; Type = 'SSRS' }))
                 {
-                    $svcInfo = Get-CimInstance -ClassName Win32_Service -Filter "Name='$($agentSvc.Name)'" -ErrorAction SilentlyContinue
-                    if ($svcInfo)
+                    $match = @($hostServices | Where-Object { $_.ServiceType -eq $feature.Type })
+                    if ($match.Count -gt 0)
                     {
-                        $serviceAccounts += "SQL Agent: $($svcInfo.StartName)"
+                        $featureList += "$($feature.Label): installiert ($(($match | ForEach-Object { $_.State }) -join ', '))"
+                    }
+                    else
+                    {
+                        $featureList += "$($feature.Label): nicht installiert"
                     }
                 }
             }
-            catch { }
-            if ($serviceAccounts.Count -eq 0) { $serviceAccounts = @('Unable to determine') }
+            else
+            {
+                # Kein WinRM: nur SQL-seitige Indizien, und die werden auch als solche benannt.
+                try
+                {
+                    $catalogs = @(Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException -Query @"
+SELECT name FROM sys.databases WHERE name IN ('SSISDB', 'ReportServer', 'ReportServerTempDB')
+"@ | Select-Object -ExpandProperty name)
+
+                    $featureList += "Integration Services (SSIS): $(if ($catalogs -contains 'SSISDB') { 'SSISDB-Katalog auf dieser Instanz vorhanden' } else { 'nicht ermittelbar (kein WinRM, kein SSISDB-Katalog)' })"
+                    $featureList += "Reporting Services (SSRS): $(if ($catalogs -contains 'ReportServer') { 'ReportServer-Datenbank auf dieser Instanz vorhanden' } else { 'nicht ermittelbar (kein WinRM, keine ReportServer-Datenbank)' })"
+                }
+                catch
+                {
+                    $featureList += 'Integration Services (SSIS): nicht ermittelbar'
+                    $featureList += 'Reporting Services (SSRS): nicht ermittelbar'
+                }
+                $featureList += 'Analysis Services (SSAS): nicht ermittelbar (nur ueber die Dienste des Rechners feststellbar, WinRM zu ' + $hostName + ' nicht moeglich)'
+            }
+
+            # ---- Monitoring-Registry-Schluessel (Invoke-sqmMonitoringKey) ----
+            try
+            {
+                $mk = Invoke-sqmMonitoringKey -ComputerName $hostName -Operation Get -ErrorAction Stop | Select-Object -First 1
+                if ($mk -and ($mk.SQL -or $mk.TSM))
+                {
+                    $featureList += "Monitoring-Schluessel: gesetzt (SQL=$($mk.SQL)$(if ($mk.SQL_Description) { " / $($mk.SQL_Description)" }), TSM=$($mk.TSM), SQLFreeSpaceVersion=$($mk.SQLFreeSpaceVersion)) unter $($mk.RegistryPath)"
+                }
+                elseif ($mk)
+                {
+                    $featureList += "Monitoring-Schluessel: vorhanden, aber ohne Werte ($($mk.RegistryPath))"
+                }
+                else
+                {
+                    $featureList += 'Monitoring-Schluessel: NICHT gesetzt'
+                }
+            }
+            catch
+            {
+                # Nur die erste Zeile der Ausnahme: der WinRM-Fehlertext ist mehrere Absaetze lang
+                # und wuerde den Bericht sonst zumuellen.
+                $kurz = (($_.Exception.Message -split "`r?`n") | Where-Object { $_.Trim() } | Select-Object -First 1)
+                if ($kurz.Length -gt 160) { $kurz = $kurz.Substring(0, 160) + '...' }
+                $featureList += "Monitoring-Schluessel: nicht ermittelbar (kein WinRM-Zugriff auf $hostName): $kurz"
+            }
 
             # SPN Status (List all SPNs + overall OK/Warning summary)
             $spnLines  = @('Not checked')
@@ -400,6 +594,9 @@ ORDER BY sp.name
                 -SAName $saName `
                 -BackupStatus $backupJobStatus `
                 -BackupStatusColor $backupStatusColor `
+                -BackupDetails $backupDetails `
+                -ServerFacts $serverFacts `
+                -FeatureList $featureList `
                 -MaxMemStatus $maxMemStatus `
                 -MaxMemColor $maxMemColor `
                 -Sysadmins $sysadmins `
@@ -464,6 +661,9 @@ function _Build-ModernReportHtml
         [string]$SAName,
         [string]$BackupStatus,
         [string]$BackupStatusColor,
+        [string[]]$BackupDetails,
+        [string[]]$ServerFacts,
+        [string[]]$FeatureList,
         [string]$MaxMemStatus,
         [string]$MaxMemColor,
         [string[]]$Sysadmins,
@@ -584,9 +784,9 @@ function _Build-ModernReportHtml
       <div class="card-detail">Name: $(_HtmlEncode $SAName)</div>
     </div>
     <div class="card $BackupStatusColor">
-      <div class="card-label">Backup Jobs</div>
+      <div class="card-label">Sicherungen</div>
       <div class="card-value">$BackupStatus</div>
-      <div class="card-detail">Enable backups immediately if missing</div>
+      <div class="card-detail">$(_HtmlList $BackupDetails 'Aus msdb.dbo.backupset, unabhaengig vom sichernden Werkzeug')</div>
     </div>
     <div class="card $MaxMemColor">
       <div class="card-label">Max Memory</div>
@@ -624,6 +824,16 @@ function _Build-ModernReportHtml
   </div>
 
   <!-- SERVICE ACCOUNTS -->
+  <div class="section-title">SERVER</div>
+  <div class="info-block">
+    <p>$(_HtmlList $ServerFacts 'Nicht ermittelbar')</p>
+  </div>
+
+  <div class="section-title">INSTALLIERTE KOMPONENTEN</div>
+  <div class="info-block">
+    <p>$(_HtmlList $FeatureList 'Nicht ermittelbar')</p>
+  </div>
+
   <div class="section-title">SERVICE ACCOUNTS</div>
   <div class="info-block">
     <p>$(_HtmlList $ServiceAccounts 'Unable to determine')</p>

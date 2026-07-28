@@ -1,5 +1,52 @@
 # sqmSQLTool — Changelog
 
+## [1.9.28.0] — 2026-07-28
+
+### Fix: Sicherungen wurden als fehlend gemeldet, obwohl gesichert wurde
+
+Die Kachel "Backup Jobs" in `Invoke-sqmSetupReport` bewertete ausschliesslich SQL Agent-Jobs, deren
+Name `backup` oder `bkp` enthaelt. Wird ueber ein externes Werkzeug gesichert - TDP/TSM, ein
+zentraler Backupserver, ein Scheduler ausserhalb des SQL Servers - gibt es solche Jobs nicht, und
+der Bericht meldete `NO BACKUP JOBS`, obwohl jede Nacht sauber gesichert wurde.
+
+Die Bewertung kommt jetzt aus `msdb.dbo.backupset`, also aus der tatsaechlichen Sicherungshistorie.
+Dort steht jede Sicherung, unabhaengig davon, wer sie ausgeloest hat, auch die ueber Virtual Device
+Interface laufenden Sicherungen von TDP/TSM. Gemeldet wird, wie viele Datenbanken ueberhaupt keine
+Vollsicherung haben (rot, mit Namen) beziehungsweise aelter als sieben Tage sind (orange), sonst
+gruen mit dem Alter der aeltesten Sicherung. Die Agent-Jobs stehen weiterhin als Zusatzinformation
+dabei, nur nicht mehr als Bewertungsgrundlage.
+
+Der Fehler ging in beide Richtungen: bei der Pruefung gegen eine Testinstanz meldete die alte Logik
+"OK (5 jobs)", waehrend 11 von 20 Datenbanken tatsaechlich nie gesichert worden waren.
+
+### Fix: falsches Dienstkonto fuer den SQL-Dienst
+
+Die Dienstkonten wurden ueber `Get-Service` und `Get-CimInstance Win32_Service` **ohne**
+`-ComputerName` gelesen. Beides fragt damit den Rechner ab, auf dem das Skript laeuft: bei einem
+Bericht ueber eine entfernte Instanz wurde also das Konto des lokalen Rechners ausgewiesen. Auf
+einem Host mit mehreren Instanzen kam durch `Select-Object -First 1` zusaetzlich eine beliebige
+davon heraus.
+
+Gelesen wird jetzt `sys.dm_server_services`. Die DMV liefert genau die Dienste der verbundenen
+Instanz, ohne WinRM, samt Status und Starttyp.
+
+### Neu im Bericht
+
+Abschnitt **SERVER**: Collation, Edition und Produktversion, Anzahl logischer Prozessoren nebst
+Sockelzahl und Scheduler, sowie der OS-Arbeitsspeicher. Alles aus `SERVERPROPERTY` und
+`sys.dm_os_sys_info`, also ueber die SQL-Verbindung und damit unabhaengig von WinRM.
+
+Abschnitt **INSTALLIERTE KOMPONENTEN**: Volltextsuche (SQL-seitig sicher feststellbar), Integration
+Services, Analysis Services und Reporting Services sowie der Monitoring-Registry-Schluessel aus
+`Invoke-sqmMonitoringKey`. Die letzten vier sind Hostangaben und brauchen WinRM. Ist das nicht
+moeglich, steht dort ausdruecklich **"nicht ermittelbar"** samt Grund, nicht "nicht installiert" -
+fuer SSIS und SSRS wird ersatzweise geprueft, ob ein SSISDB- beziehungsweise ReportServer-Katalog
+auf dieser Instanz liegt, was ebenfalls als Indiz und nicht als Nachweis benannt wird.
+
+**Getestet** gegen SQL 2022 auf DEV01 (Windows, ohne WinRM-Zugriff, also der Fallback-Pfad) und
+gegen SQL 2022 unter Linux im Container. Dienstkonten kommen nachweislich von der Zielinstanz
+(`NT Service\MSSQLSERVER`), nicht mehr vom ausfuehrenden Rechner.
+
 ## [1.9.27.1] — 2026-07-28
 
 ### Fix: -Confirm:$false an Export-DbaUser hat jeden Restore verhindert
