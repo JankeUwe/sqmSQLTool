@@ -59,6 +59,12 @@ SQL 2022, sowie der vollstaendige Standalone-Pfad von `Invoke-sqmRestoreDatabase
 Restore-Schritt. Der AG-Pfad selbst liess sich mangels verfuegbarer Availability Group nicht
 durchspielen.
 
+Dazu acht neue Pester-Tests in `tests/Unit/Public/Invoke-sqmRestoreDatabase.Tests.ps1`, die alle
+sechs Zustaende der Erkennung abdecken und festhalten, dass der Lauf abbricht, BEVOR User-Export
+oder Restore anlaufen, wenn die AG-Zugehoerigkeit nicht ermittelbar ist. Der entscheidende Test
+wurde per Mutation gegengeprueft: mit dem alten stillen Fallback wieder eingebaut schlaegt er fehl.
+Die vollstaendige Suite laeuft mit 189 Tests ohne Fehlschlag durch.
+
 ## [1.9.26.2] — 2026-07-28
 
 ### Fix: doppelte Parameterbindung brach 11 Aufrufe unter Windows PowerShell 5.1 ab
