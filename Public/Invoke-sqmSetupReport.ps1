@@ -29,6 +29,23 @@
     Invoke-sqmSetupReport -SqlInstance "SQL01"
 
 #>
+# Uebersetzt einen Kompatibilitaetsgrad (sys.databases.compatibility_level) in die SQL Server-
+# Version, fuer die er steht. Die nackte Zahl steht zwar in jedem Bericht, sagt aber nur denen
+# etwas, die die Tabelle auswendig koennen - und genau dieser Wert entscheidet, welches Verhalten
+# und welcher Abfrageoptimierer fuer die Datenbank tatsaechlich gelten.
+function _ConvertTo-SqlVersionName
+{
+    param([int]$CompatibilityLevel)
+
+    $map = @{
+        170 = '2025'; 160 = '2022'; 150 = '2019'; 140 = '2017'; 130 = '2016'
+        120 = '2014'; 110 = '2012'; 100 = '2008'; 90 = '2005'; 80 = '2000'
+    }
+    if ($CompatibilityLevel -le 0) { return 'unbekannt' }
+    if ($map.ContainsKey($CompatibilityLevel)) { return "$($map[$CompatibilityLevel]) ($CompatibilityLevel)" }
+    return "unbekannt ($CompatibilityLevel)"
+}
+
 function Invoke-sqmSetupReport
 {
     [CmdletBinding()]
@@ -357,6 +374,7 @@ FROM sys.dm_server_services
             $hostName = if ($server.ComputerNamePhysicalNetBIOS) { $server.ComputerNamePhysicalNetBIOS } else { ($SqlInstance -split '[\\,]')[0] }
 
             $serverFacts = @()
+            $instanceCompat = 0
             try
             {
                 $facts = Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException -Query @"
@@ -367,9 +385,11 @@ SELECT CONVERT(nvarchar(128), SERVERPROPERTY('Collation'))       AS Collation,
        si.cpu_count                                              AS CpuCount,
        si.hyperthread_ratio                                      AS HyperthreadRatio,
        si.scheduler_count                                        AS SchedulerCount,
-       CONVERT(bigint, si.physical_memory_kb)                    AS PhysicalMemoryKb
+       CONVERT(bigint, si.physical_memory_kb)                    AS PhysicalMemoryKb,
+       (SELECT compatibility_level FROM sys.databases WHERE name = 'model') AS InstanceCompat
 FROM sys.dm_os_sys_info si
 "@
+                $instanceCompat = [int]$facts.InstanceCompat
                 $ramGb = [math]::Round([int64]$facts.PhysicalMemoryKb / 1024 / 1024, 1)
                 # hyperthread_ratio ist die Zahl der logischen Prozessoren JE physischem Paket,
                 # nicht das Hyperthreading-Verhaeltnis im umgangssprachlichen Sinn. cpu_count
@@ -378,6 +398,7 @@ FROM sys.dm_os_sys_info si
 
                 $serverFacts += "Collation: $($facts.Collation)"
                 $serverFacts += "Edition: $($facts.Edition) ($($facts.ProductVersion))"
+                $serverFacts += "Datenbank-Modus der Instanz: $(_ConvertTo-SqlVersionName $instanceCompat) - Standard fuer neu angelegte Datenbanken"
                 $serverFacts += "CPU: $($facts.CpuCount) logische Prozessoren$(if ($sockets) { " auf $sockets Sockel" }), $($facts.SchedulerCount) Scheduler"
                 $serverFacts += "OS-RAM: $ramGb GB"
             }
@@ -713,9 +734,22 @@ JOIN sys.availability_groups ag ON ag.group_id = l.group_id
                     $daysAgo = if ($lastBackup) { (New-TimeSpan -Start $lastBackup -End (Get-Date)).Days } else { -1 }
                     $backupStatus = if ($daysAgo -lt 0) { 'Never' } elseif ($daysAgo -eq 0) { 'Today' } elseif ($daysAgo -le 7) { "$daysAgo days" } else { "$daysAgo days ⚠️" }
 
+                    # Kompatibilitaetsgrad als Jahreszahl - die reine Zahl (150, 160, ...) sagt im
+                    # Bericht niemandem etwas, und genau dieser Wert entscheidet darueber, welches
+                    # Verhalten und welcher Optimierer tatsaechlich gelten. Liegt er unter dem
+                    # Stand der Instanz, laeuft die Datenbank bewusst oder unbewusst im Modus einer
+                    # aelteren Version - das wird deshalb ausdruecklich vermerkt.
+                    $compatValue = [int]($db.CompatibilityLevel -replace '\D', '')
+                    $compatText = _ConvertTo-SqlVersionName $compatValue
+                    if ($instanceCompat -gt 0 -and $compatValue -gt 0 -and $compatValue -lt $instanceCompat)
+                    {
+                        $compatText += ", niedriger als die Instanz: $(_ConvertTo-SqlVersionName $instanceCompat)"
+                    }
+
                     $databases += [PSCustomObject]@{
                         Name           = $db.Name
                         Recovery       = $db.RecoveryModel
+                        Compatibility  = $compatText
                         DBO            = $dbo
                         LastFullBackup = $backupStatus
                     }
@@ -855,10 +889,10 @@ function _Build-ModernReportHtml
 
     $dbRows = if ($Databases) {
         $Databases | ForEach-Object {
-            "<tr><td>$(_HtmlEncode $_.Name)</td><td>$($_.Recovery)</td><td>$(_HtmlEncode $_.DBO)</td><td>$($_.LastFullBackup)</td></tr>"
+            "<tr><td>$(_HtmlEncode $_.Name)</td><td>$($_.Recovery)</td><td>$(_HtmlEncode $_.Compatibility)</td><td>$(_HtmlEncode $_.DBO)</td><td>$($_.LastFullBackup)</td></tr>"
         } | Out-String
     } else {
-        '<tr><td colspan="4">No databases</td></tr>'
+        '<tr><td colspan="5">No databases</td></tr>'
     }
 
     return @"
@@ -1008,6 +1042,7 @@ function _Build-ModernReportHtml
       <tr>
         <th>Database</th>
         <th>Recovery Model</th>
+        <th>Datenbank-Modus</th>
         <th>DBO Owner</th>
         <th>Last Full Backup</th>
       </tr>

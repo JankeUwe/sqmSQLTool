@@ -1,5 +1,25 @@
 # sqmSQLTool — Changelog
 
+## [1.9.30.0] — 2026-07-29
+
+### Neu: Datenbank-Modus (Kompatibilitaetsgrad) im Setup-Report
+
+Die Datenbanktabelle in `Invoke-sqmSetupReport` hat eine Spalte "Datenbank-Modus" bekommen, und der
+SERVER-Abschnitt weist den Standard der Instanz aus. Ausgegeben wird die SQL Server-Version, fuer
+die der Grad steht, nicht nur die nackte Zahl: `2019 (150)` statt `150`. Die Zahl allein sagt nur
+denen etwas, die die Tabelle auswendig koennen, dabei entscheidet genau dieser Wert darueber,
+welches Verhalten und welcher Abfrageoptimierer fuer die Datenbank tatsaechlich gelten.
+
+Abgedeckt sind 2000 bis 2025 (80 bis 170). Liegt eine Datenbank unter dem Stand ihrer Instanz, wird
+das ausdruecklich vermerkt, denn genau diese Konstellation faellt sonst niemandem auf:
+
+```
+sqmCompatTest    Full    2019 (150), niedriger als die Instanz: 2022 (160)
+```
+
+Der Standard der Instanz wird aus dem Kompatibilitaetsgrad von `model` gelesen, also aus dem Wert,
+den neu angelegte Datenbanken erhalten.
+
 ## [1.9.29.0] — 2026-07-28
 
 ### Fix: der Splunk-Status beschrieb den falschen Server
