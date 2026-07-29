@@ -120,32 +120,87 @@ function Get-sqmAgentJobScheduleReport {
                                   -FunctionName $functionName -Level "WARNING"
             }
 
-            # Get job execution history from msdb
+            # Get job execution history from msdb.
+            #
+            # Frueher wurde ALLES (Zeitplaene UND Historie) in einem einzigen GROUP BY ueber
+            # sj.name/ss.* zusammengefasst. Das hatte drei nachweisbare Fehler, alle gegen eine
+            # echte SQL 2022-Instanz reproduziert:
+            #
+            # 1. Ein Job OHNE jemals gelaufene (oder vollstaendig geloeschte/purgierte) Historie
+            #    lieferte ueber den LEFT JOIN eine Zeile mit jh.run_status = NULL. Die Bedingung
+            #    "WHEN jh.run_status = 1 THEN 'Success' ELSE 'Failed'" faellt bei NULL in den
+            #    ELSE-Zweig (NULL = 1 ist UNKNOWN, nicht TRUE) - ein Job, der noch nie gelaufen
+            #    ist, wurde also als 'Failed' gemeldet statt als "noch nie gelaufen".
+            # 2. MAX() auf die Ergebnis-STRINGS 'Success'/'Failed' aggregiert alphabetisch, nicht
+            #    zeitlich - 'Success' > 'Failed'. Ein Job, dessen LETZTER Lauf tatsaechlich
+            #    fehlgeschlagen ist, aber irgendwann in seiner Historie schon einmal erfolgreich
+            #    war, wurde als 'Success' gemeldet (belegt: Lauf 1 erfolgreich, Lauf 2 danach mit
+            #    absichtlichem Fehler - die alte Abfrage lieferte weiterhin 'Success').
+            # 3. Ein Job mit ZWEI ODER MEHR Zeitplaenen wird durch den JOIN auf sysjobschedules
+            #    vervielfacht (2 Zeitplaene x N Historienzeilen), GROUP BY sj.name, ss.* kollabiert
+            #    das in mehrere Zeilen PRO JOB statt einer. $jobHistoryData | Where-Object JobName
+            #    -eq ... lieferte dadurch mehrere Zeilen, $history.LastRunDate/.LastRunStatus/...
+            #    wurden zu ARRAYS statt Einzelwerten - belegt: LastExecution zeigte "Never" (die
+            #    [string]-Konvertierung eines Array mit zwei Datumswerten ergibt einen durch
+            #    Leerzeichen getrennten String, den TryParse als Ganzzahl ablehnt), Schedule zeigte
+            #    "No Schedule" trotz zweier vorhandener Zeitplaene, LastStatus wurde zu einem
+            #    Array wie {Success, Success} statt eines einzelnen Werts.
+            #
+            # Die Loesung trennt beide Fragen technisch voneinander: eine CTE mit ROW_NUMBER()
+            # OVER (PARTITION BY job_id ORDER BY instance_id DESC) liefert GENAU EINE Zeile je Job
+            # - den tatsaechlich letzten Lauf, instance_id ist SQL Agents eigener, garantiert
+            # monoton steigender Zaehler und damit zuverlaessiger als ein Vergleich von
+            # run_date/run_time. Die Zeitplaene werden separat auf einen reprsentativen Zeitplan
+            # je Job reduziert (samt Gesamtzahl, falls mehrere existieren), statt die Historie zu
+            # vervielfachen. Ein Job ohne Historie bekommt LastRunStatus = NULL (nicht 'Failed')
+            # und wird in PowerShell als eigener Zustand "Never Run" behandelt.
             $jobHistoryQuery = @"
+            ;WITH LastRun AS (
+                SELECT
+                    jh.job_id, jh.run_status, jh.run_date, jh.run_time, jh.message,
+                    ROW_NUMBER() OVER (PARTITION BY jh.job_id ORDER BY jh.instance_id DESC) AS rn
+                FROM msdb.dbo.sysjobhistory jh
+                WHERE jh.step_id = 0
+            ),
+            DurationAgg AS (
+                SELECT
+                    jh.job_id,
+                    AVG(CAST(
+                        (jh.run_duration / 10000 * 3600) +
+                        ((jh.run_duration % 10000) / 100 * 60) +
+                        (jh.run_duration % 100)
+                        AS FLOAT)) AS AvgDurationSeconds
+                FROM msdb.dbo.sysjobhistory jh
+                WHERE jh.step_id = 0
+                GROUP BY jh.job_id
+            ),
+            ScheduleAgg AS (
+                SELECT sjs.job_id, COUNT(*) AS ScheduleCount, MIN(sjs.schedule_id) AS RepresentativeScheduleId
+                FROM msdb.dbo.sysjobschedules sjs
+                GROUP BY sjs.job_id
+            )
             SELECT
                 sj.name AS JobName,
                 sj.enabled AS IsEnabled,
+                ISNULL(sch.ScheduleCount, 0) AS ScheduleCount,
                 ss.name AS ScheduleName,
                 ss.freq_type AS FrequencyType,
                 ss.freq_interval AS FrequencyInterval,
                 ss.freq_subday_type AS SubdayType,
                 ss.freq_subday_interval AS SubdayInterval,
                 ss.active_start_time AS ActiveStartTime,
-                MAX(jh.run_date) AS LastRunDate,
-                MAX(jh.run_time) AS LastRunTime,
-                MAX(CASE WHEN jh.run_status = 1 THEN 'Success' ELSE 'Failed' END) AS LastRunStatus,
-                AVG(CAST(
-                    (jh.run_duration / 10000 * 3600) +
-                    ((jh.run_duration % 10000) / 100 * 60) +
-                    (jh.run_duration % 100)
-                    AS FLOAT)) AS AvgDurationSeconds,
-                MAX(jh.message) AS LastErrorMessage
+                lr.run_date AS LastRunDate,
+                lr.run_time AS LastRunTime,
+                CASE WHEN lr.run_status IS NULL THEN NULL
+                     WHEN lr.run_status = 1 THEN 'Success'
+                     ELSE 'Failed' END AS LastRunStatus,
+                da.AvgDurationSeconds,
+                lr.message AS LastErrorMessage
             FROM msdb.dbo.sysjobs sj
-            LEFT JOIN msdb.dbo.sysjobschedules sjs ON sj.job_id = sjs.job_id
-            LEFT JOIN msdb.dbo.sysschedules ss ON sjs.schedule_id = ss.schedule_id
-            LEFT JOIN msdb.dbo.sysjobhistory jh ON sj.job_id = jh.job_id AND jh.step_id = 0
-            GROUP BY sj.name, sj.enabled, ss.name, ss.freq_type, ss.freq_interval,
-                     ss.freq_subday_type, ss.freq_subday_interval, ss.active_start_time
+            LEFT JOIN LastRun lr ON lr.job_id = sj.job_id AND lr.rn = 1
+            LEFT JOIN DurationAgg da ON da.job_id = sj.job_id
+            LEFT JOIN ScheduleAgg sch ON sch.job_id = sj.job_id
+            LEFT JOIN msdb.dbo.sysschedules ss ON ss.schedule_id = sch.RepresentativeScheduleId
             ORDER BY sj.name
 "@
 
@@ -157,15 +212,22 @@ function Get-sqmAgentJobScheduleReport {
 
             # Process each job
             foreach ($job in $jobs) {
-                $history = $jobHistoryData | Where-Object { $_.JobName -eq $job.Name }
+                # Get-DbaAgentJob und die Abfrage oben liefern beide GENAU eine Zeile je Job (siehe
+                # Kommentar zur Query) - Where-Object liefert hier also ein einzelnes Objekt, kein
+                # Array mehr, unabhaengig davon, wie viele Zeitplaene der Job hat.
+                $history = $jobHistoryData | Where-Object { $_.JobName -eq $job.Name } | Select-Object -First 1
 
                 # Parse schedule frequency
-                $scheduleText = if ($history) {
-                    _ConvertJobSchedule -FrequencyType $history.FrequencyType `
+                $scheduleText = if ($history -and $history.ScheduleCount -gt 0) {
+                    $text = _ConvertJobSchedule -FrequencyType $history.FrequencyType `
                                        -FrequencyInterval $history.FrequencyInterval `
                                        -SubdayType $history.SubdayType `
                                        -SubdayInterval $history.SubdayInterval `
                                        -StartTime $history.ActiveStartTime
+                    # Mehr als ein Zeitplan: nur der erste (nach schedule_id) wird angezeigt, das
+                    # wird kenntlich gemacht statt es stillschweigend zu verschweigen.
+                    if ([int]$history.ScheduleCount -gt 1) { $text += " (+$([int]$history.ScheduleCount - 1) weitere(r) Zeitplan/Zeitplaene)" }
+                    $text
                 } else {
                     'No Schedule'
                 }
@@ -192,16 +254,25 @@ function Get-sqmAgentJobScheduleReport {
                     'N/A'
                 }
 
+                # Kein Datensatz in sysjobhistory (nlist LastRunDate) heisst "noch nie gelaufen",
+                # NICHT "fehlgeschlagen" - das ist die zentrale Korrektur dieser Funktion. Vorher
+                # wurde genau dieser Fall (jh.run_status ist NULL, weil kein Lauf existiert) durch
+                # "ELSE 'Failed'" in der T-SQL-CASE-Anweisung faelschlich als Fehlschlag gemeldet.
+                $lastStatus = if (-not $lastRunDateTime) { 'Never Run' }
+                              elseif ($history.LastRunStatus -eq 'Success') { 'Success' }
+                              elseif ($history.LastRunStatus -eq 'Failed') { 'Failed' }
+                              else { 'Unknown' }
+
                 $jobData += [PSCustomObject]@{
                     JobName             = $job.Name
                     Enabled             = if ($job.IsEnabled) { 'Yes' } else { 'No' }
                     ScheduleName        = if ($history.ScheduleName) { $history.ScheduleName } else { 'Not Scheduled' }
                     Schedule            = $scheduleText
                     LastExecution       = if ($lastRunDateTime) { $lastRunDateTime } else { 'Never' }
-                    LastStatus          = if ($history.LastRunStatus) { $history.LastRunStatus } else { 'Unknown' }
+                    LastStatus          = $lastStatus
                     NextExecution       = $nextExecution
                     AvgDuration         = $avgDuration
-                    LastError           = if ($history.LastErrorMessage -and $history.LastRunStatus -eq 'Failed') {
+                    LastError           = if ($history.LastErrorMessage -and $lastStatus -eq 'Failed') {
                         $cleanMsg = ($history.LastErrorMessage -replace '\[.*?\]', '' -replace '\r\n', ' ').Trim()
                         if ($cleanMsg.Length -gt 100) {
                             $cleanMsg.Substring(0, 100)
@@ -611,6 +682,7 @@ function _GenerateAgentJobHtml {
         $statusClass = switch ($job.LastStatus) {
             'Success' { 'status-success' }
             'Failed' { 'status-failed' }
+            'Never Run' { 'status-unknown' }
             default { 'status-unknown' }
         }
 

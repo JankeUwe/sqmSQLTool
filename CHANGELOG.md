@@ -1,5 +1,51 @@
 # sqmSQLTool — Changelog
 
+## [1.9.31.0] — 2026-07-29
+
+### Fix: erfolgreich gelaufene Jobs wurden im Schedule-Report als "Failed" gemeldet
+
+`Get-sqmAgentJobScheduleReport` hatte drei nachweisbare Fehler in der Statusermittlung, alle gegen
+eine echte SQL Server 2022-Instanz reproduziert:
+
+1. **Ein Job, der noch nie gelaufen ist (oder dessen Historie vollstaendig purgiert wurde),
+   wurde als "Failed" gemeldet statt als "noch nie gelaufen".** Die T-SQL-Anweisung
+   `CASE WHEN jh.run_status = 1 THEN 'Success' ELSE 'Failed' END` faellt bei `run_status = NULL`
+   (kein Historieneintrag vorhanden) in den ELSE-Zweig, weil `NULL = 1` in SQL weder wahr noch
+   falsch, sondern UNKNOWN ist. Reproduziert: ein frisch angelegter, noch nie gestarteter Job
+   lieferte `LastRunStatus = Failed`.
+
+2. **`MAX()` auf die Ergebnis-Strings 'Success'/'Failed' aggregierte alphabetisch, nicht
+   zeitlich** - 'Success' > 'Failed'. Ein Job, dessen tatsaechlich LETZTER Lauf fehlgeschlagen
+   ist, aber irgendwann vorher einmal erfolgreich war, wurde als 'Success' gemeldet.
+   Reproduziert: Lauf 1 erfolgreich, Lauf 2 (der spaetere) mit absichtlichem Fehler - die alte
+   Abfrage lieferte weiterhin `Success`.
+
+3. **Ein Job mit zwei oder mehr Zeitplaenen wurde durch den JOIN auf `sysjobschedules` und
+   `sysschedules` vervielfacht** (2 Zeitplaene x N Historienzeilen), wodurch die GROUP BY-Abfrage
+   mehrere Zeilen statt einer je Job lieferte. `$jobHistoryData | Where-Object JobName -eq ...`
+   ergab dadurch ein Array statt eines einzelnen Datensatzes, und Felder wie `LastRunDate` und
+   `LastRunStatus` wurden faelschlich als Arrays weiterverarbeitet. Reproduziert: `LastExecution`
+   zeigte "Never" (die `[string]`-Konvertierung eines Arrays mit zwei Datumswerten ergibt einen
+   durch Leerzeichen getrennten String, den `TryParse` als Ganzzahl ablehnt), `Schedule` zeigte
+   "No Schedule" trotz zweier vorhandener Zeitplaene, `LastStatus` wurde zu `{Success, Success}`
+   statt eines einzelnen Werts.
+
+Die Abfrage trennt jetzt beide Fragen technisch voneinander: eine CTE mit
+`ROW_NUMBER() OVER (PARTITION BY job_id ORDER BY instance_id DESC)` liefert genau eine Zeile je
+Job - den tatsaechlich letzten Lauf. `instance_id` ist SQL Agents eigener, garantiert monoton
+steigender Zaehler und damit zuverlaessiger als ein Vergleich von `run_date`/`run_time`. Die
+Zeitplaene werden separat auf einen reprsentativen Zeitplan je Job reduziert (samt Gesamtzahl,
+falls mehrere existieren, sichtbar als "(+1 weitere(r) Zeitplan/Zeitplaene)"), statt die Historie
+zu vervielfachen. Ein Job ohne Historie bekommt jetzt den eigenen Status `Never Run` statt
+`Failed` - er zaehlt in der Zusammenfassung weder als Erfolg noch als Fehlschlag.
+
+**Getestet** gegen SQL Server 2022 auf DEV01 mit drei praeparierten Faellen (nie gelaufen, ein
+Zeitplan mit Erfolg, zwei Zeitplaene, sowie ein Job mit Erfolg gefolgt von einem tatsaechlichen
+Fehlschlag) - alle drei zeigen jetzt den korrekten Status. Dazu fuenf neue Pester-Tests
+(`tests/Unit/Public/Get-sqmAgentJobScheduleReport.Tests.ps1`), die die Statusableitung ohne
+Serverzugriff nachbilden; der entscheidende Test wurde per Mutation gegengeprueft (mit dem alten
+Verhalten wieder eingebaut schlaegt er fehl). Volle Suite: 195 Tests, keine Fehlschlaege.
+
 ## [1.9.30.0] — 2026-07-29
 
 ### Neu: Datenbank-Modus (Kompatibilitaetsgrad) im Setup-Report
