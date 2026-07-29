@@ -93,10 +93,11 @@ Describe 'Get-sqmAgentJobScheduleReport - Statusableitung' {
         InModuleScope sqmSQLTool -Parameters @{ FakeJobs = $script:FakeJobs; FakeHistory = $script:FakeHistory } {
             param($FakeJobs, $FakeHistory)
             Mock Invoke-sqmLogging { }
+            Mock Invoke-sqmOpenReport { }
             Mock Get-DbaAgentJob { $FakeJobs }
             Mock Invoke-DbaQuery { $FakeHistory }
 
-            $data = Get-sqmAgentJobScheduleReport -SqlInstance 'SQL01' -OutputPath $TestDrive -EnableException
+            $data = Get-sqmAgentJobScheduleReport -SqlInstance 'SQL01' -OutputPath $TestDrive -EnableException -NoOpen
             $job = $data | Where-Object JobName -eq 'JobNieGelaufen'
 
             $job.LastStatus    | Should -Be 'Never Run'
@@ -109,10 +110,11 @@ Describe 'Get-sqmAgentJobScheduleReport - Statusableitung' {
         InModuleScope sqmSQLTool -Parameters @{ FakeJobs = $script:FakeJobs; FakeHistory = $script:FakeHistory } {
             param($FakeJobs, $FakeHistory)
             Mock Invoke-sqmLogging { }
+            Mock Invoke-sqmOpenReport { }
             Mock Get-DbaAgentJob { $FakeJobs }
             Mock Invoke-DbaQuery { $FakeHistory }
 
-            $data = Get-sqmAgentJobScheduleReport -SqlInstance 'SQL01' -OutputPath $TestDrive -EnableException
+            $data = Get-sqmAgentJobScheduleReport -SqlInstance 'SQL01' -OutputPath $TestDrive -EnableException -NoOpen
             $job = $data | Where-Object JobName -eq 'JobErfolgreich'
 
             $job.LastStatus    | Should -Be 'Success'
@@ -125,10 +127,11 @@ Describe 'Get-sqmAgentJobScheduleReport - Statusableitung' {
         InModuleScope sqmSQLTool -Parameters @{ FakeJobs = $script:FakeJobs; FakeHistory = $script:FakeHistory } {
             param($FakeJobs, $FakeHistory)
             Mock Invoke-sqmLogging { }
+            Mock Invoke-sqmOpenReport { }
             Mock Get-DbaAgentJob { $FakeJobs }
             Mock Invoke-DbaQuery { $FakeHistory }
 
-            $data = Get-sqmAgentJobScheduleReport -SqlInstance 'SQL01' -OutputPath $TestDrive -EnableException
+            $data = Get-sqmAgentJobScheduleReport -SqlInstance 'SQL01' -OutputPath $TestDrive -EnableException -NoOpen
             $job = $data | Where-Object JobName -eq 'JobLetzterLaufFehlgeschlagen'
 
             $job.LastStatus | Should -Be 'Failed'
@@ -140,10 +143,11 @@ Describe 'Get-sqmAgentJobScheduleReport - Statusableitung' {
         InModuleScope sqmSQLTool -Parameters @{ FakeJobs = $script:FakeJobs; FakeHistory = $script:FakeHistory } {
             param($FakeJobs, $FakeHistory)
             Mock Invoke-sqmLogging { }
+            Mock Invoke-sqmOpenReport { }
             Mock Get-DbaAgentJob { $FakeJobs }
             Mock Invoke-DbaQuery { $FakeHistory }
 
-            $data = Get-sqmAgentJobScheduleReport -SqlInstance 'SQL01' -OutputPath $TestDrive -EnableException
+            $data = Get-sqmAgentJobScheduleReport -SqlInstance 'SQL01' -OutputPath $TestDrive -EnableException -NoOpen
             $job = $data | Where-Object JobName -eq 'JobMitZweiZeitplaenen'
 
             $job.LastStatus    | Should -Be 'Success'
@@ -157,10 +161,11 @@ Describe 'Get-sqmAgentJobScheduleReport - Statusableitung' {
         InModuleScope sqmSQLTool -Parameters @{ FakeJobs = $script:FakeJobs; FakeHistory = $script:FakeHistory } {
             param($FakeJobs, $FakeHistory)
             Mock Invoke-sqmLogging { }
+            Mock Invoke-sqmOpenReport { }
             Mock Get-DbaAgentJob { $FakeJobs }
             Mock Invoke-DbaQuery { $FakeHistory }
 
-            $data = Get-sqmAgentJobScheduleReport -SqlInstance 'SQL01' -OutputPath $TestDrive -EnableException
+            $data = Get-sqmAgentJobScheduleReport -SqlInstance 'SQL01' -OutputPath $TestDrive -EnableException -NoOpen
             $neverRunJobs = @($data | Where-Object LastStatus -eq 'Never Run')
             $neverRunJobs.Count | Should -BeGreaterThan 0
             foreach ($j in $neverRunJobs)

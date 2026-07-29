@@ -1,5 +1,15 @@
 # sqmSQLTool — Changelog
 
+## [1.9.32.0] — 2026-07-29
+
+### Fix: `Get-sqmAgentJobScheduleReport` oeffnete den HTML-Bericht nicht automatisch
+
+Alle anderen Report-Funktionen des Moduls unterstuetzen den Standard-Mechanismus zum
+automatischen Oeffnen des erzeugten HTML-Berichts (`-NoOpen`-Switch plus Aufruf von
+`Invoke-sqmOpenReport` nach dem Schreiben der Datei). `Get-sqmAgentJobScheduleReport` hatte
+diesen Baustein noch nicht - der Bericht wurde erzeugt, aber nie geoeffnet. Jetzt konsistent
+mit z.B. `Get-sqmDeadlockReport` und `Get-sqmWaitStatistics`.
+
 ## [1.9.31.0] — 2026-07-29
 
 ### Fix: erfolgreich gelaufene Jobs wurden im Schedule-Report als "Failed" gemeldet

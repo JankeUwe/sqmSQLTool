@@ -30,6 +30,9 @@
 .PARAMETER EnableException
     Throw exceptions immediately instead of logging.
 
+.PARAMETER NoOpen
+    Do not automatically open the HTML report after creation.
+
 .EXAMPLE
     Get-sqmAgentJobScheduleReport -SqlInstance "SQL-Server1"
 
@@ -64,7 +67,10 @@ function Get-sqmAgentJobScheduleReport {
         [switch]$OutputCsv,
 
         [Parameter(Mandatory = $false)]
-        [switch]$EnableException
+        [switch]$EnableException,
+
+        [Parameter(Mandatory = $false)]
+        [switch]$NoOpen
     )
 
     begin {
@@ -315,6 +321,8 @@ function Get-sqmAgentJobScheduleReport {
                 [System.IO.File]::WriteAllText($htmlPath, $html, [System.Text.Encoding]::UTF8)
                 Invoke-sqmLogging -Message "HTML report created: $htmlPath (Size: $([System.IO.FileInfo]::new($htmlPath).Length) bytes)" `
                                   -FunctionName $functionName -Level "INFO"
+
+                Invoke-sqmOpenReport -HtmlFile $htmlPath -NoOpen:$NoOpen
             } catch {
                 $fileErr = "HTML report creation failed: $($_.Exception.Message)"
                 Invoke-sqmLogging -Message $fileErr -FunctionName $functionName -Level "ERROR"
