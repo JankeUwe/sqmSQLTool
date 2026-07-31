@@ -706,7 +706,7 @@ JOIN sys.availability_groups ag ON ag.group_id = l.group_id
             # MAXDOP
             $maxdop = $server.Configuration.MaxDegreeOfParallelism.ConfigValue
             $cpuCount = $server.Processors
-            $recommendedMaxdop = if ($cpuCount -le 4) { $cpuCount } elseif ($cpuCount -le 8) { 4 } elseif ($cpuCount -le 16) { 8 } else { 16 }
+            $recommendedMaxdop = [math]::Min(8, $cpuCount)
             $maxdopStatus = if ($maxdop -ge 2 -and $maxdop -le $recommendedMaxdop) { "OK ($maxdop)" } else { "CHECK ($maxdop, recommended $recommendedMaxdop)" }
 
             # Cost Threshold
