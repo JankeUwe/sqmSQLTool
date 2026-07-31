@@ -121,6 +121,7 @@ function Get-sqmADGroupMembersRecursive
                     $Visited[$GroupIdentity.ToLower()] = $true
 
                     $expandedMembers = @()
+                    $usedAdModule = $false
 
                     try
                     {
@@ -139,6 +140,7 @@ function Get-sqmADGroupMembersRecursive
                                 # Nested calls: only direct members
                                 $adMembers = Get-ADGroupMember -Identity $GroupIdentity -ErrorAction Stop
                             }
+                            $usedAdModule = $true
 
                             foreach ($member in $adMembers)
                             {
@@ -166,6 +168,16 @@ function Get-sqmADGroupMembersRecursive
                         }
                     }
                     catch
+                    {
+                        # KORREKTUR: dieser catch faengt nur echte Fehler des AD-Modul-Pfads ab.
+                        # Fehlt das ActiveDirectory-Modul einfach (if-Bedingung oben false), wirft
+                        # das NIE eine Exception - ohne dieses Logging und $usedAdModule=false
+                        # lief der LDAP-Fallback bisher nie an, wenn RSAT schlicht nicht installiert war.
+                        Invoke-sqmLogging -Message "[$GroupIdentity] AD-Modul-Pfad fehlgeschlagen: $_" -FunctionName $functionName -Level "WARNING"
+                        $usedAdModule = $false
+                    }
+
+                    if (-not $usedAdModule)
                     {
                         # Fallback to LDAP - use original method
                         try
@@ -226,7 +238,10 @@ function Get-sqmADGroupMembersRecursive
                                 }
                             }
                         }
-                        catch { }
+                        catch
+                        {
+                            Invoke-sqmLogging -Message "[$GroupIdentity] LDAP-Fallback fehlgeschlagen: $_" -FunctionName $functionName -Level "WARNING"
+                        }
                     }
 
                     return $expandedMembers

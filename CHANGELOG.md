@@ -1,5 +1,34 @@
 # sqmSQLTool — Changelog
 
+## [1.9.33.0] — 2026-07-31
+
+### Fix: `Get-sqmADMemberGroups` und `Get-sqmADGroupMembersRecursive` lieferten auf Servern ohne ActiveDirectory-Modul stumm 0 Ergebnisse
+
+Auf einer echten Kunden-Domaene (`BP.PROD.BANK.LBBW.SKO.DE`) meldeten beide Funktionen
+"0 Groups"/"0 Members" ohne jede Fehlermeldung, auch nicht im Log. Ursache: der LDAP-Fallback
+steckte im `catch`-Block des ActiveDirectory-Modul-Pfads:
+
+```
+try {
+    if (Get-Module -ListAvailable -Name ActiveDirectory) { ... AD-Cmdlet-Pfad ... }
+}
+catch { ... LDAP-Fallback ... }
+```
+
+Ist das ActiveDirectory-Modul (RSAT) auf dem Zielserver schlicht nicht installiert, ist die
+`if`-Bedingung einfach `$false` - das wirft **keine Exception**, der `catch`-Block (und damit
+der komplette LDAP-Fallback) lief also nie an. Reproduziert im Log: nach der korrekt
+aufgeloesten Domain kam sofort "0 Groups found", ohne einen einzigen Eintrag dazwischen.
+
+Betraf `Get-sqmADMemberGroups` (`Find-ParentGroups`) und `Get-sqmADGroupMembersRecursive`
+(`Expand-GroupMembers`) identisch. `Get-sqmADGroupMembers` war nicht betroffen - dort war der
+Fallback bereits ueber ein explizites `$methodUsed`-Flag verdrahtet, nicht ueber `catch`.
+
+Fix: beide Helper-Funktionen tragen jetzt dasselbe `$usedAdModule`-Flag-Muster. Der
+LDAP-Fallback laeuft jetzt sowohl wenn das AD-Modul fehlt als auch wenn es eine Exception
+wirft. Zusaetzlich werden beide Fehlerfaelle jetzt explizit als WARNING geloggt statt komplett
+stumm zu bleiben.
+
 ## [1.9.32.0] — 2026-07-29
 
 ### Fix: `Get-sqmAgentJobScheduleReport` oeffnete den HTML-Bericht nicht automatisch

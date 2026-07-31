@@ -117,6 +117,7 @@ function Get-sqmADMemberGroups
                     $Visited[$MemberIdentity.ToLower()] = $true
 
                     $foundGroups = @()
+                    $usedAdModule = $false
 
                     try
                     {
@@ -126,6 +127,7 @@ function Get-sqmADMemberGroups
 
                             # Get immediate parent groups
                             $memberGroups = Get-ADPrincipalGroupMembership -Identity $MemberIdentity -ErrorAction Stop
+                            $usedAdModule = $true
 
                             foreach ($group in $memberGroups)
                             {
@@ -154,7 +156,17 @@ function Get-sqmADMemberGroups
                     }
                     catch
                     {
-                        # LDAP fallback if AD module fails
+                        # KORREKTUR: dieser catch fängt nur echte Fehler des AD-Modul-Pfads ab.
+                        # Fehlt das ActiveDirectory-Modul einfach (if-Bedingung oben false), wirft
+                        # das NIE eine Exception - ohne dieses Logging und $usedAdModule=false
+                        # lief der LDAP-Fallback bisher nie an, wenn RSAT schlicht nicht installiert war.
+                        Invoke-sqmLogging -Message "[$MemberIdentity] AD-Modul-Pfad fehlgeschlagen: $_" -FunctionName $functionName -Level "WARNING"
+                        $usedAdModule = $false
+                    }
+
+                    if (-not $usedAdModule)
+                    {
+                        # LDAP fallback - greift jetzt sowohl bei fehlendem Modul als auch bei Fehlern darin
                         try
                         {
                             $root = [ADSI]"LDAP://$targetDomain/RootDSE"
@@ -204,7 +216,10 @@ function Get-sqmADMemberGroups
                                 }
                             }
                         }
-                        catch { }
+                        catch
+                        {
+                            Invoke-sqmLogging -Message "[$MemberIdentity] LDAP-Fallback fehlgeschlagen: $_" -FunctionName $functionName -Level "WARNING"
+                        }
                     }
 
                     return $foundGroups
