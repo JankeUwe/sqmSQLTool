@@ -1,5 +1,30 @@
 # sqmSQLTool — Changelog
 
+## [1.9.34.0] — 2026-07-31
+
+### Fix: `Get-sqmADMemberGroups` fand auf einer echten Kunden-Domaene (LDAP-Fallback) weiterhin 0 Gruppen, obwohl der Account nachweislich Mitglied war
+
+Nach dem Fix in 1.9.33.0 (LDAP-Fallback lief jetzt ueberhaupt an) blieb das Ergebnis auf
+`BP.PROD.BANK.LBBW.SKO.DE` trotzdem bei 0 - ohne jede Fehlermeldung. Gegenprobe mit
+`Get-sqmADGroupMembers` (die andere Richtung: "wer ist Mitglied dieser Gruppe") fand den
+getesteten Account anstandslos per LDAP als Mitglied einer bekannten Gruppe. Zwei Bugs in
+`Find-ParentGroups` (LDAP-Zweig) gefunden und behoben:
+
+1. Der DN des gesuchten Members wurde roh in einen Gruppen-Suchfilter eingesetzt
+   (`(member=$memberDN)`). Enthaelt der DN Zeichen, die im Filter anders escaped werden
+   muessen als im DN selbst - z.B. Kommas bei `CN=Nachname, Vorname` (Standard-
+   Namenskonvention in dieser Umgebung) - liefert die Suche lautlos 0 Treffer, keine
+   Exception. Fix: `memberOf`-Attribut direkt vom gefundenen User-Objekt lesen (derselbe
+   Rueckverweis-Mechanismus wie `Get-ADPrincipalGroupMembership`), kein DN-in-Filter mehr
+   noetig.
+2. Pro gefundener Gruppe wurde `InvokeGet("groupScope")` aufgerufen - kein echtes
+   LDAP-Attribut (das AD-Schema kennt nur `groupType`; `groupScope` ist eine berechnete
+   Eigenschaft des PowerShell-AD-Moduls). Ein ungueltiger Attributname wirft eine Exception,
+   die den kompletten Gruppen-Datensatz (inklusive `SamAccountName`) aus der Ergebnisliste
+   riss, bevor er hinzugefuegt wurde - selbst wenn die Suche selbst Treffer fand. Fix: jedes
+   Attribut einzeln tolerant lesen (gleiches Muster wie bereits in
+   `Get-sqmADGroupMembersRecursive` verwendet), `groupType` statt `groupScope`.
+
 ## [1.9.33.0] — 2026-07-31
 
 ### Fix: `Get-sqmADMemberGroups` und `Get-sqmADGroupMembersRecursive` lieferten auf Servern ohne ActiveDirectory-Modul stumm 0 Ergebnisse

@@ -177,22 +177,45 @@ function Get-sqmADMemberGroups
 
                             if ($result)
                             {
-                                $memberDN = $result.Properties['distinguishedName'][0]
+                                # KORREKTUR: vorher wurde der DN des Members roh in einen Gruppen-
+                                # Suchfilter eingesetzt ("(member=$memberDN)") - bricht lautlos (0
+                                # Treffer, keine Exception), sobald der DN Zeichen enthaelt, die im
+                                # Filter anders escaped werden muessen als im DN selbst (z.B. Kommas
+                                # bei CN="Nachname, Vorname" - hier Standard-Namenskonvention).
+                                # Stattdessen: memberOf-Attribut direkt vom gefundenen User-Objekt
+                                # lesen - derselbe Rueckverweis-Mechanismus wie
+                                # Get-ADPrincipalGroupMembership, kein DN-in-Filter noetig.
+                                $memberEntry = $result.GetDirectoryEntry()
+                                $groupDNs = @()
+                                try
+                                {
+                                    $groupDNs = @($memberEntry.psbase.InvokeGet("memberOf"))
+                                }
+                                catch { }
 
-                                # Query for groups containing this member
-                                $groupSearcher = [System.DirectoryServices.DirectorySearcher]::new()
-                                $groupSearcher.SearchRoot = [ADSI]("LDAP://" + $root.defaultNamingContext[0])
-                                $groupSearcher.Filter = "(&(objectClass=group)(member=$memberDN))"
-                                $groupResults = $groupSearcher.FindAll()
-
-                                foreach ($groupResult in $groupResults)
+                                foreach ($groupDN in $groupDNs)
                                 {
                                     try
                                     {
-                                        $groupEntry = $groupResult.GetDirectoryEntry()
-                                        $sam = $groupEntry.psbase.InvokeGet("sAMAccountName")
-                                        $disp = $groupEntry.psbase.InvokeGet("displayName")
-                                        $scope = $groupEntry.psbase.InvokeGet("groupScope")
+                                        $groupEntry = [ADSI]"LDAP://$groupDN"
+
+                                        # KORREKTUR: jedes Attribut einzeln tolerant lesen. Vorher
+                                        # riss ein einzelnes fehlendes/ungueltiges Attribut
+                                        # (z.B. "groupScope" - kein echtes LDAP-Attribut, existiert
+                                        # nur als berechnete Eigenschaft im AD-PowerShell-Modul; das
+                                        # Schema kennt nur "groupType") den kompletten Gruppen-
+                                        # Datensatz per Exception aus der Ergebnisliste.
+                                        $sam = $null
+                                        try { $sam = $groupEntry.psbase.InvokeGet("sAMAccountName") } catch { }
+                                        if (-not $sam) { continue }
+
+                                        $disp = $null
+                                        try { $disp = $groupEntry.psbase.InvokeGet("displayName") } catch { }
+                                        if (-not $disp) { try { $disp = $groupEntry.psbase.InvokeGet("cn") } catch { } }
+                                        if (-not $disp) { $disp = $sam }
+
+                                        $scope = $null
+                                        try { $scope = $groupEntry.psbase.InvokeGet("groupType") } catch { }
 
                                         if ($sam -ne 'Domain Users')
                                         {
