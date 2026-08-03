@@ -57,6 +57,7 @@ $categoryMap = @{
     'Get-sqmServiceBrokerHealth'          = 'Service Broker'
     'Get-sqmSpnReport'                    = 'Server Configuration Testing'
     'Get-sqmSQLInstanceCheck'             = 'Monitoring & Health Checks'
+    'Get-sqmSsasDeploymentMode'           = 'Analysis Services (SSAS)'
     'Get-sqmSysadminAccounts'             = 'Login & User Security'
     'Grant-sqmTemporarySysadmin'          = 'Login & User Security'
     'Invoke-sqmTempSysadminAction'        = 'Login & User Security'

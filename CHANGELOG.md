@@ -1,5 +1,24 @@
 # sqmSQLTool — Changelog
 
+## [1.9.37.0] — 2026-08-03
+
+### Fix: `Set-sqmSsasDeploymentMode` schlug mit "Invalid query" fehl bei `-InstanceName` im SSMS-Format
+
+Wurde die Instanz wie in SSMS ueblich als `"Server\Instanz"` angegeben (z. B. `HLESDSQL001\APSM`,
+per Copy-Paste aus der Verbindungsleiste), baute die Funktion daraus den Dienstnamen
+`MSOLAP$HLESDSQL001\APSM` und damit die WQL-Abfrage `SELECT * FROM Win32_Service WHERE
+Name='MSOLAP$HLESDSQL001\APSM'`. Der Backslash ist in WQL-String-Literalen ein Escape-Zeichen -
+`\A` ist keine gueltige Escape-Sequenz, `Get-CimInstance` bricht deshalb mit "Invalid query" ab.
+
+Fix: Ein Server-Praefix vor dem letzten Backslash wird jetzt automatisch entfernt, es zaehlt nur
+der Instanzname dahinter (Windows-Dienstnamen enthalten ohnehin nie den Servernamen).
+
+### Neu: `Get-sqmSsasDeploymentMode`
+
+Rein lesendes Gegenstueck zu `Set-sqmSsasDeploymentMode` - liefert den aktuellen `DeploymentMode`
+(Multidimensional/Tabular/SharePoint) einer SSAS-Instanz aus `msmdsrv.ini`, ohne etwas zu aendern.
+Akzeptiert ebenfalls `"Server\Instanz"` als `-InstanceName`.
+
 ## [1.9.36.0] — 2026-08-03
 
 ### Fix: `Invoke-sqmRestoreTest` fragte immer nach `-DatabaseName`, auch wenn `-BackupFile` schon angegeben war

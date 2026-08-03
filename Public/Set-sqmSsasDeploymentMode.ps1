@@ -97,6 +97,14 @@ function Set-sqmSsasDeploymentMode
 		$functionName = $MyInvocation.MyCommand.Name
 		$modeValueMap = @{ Multidimensional = 0; SharePoint = 1; Tabular = 2 }
 
+		# Bequemlichkeits-Fix: SSAS-Instanzen werden ueblicherweise als "Server\Instanz" (SSMS-Format)
+		# kopiert. Der Windows-Dienstname enthaelt aber nur die Instanz - ein Server-Praefix fuehrt
+		# sonst zu einer ungueltigen WQL-Abfrage (Backslash ist dort ein Escape-Zeichen -> "Invalid query").
+		if ($InstanceName -match '\\')
+		{
+			$InstanceName = $InstanceName.Substring($InstanceName.LastIndexOf('\') + 1)
+		}
+
 		$result = [PSCustomObject]@{
 			InstanceName	 = $InstanceName
 			IniPath		     = $null
