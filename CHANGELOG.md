@@ -1,5 +1,70 @@
 # sqmSQLTool — Changelog
 
+## [1.9.35.0] — 2026-08-03
+
+### Fix: `Invoke-sqmRestoreDatabase` protokollierte "Restore erfolgreich", ohne dass ueberhaupt restored wurde
+
+Vorfall auf `SFCSDBS103IHZ` (AG `LFCS20DBSQL1`, Restore aus `F:\DB_Transfer_Prod\*.bak`): das
+Log zeigte fuer alle vier Laeufe (amb, custom, arena, amb) durchgehend "Success" - inklusive
+"Restore von ... erfolgreich" und "erfolgreich in AG aufgenommen". Eine Gegenprobe direkt in SQL
+Server (`msdb.dbo.restorehistory`, letzter Eintrag pro Datenbank ueber `ROW_NUMBER() OVER
+(PARTITION BY d.Name ORDER BY r.restore_date DESC)`) zeigte aber: das `restore_date` war eine
+Woche alt - es hatte an diesem Tag ueberhaupt keinen tatsaechlichen `RESTORE`-Befehl gegeben. Die
+Datenbanken blieben ausserdem im Modus RESTRICTED_USER stehen.
+
+Drei zusammenhaengende Bugs im selben Codepfad, die sich gegenseitig verdeckt haben:
+
+1. **AG-Erkennung wirkungslos.** Die Bedingung vor `Remove-DbaAgDatabase` pruefte
+   `if (-not $agDbCheck)` - eine Variable, die seit dem Refactoring in 1.9.27.0 (Abloesung durch
+   `Get-sqmDatabaseAgMembership`/`$agMembership`) nirgends mehr zugewiesen wurde und damit immer
+   `$null` war. Die Bedingung war folglich IMMER wahr, `Remove-DbaAgDatabase` lief nie - die
+   Datenbanken blieben aller Wahrscheinlichkeit nach die ganze Zeit ueber live Mitglied der AG.
+   Fix: `$agDbCheck` durch `$agMembership.IsAgDatabase` (die tatsaechlich zu Laufbeginn ermittelte
+   Live-Mitgliedschaft) ersetzt.
+
+2. **Der eigentliche `RESTORE`-Befehl wurde von SQL Server mutmasslich abgelehnt** - mit exakt dem
+   seit 1.9.27.0 bekannten Fehler "RESTORE cannot operate on database ... because it is configured
+   for database mirroring or has joined an availability group", weil die Datenbank wegen Bug 1
+   noch in der AG steckte.
+
+3. **Diese Ablehnung wurde vom Code nie bemerkt**, weil praktisch KEIN verschachtelter
+   dbatools-Aufruf in dieser Funktion `-EnableException` gesetzt hatte (nur `-ErrorAction Stop`).
+   dbatools-Funktionen (PSFramework `Stop-Function`) melden interne Ablehnungen ohne
+   `-EnableException` per Default nur als Warning und geben `$null` zurueck - OHNE eine
+   terminierende Exception zu werfen. `-ErrorAction Stop` allein greift dabei nicht, weil kein
+   reguraerer PowerShell-Fehlerdatensatz entsteht. Das eigene try/catch um `Restore-DbaDatabase`
+   sah dadurch nie einen Fehler, protokollierte "Restore erfolgreich" und liess `$restoreSucceeded`
+   auf `$true` stehen - obwohl `$restoreResult` in Wahrheit leer war. Alle nachfolgenden Schritte
+   (User-Import, Orphan-Repair, Owner setzen, AG-Rejoin) liefen anschliessend anstandslos gegen die
+   UNVERAENDERTE Alt-Datenbank durch, da sie selbst keine RESTORE-spezifische Sperre verletzen -
+   der Fehlschlag blieb dadurch komplett unsichtbar. Das RESTRICTED_USER blieb vermutlich Rest
+   eines frueheren, echten Restore-Versuchs (der Backup-Quelle in genau diesem Modus, siehe unten)
+   liegen und wurde nie zurueckgesetzt, weil ja nie ein neuer Restore lief, der das haette tun
+   koennen.
+
+   Fix: `-EnableException` an jeden verschachtelten dbatools-Aufruf ergaenzt, der bislang nur
+   `-ErrorAction Stop` gesetzt hatte (`Restore-DbaDatabase`, `Export-DbaUser`,
+   `Repair-DbaDbOrphanUser`, `Set-DbaDbOwner`, `Remove-DbaAgDatabase`, `Remove-DbaDatabase`,
+   `Add-DbaAgDatabase`, `Set-DbaAgReplica`, `Get-DbaAgReplica`, alle betroffenen
+   `Invoke-DbaQuery`-Aufrufe) - passend zum bereits etablierten Muster im Rest des Moduls (siehe
+   z.B. `Get-sqmDatabaseAgMembership`, `Test-sqmBackupIntegrity`). `Connect-DbaInstance` bewusst
+   ausgenommen (kennt laut fruehester Erfahrung in diesem Modul kein `-EnableException`, wirft aber
+   ohnehin echte Exceptions bei Verbindungsfehlern). Zusaetzlich wird das Rueckgabeobjekt von
+   `Restore-DbaDatabase` jetzt selbst geprueft (`if (-not $restoreResult) { throw ... }`) statt sich
+   allein darauf zu verlassen, dass nichts geworfen wurde.
+
+Zusaetzlich, unabhaengig von den drei Bugs oben: nach einem tatsaechlich erfolgreichen Restore
+wird jetzt immer der TATSAECHLICHE Live-Zustand (`sys.databases.user_access_desc`) abgefragt und
+bei Abweichung von MULTI_USER zurueckgesetzt - vorher hing dieser Ruecksprung an der eigenen
+`$wasSingleUser`-Fahne, die nur gesetzt wird, wenn die Funktion SELBST vor dem Restore
+SINGLE_USER erzwungen hatte. `RESTORE DATABASE` uebernimmt aber den User-Access-Modus, der zum
+Zeitpunkt der Datensicherung im Backup selbst galt (Boot-Page der Datenbank) - stand die
+Quelldatenbank beim Sichern in RESTRICTED_USER (ueblich bei einer Migrations-Sicherung wie unter
+`F:\DB_Transfer_Prod\`), kaeme eine wiederhergestellte Kopie in genau diesem Modus wieder hoch,
+unabhaengig davon, ob `$wasSingleUser` je `$true` war - und ein sysadmin-Login (unter dem diese
+Funktion laut NOTES laufen muss) koennte sich trotzdem weiter verbinden, sodass der Zustand
+unbemerkt bliebe.
+
 ## [1.9.34.0] — 2026-07-31
 
 ### Fix: `Get-sqmADMemberGroups` fand auf einer echten Kunden-Domaene (LDAP-Fallback) weiterhin 0 Gruppen, obwohl der Account nachweislich Mitglied war

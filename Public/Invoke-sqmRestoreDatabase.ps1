@@ -30,15 +30,21 @@ Before user export and before the restore, the configured PBM policy (DefaultPol
 temporarily disabled (on the working instance) to avoid restrictions during user creation. It is
 re-enabled after completion.
 
-If the database is in use, it is automatically set to single-user mode after the user export
-(and switched back to multi-user after the restore) - single-user is applied only after the
-export, not before, since Export-DbaUser needs its own connection to the database and would
-otherwise fail with "database is already open and can only have one user at a time". If the
-database is already found in SINGLE_USER or RESTRICTED_USER mode when the function starts
-(e.g. left over from a previous interrupted restore), it is immediately reset to MULTI_USER
-(disconnecting whatever session was holding that one connection slot) before anything else runs -
-otherwise every step needing its own connection, starting with Export-DbaUser, would fail the
-same way.
+If the database is in use, it is automatically set to single-user mode after the user export -
+single-user is applied only after the export, not before, since Export-DbaUser needs its own
+connection to the database and would otherwise fail with "database is already open and can only
+have one user at a time". If the database is already found in SINGLE_USER or RESTRICTED_USER
+mode when the function starts (e.g. left over from a previous interrupted restore), it is
+immediately reset to MULTI_USER (disconnecting whatever session was holding that one connection
+slot) before anything else runs - otherwise every step needing its own connection, starting with
+Export-DbaUser, would fail the same way.
+
+After a successful restore, the database's live user-access mode is always checked and reset to
+MULTI_USER if it isn't already - regardless of whether this function itself ever set
+SINGLE_USER. RESTORE DATABASE carries forward whatever user-access mode was in effect on the
+source database at backup time (it is part of the database's boot page), so a backup taken while
+the source was in SINGLE_USER/RESTRICTED_USER (e.g. as part of a migration process) leaves the
+restored copy in that same mode even though this run never touched single-user mode itself.
 
 AG-membership is normally auto-detected at the start of the run. If a previous run already
 removed the database from the AG but failed before rejoining it (or crashed/was interrupted), a
@@ -369,7 +375,7 @@ function Invoke-sqmRestoreDatabase
 				try
 				{
 					$headerInfo = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database 'master' `
-						-Query "RESTORE HEADERONLY FROM $diskClause" -ErrorAction Stop
+						-Query "RESTORE HEADERONLY FROM $diskClause" -EnableException -ErrorAction Stop
 					$detectedName = ($headerInfo | Select-Object -First 1).DatabaseName
 					if ([string]::IsNullOrWhiteSpace($detectedName))
 					{
@@ -496,7 +502,7 @@ function Invoke-sqmRestoreDatabase
 			# ---- Arbeits-Instanz bestimmen: bei einer AG-Datenbank IMMER die Primary ----
 			if ($isAGDatabase)
 			{
-				$replicas = Get-DbaAgReplica -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $availabilityGroup.Name -ErrorAction Stop
+				$replicas = Get-DbaAgReplica -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $availabilityGroup.Name -EnableException -ErrorAction Stop
 
 				# Primary-Ermittlung ueber AvailabilityGroup.PrimaryReplicaServerName statt ueber
 				# Get-DbaAgReplica + "Role -eq 'Primary'"-Filter: PrimaryReplicaServerName ist eine
@@ -569,7 +575,7 @@ function Invoke-sqmRestoreDatabase
 			# Primary/Secondaries wurden bereits oben (Arbeits-Instanz-Ermittlung) bestimmt.
 			if ($isAGDatabase -and -not $KeepAlwaysOn)
 			{
-				if (-not $agDbCheck)
+				if (-not $agMembership.IsAgDatabase)
 				{
 					# Ueber -AvailabilityGroupName erzwungen: Datenbank ist bereits kein AG-Mitglied mehr
 					# (z.B. Rest eines vorherigen, abgebrochenen Laufs) - nichts zu entfernen, aber
@@ -585,7 +591,7 @@ function Invoke-sqmRestoreDatabase
 						try
 						{
 							Invoke-sqmLogging -Message $removeAgAction -FunctionName $functionName -Level "INFO"
-							Remove-DbaAgDatabase -SqlInstance $primaryInstance -SqlCredential $SqlCredential -AvailabilityGroup $availabilityGroup.Name -Database $finalDbName -Confirm:$false -ErrorAction Stop
+							Remove-DbaAgDatabase -SqlInstance $primaryInstance -SqlCredential $SqlCredential -AvailabilityGroup $availabilityGroup.Name -Database $finalDbName -Confirm:$false -EnableException -ErrorAction Stop
 							Invoke-sqmLogging -Message "Datenbank erfolgreich aus AG entfernt." -FunctionName $functionName -Level "INFO"
 							$results += [PSCustomObject]@{ Action = "RemoveFromAG"; Status = "Success"; Message = "Datenbank aus AG entfernt." }
 						}
@@ -617,7 +623,7 @@ function Invoke-sqmRestoreDatabase
 							$secondaryServer = Connect-DbaInstance -SqlInstance $secondary -SqlCredential $SqlCredential -ErrorAction Stop
 							if ($secondaryServer.Databases[$finalDbName] -and $secondaryServer.Databases[$finalDbName].IsAccessible)
 							{
-								Remove-DbaDatabase -SqlInstance $secondary -SqlCredential $SqlCredential -Database $finalDbName -Confirm:$false -ErrorAction Stop
+								Remove-DbaDatabase -SqlInstance $secondary -SqlCredential $SqlCredential -Database $finalDbName -Confirm:$false -EnableException -ErrorAction Stop
 								Invoke-sqmLogging -Message "Datenbank auf '$secondary' geloescht." -FunctionName $functionName -Level "INFO"
 								$results += [PSCustomObject]@{ Action = "RemoveFromSecondary"; Target = $secondary; Status = "Success"; Message = "Datenbank auf sekundaerem Knoten geloescht." }
 							}
@@ -699,7 +705,7 @@ function Invoke-sqmRestoreDatabase
 						try
 						{
 							Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database master `
-								-Query "ALTER DATABASE [$finalDbName] SET MULTI_USER WITH ROLLBACK IMMEDIATE;" -ErrorAction Stop
+								-Query "ALTER DATABASE [$finalDbName] SET MULTI_USER WITH ROLLBACK IMMEDIATE;" -EnableException -ErrorAction Stop
 							$wasSingleUser = $true
 							$targetDb.Refresh()
 							Invoke-sqmLogging -Message "Datenbank '$finalDbName' auf MULTI_USER zurueckgesetzt." -FunctionName $functionName -Level "INFO"
@@ -739,13 +745,14 @@ function Invoke-sqmRestoreDatabase
 				$backupFileName = "${finalDbName}_preRestore_$(Get-Date -Format 'yyyyMMdd_HHmmss').bak"
 				$backupFileFull = Join-Path (Get-DbaDefaultPath -SqlInstance $workInstance -SqlCredential $SqlCredential).Backup $backupFileName
 				$backupParams = @{
-					SqlInstance   = $workInstance
-					SqlCredential = $SqlCredential
-					Database	  = $finalDbName
-					Path		  = $backupFileFull
-					Type		  = 'Full'
-					Confirm	      = $false
-					ErrorAction   = 'Stop'
+					SqlInstance		= $workInstance
+					SqlCredential	= $SqlCredential
+					Database		= $finalDbName
+					Path			= $backupFileFull
+					Type			= 'Full'
+					Confirm			= $false
+					EnableException = $true
+					ErrorAction		= 'Stop'
 				}
 				if ($PSCmdlet.ShouldProcess($finalDbName, "Backup der Datenbank '$finalDbName' nach $backupFileFull"))
 				{
@@ -785,7 +792,7 @@ function Invoke-sqmRestoreDatabase
 						# return - der Restore ist danach also gar nicht mehr gelaufen. Unterdrueckte
 						# Rueckfragen kommen fuer dieses Cmdlet ueber $ConfirmPreference = 'None' im
 						# begin-Block, das wirkt unabhaengig davon, ob ein Cmdlet den Parameter kennt.
-						Export-DbaUser -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -FilePath $userExportFile -ErrorAction Stop
+						Export-DbaUser -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -FilePath $userExportFile -EnableException -ErrorAction Stop
 						Invoke-sqmLogging -Message "User-Export erfolgreich." -FunctionName $functionName -Level "INFO"
 						$results += [PSCustomObject]@{ Action = "UserExport"; Status = "Success"; Message = "Exportdatei: $userExportFile" }
 					}
@@ -827,7 +834,7 @@ function Invoke-sqmRestoreDatabase
 					try
 					{
 						$singleUserQuery = "ALTER DATABASE [$finalDbName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;"
-						Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database master -Query $singleUserQuery -ErrorAction Stop
+						Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database master -Query $singleUserQuery -EnableException -ErrorAction Stop
 						$wasSingleUser = $true
 						Invoke-sqmLogging -Message "Datenbank '$finalDbName' jetzt im Single-User-Modus." -FunctionName $functionName -Level "INFO"
 						$results += [PSCustomObject]@{ Action = "SetSingleUser"; Status = "Success"; Message = "Datenbank in Single-User versetzt." }
@@ -868,14 +875,15 @@ function Invoke-sqmRestoreDatabase
 				else { $isLast }
 
 				$restoreParams = @{
-					SqlInstance   = $workInstance
-					SqlCredential = $SqlCredential
-					Path		  = $file
-					DatabaseName  = $finalDbName
-					WithReplace   = $true
-					NoRecovery    = (-not $useRecovery)
-					Confirm	      = $false
-					ErrorAction   = 'Stop'
+					SqlInstance		= $workInstance
+					SqlCredential	= $SqlCredential
+					Path			= $file
+					DatabaseName	= $finalDbName
+					WithReplace		= $true
+					NoRecovery		= (-not $useRecovery)
+					Confirm			= $false
+					EnableException = $true
+					ErrorAction		= 'Stop'
 				}
 				# Hinweis: Restore-DbaDatabase kennt KEINE Parameter -NewDatabaseName/-DatabaseFilePath/-LogFilePath.
 				# Der Zielname (auch ein neuer) wird ueber -DatabaseName ($finalDbName) gesetzt; die physischen
@@ -894,7 +902,7 @@ function Invoke-sqmRestoreDatabase
 						$backupFileListing = Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential `
 							-Database 'master' `
 							-Query "RESTORE FILELISTONLY FROM DISK = N'$safeFilePath'" `
-							-ErrorAction Stop
+							-EnableException -ErrorAction Stop
 
 						if ($backupFileListing)
 						{
@@ -946,6 +954,20 @@ function Invoke-sqmRestoreDatabase
 					{
 						Invoke-sqmLogging -Message $restoreAction -FunctionName $functionName -Level "INFO"
 						$restoreResult = Restore-DbaDatabase @restoreParams
+						# WICHTIG (1.9.35.0): -EnableException oben im $restoreParams-Hash ist zwingend -
+						# ohne diesen Parameter meldet Restore-DbaDatabase interne Ablehnungen (z.B. "RESTORE
+						# cannot operate on database ... because it is ... an availability group") nur als
+						# PSFramework-Warning und gibt $null zurueck, OHNE eine Exception zu werfen. -ErrorAction
+						# Stop allein faengt das NICHT ab, weil dabei kein regulaerer PowerShell-Fehlerdatensatz
+						# entsteht. Das war exakt der Grund, warum ein echter Lauf (SFCSDBS103IHZ, Restore aus
+						# F:\DB_Transfer_Prod\*.bak) "Restore erfolgreich" protokollierte, obwohl in
+						# msdb.dbo.restorehistory ueberhaupt kein neuer Eintrag auftauchte - der eigentliche
+						# RESTORE-Befehl war nie gelaufen. Zusaetzlich zur Exception hier auch das Ergebnis
+						# selbst pruefen, statt uns allein auf "es wurde nichts geworfen" zu verlassen.
+						if (-not $restoreResult)
+						{
+							throw "Restore-DbaDatabase lieferte kein Ergebnis zurueck (Restore vermutlich nicht ausgefuehrt)."
+						}
 						Invoke-sqmLogging -Message "Restore von $file erfolgreich." -FunctionName $functionName -Level "INFO"
 						$results += [PSCustomObject]@{ Action = "RestoreStep"; File = $file; Step = $restoreCount; Status = "Success"; Message = "Wiederhergestellt." }
 					}
@@ -981,7 +1003,7 @@ function Invoke-sqmRestoreDatabase
 					{
 						Invoke-sqmLogging -Message $importAction -FunctionName $functionName -Level "INFO"
 						$sql = Get-Content $userExportFile -Raw
-						Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -Query $sql -ErrorAction Stop
+						Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -Query $sql -EnableException -ErrorAction Stop
 						Invoke-sqmLogging -Message "User-Import erfolgreich." -FunctionName $functionName -Level "INFO"
 						$results += [PSCustomObject]@{ Action = "UserImport"; Status = "Success"; Message = "User aus Export wiederhergestellt." }
 					}
@@ -1006,7 +1028,7 @@ function Invoke-sqmRestoreDatabase
 				try
 				{
 					Invoke-sqmLogging -Message $orphanFixAction -FunctionName $functionName -Level "INFO"
-					$repairResult = Repair-DbaDbOrphanUser -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -Confirm:$false -ErrorAction Stop
+					$repairResult = Repair-DbaDbOrphanUser -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -Confirm:$false -EnableException -ErrorAction Stop
 					$repairedCount = if ($repairResult) { @($repairResult).Count } else { 0 }
 					Invoke-sqmLogging -Message "Verwaiste User repariert: $repairedCount." -FunctionName $functionName -Level "INFO"
 					$results += [PSCustomObject]@{ Action = "FixOrphans"; Status = "Success"; Message = "Repair-DbaDbOrphanUser: $repairedCount User repariert." }
@@ -1040,7 +1062,7 @@ WHERE dp.type IN ('U', 'G')
   AND sp.sid IS NULL
   AND dp.name NOT IN ('dbo', 'guest', 'INFORMATION_SCHEMA', 'sys')
 "@
-					$missingLogins = Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -Query $query -ErrorAction Stop
+					$missingLogins = Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -Query $query -EnableException -ErrorAction Stop
 					foreach ($login in $missingLogins)
 					{
 						$userName = $login.UserName
@@ -1074,13 +1096,13 @@ WHERE dp.type IN ('U', 'G')
 					$saNameRow = Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential `
 						-Database 'master' `
 						-Query "SELECT name FROM sys.server_principals WHERE sid = 0x01" `
-						-ErrorAction Stop
+						-EnableException -ErrorAction Stop
 					if (-not $saNameRow -or [string]::IsNullOrWhiteSpace($saNameRow.name))
 					{
 						throw "sa-Login (SID 0x01) nicht gefunden."
 					}
 					$saName = $saNameRow.name
-					Set-DbaDbOwner -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -TargetLogin $saName -Confirm:$false -ErrorAction Stop
+					Set-DbaDbOwner -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -TargetLogin $saName -Confirm:$false -EnableException -ErrorAction Stop
 					Invoke-sqmLogging -Message "Datenbankeigentuemer auf '$saName' gesetzt." -FunctionName $functionName -Level "INFO"
 					$results += [PSCustomObject]@{ Action = "SetDbOwner"; Status = "Success"; Message = "Eigentuemer: $saName" }
 				}
@@ -1153,7 +1175,7 @@ WHERE dp.type IN ('U', 'G')
 						# "Role -eq 'Secondary'" gefiltert, da die Role transient anders melden kann
 						# (z.B. 'Resolving') und dann Replicas hier stillschweigend uebersprungen wuerden.
 						$agReplicas = Get-DbaAgReplica -SqlInstance $primaryInstance -SqlCredential $SqlCredential `
-							-AvailabilityGroup $availabilityGroup.Name -ErrorAction Stop
+							-AvailabilityGroup $availabilityGroup.Name -EnableException -ErrorAction Stop
 
 						foreach ($replica in ($agReplicas | Where-Object { $_.Name -ne $primaryInstance }))
 						{
@@ -1166,7 +1188,7 @@ WHERE dp.type IN ('U', 'G')
 								Set-DbaAgReplica -SqlInstance $primaryInstance -SqlCredential $SqlCredential `
 									-AvailabilityGroup $availabilityGroup.Name `
 									-Replica $replica.Name `
-									-SeedingMode Automatic -Confirm:$false -ErrorAction Stop
+									-SeedingMode Automatic -Confirm:$false -EnableException -ErrorAction Stop
 
 								# Secondary-Seite: GRANT CREATE ANY DATABASE
 								Invoke-DbaQuery -SqlInstance $replica.Name -SqlCredential $SqlCredential `
@@ -1191,6 +1213,7 @@ WHERE dp.type IN ('U', 'G')
 							-Database $finalDbName `
 							-SeedingMode Automatic `
 							-Confirm:$false `
+							-EnableException `
 							-ErrorAction Stop
 
 						Invoke-sqmLogging -Message "Datenbank '$finalDbName' erfolgreich in AG '$($availabilityGroup.Name)' aufgenommen." `
@@ -1222,28 +1245,57 @@ WHERE dp.type IN ('U', 'G')
 				}
 			}
 
-			# ---- Datenbank aus Single-User-Modus zuruecknehmen ----
-			if ($wasSingleUser)
+			# ---- Datenbank aus Single-User/Restricted-User-Modus zuruecknehmen ----
+			# WICHTIG: Nicht auf die eigene $wasSingleUser-Fahne verlassen - die pruefte bislang nur,
+			# ob DIESE Funktion selbst vor dem Restore SINGLE_USER gesetzt hatte. RESTORE DATABASE
+			# uebernimmt aber den User-Access-Modus (MULTI_USER/SINGLE_USER/RESTRICTED_USER), der zum
+			# Zeitpunkt der Datensicherung im Backup selbst gesetzt war (steckt in der Boot-Page der
+			# Datenbank). Wurde das Backup von einer Quelle gezogen, die z.B. fuer eine Migration
+			# bewusst auf RESTRICTED_USER stand (genau der Fall bei Dateien wie
+			# F:\DB_Transfer_Prod\*.bak), kommt die wiederhergestellte Datenbank in genau diesem Modus
+			# wieder hoch - unabhaengig davon, ob $wasSingleUser hier je $true war. Ein sysadmin-Login
+			# (unter dem diese Funktion laut NOTES laufen muss) kann sich trotzdem verbinden, weshalb
+			# die Schritte 6-10 anstandslos durchlaufen und die Datenbank am Ende unbemerkt in
+			# RESTRICTED_USER zurueckbleibt. Deshalb hier immer den TATSAECHLICHEN Live-Zustand
+			# abfragen und bei Bedarf zuruecksetzen, statt sich auf die eigene Vorgeschichte zu
+			# verlassen.
+			if ($restoreSucceeded)
 			{
-				$setMultiUserAction = "Setze Datenbank '$finalDbName' zurueck in Multi-User-Modus"
-				if ($PSCmdlet.ShouldProcess($finalDbName, $setMultiUserAction))
+				$liveAccess = $null
+				try
 				{
-					try
-					{
-						$multiUserQuery = "ALTER DATABASE [$finalDbName] SET MULTI_USER;"
-						Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database master -Query $multiUserQuery -ErrorAction Stop
-						Invoke-sqmLogging -Message "Datenbank '$finalDbName' wieder im Multi-User-Modus." -FunctionName $functionName -Level "INFO"
-						$results += [PSCustomObject]@{ Action = "SetMultiUser"; Status = "Success"; Message = "Datenbank wieder im Multi-User-Modus." }
-					}
-					catch
-					{
-						Invoke-sqmLogging -Message "Fehler beim Zuruecksetzen des Multi-User-Modus: $($_.Exception.Message)" -FunctionName $functionName -Level "ERROR"
-						$results += [PSCustomObject]@{ Action = "SetMultiUser"; Status = "Failed"; Message = $_.Exception.Message }
-					}
+					$finalDbNameEscaped = $finalDbName.Replace("'", "''")
+					$liveAccess = (Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database master `
+						-Query "SELECT user_access_desc FROM sys.databases WHERE name = N'$finalDbNameEscaped'" -EnableException -ErrorAction Stop).user_access_desc
 				}
-				else
+				catch
 				{
-					$results += [PSCustomObject]@{ Action = "SetMultiUser"; Status = "Skipped"; Message = "WhatIf - Multi-User uebersprungen." }
+					Invoke-sqmLogging -Message "Konnte den aktuellen User-Access-Modus von '$finalDbName' nicht ermitteln: $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
+				}
+
+				if ($liveAccess -and $liveAccess -ne 'MULTI_USER')
+				{
+					$setMultiUserAction = "Datenbank '$finalDbName' ist nach dem Restore im Modus '$liveAccess' (aus dem Backup uebernommen) - setze zurueck auf Multi-User-Modus"
+					if ($PSCmdlet.ShouldProcess($finalDbName, $setMultiUserAction))
+					{
+						try
+						{
+							Invoke-sqmLogging -Message $setMultiUserAction -FunctionName $functionName -Level "WARNING"
+							$multiUserQuery = "ALTER DATABASE [$finalDbName] SET MULTI_USER;"
+							Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database master -Query $multiUserQuery -EnableException -ErrorAction Stop
+							Invoke-sqmLogging -Message "Datenbank '$finalDbName' wieder im Multi-User-Modus." -FunctionName $functionName -Level "INFO"
+							$results += [PSCustomObject]@{ Action = "SetMultiUser"; Status = "Success"; Message = "War '$liveAccess', auf Multi-User-Modus zurueckgesetzt." }
+						}
+						catch
+						{
+							Invoke-sqmLogging -Message "Fehler beim Zuruecksetzen des Multi-User-Modus: $($_.Exception.Message)" -FunctionName $functionName -Level "ERROR"
+							$results += [PSCustomObject]@{ Action = "SetMultiUser"; Status = "Failed"; Message = $_.Exception.Message }
+						}
+					}
+					else
+					{
+						$results += [PSCustomObject]@{ Action = "SetMultiUser"; Status = "Skipped"; Message = "WhatIf - Multi-User uebersprungen." }
+					}
 				}
 			}
 

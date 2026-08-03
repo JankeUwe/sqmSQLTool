@@ -172,4 +172,108 @@ Describe 'Invoke-sqmRestoreDatabase - AG-Erkennung' {
             Remove-Item $fakeBackup -ErrorAction SilentlyContinue
         }
     }
+
+    It 'prueft vor Remove-DbaAgDatabase die lebende Mitgliedschaft, nicht eine nie zugewiesene Variable' {
+        # Regression 1.9.35.0: "if (-not $agDbCheck)" - $agDbCheck wurde seit dem Refactoring auf
+        # Get-sqmDatabaseAgMembership (1.9.27.0) nirgends mehr zugewiesen und wertete damit IMMER
+        # als $null. Die Bedingung war dadurch permanent wahr, Remove-DbaAgDatabase lief nie -
+        # selbst wenn die Datenbank nachweislich noch AG-Mitglied war.
+        $source = Get-Content "$PSScriptRoot\..\..\..\Public\Invoke-sqmRestoreDatabase.ps1" -Raw
+        $source | Should -Not -Match '\$agDbCheck'
+        $source | Should -Match '\(-not \$agMembership\.IsAgDatabase\)'
+    }
+
+    It 'nimmt den Multi-User-Reset am Ende nicht nur vor, wenn die Funktion selbst SINGLE_USER gesetzt hatte' {
+        # Regression 1.9.35.0: RESTORE DATABASE uebernimmt den User-Access-Modus, der zum
+        # Zeitpunkt der Sicherung im Backup selbst galt (Boot-Page). War die Quelldatenbank beim
+        # Backup in RESTRICTED_USER (z.B. waehrend einer Migration), kam die wiederhergestellte
+        # Kopie in genau diesem Modus wieder hoch - auch wenn diese Funktion selbst nie
+        # SINGLE_USER gesetzt hatte ($wasSingleUser blieb $false). Der alte Reset-Schritt haengte
+        # ausschliesslich an dieser Fahne und lief in diesem Fall nie. Der Fix fragt stattdessen
+        # den tatsaechlichen Live-Zustand ab.
+        $source = Get-Content "$PSScriptRoot\..\..\..\Public\Invoke-sqmRestoreDatabase.ps1" -Raw
+        $source | Should -Match 'user_access_desc'
+        $source | Should -Not -Match 'if\s*\(\$wasSingleUser\)\s*\r?\n\s*\{\s*\r?\n\s*\$setMultiUserAction'
+    }
+
+    It 'gibt jedem verschachtelten dbatools-Aufruf, der -ErrorAction Stop erwartet, auch -EnableException mit' {
+        # Regression 1.9.35.0: Restore-DbaDatabase (und praktisch jeder andere genestete
+        # dbatools-Aufruf in dieser Funktion) hatte nur -ErrorAction Stop, kein -EnableException.
+        # dbatools-Funktionen melden interne Ablehnungen (z.B. "RESTORE cannot operate on database
+        # ... because it is ... an availability group") ohne -EnableException per PSFramework
+        # Stop-Function nur als Warning und geben $null zurueck - OHNE eine terminierende Exception.
+        # -ErrorAction Stop allein faengt das nicht ab. Ein echter Lauf protokollierte dadurch
+        # "Restore erfolgreich" fuer vier Datenbanken, obwohl msdb.dbo.restorehistory keinen
+        # einzigen neuen Eintrag zeigte - der Restore war nie gelaufen, das eigene try/catch hat es
+        # nie bemerkt. Jeder Cmdlet-Name unten unterstuetzt -EnableException laut
+        # Get-Command <Name> | Select -Expand Parameters (dbatools 2.8.2) - nur Connect-DbaInstance
+        # kennt den Parameter nicht (siehe Invoke-sqmDeployScripts weiter oben im Changelog) und
+        # bleibt bewusst bei -ErrorAction Stop allein.
+        $path = "$PSScriptRoot\..\..\..\Public\Invoke-sqmRestoreDatabase.ps1"
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$null, [ref]$null)
+
+        # 1) Direkte Cmdlet-Aufrufe mit -ErrorAction (Stop) als Parameter
+        $commands = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.CommandAst] }, $true)
+        $mustSupportEnableException = @(
+            'Invoke-DbaQuery', 'Restore-DbaDatabase', 'Export-DbaUser', 'Repair-DbaDbOrphanUser',
+            'Set-DbaDbOwner', 'Remove-DbaAgDatabase', 'Remove-DbaDatabase', 'Add-DbaAgDatabase',
+            'Set-DbaAgReplica', 'Get-DbaAgReplica', 'Backup-DbaDatabase'
+        )
+
+        $offenders = @()
+        foreach ($command in $commands)
+        {
+            $name = $command.GetCommandName()
+            if ($name -notin $mustSupportEnableException) { continue }
+
+            # Nur echtes "-ErrorAction Stop" (bzw. 'Stop') zaehlt - ein bewusstes
+            # "-ErrorAction SilentlyContinue" (z.B. Best-Effort-Cleanup) soll TOLERANT bleiben und
+            # braucht kein -EnableException.
+            $elements = $command.CommandElements
+            $hasErrorActionStop = $false
+            for ($i = 0; $i -lt $elements.Count; $i++)
+            {
+                $el = $elements[$i]
+                if ($el -is [System.Management.Automation.Language.CommandParameterAst] -and $el.ParameterName -like 'ErrorA*')
+                {
+                    $valueText = if ($el.Argument) { $el.Argument.Extent.Text } elseif ($i + 1 -lt $elements.Count) { $elements[$i + 1].Extent.Text } else { '' }
+                    if ($valueText -match "^'?Stop'?$")
+                    {
+                        $hasErrorActionStop = $true
+                    }
+                }
+            }
+            if (-not $hasErrorActionStop) { continue }
+
+            $hasEnableException = $command.CommandElements | Where-Object {
+                $_ -is [System.Management.Automation.Language.CommandParameterAst] -and $_.ParameterName -eq 'EnableException'
+            }
+            if (-not $hasEnableException)
+            {
+                $offenders += "$name (Zeile $($command.Extent.StartLineNumber))"
+            }
+        }
+
+        # 2) Gesplattete Aufrufe (@restoreParams, @backupParams) - dort steckt ErrorAction/EnableException
+        # in der Hashtable-Definition, nicht am Aufruf selbst.
+        $hashAssignments = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.AssignmentStatementAst] -and $args[0].Right.Extent.Text -match '^@\{' }, $true)
+        foreach ($assign in $hashAssignments)
+        {
+            $text = $assign.Extent.Text
+            if ($text -notmatch "ErrorAction\s*=\s*'Stop'") { continue }
+            if ($text -notmatch 'EnableException\s*=\s*\$true')
+            {
+                $offenders += "Splat-Hashtable ohne EnableException (Zeile $($assign.Extent.StartLineNumber))"
+            }
+        }
+
+        ($offenders -join ', ') | Should -BeNullOrEmpty
+    }
+
+    It 'prueft nach Restore-DbaDatabase zusaetzlich das Rueckgabeobjekt, statt sich allein auf "keine Exception" zu verlassen' {
+        # Regression 1.9.35.0: Defense in depth zusaetzlich zu -EnableException.
+        $source = Get-Content "$PSScriptRoot\..\..\..\Public\Invoke-sqmRestoreDatabase.ps1" -Raw
+        $source | Should -Match '\$restoreResult\s*=\s*Restore-DbaDatabase'
+        $source | Should -Match 'if\s*\(-not \$restoreResult\)'
+    }
 }
