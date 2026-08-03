@@ -82,7 +82,13 @@ msdb history already answered.
 
 .PARAMETER DatabaseName
 Name of the source database as it appears in the backup. Used for the default test name and for
-the report.
+the report, and - only when -BackupFile is NOT given - as the search key for the msdb backup
+history lookup.
+
+OPTIONAL when -BackupFile IS given: the name is then read directly from the backup's own header
+(RESTORE HEADERONLY), the same way Invoke-sqmRestoreDatabase does it - no need to type a name that
+is already inside the backup file. Still mandatory in the automatic-discovery case (no -BackupFile),
+since there the name is the only way to find the right backup in the first place.
 
 .PARAMETER TestDatabaseName
 Optional: name of the test database. Must start with "RestoreTest_".
@@ -140,6 +146,12 @@ Invoke-sqmRestoreTest -SqlInstance "SQL01" -DatabaseName "Kunde" -IncludeChain
 Invoke-sqmRestoreTest -SqlInstance "SQL01" -BackupFile "D:\Backup\Kunde_Full.bak" -DatabaseName "Kunde"
 
 .EXAMPLE
+# -DatabaseName omitted entirely - read straight from the backup's own header (RESTORE
+# HEADERONLY), the same way Invoke-sqmRestoreDatabase does it. Only works together with
+# -BackupFile - without it, -DatabaseName is still required as the history lookup key.
+Invoke-sqmRestoreTest -SqlInstance "SQL01" -BackupFile "D:\Backup\Kunde_Full.bak"
+
+.EXAMPLE
 # Restore test with cleanup, report to a share, no auto-open (e.g. from an Agent job)
 Invoke-sqmRestoreTest -SqlInstance "SQL01" -BackupFile "D:\Backup\Kunde_Full.bak" -DatabaseName "Kunde" `
     -RemoveTestDatabase -OutputPath "\\srv\Nachweise" -NoOpen
@@ -170,7 +182,7 @@ function Invoke-sqmRestoreTest
 		[System.Management.Automation.PSCredential]$SqlCredential,
 		[Parameter(Mandatory = $false)]
 		[string[]]$BackupFile,
-		[Parameter(Mandatory = $true)]
+		[Parameter(Mandatory = $false)]
 		[string]$DatabaseName,
 		[Parameter(Mandatory = $false)]
 		[switch]$IncludeChain,
@@ -234,6 +246,55 @@ function Invoke-sqmRestoreTest
 	process
 	{
 		$startTime = Get-Date
+
+		# --- Datenbankname bestimmen, falls nicht angegeben ---------------------------------
+		# Ohne -DatabaseName UND ohne -BackupFile ist eine Ermittlung nicht moeglich: dort dient
+		# der Name als Suchschluessel fuer die msdb-Sicherungshistorie (Get-DbaDbBackupHistory) -
+		# es gibt keinen anderen Weg, "welche Datenbank" zu bestimmen, bevor ueberhaupt eine
+		# Backupdatei bekannt ist. Ist dagegen -BackupFile gegeben, steht der Name bereits im
+		# Backup selbst (RESTORE HEADERONLY liest ihn direkt aus der Datei) - genau wie bei
+		# Invoke-sqmRestoreDatabase muss der Aufrufer ihn dann nicht redundant selbst tippen. Muss
+		# VOR der Zielnamen-Bestimmung/den Guards unten laufen, die $DatabaseName bereits nutzen.
+		if ([string]::IsNullOrWhiteSpace($DatabaseName))
+		{
+			if (-not $BackupFile -or $BackupFile.Count -eq 0)
+			{
+				$errMsg = "-DatabaseName wurde nicht angegeben. Ohne -BackupFile dient der Name als " +
+						  "Suchschluessel fuer die Sicherungshistorie und muss deshalb angegeben werden; " +
+						  "mit -BackupFile wird er stattdessen aus dem Backup-Header gelesen."
+				Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+				if ($EnableException) { throw $errMsg }
+				return [PSCustomObject]@{
+					SqlInstance = $SqlInstance; SourceDatabase = $null; TestDatabase = $TestDatabaseName
+					Success = $false; Status = 'Rejected'; Message = $errMsg
+				}
+			}
+
+			try
+			{
+				$safeHeaderPath = $BackupFile[0].Replace("'", "''")
+				$headerInfo = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database 'master' `
+					-Query "RESTORE HEADERONLY FROM DISK = N'$safeHeaderPath'" -EnableException -ErrorAction Stop
+				$detectedName = ($headerInfo | Select-Object -First 1).DatabaseName
+				if ([string]::IsNullOrWhiteSpace($detectedName))
+				{
+					throw "RESTORE HEADERONLY lieferte keinen DatabaseName-Wert."
+				}
+				$DatabaseName = $detectedName
+				Invoke-sqmLogging -Message "-DatabaseName nicht angegeben - aus Backup-Header gelesen: '$DatabaseName'." `
+					-FunctionName $functionName -Level "INFO"
+			}
+			catch
+			{
+				$errMsg = "-DatabaseName wurde nicht angegeben und konnte nicht aus dem Backup-Header gelesen werden: $($_.Exception.Message)"
+				Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+				if ($EnableException) { throw }
+				return [PSCustomObject]@{
+					SqlInstance = $SqlInstance; SourceDatabase = $null; TestDatabase = $TestDatabaseName
+					Success = $false; Status = 'Failed'; Message = $errMsg
+				}
+			}
+		}
 
 		# --- Zielname bestimmen -------------------------------------------------------------
 		if ([string]::IsNullOrWhiteSpace($TestDatabaseName))

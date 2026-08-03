@@ -1,5 +1,22 @@
 # sqmSQLTool — Changelog
 
+## [1.9.36.0] — 2026-08-03
+
+### Fix: `Invoke-sqmRestoreTest` fragte immer nach `-DatabaseName`, auch wenn `-BackupFile` schon angegeben war
+
+`-DatabaseName` war unbedingt `Mandatory = $true` - PowerShell fragte den Namen deshalb immer
+interaktiv ab, selbst wenn `-BackupFile` bereits mitgegeben war und der Name damit laengst im
+Backup selbst steht. `Invoke-sqmRestoreDatabase` loest genau diesen Fall schon immer selbst (per
+`RESTORE HEADERONLY`), `Invoke-sqmRestoreTest` hatte diese Angleichung nie bekommen.
+
+Fix: `-DatabaseName` ist jetzt nur noch dann erforderlich, wenn `-BackupFile` FEHLT - dort dient
+der Name als Suchschluessel fuer die msdb-Sicherungshistorie (`Get-DbaDbBackupHistory`) und es
+gibt keinen anderen Weg, das passende Backup zu finden. Ist `-BackupFile` gegeben, wird der Name
+bei Bedarf automatisch aus dem Backup-Header gelesen (`RESTORE HEADERONLY`), analog zu
+`Invoke-sqmRestoreDatabase`. Fehlen sowohl `-DatabaseName` als auch `-BackupFile`, wird das jetzt
+als klare Ablehnung (`Status = 'Rejected'`) gemeldet, bevor ueberhaupt eine Verbindung aufgebaut
+wird - statt PowerShell interaktiv nach dem Parameter fragen zu lassen.
+
 ## [1.9.35.0] — 2026-08-03
 
 ### Fix: `Invoke-sqmRestoreDatabase` protokollierte "Restore erfolgreich", ohne dass ueberhaupt restored wurde
