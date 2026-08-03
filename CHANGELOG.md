@@ -1,5 +1,43 @@
 # sqmSQLTool — Changelog
 
+## [1.9.39.0] — 2026-08-03
+
+### Fix: `Invoke-sqmSplunkConfiguration` liess veraltete Pfade nach SQL-Versionswechsel im Environment stehen
+
+Die Funktion hat gesetzte `MSSQLn_Log`-Variablen grundsaetzlich nie ueberschrieben. Wurde eine
+Instanz auf eine neue SQL-Version aktualisiert (z.B. neues ErrorLog-Verzeichnis wie
+`MSSQL16.MSSQLSERVER` statt `MSSQL15.MSSQLSERVER`) oder komplett neu installiert, blieb der alte,
+nicht mehr existierende Pfad in der Umgebungsvariable stehen - Splunk ueberwachte damit dauerhaft
+einen toten Pfad und meldete Fehlalarme.
+
+Fix: Vor dem "nicht ueberschreiben" wird jetzt geprueft, ob der gespeicherte Pfad noch existiert
+(`Test-Path`). Existiert er nicht mehr, gilt die Variable als veraltet und wird mit dem aktuell
+ermittelten ErrorLog-Pfad der Instanz aktualisiert - eine noch gueltige, unveraenderte Variable
+wird weiterhin nicht angefasst. Zusaetzlich werden `MSSQLn_Log`-Variablen entfernt, deren Ordinalzahl
+groesser ist als die Anzahl aktuell installierter Instanzen (verwaist, z.B. nach Deinstallation
+statt In-Place-Upgrade einer Instanz). Die Instanznamen werden vor der Nummerierung sortiert, damit
+die Ordinalzahl bei unveraendertem Instanzbestand stabil bleibt. `-Mode Test` meldet veraltete und
+verwaiste Variablen jetzt ebenfalls, ohne etwas zu aendern.
+
+## [1.9.38.0] — 2026-08-03
+
+### Neu: `Repair-sqmServerName`
+
+Nach einer Windows-Hostname-/FQDN-Aenderung (Umbenennung, VM-Klon, Rechenzentrums-Umzug) meldet
+Windows sofort den neuen Namen, waehrend SQL Server den ALTEN Namen weiter als "lokalen Server"
+in `sys.servers` fuehrt (`@@SERVERNAME` / `SERVERPROPERTY('ServerName')`). Der Drift faellt oft
+erst auf, wenn Replikation, Linked-Server-Loopbacks, SSRS oder Zertifikate mit dem falschen Namen
+fehlschlagen - bislang gab es dafuer keine sqmSQLTool-Funktion.
+
+Die neue Funktion vergleicht den registrierten Namen mit dem aus `MachineName`/`InstanceName`
+berechneten Soll-Namen und korrigiert ihn per `sp_dropserver`/`sp_addserver`. Vor der Aenderung
+prueft sie Failover-Cluster-Mitgliedschaft (`IsClustered`), AlwaysOn-AG-Mitgliedschaft
+(`sys.availability_replicas`) und Replikationsrollen (`sys.databases`: Distributor/Publisher/
+Subscriber) - in all diesen Faellen haengen andere Objekte am alten Namen, deshalb wird ohne
+`-Force` abgebrochen (Status `Blocked`). Unterstuetzt `-WhatIf`; weist nach erfolgreicher
+Aenderung darauf hin, dass ein Dienst-Neustart noetig ist, bis `@@SERVERNAME` den neuen Wert
+liefert (kein automatischer Neustart).
+
 ## [1.9.37.0] — 2026-08-03
 
 ### Fix: `Set-sqmSsasDeploymentMode` schlug mit "Invalid query" fehl bei `-InstanceName` im SSMS-Format

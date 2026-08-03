@@ -31,7 +31,7 @@ $members['sicherheit'] = 'Enable-sqmMonitoringAccess','Find-sqmADUser','Get-sqmA
 $members['diagnose-&-health'] = 'Copy-sqmNTFSPermissions','Get-sqmAgentJobScheduleReport','Get-sqmConnectionStats','Get-sqmDatabaseHealth','Get-sqmDiskInfoByDriveLetter','Get-sqmDiskPartitionMap','Get-sqmDiskSpaceReport','Get-sqmOperationStatus','Get-sqmOrphanedFiles','Get-sqmSpnReport','Get-sqmSQLInstanceCheck','Get-sqmTempDbRecommendation','Invoke-sqmPatchAnalysis','Invoke-sqmSetupReport','New-sqmAgentProxy','New-sqmSetupReport','Test-sqmCostThreshold','Test-sqmTempDbFileCount'
 $members['performance'] = 'Get-sqmAutoGrowthReport','Get-sqmBlockingReport','Get-sqmDeadlockReport','Get-sqmIndexFragmentation','Get-sqmLongRunningQueries','Get-sqmMissingIndexes','Get-sqmPerfCounters','Get-sqmServerUtilization','Get-sqmWaitStatistics','Invoke-sqmExtendedEvents','Invoke-sqmPerfBaseline','Invoke-sqmQueryStore','Invoke-sqmUpdateStatistics'
 $members['wartung'] = 'Invoke-sqmFormatDrive64k','Invoke-sqmNtfsSetup','Test-sqmOlaInstallation','Test-sqmSQLFirewall'
-$members['sql-konfiguration'] = 'Compare-sqmServerConfiguration','Get-sqmServerSetting','Invoke-sqmCollationChange','Invoke-sqmSetDatabaseRecoveryMode','Invoke-sqmSsisConfiguration','Set-sqmMaxDop','Set-sqmMaxMemory','Set-sqmSsrsConfiguration','Set-sqmTcpPort','Test-sqmMaxDop','Test-sqmMaxMemory'
+$members['sql-konfiguration'] = 'Compare-sqmServerConfiguration','Get-sqmServerSetting','Invoke-sqmCollationChange','Invoke-sqmSetDatabaseRecoveryMode','Invoke-sqmSsisConfiguration','Repair-sqmServerName','Set-sqmMaxDop','Set-sqmMaxMemory','Set-sqmSsrsConfiguration','Set-sqmTcpPort','Test-sqmMaxDop','Test-sqmMaxMemory'
 $members['sqmtool-config'] = 'Get-sqmConfig','Set-sqmConfig'
 $members['inventar-&-suche'] = 'Export-sqmDatabaseDocumentation','Export-sqmServerConfiguration','Find-sqmDatabaseObject','Get-sqmLinkedServerUsage','Invoke-sqmConfigRollback','Invoke-sqmInstanceInventory'
 $members['cluster-&-dienste'] = 'Get-sqmClusterInfo','Set-sqmSsasDeploymentMode','Test-sqmSsasDirectoryPermissions','Test-sqmSSISPackageCompatibility'
@@ -62,6 +62,7 @@ $deTrans = @{
   'Uninstall-sqmDb2Driver'       = 'Uninstalls the IBM DB2 ODBC/CLI driver.'
   'Uninstall-sqmJdbcDriver'      = 'Uninstalls the Microsoft JDBC Driver for SQL Server.'
   'Uninstall-sqmOdbcDriver'      = 'Uninstalls the Microsoft ODBC Driver for SQL Server.'
+  'Repair-sqmServerName'         = 'Corrects the SQL Server registered server name (@@SERVERNAME) after a Windows hostname/FQDN rename, with guard checks for clustering, AlwaysOn AG membership and replication.'
 }
 
 $real = Get-ChildItem $pub -Filter *.ps1 | ForEach-Object {

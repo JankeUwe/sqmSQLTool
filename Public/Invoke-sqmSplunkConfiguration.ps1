@@ -66,15 +66,57 @@ function _sqmSplunk_LocalCore {
 
     _sqmSplunkWriteLog $logFile "Instanzen gefunden: $($instanceNames.Count) ($($instanceNames -join ', '))"
 
+    # Deterministische Reihenfolge, damit MSSQL1_Log/MSSQL2_Log/... bei unveraendertem
+    # Instanzbestand stabil denselben Instanzen zugeordnet bleiben (Registry-Enumerationsreihenfolge
+    # ist nicht garantiert).
+    $instanceNames = $instanceNames | Sort-Object
+
+    function _sqmSplunk_ResolveLogDir {
+        param([string]$InstName, [string]$InstID)
+
+        $logDir = $null
+        try {
+            $asm = [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.Smo')
+            if ($asm) {
+                $srvName = if ($InstName -eq 'MSSQLSERVER') { '(local)' } else { "(local)\$InstName" }
+                $srv     = New-Object Microsoft.SqlServer.Management.Smo.Server($srvName)
+                $logDir  = $srv.ErrorLogPath
+            }
+        } catch { }
+
+        if (-not $logDir) {
+            $regP = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$InstID\MSSQLServer\Parameters"
+            if (Test-Path $regP) {
+                $prm = Get-ItemProperty -Path $regP
+                $arg = ($prm.PSObject.Properties |
+                        Where-Object { $_.Name -like 'SQLArg*' -and $_.Value -like '-e*' }).Value
+                if ($arg) {
+                    $logDir = Split-Path ($arg -replace '^-e"?','' -replace '"$','')
+                }
+            }
+        }
+
+        return $logDir
+    }
+
     $i = 1
     foreach ($instName in $instanceNames) {
         $instID  = $instances.$instName
         $varName = "MSSQL${i}_Log"
 
+        # Ein gesetzter Pfad, der nicht mehr existiert, ist veraltet - typischerweise weil eine neue
+        # SQL-Version installiert wurde und das alte ErrorLog-Verzeichnis (z.B. MSSQL15.MSSQLSERVER)
+        # dabei entfernt/ersetzt wurde. Solche Variablen wuerden Splunk dauerhaft auf einen toten Pfad
+        # zeigen lassen und Fehlalarme ausloesen - sie muessen aktualisiert werden, auch wenn sie
+        # bereits gesetzt sind.
+        $existing = [Environment]::GetEnvironmentVariable($varName, [EnvironmentVariableTarget]::Machine)
+        $stale    = ($null -ne $existing) -and (-not (Test-Path -LiteralPath $existing))
+
         if ($TestMode) {
-            $existing = [Environment]::GetEnvironmentVariable($varName, [EnvironmentVariableTarget]::Machine)
             if ($null -eq $existing) {
                 _sqmSplunkWriteLog $logFile "TEST: '$varName' nicht gesetzt."
+            } elseif ($stale) {
+                _sqmSplunkWriteLog $logFile "TEST: '$varName' = '$existing' - Pfad existiert nicht mehr (veraltet, z.B. nach SQL-Versionswechsel)."
             } else {
                 _sqmSplunkWriteLog $logFile "TEST: '$varName' = '$existing'"
             }
@@ -84,37 +126,17 @@ function _sqmSplunk_LocalCore {
 
         _sqmSplunkWriteLog $logFile "Verarbeite Instanz $i : $instName (ID: $instID)"
 
-        $current = [Environment]::GetEnvironmentVariable($varName, [EnvironmentVariableTarget]::Machine)
-        if ($null -ne $current) {
-            _sqmSplunkWriteLog $logFile "  '$varName' bereits gesetzt ('$current') - wird nicht ueberschrieben."
+        if ($null -ne $existing -and -not $stale) {
+            _sqmSplunkWriteLog $logFile "  '$varName' bereits gesetzt ('$existing') - wird nicht ueberschrieben."
             $i++
             continue
         }
+        if ($stale) {
+            _sqmSplunkWriteLog $logFile "  '$varName' zeigt auf nicht mehr vorhandenen Pfad ('$existing') - wird aktualisiert."
+        }
 
         try {
-            $logDir = $null
-
-            try {
-                $asm = [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.Smo')
-                if ($asm) {
-                    $srvName = if ($instName -eq 'MSSQLSERVER') { '(local)' } else { "(local)\$instName" }
-                    $srv    = New-Object Microsoft.SqlServer.Management.Smo.Server($srvName)
-                    $logDir = $srv.ErrorLogPath
-                }
-            } catch { }
-
-            if (-not $logDir) {
-                $regP = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$instID\MSSQLServer\Parameters"
-                if (Test-Path $regP) {
-                    $prm = Get-ItemProperty -Path $regP
-                    $arg = ($prm.PSObject.Properties |
-                            Where-Object { $_.Name -like 'SQLArg*' -and $_.Value -like '-e*' }).Value
-                    if ($arg) {
-                        $logDir = Split-Path ($arg -replace '^-e"?','' -replace '"$','')
-                    }
-                }
-            }
-
+            $logDir = _sqmSplunk_ResolveLogDir -InstName $instName -InstID $instID
             if (-not $logDir) { throw 'Pfad nicht ermittelbar.' }
 
             _sqmSplunkWriteLog $logFile "  ErrorLog-Pfad: $logDir"
@@ -125,6 +147,24 @@ function _sqmSplunk_LocalCore {
         }
 
         $i++
+    }
+
+    # Verwaiste MSSQLn_Log-Variablen (n > aktuelle Instanzanzahl) entfernen, z.B. wenn eine Instanz
+    # bei einem Versionswechsel komplett deinstalliert statt in-place aktualisiert wurde. Ohne diese
+    # Bereinigung ueberwacht Splunk weiterhin einen Pfad, der zu keiner vorhandenen Instanz mehr gehoert.
+    $orphaned = foreach ($varName in ([Environment]::GetEnvironmentVariables([EnvironmentVariableTarget]::Machine)).Keys) {
+        if ($varName -match '^MSSQL(\d+)_Log$' -and [int]$Matches[1] -gt $instanceNames.Count) {
+            $varName
+        }
+    }
+
+    foreach ($varName in $orphaned) {
+        if ($TestMode) {
+            _sqmSplunkWriteLog $logFile "TEST: '$varName' ist verwaist (keine passende Instanz mehr) - wuerde entfernt."
+        } else {
+            [Environment]::SetEnvironmentVariable($varName, $null, [EnvironmentVariableTarget]::Machine)
+            _sqmSplunkWriteLog $logFile "  Verwaiste Variable '$varName' entfernt."
+        }
     }
 
     $svcName = 'SplunkForwarder'
@@ -321,7 +361,10 @@ function Invoke-sqmSplunkConfiguration {
         Detects all SQL Server instances, sets machine-wide environment variables
         for the ErrorLog path (MSSQL1_Log, MSSQL2_Log, ...) and manages the
         SplunkForwarder service — locally or remotely on any number of servers.
-        Existing environment variables are not overwritten.
+        Existing, still-valid environment variables are not overwritten. Variables whose path no
+        longer exists (e.g. after installing a new SQL Server version) are corrected automatically,
+        and variables left over from an instance that no longer exists are removed - both would
+        otherwise leave Splunk monitoring a stale path and raising false alerts.
     .PARAMETER Mode
         Set  - Set environment variables and start/restart SplunkForwarder (default).
         Test - Check only, no changes.
