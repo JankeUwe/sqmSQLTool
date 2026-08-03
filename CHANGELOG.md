@@ -1,5 +1,26 @@
 # sqmSQLTool — Changelog
 
+## [1.9.41.0] — 2026-08-03
+
+### Fix: CI-Testfehler bei `Repair-sqmServerName` (Write-Error unter $ErrorActionPreference='Stop')
+
+Der GitHub-Actions-Job "Import & Pester (PowerShell 7)" schlug bei `Repair-sqmServerName.Tests.ps1`
+fehl: `pwsh`-Steps in GitHub Actions laufen mit `$ErrorActionPreference = 'Stop'`. Die Catch-Bloecke
+riefen `Write-Error` ohne eigenes `-ErrorAction` auf - unter geerbtem `Stop` wurde daraus ein
+TERMINIERENDER Fehler statt einer reinen Meldung. Im inneren Catch (sp_addserver-Fehlschlag) brach
+das die Ausfuehrung ab, bevor `return $result` erreicht wurde; der Fehler wanderte in den aeusseren
+Catch, dessen eigener `Write-Error`-Aufruf dann komplett unbehandelt aus der Funktion entkam - der
+Test scheiterte nicht an der Assertion, sondern weil `Repair-sqmServerName` selbst eine Exception
+warf, statt wie dokumentiert ein Ergebnisobjekt mit `Status = 'Error'` zurueckzugeben. Lokal (ohne
+`Stop`-Preference) blieb das unbemerkt, weil `Write-Error` dort nur eine nicht-terminierende Meldung
+schreibt.
+
+Fix: Alle betroffenen `Write-Error`-Aufrufe (`Repair-sqmServerName`, sowie `Get-sqmSsasDeploymentMode`
+und `Set-sqmSsasDeploymentMode` mit demselben Muster) bekommen jetzt explizit `-ErrorAction Continue`,
+damit sie unabhaengig von der geerbten Preference des Aufrufers immer nur melden statt abzubrechen -
+mit `$ErrorActionPreference = 'Stop'` reproduziert und verifiziert, komplette Testsuite (202 Tests)
+weiterhin gruen.
+
 ## [1.9.40.0] — 2026-08-03
 
 ### Fix: `Invoke-sqmSplunkConfiguration` meldete "neu gestartet", obwohl der Neustart fehlgeschlagen war

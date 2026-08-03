@@ -276,7 +276,7 @@ function Set-sqmSsasDeploymentMode
 			$result.Message = $errMsg
 			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 			if ($EnableException) { throw }
-			Write-Error $errMsg
+			Write-Error $errMsg -ErrorAction Continue
 		}
 		return $result
 	}

@@ -208,7 +208,7 @@ SELECT
 				"ist fehlgeschlagen: $($_.Exception.Message). Die Instanz hat aktuell KEINEN lokalen Server-Eintrag " +
 				"mehr - manuell mit 'EXEC sp_addserver N''$newEsc'', local;' nachziehen."
 				_Log $result.Message 'ERROR'
-				Write-Error $result.Message
+				Write-Error $result.Message -ErrorAction Continue
 				if ($EnableException) { throw }
 				return $result
 			}
@@ -233,7 +233,7 @@ SELECT
 		$result.Status = 'Error'
 		$result.Message = "Fehler in $functionName : $($_.Exception.Message)"
 		_Log $result.Message 'ERROR'
-		Write-Error $result.Message
+		Write-Error $result.Message -ErrorAction Continue
 		if ($EnableException) { throw }
 	}
 
