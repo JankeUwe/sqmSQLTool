@@ -1,5 +1,20 @@
 # sqmSQLTool — Changelog
 
+## [1.9.42.0] — 2026-08-03
+
+### Fix: `Invoke-sqmMonitoringKey` schrieb/las den falschen Registry-Pfad
+
+Die Quelldatei war auf `HKLM:\<RegistryBase>\dtcSoftware\sqmSQLTool` zurueckgefallen, obwohl die
+reale System-Center-Konvention beim Kunden `HKLM:\SYSTEM\FITS\Systemcenter` lautet, mit den Werten
+`SQL` (0/1/2 - None/Standard/Full, kundenabhaengig und manuell zu setzen) und
+`SQLFreeSpaceVersion` (Standard/Cluster, per `-AutoDetectSQLFreeSpaceVersion` ueber die
+AG-Zugehoerigkeit automatisch erkennbar) direkt unter diesem Schluessel. Die gebaute/verteilte
+Kopie in `bin/Public` hatte weiterhin den richtigen Pfad - nur die Quelle war betroffen.
+
+Fix: `$regSubKey` wieder auf `$RegistryBase\FITS\SystemCenter` gesetzt. Neuer Pester-Test
+(`Invoke-sqmMonitoringKey.Tests.ps1`, komplett gemockt) haelt den Pfad fest und schlaegt
+nachweislich fehl, sobald der alte `dtcSoftware\sqmSQLTool`-Pfad zurueckkommt.
+
 ## [1.9.41.0] — 2026-08-03
 
 ### Fix: CI-Testfehler bei `Repair-sqmServerName` (Write-Error unter $ErrorActionPreference='Stop')
