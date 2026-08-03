@@ -185,10 +185,24 @@ function _sqmSplunk_LocalCore {
     } else {
         if ($svc.Status -eq 'Running') {
             try {
-                Restart-Service -Name $svcName -Force
+                # -ErrorAction Stop ist noetig, damit ein fehlgeschlagener Stop-Schritt hier landet
+                # statt (bei $ErrorActionPreference = 'Continue') stillschweigend als Erfolg durchzulaufen.
+                Restart-Service -Name $svcName -Force -ErrorAction Stop
                 _sqmSplunkWriteLog $logFile "Dienst '$svcName' neu gestartet."
             } catch {
                 _sqmSplunkWriteLog $logFile "FEHLER beim Neustart: $_"
+
+                # Restart-Service kann den Dienst bereits gestoppt haben, bevor der Fehler auftrat -
+                # ohne Nachstart-Versuch bliebe er dann stehen, obwohl er vorher lief.
+                $afterRestart = Get-Service -Name $svcName -ErrorAction SilentlyContinue
+                if ($afterRestart -and $afterRestart.Status -ne 'Running') {
+                    try {
+                        Start-Service -Name $svcName -ErrorAction Stop
+                        _sqmSplunkWriteLog $logFile "  '$svcName' nach fehlgeschlagenem Neustart erfolgreich gestartet."
+                    } catch {
+                        _sqmSplunkWriteLog $logFile "  FEHLER: '$svcName' konnte nach fehlgeschlagenem Neustart nicht gestartet werden: $_"
+                    }
+                }
             }
         } else {
             try {

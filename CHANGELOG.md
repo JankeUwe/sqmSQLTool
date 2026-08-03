@@ -1,5 +1,22 @@
 # sqmSQLTool — Changelog
 
+## [1.9.40.0] — 2026-08-03
+
+### Fix: `Invoke-sqmSplunkConfiguration` meldete "neu gestartet", obwohl der Neustart fehlgeschlagen war
+
+Praxisfall auf `HLB1W01AWSA0087`: `Restart-Service -Name SplunkForwarder -Force` warf "Cannot stop
+SplunkForwarder service", der Dienst blieb danach im Status `Stopped`. Im Log stand trotzdem
+"Dienst 'SplunkForwarder' neu gestartet." und das Endergebnis meldete `Status = Success` - weil
+`Restart-Service` ohne `-ErrorAction Stop` aufgerufen wurde und `_sqmSplunk_LocalCore` mit
+`$ErrorActionPreference = 'Continue'` laeuft: der nicht-terminierende Fehler landete nie im
+`catch`-Block, die Ausfuehrung lief einfach zur naechsten Zeile durch.
+
+Fix: `Restart-Service` bekommt jetzt `-ErrorAction Stop`, damit ein fehlgeschlagener Stop-Schritt
+tatsaechlich im `catch` ankommt und korrekt als Fehler geloggt wird. Zusaetzlich versucht die
+Funktion in diesem Fall, den Dienst per `Start-Service` nachzustarten - `Restart-Service` kann ihn
+bereits gestoppt haben, bevor der Fehler auftrat, und ohne Nachstart-Versuch waere er stehen
+geblieben, obwohl er vorher lief.
+
 ## [1.9.39.0] — 2026-08-03
 
 ### Fix: `Invoke-sqmSplunkConfiguration` liess veraltete Pfade nach SQL-Versionswechsel im Environment stehen
