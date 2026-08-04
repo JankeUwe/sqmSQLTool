@@ -1,5 +1,22 @@
 # sqmSQLTool — Changelog
 
+## [1.9.47.0] — 2026-08-05
+
+### Neu: `Get-sqmLoginSettings` zeigt jetzt Kennwort-Richtlinie, Kennwortablauf und "Kennwort muss geaendert werden"
+
+Bisher fehlten in der Ausgabe die Kennwort-bezogenen Einstellungen eines SQL-Logins
+komplett - man musste dafuer separat `sys.sql_logins`/`LOGINPROPERTY()` abfragen.
+
+Neu (per LEFT JOIN `sys.sql_logins` + `LOGINPROPERTY()`, zusaetzlich zu den bisherigen
+Spalten): `PasswordPolicyEnforced` (CHECK_POLICY), `PasswordExpirationEnforced`
+(CHECK_EXPIRATION), `PasswordExpired` (Kennwort aktuell abgelaufen), `MustChangePassword`
+("Benutzer muss Kennwort bei naechster Anmeldung aendern") und `DaysUntilExpiration`.
+Bei Windows-Logins/-Gruppen sind diese Felder `$null` (kein `sys.sql_logins`-Eintrag,
+Kennwortrichtlinie liegt dort bei AD) - `Invoke-DbaQuery` liefert das ohne `-As PSObject`
+als `[DBNull]`, nicht als PowerShell-`$null`; ein direktes `[bool]`-Cast waere daher auf
+einen `[DBNull]`-Wert gelaufen und mit einer Ausnahme gescheitert. Gegen DEV01 verifiziert:
+SQL-Logins liefern die echten Werte, Windows-Logins bleiben leer statt zu fehlern.
+
 ## [1.9.46.0] — 2026-08-05
 
 ### Neu: Doppelklick-Start fuer `Show-sqmToolGui` (elevated) + AllUsers-Startmenue-Eintrag
