@@ -155,7 +155,7 @@ Write-Host "Installing sqmSQLTool to: $Destination" -ForegroundColor Cyan
 robocopy $Source $Destination /E /PURGE /NJH /NJS /NDL /COPY:DAT `
     /XD .git tests bin `
     /XF .gitignore README.md LICENSE `
-          Install.cmd Install.ps1 `
+          Install.cmd Install.ps1 Start-sqmToolGui.cmd `
           "*.TempPoint.*" "*.RestorePoint.*" "*.psproj" "*.psproj.psbuild" "*.psprojs" `
           "desktop.ini" "Tester.ps1" "Test-Module*.ps1" `
           "coverage.xml" "testresults.xml"
@@ -256,6 +256,44 @@ try {
     }
 } catch {
     Write-Host "  Hinweis: Event Log Source konnte nicht registriert werden (keine Adminrechte?) - wird beim ersten Job-Lauf nachgeholt." -ForegroundColor Yellow
+}
+
+# ---------------------------------------------------------------------------
+# 6c. GUI-Launcher + AllUsers-Startmenue-Verknuepfung
+#     Nur bei AllUsers (Admin-Scope bereits durch Schritt 3 sichergestellt) und nur
+#     wenn der Import-Test oben erfolgreich war - sonst wuerde die Verknuepfung auf ein
+#     nicht lauffaehiges Modul zeigen. Start-sqmToolGui.cmd liegt bewusst NICHT im
+#     Modul-Zielordner ($Destination): der wird bei jeder Neuinstallation per
+#     robocopy /PURGE bereinigt (siehe Schritt 4, Start-sqmToolGui.cmd ist dort
+#     explizit von /XF ausgenommen) und ist ohnehin tief unter WindowsPowerShell\Modules
+#     verschachtelt. Ein eigener, stabiler Ordner unter Program Files ist das
+#     naheliegende Ziel fuer einen Doppelklick-Start.
+# ---------------------------------------------------------------------------
+if ($importOk -and $Scope -eq 'AllUsers') {
+    Write-Host "Richte GUI-Launcher ein..." -ForegroundColor Cyan
+    try {
+        $launcherDir  = Join-Path $env:ProgramFiles 'sqmSQLTool'
+        $launcherPath = Join-Path $launcherDir 'Start-sqmToolGui.cmd'
+        if (-not (Test-Path $launcherDir)) {
+            New-Item -ItemType Directory -Path $launcherDir -Force | Out-Null
+        }
+        Copy-Item -Path (Join-Path $Source 'Start-sqmToolGui.cmd') -Destination $launcherPath -Force
+        Unblock-File -Path $launcherPath -ErrorAction SilentlyContinue
+        Write-Host "  Launcher kopiert nach: $launcherPath" -ForegroundColor Gray
+
+        $startMenuDir = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs'
+        $shortcutPath = Join-Path $startMenuDir 'sqmSQLTool GUI.lnk'
+        $wshShell = New-Object -ComObject WScript.Shell
+        $shortcut = $wshShell.CreateShortcut($shortcutPath)
+        $shortcut.TargetPath = $launcherPath
+        $shortcut.WorkingDirectory = $launcherDir
+        $shortcut.Description = 'sqmSQLTool GUI (elevated)'
+        $shortcut.Save()
+        Write-Host "  Startmenue-Verknuepfung (AllUsers) angelegt: $shortcutPath" -ForegroundColor Green
+    } catch {
+        Write-Warning "  GUI-Launcher/Startmenue-Verknuepfung konnte nicht eingerichtet werden: $_"
+        Write-Warning "  Die GUI laesst sich trotzdem manuell starten: Import-Module sqmSQLTool; Show-sqmToolGui"
+    }
 }
 
 # ---------------------------------------------------------------------------

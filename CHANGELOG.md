@@ -1,5 +1,28 @@
 # sqmSQLTool — Changelog
 
+## [1.9.46.0] — 2026-08-05
+
+### Neu: Doppelklick-Start fuer `Show-sqmToolGui` (elevated) + AllUsers-Startmenue-Eintrag
+
+Bisher musste die GUI manuell in einer PowerShell-Session gestartet werden
+(`Import-Module sqmSQLTool; Show-sqmToolGui`). Viele der darueber aufrufbaren Funktionen
+(`Invoke-sqmNtfsSetup`, Eventlog-Quellen, SQL-Agent-Jobs) aendern lokale Systemzustaende
+und brauchen dafuer Adminrechte - ein einfacher Doppelklick ohne Elevation waere nur
+eingeschraenkt nutzbar gewesen.
+
+Neu: `Start-sqmToolGui.cmd` (Repo-Root, analog zu `Install.cmd`) prueft `net session` und
+relauncht sich bei Bedarf per UAC selbst elevated, startet dann `Show-sqmToolGui` in einem
+minimierten PowerShell-Fenster (bewusst `-WindowStyle Minimized` statt `Hidden` - ein
+komplett verstecktes PowerShell-Fenster ist ein klassisches AV/EDR-Alarmsignal auf
+ueberwachten SQL-Servern). Schlaegt der Modul-Import fehl, zeigt eine MessageBox den
+Fehler statt wortlos im minimierten Fenster zu verschwinden.
+
+`Install.ps1` kopiert den Launcher bei einer `AllUsers`-Installation zusaetzlich nach
+`C:\Program Files\sqmSQLTool\Start-sqmToolGui.cmd` (bewusst ausserhalb des per
+`robocopy /PURGE` verwalteten Modul-Zielordners) und legt eine AllUsers-Startmenue-
+Verknuepfung `sqmSQLTool GUI.lnk` an - nicht fatal, falls das fehlschlaegt (die GUI bleibt
+weiterhin manuell startbar).
+
 ## [1.9.45.0] — 2026-08-04
 
 ### Fix: `Invoke-sqmUserDatabaseBackup` legte ein neues Backupverzeichnis an, konnte aber danach nicht hineinschreiben
