@@ -620,16 +620,44 @@ function Invoke-sqmRestoreDatabase
 						try
 						{
 							Invoke-sqmLogging -Message $removeDbAction -FunctionName $functionName -Level "INFO"
-							$secondaryServer = Connect-DbaInstance -SqlInstance $secondary -SqlCredential $SqlCredential -ErrorAction Stop
+							# -NonPooledConnection: dbatools cached SMO-Verbindungen werden innerhalb der Session
+							# wiederverwendet: eine bereits frueher in dieser Session geladene .Databases-Collection
+							# bleibt sonst auf dem alten Stand stehen, selbst wenn sich die Datenbank auf dem
+							# Server laengst geaendert hat (z.B. bereits geloescht). Ohne frische Verbindung wuerde
+							# die Pruefung unten faelschlich "vorhanden" melden.
+							$secondaryServer = Connect-DbaInstance -SqlInstance $secondary -SqlCredential $SqlCredential -NonPooledConnection -ErrorAction Stop
 							if ($secondaryServer.Databases[$finalDbName])
 							{
 								# Nach Remove-DbaAgDatabase liegt die Kopie auf dem Secondary meist im Status
 								# RESTORING (IsAccessible = $false) - trotzdem vorhanden und muss geloescht
 								# werden, sonst schlaegt spaeter Add-DbaAgDatabase/Automatic Seeding mit
 								# "Database With Name Already Exists" fehl. Daher NICHT auf IsAccessible pruefen.
-								Remove-DbaDatabase -SqlInstance $secondary -SqlCredential $SqlCredential -Database $finalDbName -Confirm:$false -EnableException -ErrorAction Stop
-								Invoke-sqmLogging -Message "Datenbank auf '$secondary' geloescht." -FunctionName $functionName -Level "INFO"
-								$results += [PSCustomObject]@{ Action = "RemoveFromSecondary"; Target = $secondary; Status = "Success"; Message = "Datenbank auf sekundaerem Knoten geloescht." }
+								#
+								# Remove-DbaDatabase wirft bei einem fehlgeschlagenen Drop pro Datenbank KEINE
+								# Exception (auch nicht mit -EnableException) - es faengt den Fehler intern und
+								# packt den rohen SQL-Fehlertext in die Status-Eigenschaft des Rueckgabeobjekts.
+								# Deshalb muss der Rueckgabewert explizit ausgewertet werden statt "keine Exception
+								# = Erfolg" anzunehmen.
+								$dropResult = Remove-DbaDatabase -SqlInstance $secondary -SqlCredential $SqlCredential -Database $finalDbName -Confirm:$false -EnableException -ErrorAction Stop
+								if ($dropResult -and $dropResult.Status -eq 'Dropped')
+								{
+									Invoke-sqmLogging -Message "Datenbank auf '$secondary' geloescht." -FunctionName $functionName -Level "INFO"
+									$results += [PSCustomObject]@{ Action = "RemoveFromSecondary"; Target = $secondary; Status = "Success"; Message = "Datenbank auf sekundaerem Knoten geloescht." }
+								}
+								elseif ($dropResult -and $dropResult.Status -match 'does not exist')
+								{
+									# Ziel bereits erreicht (Datenbank ist weg) - kein Fehler, nur die zuvor
+									# gecachte Sicht war veraltet.
+									Invoke-sqmLogging -Message "Datenbank auf '$secondary' war beim tatsaechlichen Drop bereits nicht mehr vorhanden." -FunctionName $functionName -Level "INFO"
+									$results += [PSCustomObject]@{ Action = "RemoveFromSecondary"; Target = $secondary; Status = "AlreadyGone"; Message = "Datenbank war auf sekundaerem Knoten bereits nicht mehr vorhanden." }
+								}
+								else
+								{
+									$dropErrMsg = "Fehler beim Loeschen auf '$secondary': $($dropResult.Status)"
+									Invoke-sqmLogging -Message $dropErrMsg -FunctionName $functionName -Level "ERROR"
+									if ($EnableException) { throw $dropErrMsg }
+									$results += [PSCustomObject]@{ Action = "RemoveFromSecondary"; Target = $secondary; Status = "Failed"; Message = $dropErrMsg }
+								}
 							}
 							else
 							{

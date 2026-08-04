@@ -1,5 +1,29 @@
 # sqmSQLTool — Changelog
 
+## [1.9.44.0] — 2026-08-04
+
+### Fix: `Invoke-sqmRestoreDatabase` meldete einen fehlgeschlagenen Secondary-Drop faelschlich als Erfolg
+
+Nachtrag zu 1.9.43.0: In einem realen AG-Restore (sfcsdbs103ihz/sfcsdbs104ihz, Datenbank
+`AlwaysOnTest`) lief der Secondary-Drop zwar an, `Remove-DbaDatabase` scheiterte dabei aber mit
+"Cannot drop the database 'AlwaysOnTest', because it does not exist or you do not have
+permission." - ohne eine Exception zu werfen, auch nicht mit `-EnableException`. `Remove-DbaDatabase`
+faengt einen fehlgeschlagenen Drop pro Datenbank intern ab und packt den rohen SQL-Fehlertext
+lediglich in die `Status`-Eigenschaft des Rueckgabeobjekts. Der bisherige Code werteten diesen
+Rueckgabewert nicht aus und meldete "RemoveFromSecondary: Success", obwohl der Drop nachweislich
+fehlgeschlagen war.
+
+Zusaetzlich verwendete die vorausgehende Existenzpruefung eine von dbatools ueber die
+PowerShell-Session hinweg gecachte SMO-Verbindung (`Connect-DbaInstance` ohne
+`-NonPooledConnection`): deren `.Databases`-Collection kann den Stand von vor dem eigentlichen Drop
+zeigen, selbst wenn sich die Datenbank auf dem Server laengst geaendert hat.
+
+Fix: `Connect-DbaInstance` fuer die Existenzpruefung nutzt jetzt `-NonPooledConnection` fuer eine
+frische Sicht. Der Rueckgabewert von `Remove-DbaDatabase` wird ausgewertet: `Status -eq 'Dropped'`
+gilt als Erfolg, `Status -match 'does not exist'` gilt als bereits erreichtes Ziel (Datenbank ist
+weg, kein Fehler), jeder andere Status (z.B. ein echtes Berechtigungsproblem) wird als `Failed`
+gemeldet statt verschluckt zu werden.
+
 ## [1.9.43.0] — 2026-08-04
 
 ### Fix: `Invoke-sqmRestoreDatabase` liess bei AG-Restore stale Datenbank auf Secondary zurueck

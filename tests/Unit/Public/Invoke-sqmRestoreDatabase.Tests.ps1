@@ -288,4 +288,20 @@ Describe 'Invoke-sqmRestoreDatabase - AG-Erkennung' {
         $source | Should -Not -Match '\$secondaryServer\.Databases\[\$finalDbName\]\s*-and\s*\$secondaryServer\.Databases\[\$finalDbName\]\.IsAccessible'
         $source | Should -Match 'if\s*\(\$secondaryServer\.Databases\[\$finalDbName\]\)'
     }
+
+    It 'verlaesst sich beim Secondary-Drop nicht auf "keine Exception = Erfolg" und nutzt eine frische Verbindung' {
+        # Regression 1.9.44.0: Remove-DbaDatabase faengt einen fehlgeschlagenen Drop pro Datenbank
+        # intern ab und packt den rohen SQL-Fehlertext ("Cannot drop the database '...', because it
+        # does not exist or you do not have permission.") in die Status-Eigenschaft des
+        # Rueckgabeobjekts - OHNE eine Exception zu werfen, selbst mit -EnableException. Ohne
+        # Auswertung von .Status wurde das faelschlich als "RemoveFromSecondary: Success" gemeldet.
+        # Ursache dafuer war ausserdem eine von dbatools ueber die Session hinweg gecachte
+        # SMO-Verbindung (Connect-DbaInstance ohne -NonPooledConnection), deren .Databases-Collection
+        # den Stand von vor dem eigentlichen Drop zeigte.
+        $source = Get-Content "$PSScriptRoot\..\..\..\Public\Invoke-sqmRestoreDatabase.ps1" -Raw
+        $source | Should -Match 'Connect-DbaInstance\s+-SqlInstance\s+\$secondary\s+-SqlCredential\s+\$SqlCredential\s+-NonPooledConnection'
+        $source | Should -Match '\$dropResult\s*=\s*Remove-DbaDatabase'
+        $source | Should -Match "\`$dropResult\.Status\s*-eq\s*'Dropped'"
+        $source | Should -Match "\`$dropResult\.Status\s*-match\s*'does not exist'"
+    }
 }
