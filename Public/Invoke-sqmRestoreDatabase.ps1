@@ -621,8 +621,12 @@ function Invoke-sqmRestoreDatabase
 						{
 							Invoke-sqmLogging -Message $removeDbAction -FunctionName $functionName -Level "INFO"
 							$secondaryServer = Connect-DbaInstance -SqlInstance $secondary -SqlCredential $SqlCredential -ErrorAction Stop
-							if ($secondaryServer.Databases[$finalDbName] -and $secondaryServer.Databases[$finalDbName].IsAccessible)
+							if ($secondaryServer.Databases[$finalDbName])
 							{
+								# Nach Remove-DbaAgDatabase liegt die Kopie auf dem Secondary meist im Status
+								# RESTORING (IsAccessible = $false) - trotzdem vorhanden und muss geloescht
+								# werden, sonst schlaegt spaeter Add-DbaAgDatabase/Automatic Seeding mit
+								# "Database With Name Already Exists" fehl. Daher NICHT auf IsAccessible pruefen.
 								Remove-DbaDatabase -SqlInstance $secondary -SqlCredential $SqlCredential -Database $finalDbName -Confirm:$false -EnableException -ErrorAction Stop
 								Invoke-sqmLogging -Message "Datenbank auf '$secondary' geloescht." -FunctionName $functionName -Level "INFO"
 								$results += [PSCustomObject]@{ Action = "RemoveFromSecondary"; Target = $secondary; Status = "Success"; Message = "Datenbank auf sekundaerem Knoten geloescht." }

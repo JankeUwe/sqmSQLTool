@@ -276,4 +276,16 @@ Describe 'Invoke-sqmRestoreDatabase - AG-Erkennung' {
         $source | Should -Match '\$restoreResult\s*=\s*Restore-DbaDatabase'
         $source | Should -Match 'if\s*\(-not \$restoreResult\)'
     }
+
+    It 'loescht die Datenbank auf dem Secondary auch dann, wenn sie dort nicht IsAccessible ist' {
+        # Regression 1.9.43.0: Nach Remove-DbaAgDatabase liegt die verbliebene Kopie auf dem
+        # Secondary typischerweise im Status RESTORING - IsAccessible ist dann $false, obwohl die
+        # Datenbank existiert. Die alte Bedingung "$db -and $db.IsAccessible" wertete das
+        # faelschlich als "nicht vorhanden" und liess den Drop komplett aus. Beim naechsten
+        # Add-DbaAgDatabase/Automatic-Seeding schlug das dann mit "Database With Name Already
+        # Exists" fehl, ohne dass RemoveFromSecondary je als fehlgeschlagen auftauchte.
+        $source = Get-Content "$PSScriptRoot\..\..\..\Public\Invoke-sqmRestoreDatabase.ps1" -Raw
+        $source | Should -Not -Match '\$secondaryServer\.Databases\[\$finalDbName\]\s*-and\s*\$secondaryServer\.Databases\[\$finalDbName\]\.IsAccessible'
+        $source | Should -Match 'if\s*\(\$secondaryServer\.Databases\[\$finalDbName\]\)'
+    }
 }

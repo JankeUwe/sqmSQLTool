@@ -1,5 +1,22 @@
 # sqmSQLTool — Changelog
 
+## [1.9.43.0] — 2026-08-04
+
+### Fix: `Invoke-sqmRestoreDatabase` liess bei AG-Restore stale Datenbank auf Secondary zurueck
+
+Der Secondary-Cleanup-Schritt (nach `Remove-DbaAgDatabase` auf dem Primary) pruefte vor dem
+`Remove-DbaDatabase`-Aufruf zusaetzlich `.IsAccessible` der Datenbank auf dem sekundaeren Knoten.
+Nach dem Entfernen aus der AG liegt die dort verbleibende Kopie aber typischerweise im Status
+RESTORING - `IsAccessible` ist dann `$false`, obwohl die Datenbank sehr wohl existiert. Der Code
+interpretierte das faelschlich als "nicht vorhanden" und uebersprang den Drop komplett (inklusive
+irrefuehrender VERBOSE-Meldung). Beim anschliessenden Wiedereinfuegen in die AG
+(`Add-DbaAgDatabase -SeedingMode Automatic`) schlug das Seeding dadurch mit
+"Database With Name Already Exists" fehl - die Secondaries blieben ohne die neu restaurierte
+Datenbank zurueck, obwohl `RejoinAG` scheinbar der einzige fehlgeschlagene Schritt war.
+
+Fix: Existenzpruefung auf dem Secondary vor dem Drop prueft nur noch, ob die Datenbank ueberhaupt
+vorhanden ist (`$secondaryServer.Databases[$finalDbName]`), nicht mehr zusaetzlich `IsAccessible`.
+
 ## [1.9.42.0] — 2026-08-03
 
 ### Fix: `Invoke-sqmMonitoringKey` schrieb/las den falschen Registry-Pfad
