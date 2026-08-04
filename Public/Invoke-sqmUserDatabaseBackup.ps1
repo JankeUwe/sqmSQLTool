@@ -103,8 +103,9 @@ Invoke-sqmUserDatabaseBackup -SqlInstance "SQL01" -All -UseExcludeTable `
     -CheckPreferredReplica -MailTo "dba@example.com" -MailOnSuccess
 
 .NOTES
-Requires the dbatools module and existing Invoke-sqmLogging and Get-sqmServerSetting functions
-(for the default backup path). The path must end with 'User-Db'.
+Requires the dbatools module and existing Invoke-sqmLogging, Get-sqmServerSetting (for the
+default backup path) and Invoke-sqmNtfsSetup (used to grant the SQL service account NTFS write
+access when a new backup directory has to be created) functions. The path must end with 'User-Db'.
 Default for SqlInstance: $env:COMPUTERNAME (applies to all future versions).
 #>
 
@@ -197,6 +198,36 @@ function Invoke-sqmUserDatabaseBackup
 			{
 				New-Item -Path $BackupPath -ItemType Directory -Force -ErrorAction Stop | Out-Null
 				Invoke-sqmLogging -Message "Verzeichnis $BackupPath wurde erstellt." -FunctionName $functionName -Level "INFO"
+
+				# Ein frisch angelegtes Verzeichnis erbt NTFS-Rechte nur, wenn irgendein Vorfahre
+				# bereits eine vererbbare ACE fuer das SQL-Dienstkonto hat. Zeigt BackupDirectory
+				# (Server-Eigenschaft) auf einen bislang nicht existierenden Pfad - z.B. weil er
+				# waehrend eines Instanz-Setups umgestellt, aber der zugehoerige NTFS-Setup-Schritt
+				# nie fuer diesen Pfad ausgefuehrt wurde - fehlt diese Vererbung haeufig. New-Item
+				# legt den Ordner dann unter der aufrufenden Identitaet erfolgreich an, aber
+				# BACKUP DATABASE laeuft als SQL-Dienstkonto und scheitert danach mit "Cannot open
+				# backup device ... Operating system error 5(Access is denied.)", obwohl der Ordner
+				# sichtbar vorhanden ist. Deshalb hier proaktiv dieselben Rechte vergeben, die
+				# Invoke-sqmNtfsSetup fuer die Standardverzeichnisse setzt - nicht fatal, falls das
+				# selbst fehlschlaegt (z.B. Dienstkonto nicht ermittelbar): der Backup-Versuch laeuft
+				# trotzdem weiter und liefert im Fehlerfall die eigentliche SQL-Fehlermeldung.
+				try
+				{
+					$ntfsResult = Invoke-sqmNtfsSetup -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
+						-Directory $BackupPath -Permission Modify -SkipBackup -Confirm:$false -ErrorAction Stop
+					if ($ntfsResult.Status -in @('Granted', 'WhatIfSkipped'))
+					{
+						Invoke-sqmLogging -Message "NTFS-Rechte fuer SQL-Dienstkonto(s) auf neu angelegtem Verzeichnis $BackupPath vergeben." -FunctionName $functionName -Level "INFO"
+					}
+					else
+					{
+						Invoke-sqmLogging -Message "NTFS-Rechte auf $BackupPath konnten nicht vollstaendig vergeben werden: $($ntfsResult.Message)" -FunctionName $functionName -Level "WARNING"
+					}
+				}
+				catch
+				{
+					Invoke-sqmLogging -Message "Konnte NTFS-Rechte auf neu angelegtem Verzeichnis $BackupPath nicht setzen (Backup wird trotzdem versucht): $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
+				}
 			}
 			catch
 			{

@@ -1,5 +1,40 @@
 # sqmSQLTool — Changelog
 
+## [1.9.45.0] — 2026-08-04
+
+### Fix: `Invoke-sqmUserDatabaseBackup` legte ein neues Backupverzeichnis an, konnte aber danach nicht hineinschreiben
+
+Zeigte die Server-Eigenschaft `BackupDirectory` auf einen noch nicht existierenden Pfad (z.B. nach
+einer Umstellung waehrend eines Instanz-Setups, ohne dass fuer den neuen Pfad je `Invoke-sqmNtfsSetup`
+gelaufen ist), legte `New-Item` das Verzeichnis zwar erfolgreich unter der aufrufenden Identitaet an
+- ein neu angelegter Ordner erbt NTFS-Rechte aber nur, wenn ein Vorfahre bereits eine vererbbare ACE
+fuer das SQL-Dienstkonto hat. `BACKUP DATABASE` laeuft dagegen als SQL-Dienstkonto und scheiterte
+danach mit "Cannot open backup device ... Operating system error 5(Access is denied.)", obwohl das
+Verzeichnis sichtbar vorhanden war.
+
+Fix: Nach dem Anlegen eines neuen Backupverzeichnisses vergibt die Funktion jetzt automatisch
+`Modify`-Rechte fuer das/die SQL-Dienstkonto(s) auf diesem Verzeichnis (ueber `Invoke-sqmNtfsSetup
+-Directory $BackupPath -Permission Modify -SkipBackup`), bevor der eigentliche Backup-Lauf startet.
+Schlaegt das Setzen der Rechte selbst fehl (z.B. Dienstkonto nicht ermittelbar), wird das nur als
+Warnung geloggt - das Backup wird trotzdem versucht und liefert im Fehlerfall die eigentliche
+SQL-Fehlermeldung.
+
+### Fix: `Show-sqmToolGui` forderte bei Funktionen mit mehreren Parameter-Sets alle sich gegenseitig ausschliessenden Pflichtparameter gleichzeitig
+
+Bei `Invoke-sqmRestoreDatabase` z.B. ist `-BackupFile` nur im Parameter-Set `SingleFile` und
+`-BackupFiles` nur im Set `Sequence` Mandatory - beides sind Alternativen, nicht zwei zusaetzliche
+Pflichtfelder. Die bisherige Pruefung vor `Run` markierte einen Parameter aber bereits als Pflichtfeld,
+sobald IRGENDEINES seiner `ParameterAttribute`-Objekte `Mandatory = $true` gesetzt hatte - unabhaengig
+vom Parameter-Set. Dadurch verlangte der Dialog `-BackupFile` UND `-BackupFiles` gleichzeitig ausgefuellt,
+obwohl `Invoke-sqmRestoreDatabase` bei beiden gesetzt sofort mit "Parameter set cannot be resolved"
+fehlgeschlagen waere - der Restore liess sich ueber die GUI faktisch nie starten.
+
+Fix: Die Validierung nutzt jetzt `Command.ParameterSets` und laesst `Run` zu, sobald FUER MINDESTENS
+EIN Parameter-Set alle seine Pflichtparameter ausgefuellt sind (genau wie PowerShell selbst beim
+Binden entscheidet), statt die Vereinigung aller Pflichtparameter ueber alle Sets hinweg zu verlangen.
+Die Hinweis-Meldung bei fehlenden Angaben zeigt bei mehreren Parameter-Sets jede noch unvollstaendige
+Kombination einzeln an, damit klar ist, dass EINE davon ausreicht.
+
 ## [1.9.44.0] — 2026-08-04
 
 ### Fix: `Invoke-sqmRestoreDatabase` meldete einen fehlgeschlagenen Secondary-Drop faelschlich als Erfolg

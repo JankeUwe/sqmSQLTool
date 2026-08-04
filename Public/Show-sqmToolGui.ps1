@@ -650,31 +650,51 @@
 			}
 		})
 
+	# A parameter that is Mandatory only within one ParameterSetName (e.g. BackupFile in the
+	# 'SingleFile' set vs. BackupFiles in the 'Sequence' set of Invoke-sqmRestoreDatabase) is a
+	# per-set alternative, not something the caller must fill in on top of the other. Checking
+	# "is this parameter Mandatory in ANY of its ParameterAttributes" - as this used to do - flags
+	# every such alternative as globally required, so Run refused to fire unless the user filled
+	# in ALL of them simultaneously, even though the underlying function only accepts one at a
+	# time and throws "Parameter set cannot be resolved" if both are passed. Validate instead the
+	# way PowerShell itself binds: the command can run as soon as AT LEAST ONE of its parameter
+	# sets has every one of ITS mandatory parameters filled in.
+	$isValueFilled = {
+		param ($pname)
+		if ($script:guiState.Creds.ContainsKey($pname)) { return [bool]$script:guiState.Creds[$pname].Cred }
+		if (-not $script:guiState.Controls.ContainsKey($pname)) { return $false }
+		$ctrl = $script:guiState.Controls[$pname]
+		if ($ctrl -is [System.Windows.Forms.CheckBox]) { return $ctrl.Checked }
+		if ($ctrl -is [System.Windows.Forms.ComboBox]) { return [bool]$ctrl.SelectedItem }
+		return -not [string]::IsNullOrWhiteSpace($ctrl.Text)
+	}
+
 	$btnRun.Add_Click({
 			if (-not $script:guiState.Command) { return }
-			# Validate mandatory fields
+			# Validate mandatory fields - per parameter set, see $isValueFilled above.
+			$paramSets = $script:guiState.Command.ParameterSets
 			$missing = @()
-			foreach ($pname in $script:guiState.Controls.Keys)
+			$satisfiedAny = $false
+			foreach ($ps in $paramSets)
 			{
-				$p = $script:guiState.Command.Parameters[$pname]
-				$man = $false
-				foreach ($a in $p.Attributes) { if ($a -is [System.Management.Automation.ParameterAttribute] -and $a.Mandatory) { $man = $true } }
-				if ($man)
+				$setMandatory = @($ps.Parameters | Where-Object { $_.IsMandatory -and $_.Name -notin @('WhatIf', 'Confirm') -and $common -notcontains $_.Name })
+				$setMissing = @($setMandatory | Where-Object { -not (& $isValueFilled $_.Name) } | Select-Object -ExpandProperty Name)
+				if ($setMissing.Count -eq 0) { $satisfiedAny = $true; break }
+				$missing += , $setMissing
+			}
+			if (-not $satisfiedAny)
+			{
+				# Multiple parameter sets: show each still-incomplete combination as its own
+				# alternative so the user knows filling in EITHER is enough, not all of them.
+				$lines = if ($paramSets.Count -gt 1)
 				{
-					$ctrl = $script:guiState.Controls[$pname]
-					if ($ctrl -is [System.Windows.Forms.TextBox] -and [string]::IsNullOrWhiteSpace($ctrl.Text)) { $missing += $pname }
+					for ($i = 0; $i -lt $paramSets.Count; $i++) { "  [$($paramSets[$i].Name)] $($missing[$i] -join ', ')" }
 				}
-			}
-			foreach ($cn in $script:guiState.Creds.Keys)
-			{
-				$cp = $script:guiState.Command.Parameters[$cn]
-				$man = $false
-				foreach ($a in $cp.Attributes) { if ($a -is [System.Management.Automation.ParameterAttribute] -and $a.Mandatory) { $man = $true } }
-				if ($man -and -not $script:guiState.Creds[$cn].Cred) { $missing += $cn }
-			}
-			if ($missing.Count -gt 0)
-			{
-				[System.Windows.Forms.MessageBox]::Show("Required parameters missing:`n  - $($missing -join "`n  - ")", 'Incomplete input', 'OK', 'Warning') | Out-Null
+				else
+				{
+					$missing[0] | ForEach-Object { "  - $_" }
+				}
+				[System.Windows.Forms.MessageBox]::Show("Required parameters missing:`n$($lines -join "`n")", 'Incomplete input', 'OK', 'Warning') | Out-Null
 				return
 			}
 
