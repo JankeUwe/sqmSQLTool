@@ -3,8 +3,20 @@
     Enables or disables a single Policy-Based Management policy on a SQL Server instance.
 
 .DESCRIPTION
-    Uses dbatools (Get-DbaPbmPolicy) to check whether the specified policy exists on
-    the target instance, and then toggles only that policy via its SMO object.
+    Checks msdb.dbo.syspolicy_policies for the named policy and toggles only that policy
+    via the msdb procedure sp_syspolicy_update_policy.
+
+    Deliberately pure T-SQL instead of the dbatools PBM cmdlets (Get-DbaPbmPolicy): those
+    require the SMO PolicyStore and abort under PowerShell 7 with "Get-DbaPbmStore: This
+    command is not supported on Linux or macOS". That failed SILENTLY - the policy was never
+    disabled, and callers relying on it (e.g. Invoke-sqmTempSysadminAction before a
+    CREATE LOGIN, Invoke-sqmRestoreDatabase) ran on unprotected against the
+    syspolicy_server_trigger. The T-SQL path behaves identically under Windows PowerShell 5.1
+    and PowerShell 7.
+
+    Note: disabling the last enabled "On Change: Prevent" policy makes SQL Server DROP the
+    syspolicy_server_trigger entirely; re-enabling recreates it. That is PBM's own behaviour,
+    not something this function does.
 
     Unlike older scripts, this does not change the global PBM engine state,
     but only the explicitly named policy.
@@ -101,9 +113,23 @@ function Set-sqmSqlPolicyState
 			try
 			{
 				Invoke-sqmLogging -Message "[$instance] Suche Policy '$Policy' ..." -FunctionName $functionName -Level "INFO"
-				
-				$policyObject = Get-DbaPbmPolicy @connParams -Policy $Policy -EnableException:$EnableException -ErrorAction Stop
-				if (-not $policyObject)
+
+				# Policy-Existenz per Katalogsicht statt Get-DbaPbmPolicy: die PBM-Cmdlets von
+				# dbatools setzen SMO-PolicyStore voraus und brechen unter PowerShell 7 mit
+				# "Get-DbaPbmStore: This command is not supported on Linux or macOS" ab (dbatools
+				# blockiert die PBM-Befehle ausserhalb der Windows-PowerShell/.NET-Framework-
+				# Umgebung). Ergebnis war ein STILLER Fehlschlag: Get-DbaPbmPolicy lieferte nichts,
+				# diese Funktion meldete "Policy existiert nicht" und der Aufrufer lief ungeschuetzt
+				# weiter - genau die Ursache dafuer, dass die Policy-Deaktivierung vor einem
+				# CREATE LOGIN unter PS 7 wirkungslos blieb und die Anweisung am
+				# syspolicy_server_trigger scheiterte. Die Katalogsicht und die msdb-Prozedur
+				# sp_syspolicy_update_policy sind reines T-SQL und funktionieren unter JEDER
+				# PowerShell-Version identisch.
+				$policyLit = $Policy -replace "'", "''"
+				$policyRow = Invoke-DbaQuery @connParams -Database msdb -EnableException -ErrorAction Stop `
+					-Query "SELECT policy_id, is_enabled FROM msdb.dbo.syspolicy_policies WHERE name = N'$policyLit';"
+
+				if (-not $policyRow)
 				{
 					$msg = "Policy '$Policy' existiert nicht auf '$instance'."
 					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "WARNING"
@@ -116,41 +142,25 @@ function Set-sqmSqlPolicyState
 						})
 					continue
 				}
-				
+
 				$actionMsg = "Policy '$Policy' auf '$instance' $actionLabel"
 				if ($PSCmdlet.ShouldProcess($instance, $actionMsg))
 				{
 					Invoke-sqmLogging -Message "[$instance] $actionMsg ..." -FunctionName $functionName -Level "INFO"
 
-					# SMO-Policy-Objekt ermitteln: dbatools gibt je nach Version entweder
-					# einen Wrapper mit .Policy-Sub-Property zurueck, oder das SMO-Objekt direkt.
-					$smoPolicy = $null
-					$policySubObj = $policyObject.PSObject.Properties['Policy']
-					if ($policySubObj -and $null -ne $policySubObj.Value)
+					$policyId = [int]$policyRow.policy_id
+					$enabledInt = if ($targetEnabled) { 1 } else { 0 }
+					Invoke-DbaQuery @connParams -Database msdb -EnableException -ErrorAction Stop `
+						-Query "EXEC msdb.dbo.sp_syspolicy_update_policy @policy_id = $policyId, @is_enabled = $enabledInt;"
+
+					# Nachpruefen statt auf "keine Exception = Erfolg" zu vertrauen.
+					$verifyRow = Invoke-DbaQuery @connParams -Database msdb -EnableException -ErrorAction Stop `
+						-Query "SELECT is_enabled FROM msdb.dbo.syspolicy_policies WHERE policy_id = $policyId;"
+					if (-not $verifyRow -or [int]$verifyRow.is_enabled -ne $enabledInt)
 					{
-						$candidate = $policySubObj.Value
-						if ($candidate | Get-Member -Name 'Enabled' -MemberType Property -ErrorAction SilentlyContinue)
-						{
-							$smoPolicy = $candidate
-						}
-					}
-					# Fallback: dbatools gibt SMO-Objekt direkt zurueck (dbatools 2.x)
-					if ($null -eq $smoPolicy)
-					{
-						if ($policyObject | Get-Member -Name 'Enabled' -MemberType Property -ErrorAction SilentlyContinue)
-						{
-							$smoPolicy = $policyObject
-						}
-					}
-					if ($null -eq $smoPolicy)
-					{
-						throw "Policy-Objekt hat keine setzbare 'Enabled'-Eigenschaft. " +
-						      "dbatools-Version pruefen. Verfuegbare Eigenschaften: " +
-						      (($policyObject | Get-Member -MemberType Property | Select-Object -ExpandProperty Name) -join ', ')
+						throw "sp_syspolicy_update_policy lief ohne Fehler, aber 'is_enabled' der Policy '$Policy' auf '$instance' steht danach nicht auf $enabledInt."
 					}
 
-					$smoPolicy.Enabled = $targetEnabled
-					$smoPolicy.Alter()
 					$msg = "Policy '$Policy' auf '$instance' erfolgreich $actionLabel."
 					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "INFO"
 					$results.Add([PSCustomObject]@{

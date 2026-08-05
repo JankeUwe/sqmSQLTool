@@ -1,5 +1,40 @@
 # sqmSQLTool — Changelog
 
+## [1.9.64.0] — 2026-08-05
+
+### Fix: PBM-Policy-Handling scheiterte unter PowerShell 7 STILLSCHWEIGEND
+
+Die dbatools-PBM-Cmdlets setzen den SMO-PolicyStore voraus und brechen unter PowerShell 7 mit
+"Get-DbaPbmStore: This command is not supported on Linux or macOS" ab. Zusammen mit
+`-ErrorAction SilentlyContinue` bzw. der `-ContinueOnError`-Auswertung fuehrte das zu einem
+lautlosen Fehlschlag: die Policy wurde nie deaktiviert, der Aufrufer lief ungeschuetzt weiter.
+
+Gegen DEV01 unter beiden Versionen gemessen (identisches Skript, identische Instanz):
+
+| | PowerShell 5.1 | PowerShell 7 |
+|---|---|---|
+| Policy nach Disable | `is_enabled=0` | **unveraendert `1`** |
+| `syspolicy_server_trigger` | von PBM entfernt | bleibt bestehen |
+| `CREATE LOGIN ... FROM WINDOWS` | erfolgreich | **blockiert** |
+
+Bemerkenswert dabei (und ebenfalls verifiziert): SQL Server entfernt den
+`syspolicy_server_trigger` automatisch, sobald keine aktivierte "On Change: Prevent"-Policy mehr
+existiert, und legt ihn beim Aktivieren neu an - die Trigger-Existenz wird von PBM selbst
+verwaltet.
+
+Fix: `Set-sqmSqlPolicyState` nutzt jetzt ausschliesslich T-SQL (`msdb.dbo.syspolicy_policies` zum
+Pruefen, `msdb.dbo.sp_syspolicy_update_policy` zum Umschalten) statt der dbatools-PBM-Cmdlets,
+inklusive Verifikation des Ergebnisses statt "keine Exception = Erfolg". Verhaelt sich unter
+PS 5.1 und PS 7 identisch - beide Wege gegen DEV01 nachgewiesen.
+
+Vollstaendiges Audit des Moduls auf weitere Betroffene: dbatools 2.8.2 sperrt genau 6 Befehle
+ausserhalb der Windows PowerShell (`Copy-DbaSsisCatalog`, `Export-DbaCredential`,
+`Export-DbaLinkedServer`, `Get-DbaPbmStore`, `Get-DbaSsisEnvironmentVariable`,
+`New-DbaSsisCatalog`). Davon nutzt sqmSQLTool nur den PBM-Pfad, an genau zwei Stellen:
+`Set-sqmSqlPolicyState` (oben) und `Invoke-sqmRestoreDatabase` (Policy-Deaktivierung vor dem
+Restore, dort ebenfalls mit `-ErrorAction SilentlyContinue` und damit lautlos) - beide auf die
+Katalogsicht umgestellt. Die uebrigen vier Befehle kommen im Modul nicht vor.
+
 ## [1.9.63.0] — 2026-08-05
 
 ### Neu: Warnung, wenn die "temporaere" Rolle in Wahrheit dauerhaft ueber eine Gruppe besteht

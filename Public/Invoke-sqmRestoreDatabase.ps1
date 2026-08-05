@@ -684,8 +684,17 @@ function Invoke-sqmRestoreDatabase
 			{
 				try
 				{
-					$policyObj = Get-DbaPbmPolicy -SqlInstance $workInstance -SqlCredential $SqlCredential -Policy $policyName -ErrorAction SilentlyContinue
-					if ($policyObj -and $policyObj.Policy.Enabled)
+					# Policy-Status per Katalogsicht statt Get-DbaPbmPolicy: die dbatools-PBM-Cmdlets
+					# setzen den SMO-PolicyStore voraus und brechen unter PowerShell 7 ab
+					# ("Get-DbaPbmStore: This command is not supported on Linux or macOS"). Zusammen
+					# mit -ErrorAction SilentlyContinue war das ein STILLER Fehlschlag: $policyObj
+					# blieb leer, der gesamte Block wurde uebersprungen und die Policy waehrend des
+					# Restores nie deaktiviert - ohne jeden Hinweis im Log. Die Katalogsicht ist
+					# reines T-SQL und verhaelt sich unter PS 5.1 und PS 7 identisch.
+					$policyNameLit = $policyName -replace "'", "''"
+					$policyRow = Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database msdb `
+						-Query "SELECT is_enabled FROM msdb.dbo.syspolicy_policies WHERE name = N'$policyNameLit';" -EnableException -ErrorAction Stop
+					if ($policyRow -and [int]$policyRow.is_enabled -eq 1)
 					{
 						$policyWasEnabled = $true
 						if ($PSCmdlet.ShouldProcess($workInstance, "Temporaer Policy '$policyName' deaktivieren fuer Restore-Operation"))
