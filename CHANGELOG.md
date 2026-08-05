@@ -1,5 +1,35 @@
 # sqmSQLTool — Changelog
 
+## [1.9.63.0] — 2026-08-05
+
+### Neu: Warnung, wenn die "temporaere" Rolle in Wahrheit dauerhaft ueber eine Gruppe besteht
+
+Auf DWP1W02SQLT0001 stellte sich heraus, dass die betroffenen Logins die sysadmin-Rolle bereits
+ueber AD-Gruppenmitgliedschaft besassen. Das hat eine Konsequenz, die ueber den Bug aus 1.9.61.0
+hinausgeht und die Kernzusage dieser Funktion beruehrt: `ALTER SERVER ROLE ... DROP MEMBER`
+entfernt beim Entzug nur die DIREKTE Mitgliedschaft. Eine ueber eine Gruppe geerbte Berechtigung
+bleibt danach unveraendert bestehen - die zeitliche Befristung waere also nur scheinbar gegeben,
+und niemand haette es bemerkt, weil das Tool sauberen Erfolg meldete.
+
+Neu in `Invoke-sqmTempSysadminAction`:
+- Beim Grant wird vorab geprueft, ob die Rolle bereits ueber einen anderen Pfad wirksam ist
+  (effektiv ja, direkt nein). Ist das so, wird die zusaetzliche direkte Mitgliedschaft zwar
+  vergeben (sie schafft einen sauberen, befristeten Audit-Eintrag), aber mit einer WARNUNG in
+  Logfile und Eventlog (EventId 9011) versehen, dass die geerbte Berechtigung davon unberuehrt
+  bleibt.
+- Beim Revoke wird NACH dem Entzug geprueft, ob der Login weiterhin effektiv Mitglied ist. Falls
+  ja, warnt das Tool ausdruecklich (Logfile + Eventlog, EventId 9012), dass die privilegierten
+  Rechte NICHT beendet wurden und dafuer die Gruppenmitgliedschaft angepasst werden muss.
+
+Bewusst als Warnung und nicht als Abbruch umgesetzt: die zusaetzliche direkte Mitgliedschaft ist
+fuer die Nachvollziehbarkeit (wer war wann per Ticket erhoeht) durchaus sinnvoll - sie darf nur
+nicht mit einer echten Befristung verwechselt werden.
+
+Verifiziert gegen DEV01, dass der Normalfall (keine geerbten Rechte) unveraendert und ohne
+Fehlalarm durchlaeuft. Der geerbte Fall selbst liess sich in der Testumgebung nicht nachstellen
+(Workgroup, keine Domaene, kein `BUILTIN\Administrators`-Login) - die Einzelbausteine der
+Erkennung (`IS_SRVROLEMEMBER()` effektiv, Katalogsicht direkt) sind aber jeweils belegt.
+
 ## [1.9.62.0] — 2026-08-05
 
 ### Fix: `Get-sqmLoginSettings` untertrieb sysadmin-Privilegien, die ueber AD-Gruppen geerbt sind

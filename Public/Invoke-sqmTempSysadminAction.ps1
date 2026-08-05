@@ -287,11 +287,28 @@ EXISTS (
     JOIN sys.server_principals m ON m.principal_id = rm.member_principal_id
     WHERE r.name = N'$Role' AND m.name = N'$loginLit')
 "@
+					# Vor der Vergabe feststellen, ob die Rolle bereits ueber einen ANDEREN Pfad
+					# (typischerweise eine Windows-/AD-Gruppe) wirksam ist. Das ist keine
+					# Kosmetik, sondern betrifft die Kernzusage dieser Funktion: der spaetere
+					# Revoke entfernt nur die DIREKTE Mitgliedschaft - eine ueber eine Gruppe
+					# geerbte Berechtigung bleibt danach bestehen. Die "temporaere" Erhoehung
+					# waere dann in Wahrheit dauerhaft, ohne dass das jemand bemerkt.
+					$preState = Invoke-DbaQuery @connParams -Database master -EnableException -ErrorAction Stop `
+						-Query "SELECT ISNULL(IS_SRVROLEMEMBER('$Role', N'$loginLit'), 0) AS IsEffective, CASE WHEN $directMemberPredicate THEN 1 ELSE 0 END AS IsDirect;"
+					$hadInheritedRole = ($preState -and [int]$preState.IsEffective -eq 1 -and [int]$preState.IsDirect -eq 0)
+
 					$sql = @"
 IF NOT $directMemberPredicate
     ALTER SERVER ROLE $roleBracket ADD MEMBER $loginBracket;
 "@
 					Invoke-DbaQuery @connParams -Database master -Query $sql -EnableException -ErrorAction Stop
+
+					if ($hadInheritedRole)
+					{
+						$inheritMsg = "HINWEIS: Login '$Login' besass die Rolle '$Role' auf '$SqlInstance' bereits ueber einen anderen Pfad (z.B. Mitgliedschaft in einer Windows-/AD-Gruppe, die selbst Mitglied der Rolle ist). Die direkte Mitgliedschaft wurde zusaetzlich vergeben und wird beim Entzug wieder entfernt - die GEERBTE Berechtigung bleibt davon unberuehrt und besteht auch nach dem Entzug weiter. Eine echte zeitliche Befristung ist so nicht gegeben; dafuer muesste die Gruppenmitgliedschaft angepasst werden. Auftragsnummer: $ticketText."
+						Invoke-sqmLogging -Message $inheritMsg -FunctionName $functionName -Level 'WARNING'
+						Write-sqmEventLogSafe -Message $inheritMsg -EntryType 'Warning' -EventId 9011
+					}
 
 					# --- Verifikation: nicht auf "keine Exception = Erfolg" verlassen. Eine
 					# bedingte Anweisung, deren Bedingung nicht zutrifft, ist kein SQL-Fehler -
@@ -337,6 +354,21 @@ IF $directMemberPredicate
 					if (-not $verify -or [int]$verify.IsDirectMember -ne 0)
 					{
 						throw "ALTER SERVER ROLE $roleBracket DROP MEMBER lief ohne Fehler, aber '$Login' ist laut sys.server_role_members danach immer noch direktes Mitglied der Rolle '$Role' auf '$SqlInstance'."
+					}
+
+					# Kernzusage dieser Funktion pruefen: ist die Berechtigung nach dem Entzug
+					# TATSAECHLICH weg? Bei einer ueber eine Windows-/AD-Gruppe geerbten Rolle
+					# entfernt DROP MEMBER nur die direkte Mitgliedschaft - der Anwender bleibt
+					# faktisch privilegiert. Das darf nicht als sauber abgeschlossener Entzug
+					# durchgehen, sondern muss sichtbar sein (Log UND Eventlog), sonst meldet das
+					# Tool eine zeitliche Befristung, die es nicht gibt.
+					$stillEffective = Invoke-DbaQuery @connParams -Database master -EnableException -ErrorAction Stop `
+						-Query "SELECT ISNULL(IS_SRVROLEMEMBER('$Role', N'$loginLit'), 0) AS IsEffective;"
+					if ($stillEffective -and [int]$stillEffective.IsEffective -eq 1)
+					{
+						$stillMsg = "ACHTUNG: Die direkte Mitgliedschaft von '$Login' in '$Role' auf '$SqlInstance' wurde entzogen, der Login ist aber WEITERHIN effektiv Mitglied der Rolle - die Berechtigung wird ueber einen anderen Pfad vererbt (z.B. eine Windows-/AD-Gruppe, die selbst Mitglied der Rolle ist). Der Entzug beendet die privilegierten Rechte damit NICHT. Zum tatsaechlichen Entzug muss die Gruppenmitgliedschaft angepasst werden. Auftragsnummer: $ticketText."
+						Invoke-sqmLogging -Message $stillMsg -FunctionName $functionName -Level 'WARNING'
+						Write-sqmEventLogSafe -Message $stillMsg -EntryType 'Warning' -EventId 9012
 					}
 
 					$msg = "$Role Revoke fuer Login '$Login' auf '$SqlInstance' erfolgreich. Auftragsnummer: $ticketText."
