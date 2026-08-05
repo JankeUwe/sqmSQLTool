@@ -274,6 +274,19 @@ IF IS_SRVROLEMEMBER('$Role', N'$loginLit') = 0
 "@
 					Invoke-DbaQuery @connParams -Database master -Query $sql -EnableException -ErrorAction Stop
 
+					# --- Verifikation: IS_SRVROLEMEMBER() liefert NULL statt 0/1, wenn es Login
+					# oder Rolle nicht eindeutig aufloesen kann - das IF oben wird dann
+					# STILLSCHWEIGEND uebersprungen, OHNE Exception. Ohne diese Nachpruefung
+					# meldete die Funktion in genau diesem Fall faelschlich Erfolg, obwohl die
+					# Rolle nie vergeben wurde ("keine Fehlermeldung, aber sysadmin: nein").
+					$verify = Invoke-DbaQuery @connParams -Database master -EnableException -ErrorAction Stop `
+						-Query "SELECT IS_SRVROLEMEMBER('$Role', N'$loginLit') AS IsMember;"
+					$isMemberNow = if ($verify -and $verify.IsMember -isnot [DBNull]) { [int]$verify.IsMember } else { $null }
+					if ($isMemberNow -ne 1)
+					{
+						throw "ALTER SERVER ROLE $roleBracket ADD MEMBER lief ohne Fehler, aber IS_SRVROLEMEMBER('$Role', '$Login') zeigt danach immer noch NICHT Mitglied (Wert: $(if($null -eq $isMemberNow){'NULL'}else{$isMemberNow})). Vermutliche Ursache: IS_SRVROLEMEMBER() konnte Login oder Rolle nicht eindeutig aufloesen (liefert dann NULL statt 0/1), wodurch die bedingte ALTER-Anweisung stillschweigend uebersprungen wurde, statt einen Fehler zu werfen."
+					}
+
 					$msg = "$Role Grant fuer Login '$Login' auf '$SqlInstance' erfolgreich$(if($loginCreated){' (Login neu angelegt)'}). Auftragsnummer: $ticketText."
 					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "INFO"
 					Write-sqmEventLogSafe -Message $msg -EntryType 'Information' -EventId 9001
@@ -286,6 +299,15 @@ IF IS_SRVROLEMEMBER('$Role', N'$loginLit') = 1
     ALTER SERVER ROLE $roleBracket DROP MEMBER $loginBracket;
 "@
 					Invoke-DbaQuery @connParams -Database master -Query $sql -EnableException -ErrorAction Stop
+
+					# --- Verifikation: gleiche Begruendung wie beim Grant oben, spiegelverkehrt. ---
+					$verify = Invoke-DbaQuery @connParams -Database master -EnableException -ErrorAction Stop `
+						-Query "SELECT IS_SRVROLEMEMBER('$Role', N'$loginLit') AS IsMember;"
+					$isMemberNow = if ($verify -and $verify.IsMember -isnot [DBNull]) { [int]$verify.IsMember } else { $null }
+					if ($isMemberNow -eq 1)
+					{
+						throw "ALTER SERVER ROLE $roleBracket DROP MEMBER lief ohne Fehler, aber IS_SRVROLEMEMBER('$Role', '$Login') zeigt danach immer noch Mitglied. Vermutliche Ursache: IS_SRVROLEMEMBER() konnte Login oder Rolle nicht eindeutig aufloesen (liefert dann NULL statt 0/1), wodurch die bedingte ALTER-Anweisung stillschweigend uebersprungen wurde, statt einen Fehler zu werfen."
+					}
 
 					$msg = "$Role Revoke fuer Login '$Login' auf '$SqlInstance' erfolgreich. Auftragsnummer: $ticketText."
 					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "INFO"

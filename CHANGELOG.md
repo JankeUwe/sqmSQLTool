@@ -1,5 +1,27 @@
 # sqmSQLTool — Changelog
 
+## [1.9.60.0] — 2026-08-05
+
+### Fix: `Invoke-sqmTempSysadminAction` meldete Erfolg, obwohl die Rolle nie vergeben wurde
+
+Auf DWP1W02SQLT0001 beobachtet: kein Fehler, der Revoke-Job wird angelegt, aber die Rolle war
+danach nachweislich nicht vergeben. Ursache: die Grant-/Revoke-Anweisung ist bedingt (`IF
+IS_SRVROLEMEMBER('$Role', N'$Login') = 0 ALTER SERVER ROLE ... ADD MEMBER ...`) -
+`IS_SRVROLEMEMBER()` liefert laut Doku `NULL` statt `0`/`1`, wenn es Login oder Rolle nicht
+eindeutig aufloesen kann (gegen DEV01 bestaetigt: liefert NULL fuer einen nicht auflösbaren
+Login). `NULL = 0` ist in T-SQL weder wahr noch falsch, das IF wird dann STILLSCHWEIGEND
+uebersprungen, ohne dass `ALTER SERVER ROLE` je laeuft und ohne dass eine Exception entsteht -
+`Invoke-DbaQuery -EnableException` wirft nur bei echten SQL-Fehlern, ein uebersprungenes IF ist
+kein Fehler. Der Code vertraute bisher ausschliesslich auf "keine Exception = Erfolg", genau das
+Muster, das dieses Modul schon mehrfach eingeholt hat (siehe 1.9.43.0/1.9.44.0,
+`Remove-DbaDatabase` bei `Invoke-sqmRestoreDatabase`).
+
+Fix: nach der Grant-/Revoke-Anweisung wird `IS_SRVROLEMEMBER()` explizit nachgeprueft; weicht das
+Ergebnis vom erwarteten Zustand ab (inkl. `NULL`), wirft die Funktion jetzt einen expliziten
+Fehler mit der vermuteten Ursache, statt faelschlich Erfolg zu meldem. Regressionsgetestet gegen
+DEV01 (normaler Grant+Revoke-Rundlauf funktioniert weiterhin unveraendert), NULL-Verhalten von
+`IS_SRVROLEMEMBER()` fuer einen nicht aufloesbaren Login separat verifiziert.
+
 ## [1.9.59.0] — 2026-08-05
 
 ### Fix: sysadmin-Grant scheiterte trotz deaktivierter Policy - alle Server-Trigger statt nur eine Policy deaktivieren
