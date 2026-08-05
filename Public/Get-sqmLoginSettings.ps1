@@ -16,6 +16,13 @@
       SQL-Logins gefuellt (via sys.sql_logins / LOGINPROPERTY), bei Windows-Logins/
       -Gruppen $null, da deren Kennwortrichtlinie ueber AD und nicht ueber SQL Server
       verwaltet wird.
+    - Mitgliedschaft in der festen Serverrolle sysadmin (IsSysAdmin).
+    - Ein daraus abgeleitetes RiskLevel ('Critical' / 'Warning' / 'OK' / 'N/A') plus
+      RiskIcon (roter/gelber/gruener/grauer Punkt) fuer eine kompakte Sicherheitsampel:
+      Kennwort-Richtlinie oder -Ablauf deaktiviert bei einem sysadmin-Login ist Critical,
+      beim Nicht-sysadmin-Login nur Warning; ohne jede Abweichung OK. Gilt nur fuer
+      SQL-Logins (bei Windows-Logins/-Gruppen greift die Kennwortrichtlinie von AD, nicht
+      von SQL Server - dort N/A statt eines falschen Befundes).
 
     Ausgabe direkt als Objekte. Optional als CSV nach OutputPath.
 
@@ -58,6 +65,12 @@
 
 .EXAMPLE
     Get-sqmLoginSettings -SqlInstance "SQL01","SQL02" -OutputPath "C:\Reports"
+
+.EXAMPLE
+    Get-sqmLoginSettings -SqlInstance "SQL01" | Where-Object RiskLevel -in 'Critical', 'Warning'
+
+    Nur SQL-Logins mit deaktivierter Kennwort-Richtlinie/-Ablauf anzeigen (Critical = zusaetzlich
+    sysadmin, Warning = nicht-privilegiert).
 
 .NOTES
     Benoetigt: dbatools, Invoke-sqmLogging
@@ -127,9 +140,13 @@ SELECT
     sl.is_expiration_checked   AS PasswordExpirationEnforced,
     CAST(LOGINPROPERTY(sp.name, 'IsExpired') AS bit)     AS PasswordExpired,
     CAST(LOGINPROPERTY(sp.name, 'IsMustChange') AS bit)  AS MustChangePassword,
-    LOGINPROPERTY(sp.name, 'DaysUntilExpiration')        AS DaysUntilExpiration
+    LOGINPROPERTY(sp.name, 'DaysUntilExpiration')        AS DaysUntilExpiration,
+    CASE WHEN srm.member_principal_id IS NOT NULL THEN 1 ELSE 0 END AS IsSysAdmin
 FROM sys.server_principals sp
 LEFT JOIN sys.sql_logins sl ON sl.principal_id = sp.principal_id
+LEFT JOIN sys.server_role_members srm
+    ON srm.member_principal_id = sp.principal_id
+   AND srm.role_principal_id = (SELECT principal_id FROM sys.server_principals WHERE name = 'sysadmin' AND type = 'R')
 WHERE sp.type IN ($typeFilter)
   AND sp.name NOT LIKE '##%##'
 ORDER BY sp.type_desc, sp.name
@@ -174,17 +191,43 @@ ORDER BY sp.type_desc, sp.name
 					# (kein Eintrag in sys.sql_logins) SQL NULL zurueck - Invoke-DbaQuery gibt das ohne
 					# -As PSObject als [DBNull] durch, nicht als PowerShell-$null. [bool]([DBNull]::Value)
 					# wirft eine Ausnahme, daher hier explizit auf [DBNull] pruefen statt zu casten.
+					$policyEnforced     = if ($row.PasswordPolicyEnforced -is [DBNull]) { $null } else { [bool]$row.PasswordPolicyEnforced }
+					$expirationEnforced = if ($row.PasswordExpirationEnforced -is [DBNull]) { $null } else { [bool]$row.PasswordExpirationEnforced }
+					$isSysAdmin         = [bool]$row.IsSysAdmin
+
+					# Sicherheitsampel: Kennwort-Richtlinie/-Ablauf gilt nur fuer SQL-Logins (bei
+					# Windows-Logins/-Gruppen sind die Felder oben bewusst $null - AD, nicht SQL Server,
+					# verwaltet deren Kennwortrichtlinie) - dort N/A statt eines falschen Befundes.
+					# Deaktivierte Richtlinie/Ablauf bei einem sysadmin-Login ist Critical (privilegiertes
+					# Konto ohne Kennwortschutz), beim Nicht-sysadmin nur Warning; ohne Abweichung OK.
+					if ($row.LoginType -ne 'SQL_LOGIN')
+					{
+						$riskLevel = 'N/A'; $riskIcon = '⚪'
+					}
+					elseif ($policyEnforced -eq $false -or $expirationEnforced -eq $false)
+					{
+						if ($isSysAdmin) { $riskLevel = 'Critical'; $riskIcon = '🔴' }
+						else { $riskLevel = 'Warning'; $riskIcon = '🟡' }
+					}
+					else
+					{
+						$riskLevel = 'OK'; $riskIcon = '🟢'
+					}
+
 					$allResults.Add([PSCustomObject]@{
 						SqlInstance                = $instance
 						LoginName                  = $row.LoginName
 						LoginType                  = $row.LoginType
+						IsSysAdmin                 = $isSysAdmin
+						RiskLevel                  = $riskLevel
+						RiskIcon                   = $riskIcon
 						DefaultDatabase            = $row.DefaultDatabase
 						DefaultLanguage            = $row.DefaultLanguage
 						IsDisabled                 = [bool]$row.IsDisabled
 						CreateDate                 = $row.CreateDate
 						ModifyDate                 = $row.ModifyDate
-						PasswordPolicyEnforced     = if ($row.PasswordPolicyEnforced -is [DBNull]) { $null } else { [bool]$row.PasswordPolicyEnforced }
-						PasswordExpirationEnforced = if ($row.PasswordExpirationEnforced -is [DBNull]) { $null } else { [bool]$row.PasswordExpirationEnforced }
+						PasswordPolicyEnforced     = $policyEnforced
+						PasswordExpirationEnforced = $expirationEnforced
 						PasswordExpired            = if ($row.PasswordExpired -is [DBNull]) { $null } else { [bool]$row.PasswordExpired }
 						MustChangePassword         = if ($row.MustChangePassword -is [DBNull]) { $null } else { [bool]$row.MustChangePassword }
 						DaysUntilExpiration        = if ($row.DaysUntilExpiration -is [DBNull]) { $null } else { [int]$row.DaysUntilExpiration }

@@ -1,5 +1,27 @@
 # sqmSQLTool — Changelog
 
+## [1.9.52.0] — 2026-08-05
+
+### Neu: `Get-sqmLoginSettings` mit sysadmin-Mitgliedschaft und Sicherheitsampel (RiskLevel/RiskIcon)
+
+Bisher zeigte der Report nur die rohen Kennwort-Einstellungen, ohne einzuordnen, wie kritisch eine
+Abweichung tatsaechlich ist - ein deaktivierter Kennwortablauf bei einem sysadmin-Login ist ein
+ganz anderes Risiko als bei einem eingeschraenkten Konto.
+
+Neu: `IsSysAdmin` (Mitgliedschaft in der festen Serverrolle sysadmin, via `sys.server_role_members`
++ `sys.server_principals` - gilt fuer SQL- UND Windows-Logins/-Gruppen gleichermassen) sowie ein
+daraus abgeleitetes `RiskLevel` ('Critical' / 'Warning' / 'OK' / 'N/A') mit kompaktem `RiskIcon`
+(🔴/🟡/🟢/⚪) fuer eine schnelle visuelle Einordnung, wenn Text in der Tabelle/dem Report zu lang
+wird: Kennwort-Richtlinie oder -Ablauf deaktiviert bei einem sysadmin-Login ist Critical, beim
+Nicht-sysadmin nur Warning, ohne Abweichung OK. Gilt nur fuer SQL-Logins - bei Windows-Logins/
+-Gruppen greift die Kennwortrichtlinie von AD statt SQL Server, dort N/A statt eines falschen
+Befundes (unabhaengig von deren sysadmin-Mitgliedschaft, die durchaus haeufig ist, z.B. die
+SQL-Dienstkonten selbst).
+
+Gegen DEV01 verifiziert: `dev`/`sa` (sysadmin, Policy+Expiration aus) → Critical, `sqmTestLogin`
+(kein sysadmin, gleiche Einstellungen) → Warning, alle Windows-Logins/-Gruppen (inkl. sysadmin-
+Mitgliedern wie den SQL-Dienstkonten) → N/A statt Fehlklassifikation.
+
 ## [1.9.51.0] — 2026-08-05
 
 ### Fix: `Start-sqmToolGui.cmd` - fragilen zweiten Elevation-Hop entfernt
