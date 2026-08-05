@@ -151,11 +151,22 @@ function Invoke-sqmTempSysadminAction
 			{
 				if ($DisablePolicy -and -not [string]::IsNullOrWhiteSpace($policyName))
 				{
-					$pd = Set-sqmSqlPolicyState @connParams -State Disable -ContinueOnError -ErrorAction Stop
-					if (($pd | Select-Object -ExpandProperty Status -First 1) -eq 'Success')
+					$pd = Set-sqmSqlPolicyState @connParams -Policy $policyName -State Disable -ContinueOnError -ErrorAction Stop
+					$pdFirst = $pd | Select-Object -First 1
+					if ($pdFirst.Status -eq 'Success')
 					{
 						$policyDisabled = $true
 						Invoke-sqmLogging -Message "PBM-Policy '$policyName' auf '$SqlInstance' fuer sysadmin-$Action temporaer deaktiviert." -FunctionName $functionName -Level 'INFO'
+					}
+					else
+					{
+						# NICHT stillschweigend weitermachen: bleibt die Policy aktiv (z.B. weil
+						# Set-sqmSqlPolicyState selbst an fehlenden Rechten oder einer
+						# dbatools/SMO-Eigenheit scheitert), schlaegt die eigentliche
+						# ALTER SERVER ROLE-Anweisung gleich darauf mit demselben
+						# Trigger-Rollback fehl wie ohne diesen Versuch ueberhaupt - bisher
+						# ohne jeden Hinweis darauf, WARUM die Deaktivierung nicht griff.
+						Invoke-sqmLogging -Message "WARNUNG: PBM-Policy '$policyName' auf '$SqlInstance' konnte NICHT deaktiviert werden (Status: $($pdFirst.Status)): $($pdFirst.Message). Der folgende sysadmin-$Action-Versuch laeuft trotzdem, kann aber am selben Policy-Trigger scheitern." -FunctionName $functionName -Level 'WARNING'
 					}
 				}
 

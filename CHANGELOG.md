@@ -1,5 +1,26 @@
 # sqmSQLTool — Changelog
 
+## [1.9.54.0] — 2026-08-05
+
+### Fix: `Invoke-sqmTempSysadminAction` - Fehlschlag der Policy-Deaktivierung war unsichtbar
+
+Nachtrag zu 1.9.53.0: auf DWP1W02SQLT0001 (`DefaultPolicy` korrekt auf 'New Login_Enforce
+Passwort Policy' gesetzt, passend zum dort per `sp_syspolicy_add_policy` angelegten Server/Login-
+Facet und dem serverweiten `syspolicy_server_trigger FOR ALTER_LOGIN, CREATE_LOGIN` - `ALTER SERVER
+ROLE ADD MEMBER` loest intern ebenfalls ein `ALTER_LOGIN`-Ereignis aus, der Trigger sollte also
+weiterhin feuern) schlug der sysadmin-Grant trotz 1.9.53.0 weiterhin fehl.
+
+`Set-sqmSqlPolicyState -State Disable` wurde bisher mit `-ContinueOnError` aufgerufen: schlaegt das
+Deaktivieren selbst fehl (z.B. Berechtigung, dbatools/SMO-Eigenheit), wurde das bisher komplett
+stillschweigend uebersprungen - kein Log-Eintrag, keine Warnung. Der anschliessende sysadmin-Grant
+lief dann gegen die weiterhin aktive Policy und scheiterte am selben Trigger-Rollback wie ganz ohne
+Deaktivierungsversuch, ohne dass aus dem Log je erkennbar war, WARUM die Deaktivierung nicht griff.
+
+Fix: der Rueckgabewert von `Set-sqmSqlPolicyState` wird jetzt in jedem Fall ausgewertet - bei
+Status ungleich 'Success' wird eine WARNUNG mit der eigentlichen Fehlermeldung geloggt, bevor der
+Grant/Revoke-Versuch trotzdem weiterlaeuft. Regressionstest (Grant + Revoke Rundlauf) erneut gegen
+DEV01 verifiziert.
+
 ## [1.9.53.0] — 2026-08-05
 
 ### Fix: `Invoke-sqmTempSysadminAction` scheiterte auf Instanzen mit "On Change: Prevent"-PBM-Policy an ALTER SERVER ROLE
