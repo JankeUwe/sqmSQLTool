@@ -1,5 +1,19 @@
 # sqmSQLTool — Changelog
 
+## [1.9.49.0] — 2026-08-05
+
+### `Show-sqmToolGui` vergroessert - mehr Platz fuer die Hilfe-Anzeige
+
+Der Help-Button schreibt `Get-Help -Full` in dasselbe "Output"-Panel wie die
+Kommando-Ausgabe (unterste Zeile des rechten TableLayoutPanel) - bei der bisherigen
+Fenstergroesse (1150x720) und dem 55/45-Split zugunsten von "Parameters" blieb dafuer
+wenig Raum, obwohl Bildschirmaufloesungen heute deutlich mehr hergeben.
+
+Standardgroesse von 1150x720 auf 1400x900 erhoeht (Minimum 900x560 -> 1000x650), und der
+Hoehen-Split der unteren beiden Prozent-Zeilen von 55% Parameters / 45% Output auf 40%/60%
+zugunsten von Output gedreht - die Parameter-Liste bleibt ohnehin scrollbar (`paramPanel.AutoScroll`)
+und braucht selten mehr als eine Handvoll Zeilen, waehrend `Get-Help -Full`-Text schnell laenger wird.
+
 ## [1.9.48.0] — 2026-08-05
 
 ### Neu: eigenes Icon fuer die Startmenue-Verknuepfung der GUI

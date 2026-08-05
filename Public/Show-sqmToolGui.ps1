@@ -163,9 +163,9 @@
 	$form = New-Object System.Windows.Forms.Form
 	$yearSpan = "2025-$((Get-Date).ToString('yy'))"
 	$form.Text = "sqmSQLTool - Function Browser  v$($module.Version)  [$($commands.Count)]   |   powershelldba.de - Janke (c) $yearSpan"
-	$form.Size = New-Object System.Drawing.Size(1150, 720)
+	$form.Size = New-Object System.Drawing.Size(1400, 900)
 	$form.StartPosition = 'CenterScreen'
-	$form.MinimumSize = New-Object System.Drawing.Size(900, 560)
+	$form.MinimumSize = New-Object System.Drawing.Size(1000, 650)
 	$form.Font = New-Object System.Drawing.Font('Segoe UI', 9)
 	$form.BackColor = $cPanel
 	$form.ForeColor = $cText
@@ -303,9 +303,9 @@
 	$right.Padding = '6,6,6,6'
 	$right.BackColor = $cPanel
 	[void]$right.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Absolute', 130)))  # header
-	[void]$right.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Percent', 55)))     # parameters
+	[void]$right.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Percent', 40)))     # parameters
 	[void]$right.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Absolute', 122)))   # preview + options + buttons
-	[void]$right.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Percent', 45)))     # output
+	[void]$right.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Percent', 60)))     # output (also shows Help text)
 	$split.Panel2.Controls.Add($right)
 	$split.Panel2.BackColor = $cPanel
 
