@@ -37,6 +37,9 @@ $script:sqmModuleConfig = @{
 	RestoreTestRetentionMonths = 12
 	HpuDomainGroupMap     = @()
 	SsrsInstallerPath     = $null
+	# Freigabelaufwerk mit einer vorab gepackten dbatools + dbatools.library-Baseline, fuer
+	# Umgebungen ohne PSGallery-Zugriff (siehe Install.ps1 Schritt 5b). $null = PSGallery nutzen.
+	DbatoolsSharePath     = $null
 	AutoUpdate            = $false
 	UpdateRepository      = ''
 	# Auto-Update-Quelle (zuletzt verwendete Installationsquelle - von Install.ps1 gesetzt
@@ -136,6 +139,7 @@ if ($script:sqmIsFitsEnvironment)
 	$script:sqmModuleConfig['DefaultPolicy']          = 'New Login_Enforce Passwort Policy'
 	$script:sqmModuleConfig['DefaultMonitoringUser']  = "$env:USERDOMAIN\izt0504"
 	$script:sqmModuleConfig['SsrsInstallerPath']      = 'W:\75084-Datenbanken\MSSQL\SQLSources\Reporting'
+	$script:sqmModuleConfig['DbatoolsSharePath']      = 'W:\75084-Datenbanken\MSSQL\SQLSources\Modules'
 	$script:sqmModuleConfig['OlaJobNameFull']         = 'FITS Backup - USER_DATABASES - FULL'
 	$script:sqmModuleConfig['OlaJobNameDiff']         = 'FITS Backup - USER_DATABASES - DIFF'
 	$script:sqmModuleConfig['OlaJobNameLog']          = 'FITS Backup - USER_DATABASES - LOG'

@@ -188,18 +188,39 @@ Get-ChildItem -Path $Destination -Recurse -File | ForEach-Object {
 #
 #     FITS-Umgebung (Quelle unter W:\ bzw. \\tsclient\W\ - Citrix-Freigabelaufwerk, Erkennung wie
 #     in Schritt 7 unten): PSGallery ist auf einer abgeschotteten Produktivinstanz typischerweise
-#     NICHT erreichbar. Dort liegt unter <SQLSources>\Modules (Geschwisterordner von Tools, wo
-#     sqmSQLTool selbst herkommt) bereits ein von FI-TS gepflegtes, fertiges Ordnerpaar
+#     NICHT erreichbar. Dort liegt bereits ein von FI-TS gepflegtes, fertiges Ordnerpaar
 #     'dbatools' + 'dbatools.library' (das binaere Begleitmodul von dbatools 2.x) - Quelle der
-#     Wahrheit ist in diesem Fall das Freigabelaufwerk, nicht PSGallery.
+#     Wahrheit ist in diesem Fall das Freigabelaufwerk, nicht PSGallery. Der Pfad dazu kommt
+#     jetzt primaer aus der Konfiguration (sqmConfig-Key 'DbatoolsSharePath', siehe
+#     Set-sqmConfig) statt implizit aus -Source abgeleitet zu werden - das Modul selbst ist an
+#     dieser Stelle aber noch NICHT importiert (dbatools muss zuerst da sein, bevor
+#     Import-Module wegen RequiredModules ueberhaupt klappt), daher wird config.json hier
+#     direkt gelesen statt Get-sqmConfig aufzurufen. Ist der Key noch nicht gesetzt (erster
+#     Install auf einer neuen Instanz), Fallback auf die bisherige Herleitung
+#     (<SQLSources>\Modules, Geschwisterordner von Tools) - und das Ergebnis wird nach einem
+#     erfolgreichen Modul-Import unten (Schritt 6a) in die Konfiguration zurueckgeschrieben,
+#     damit kuenftige Installationen UND andere Modulfunktionen den Pfad direkt haben.
 # ---------------------------------------------------------------------------
 $isFitsInstall = ($Source -like 'W:\*') -or ($Source -like '\\tsclient\W\*')
 $fitsModulesShare = $null
+$dbatoolsSharePathFromConfig = $null
+$sqmConfigFile = Join-Path $env:APPDATA 'MSSQLTools\config.json'
+if (Test-Path $sqmConfigFile) {
+    try {
+        $dbatoolsSharePathFromConfig = (Get-Content $sqmConfigFile -Raw | ConvertFrom-Json).DbatoolsSharePath
+    } catch { }
+}
 if ($isFitsInstall) {
-    $candidateShare = Join-Path (Split-Path (Split-Path $Source -Parent) -Parent) 'Modules'
+    $candidateShare = if (-not [string]::IsNullOrWhiteSpace($dbatoolsSharePathFromConfig)) {
+        $dbatoolsSharePathFromConfig
+    } else {
+        Join-Path (Split-Path (Split-Path $Source -Parent) -Parent) 'Modules'
+    }
     if ((Test-Path (Join-Path $candidateShare 'dbatools') -PathType Container) -and
         (Test-Path (Join-Path $candidateShare 'dbatools.library') -PathType Container)) {
         $fitsModulesShare = $candidateShare
+    } elseif (-not [string]::IsNullOrWhiteSpace($dbatoolsSharePathFromConfig)) {
+        Write-Warning "  Konfigurierter DbatoolsSharePath '$dbatoolsSharePathFromConfig' enthaelt nicht beide erwarteten Ordner ('dbatools', 'dbatools.library') - wird ignoriert."
     }
 }
 
@@ -311,6 +332,19 @@ if ($importOk) {
         Write-Host "Installationsquelle gemerkt: $srcType ($Source)" -ForegroundColor Gray
     } catch {
         Write-Warning "Installationsquelle konnte nicht gespeichert werden: $_"
+    }
+
+    # DbatoolsSharePath in die Konfiguration zurueckschreiben, wenn Schritt 5b eine FITS-
+    # Freigabe gefunden hat, die dort noch nicht (oder mit einem anderen Pfad) hinterlegt war -
+    # kuenftige Installationen lesen ihn dann direkt aus config.json statt ihn erneut aus
+    # -Source herzuleiten, und andere Modulfunktionen koennen ihn ueber Get-sqmConfig nutzen.
+    if ($fitsModulesShare -and $fitsModulesShare -ne $dbatoolsSharePathFromConfig) {
+        try {
+            Set-sqmConfig -DbatoolsSharePath $fitsModulesShare -ErrorAction Stop
+            Write-Host "DbatoolsSharePath gemerkt: $fitsModulesShare" -ForegroundColor Gray
+        } catch {
+            Write-Warning "DbatoolsSharePath konnte nicht gespeichert werden: $_"
+        }
     }
 }
 

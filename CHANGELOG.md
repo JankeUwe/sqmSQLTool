@@ -1,5 +1,27 @@
 # sqmSQLTool — Changelog
 
+## [1.9.57.0] — 2026-08-05
+
+### Neu: `DbatoolsSharePath`-Konfigurationsschluessel fuer die dbatools-Freigabe
+
+Nachtrag zu 1.9.56.0: der Pfad zur FI-TS-Freigabe mit der dbatools + dbatools.library-Baseline
+wurde bisher implizit aus `-Source` hergeleitet (Geschwisterordner `Modules` neben `Tools`) -
+funktioniert nur, wenn diese Ordnerkonvention exakt so vorliegt, und laesst sich nicht explizit
+setzen/uebersteuern.
+
+Neu: `Set-sqmConfig -DbatoolsSharePath '<Pfad>'` (neutraler Default `$null`, FI-TS-Default
+`W:\75084-Datenbanken\MSSQL\SQLSources\Modules` - analog zum bereits vorhandenen
+`SsrsInstallerPath`). `Install.ps1` Schritt 5b liest diesen Key jetzt vorrangig (direkt aus
+`config.json`, da das Modul an dieser Stelle noch nicht importiert ist - dbatools muss zuerst da
+sein) und faellt nur auf die bisherige Herleitung zurueck, wenn der Key noch nicht gesetzt ist.
+Nach erfolgreichem Modulimport wird ein neu ermittelter Pfad automatisch in die Konfiguration
+zurueckgeschrieben (Schritt 6a) - kuenftige Installationen und andere Modulfunktionen finden ihn
+dann direkt ueber `Get-sqmConfig`, ohne ihn erneut herzuleiten.
+
+Verifiziert: Default leer ausserhalb FI-TS, `Set-sqmConfig` persistiert korrekt nach
+`config.json`, Wert bleibt nach einem frischen Modul-Reimport erhalten. Direktes
+config.json-Parsing (Schluessel fehlt / ist `null` / ist gesetzt) fuer alle drei Faelle geprueft.
+
 ## [1.9.56.0] — 2026-08-05
 
 ### Fix: dbatools-Update in FITS-Umgebungen von PSGallery auf Freigabelaufwerk-Sideload umgestellt

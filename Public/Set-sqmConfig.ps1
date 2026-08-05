@@ -59,6 +59,14 @@
     Used by Install-sqmSsrsReportServer when -InstallerPath is not specified.
     Example: '\\srv-share\Software\SSRS2022\SQLServerReportingServices.exe'
 
+.PARAMETER DbatoolsSharePath
+    UNC or local path to a share containing a pre-packaged 'dbatools' + 'dbatools.library'
+    baseline (two subfolders of that name). Used by Install.ps1 to sideload dbatools on
+    instances without PSGallery access (e.g. FI-TS-hosted production servers) instead of
+    deriving the path from -Source. See github.com/JankeUwe/dbatools-baseline for how such
+    a share gets populated/kept in sync.
+    Example: 'W:\75084-Datenbanken\MSSQL\SQLSources\Modules'
+
 .PARAMETER InstallSourceType
     Typ der zuletzt verwendeten Installationsquelle fuer das Auto-Update:
     'PSGallery' | 'UNC' | 'GitHub' | 'LocalDir'. Wird normalerweise von Install.ps1
@@ -114,6 +122,9 @@
 
 .EXAMPLE
     Set-sqmConfig -SsrsInstallerPath '\\srv-share\Software\SSRS2022\SQLServerReportingServices.exe'
+
+.EXAMPLE
+    Set-sqmConfig -DbatoolsSharePath 'W:\75084-Datenbanken\MSSQL\SQLSources\Modules'
 #>
 function Set-sqmConfig
 {
@@ -156,6 +167,8 @@ function Set-sqmConfig
 		[PSCustomObject[]]$HpuDomainGroupMap,
 		[Parameter(Mandatory = $false)]
 		[string]$SsrsInstallerPath,
+		[Parameter(Mandatory = $false)]
+		[string]$DbatoolsSharePath,
 		[Parameter(Mandatory = $false)]
 		[ValidateSet('Auto', 'FiTs', 'Generic')]
 		[string]$CheckProfile,
@@ -421,6 +434,21 @@ function Set-sqmConfig
 		}
 	}
 	
+	# dbatools-Baseline-Freigabe (Sideload ohne PSGallery-Zugriff)
+	if ($PSBoundParameters.ContainsKey('DbatoolsSharePath'))
+	{
+		if (-not [string]::IsNullOrWhiteSpace($DbatoolsSharePath))
+		{
+			$globalConfig['DbatoolsSharePath'] = $DbatoolsSharePath
+			$updated = $true
+		}
+		else
+		{
+			Write-Error "DbatoolsSharePath darf nicht leer sein."
+			return
+		}
+	}
+
 	# Check-Profil und Grenzwerte
 	if ($PSBoundParameters.ContainsKey('CheckProfile'))
 	{
