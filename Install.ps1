@@ -155,7 +155,7 @@ Write-Host "Installing sqmSQLTool to: $Destination" -ForegroundColor Cyan
 robocopy $Source $Destination /E /PURGE /NJH /NJS /NDL /COPY:DAT `
     /XD .git tests bin Assets `
     /XF .gitignore README.md LICENSE `
-          Install.cmd Install.ps1 Start-sqmToolGui.cmd `
+          Install.cmd Install.ps1 Start-sqmToolGui.cmd Start-sqmToolGui.ps1 `
           "*.TempPoint.*" "*.RestorePoint.*" "*.psproj" "*.psproj.psbuild" "*.psprojs" `
           "desktop.ini" "Tester.ps1" "Test-Module*.ps1" `
           "coverage.xml" "testresults.xml"
@@ -279,6 +279,9 @@ if ($importOk -and $Scope -eq 'AllUsers') {
         }
         Copy-Item -Path (Join-Path $Source 'Start-sqmToolGui.cmd') -Destination $launcherPath -Force
         Unblock-File -Path $launcherPath -ErrorAction SilentlyContinue
+        $launcherPs1Path = Join-Path $launcherDir 'Start-sqmToolGui.ps1'
+        Copy-Item -Path (Join-Path $Source 'Start-sqmToolGui.ps1') -Destination $launcherPs1Path -Force
+        Unblock-File -Path $launcherPs1Path -ErrorAction SilentlyContinue
         Write-Host "  Launcher kopiert nach: $launcherPath" -ForegroundColor Gray
 
         $iconSource = Join-Path $Source 'Assets\sqmSQLTool.ico'

@@ -1,5 +1,31 @@
 # sqmSQLTool — Changelog
 
+## [1.9.50.0] — 2026-08-05
+
+### Fix: `Start-sqmToolGui.cmd` konnte auf DEV03 nach dem UAC-"Zulassen" kommentarlos beenden
+
+Funktionierte in der Produktionsumgebung, auf DEV03 dagegen: UAC-Abfrage erscheint, kurzes
+Fensteraufblitzen, dann nichts mehr - ohne Fehlermeldung. Ursache liess sich von hier aus nicht
+live nachstellen (kein interaktiver Desktop-Zugriff, eigene Tool-Sessions laufen nicht elevated),
+aber der bisherige Code hatte eine bekannte Luecke: das `try { Import-Module ...; Show-sqmToolGui }
+catch {...}` in der alten `-Command`-Zeile faengt zuverlaessig nur SYNCHRONE Fehler ab (Modul fehlt,
+Fehler waehrend des GUI-Aufbaus vor `ShowDialog()`). Eine Ausnahme, die dagegen WAEHREND der
+`ShowDialog()`-Message-Loop auftritt (z.B. in einem Event-Handler beim Befuellen der Parameterfelder),
+erreicht dieses `catch` nicht zuverlaessig - unter `powershell.exe` als WinForms-Host greift dafuer
+.NETs eigene Unhandled-Exception-Policy fuer den UI-Thread, die den Prozess je nach Konfiguration
+kommentarlos beenden kann, ohne dass die Ausnahme je den aufrufenden try/catch erreicht. Das erklaert
+genau das beobachtete Bild: kurzes Aufblitzen, dann Ende, keine Fehlermeldung.
+
+Fix: Die Startlogik ist jetzt in einer eigenen `Start-sqmToolGui.ps1` (liegt neben dem `.cmd`,
+wird von `Install.ps1` mit ausgeliefert) statt als gequoteter `-Command`-Einzeiler. Sie setzt
+`[Application]::SetUnhandledExceptionMode('CatchException')` + einen `ThreadException`-Handler,
+damit auch asynchrone GUI-Ausnahmen sicher abgefangen werden - jeder Fehler (synchron oder aus der
+Message-Loop) wird jetzt nach `%ProgramData%\sqmSQLTool\gui-launch.log` geschrieben UND als
+MessageBox angezeigt, statt den Prozess wortlos zu beenden. `-WindowStyle Minimized` vorerst auf
+`Normal` zurueckgesetzt (ein sichtbares Fenster ist beim Verifizieren dieses Fixes wichtiger als das
+AV/EDR-Argument fuer ein verstecktes Fenster) - kann zurueckgestellt werden, sobald bestaetigt ist,
+dass das Problem behoben ist.
+
 ## [1.9.49.0] — 2026-08-05
 
 ### `Show-sqmToolGui` vergroessert - mehr Platz fuer die Hilfe-Anzeige

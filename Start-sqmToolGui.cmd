@@ -12,10 +12,16 @@ if %errorlevel% neq 0 (
     exit /b 0
 )
 
-:: -WindowStyle Minimized statt Hidden: ein komplett verstecktes PowerShell-Fenster ist
-:: ein klassisches AV/EDR-Alarmsignal auf ueberwachten SQL-Servern. Minimiert reicht fuer
-:: einen sauberen Doppelklick-Start und bleibt trotzdem nachvollziehbar sichtbar (Taskleiste).
-powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Minimized -Command ^
-    "try { Import-Module sqmSQLTool -ErrorAction Stop; Show-sqmToolGui } catch { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show(('sqmSQLTool konnte nicht geladen werden:' + [Environment]::NewLine + $_.Exception.Message + [Environment]::NewLine + [Environment]::NewLine + 'Bitte zuerst Install.cmd AllUsers ausfuehren.'), 'sqmSQLTool GUI', 'OK', 'Error') }"
+:: Start-sqmToolGui.ps1 (Begleitdatei, liegt neben diesem .cmd) macht den Start robust: fing
+:: bisher nur den Import-Module-Fehler ab, nicht aber Ausnahmen, die WAEHREND der
+:: ShowDialog()-Message-Loop auftreten - genau das kann unter powershell.exe je nach
+:: .NET-Unhandled-Exception-Policy den Prozess kommentarlos beenden (Fenster blitzt kurz auf,
+:: dann nichts mehr). Start-sqmToolGui.ps1 setzt SetUnhandledExceptionMode + einen
+:: ThreadException-Handler und schreibt jeden Fehler zusaetzlich nach
+:: %ProgramData%\sqmSQLTool\gui-launch.log.
+:: -WindowStyle Normal (nicht Minimized/Hidden), solange dieser Fehlerpfad noch nicht auf allen
+:: Zielmaschinen verifiziert ist - ein sichtbares Fenster ist beim Debuggen wichtiger als das
+:: sonst berechtigte AV/EDR-Argument fuer ein verstecktes Fenster.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Normal -File "%~dp0Start-sqmToolGui.ps1"
 
 exit /b 0
