@@ -268,23 +268,41 @@ function Invoke-sqmTempSysadminAction
 					}
 
 					# --- 3. Rolle vergeben (idempotent) ---
+					# WICHTIG: Bedingung ueber sys.server_role_members (DIREKTE Mitgliedschaft),
+					# NICHT ueber IS_SRVROLEMEMBER(). IS_SRVROLEMEMBER() liefert die EFFEKTIVE
+					# Mitgliedschaft inklusive Vererbung ueber Windows-/AD-Gruppen: ist der Login
+					# Mitglied einer AD-Gruppe, die ihrerseits als sysadmin-Login eingetragen ist,
+					# liefert es bereits 1 - die bedingte ALTER-Anweisung wurde dadurch
+					# uebersprungen und der Login NIE direkt in die Rolle aufgenommen (genau der
+					# Fall auf DWP1W02SQLT0001: "kein Fehler, Log sagt erfolgreich, trotzdem kein
+					# sysadmin"). Umgekehrt kann IS_SRVROLEMEMBER() auch 0 liefern, obwohl direkte
+					# Mitgliedschaft besteht (auf DEV01 mit 'NT Service\MSSQLSERVER' reproduziert).
+					# Fuer "diesen Login temporaer in die Rolle aufnehmen/daraus entfernen" ist
+					# ausschliesslich die direkte Mitgliedschaft massgeblich.
+					$directMemberPredicate = @"
+EXISTS (
+    SELECT 1
+    FROM sys.server_role_members rm
+    JOIN sys.server_principals r ON r.principal_id = rm.role_principal_id
+    JOIN sys.server_principals m ON m.principal_id = rm.member_principal_id
+    WHERE r.name = N'$Role' AND m.name = N'$loginLit')
+"@
 					$sql = @"
-IF IS_SRVROLEMEMBER('$Role', N'$loginLit') = 0
+IF NOT $directMemberPredicate
     ALTER SERVER ROLE $roleBracket ADD MEMBER $loginBracket;
 "@
 					Invoke-DbaQuery @connParams -Database master -Query $sql -EnableException -ErrorAction Stop
 
-					# --- Verifikation: IS_SRVROLEMEMBER() liefert NULL statt 0/1, wenn es Login
-					# oder Rolle nicht eindeutig aufloesen kann - das IF oben wird dann
-					# STILLSCHWEIGEND uebersprungen, OHNE Exception. Ohne diese Nachpruefung
-					# meldete die Funktion in genau diesem Fall faelschlich Erfolg, obwohl die
-					# Rolle nie vergeben wurde ("keine Fehlermeldung, aber sysadmin: nein").
+					# --- Verifikation: nicht auf "keine Exception = Erfolg" verlassen. Eine
+					# bedingte Anweisung, deren Bedingung nicht zutrifft, ist kein SQL-Fehler -
+					# ohne Nachpruefung meldete die Funktion faelschlich Erfolg, obwohl die Rolle
+					# nie vergeben wurde. Gleiche Fehlerklasse wie 1.9.43.0/1.9.44.0
+					# (Remove-DbaDatabase in Invoke-sqmRestoreDatabase).
 					$verify = Invoke-DbaQuery @connParams -Database master -EnableException -ErrorAction Stop `
-						-Query "SELECT IS_SRVROLEMEMBER('$Role', N'$loginLit') AS IsMember;"
-					$isMemberNow = if ($verify -and $verify.IsMember -isnot [DBNull]) { [int]$verify.IsMember } else { $null }
-					if ($isMemberNow -ne 1)
+						-Query "SELECT CASE WHEN $directMemberPredicate THEN 1 ELSE 0 END AS IsDirectMember;"
+					if (-not $verify -or [int]$verify.IsDirectMember -ne 1)
 					{
-						throw "ALTER SERVER ROLE $roleBracket ADD MEMBER lief ohne Fehler, aber IS_SRVROLEMEMBER('$Role', '$Login') zeigt danach immer noch NICHT Mitglied (Wert: $(if($null -eq $isMemberNow){'NULL'}else{$isMemberNow})). Vermutliche Ursache: IS_SRVROLEMEMBER() konnte Login oder Rolle nicht eindeutig aufloesen (liefert dann NULL statt 0/1), wodurch die bedingte ALTER-Anweisung stillschweigend uebersprungen wurde, statt einen Fehler zu werfen."
+						throw "ALTER SERVER ROLE $roleBracket ADD MEMBER lief ohne Fehler, aber '$Login' ist danach laut sys.server_role_members KEIN direktes Mitglied der Rolle '$Role' auf '$SqlInstance'."
 					}
 
 					$msg = "$Role Grant fuer Login '$Login' auf '$SqlInstance' erfolgreich$(if($loginCreated){' (Login neu angelegt)'}). Auftragsnummer: $ticketText."
@@ -294,19 +312,31 @@ IF IS_SRVROLEMEMBER('$Role', N'$loginLit') = 0
 				else # Revoke
 				{
 					# --- 1. Rolle entziehen (idempotent) ---
+					# Direkte Mitgliedschaft statt IS_SRVROLEMEMBER() - siehe ausfuehrliche
+					# Begruendung im Grant-Zweig oben. Beim Revoke ist die direkte Mitgliedschaft
+					# ohnehin die einzig sinnvolle Bedingung: DROP MEMBER kann nur entfernen, was
+					# direkt Mitglied ist - eine ueber eine AD-Gruppe geerbte Berechtigung laesst
+					# sich damit gar nicht entziehen.
+					$directMemberPredicate = @"
+EXISTS (
+    SELECT 1
+    FROM sys.server_role_members rm
+    JOIN sys.server_principals r ON r.principal_id = rm.role_principal_id
+    JOIN sys.server_principals m ON m.principal_id = rm.member_principal_id
+    WHERE r.name = N'$Role' AND m.name = N'$loginLit')
+"@
 					$sql = @"
-IF IS_SRVROLEMEMBER('$Role', N'$loginLit') = 1
+IF $directMemberPredicate
     ALTER SERVER ROLE $roleBracket DROP MEMBER $loginBracket;
 "@
 					Invoke-DbaQuery @connParams -Database master -Query $sql -EnableException -ErrorAction Stop
 
 					# --- Verifikation: gleiche Begruendung wie beim Grant oben, spiegelverkehrt. ---
 					$verify = Invoke-DbaQuery @connParams -Database master -EnableException -ErrorAction Stop `
-						-Query "SELECT IS_SRVROLEMEMBER('$Role', N'$loginLit') AS IsMember;"
-					$isMemberNow = if ($verify -and $verify.IsMember -isnot [DBNull]) { [int]$verify.IsMember } else { $null }
-					if ($isMemberNow -eq 1)
+						-Query "SELECT CASE WHEN $directMemberPredicate THEN 1 ELSE 0 END AS IsDirectMember;"
+					if (-not $verify -or [int]$verify.IsDirectMember -ne 0)
 					{
-						throw "ALTER SERVER ROLE $roleBracket DROP MEMBER lief ohne Fehler, aber IS_SRVROLEMEMBER('$Role', '$Login') zeigt danach immer noch Mitglied. Vermutliche Ursache: IS_SRVROLEMEMBER() konnte Login oder Rolle nicht eindeutig aufloesen (liefert dann NULL statt 0/1), wodurch die bedingte ALTER-Anweisung stillschweigend uebersprungen wurde, statt einen Fehler zu werfen."
+						throw "ALTER SERVER ROLE $roleBracket DROP MEMBER lief ohne Fehler, aber '$Login' ist laut sys.server_role_members danach immer noch direktes Mitglied der Rolle '$Role' auf '$SqlInstance'."
 					}
 
 					$msg = "$Role Revoke fuer Login '$Login' auf '$SqlInstance' erfolgreich. Auftragsnummer: $ticketText."

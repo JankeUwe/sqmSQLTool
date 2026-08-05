@@ -1,5 +1,36 @@
 # sqmSQLTool — Changelog
 
+## [1.9.61.0] — 2026-08-05
+
+### Fix (Ursache gefunden): `IS_SRVROLEMEMBER()` prueft EFFEKTIVE, nicht direkte Rollenmitgliedschaft
+
+Das ist die eigentliche Ursache hinter "kein Fehler, Log sagt erfolgreich, trotzdem kein sysadmin"
+auf DWP1W02SQLT0001 - und auch hinter allen vorherigen Fehlversuchen in dieser Reihe.
+
+`IS_SRVROLEMEMBER('sysadmin', N'<Login>')` liefert die EFFEKTIVE Mitgliedschaft **inklusive
+Vererbung ueber Windows-/AD-Gruppen**. Ist der Login Mitglied einer AD-Gruppe, die ihrerseits als
+sysadmin-Login auf der Instanz eingetragen ist, liefert die Funktion bereits `1`, obwohl der Login
+selbst NIE direkt in die Serverrolle aufgenommen wurde. Die bedingte Anweisung
+`IF IS_SRVROLEMEMBER(...) = 0 ALTER SERVER ROLE ... ADD MEMBER` wurde dadurch uebersprungen -
+ohne Fehler, ohne Effekt. Die in 1.9.60.0 ergaenzte Verifikation nutzte dieselbe Funktion und
+bestaetigte den Trugschluss deshalb nur (`SELECT IS_SRVROLEMEMBER(...)` = 1, obwohl keine direkte
+Mitgliedschaft bestand).
+
+Die beiden Semantiken weichen nachweislich voneinander ab - gegen DEV01 in BEIDE Richtungen
+reproduziert: `NT Service\MSSQLSERVER` ist direktes Mitglied von sysadmin
+(`sys.server_role_members`), waehrend `IS_SRVROLEMEMBER()` dafuer `0` liefert.
+
+Fix: sowohl die Bedingung als auch die Verifikation in `Invoke-sqmTempSysadminAction` pruefen
+jetzt die DIREKTE Mitgliedschaft ueber `sys.server_role_members` (JOIN auf
+`sys.server_principals`) statt `IS_SRVROLEMEMBER()`. Fuer "diesen Login temporaer in die Rolle
+aufnehmen bzw. daraus entfernen" ist ausschliesslich die direkte Mitgliedschaft massgeblich -
+eine ueber eine AD-Gruppe geerbte Berechtigung liesse sich per `DROP MEMBER` ohnehin nicht
+entziehen. Als Nebeneffekt entfaellt die NULL-Sonderbehandlung: die neue Bedingung liefert immer
+`0` oder `1`, nie `NULL`.
+
+Verifiziert gegen DEV01: Grant -> direkte Mitgliedschaft 1, erneuter Grant (idempotent)
+erfolgreich, Revoke -> 0, erneuter Revoke (idempotent) erfolgreich.
+
 ## [1.9.60.0] — 2026-08-05
 
 ### Fix: `Invoke-sqmTempSysadminAction` meldete Erfolg, obwohl die Rolle nie vergeben wurde
