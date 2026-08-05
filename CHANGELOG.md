@@ -1,5 +1,49 @@
 # sqmSQLTool — Changelog
 
+## [1.9.59.0] — 2026-08-05
+
+### Fix: sysadmin-Grant scheiterte trotz deaktivierter Policy - alle Server-Trigger statt nur eine Policy deaktivieren
+
+Nachtrag zu 1.9.53.0/1.9.54.0: auf DWP1W02SQLT0001 manuell vorab deaktiviert getestet ("New
+Login_Enforce Passwort Policy" aus, unser Code also gar nicht im Spiel) - der Grant scheiterte
+trotzdem identisch am selben Trigger-Rollback. Damit war ausgeschlossen, dass es an unserer
+`DisablePolicy`-Logik liegt: entweder eine ZWEITE, aktive Policy mit demselben Auswertungsmodus,
+oder der Trigger-Mechanismus selbst - in beiden Faellen hilft das gezielte Deaktivieren einer
+einzelnen benannten Policy nicht.
+
+Gegen DEV01 mit einem synthetischen Test-Trigger (FOR ALTER_LOGIN, CREATE_LOGIN, ROLLBACK)
+nachgestellt und verifiziert, dass ein Policy-unabhaengiger Trigger genau den gemeldeten Fehler
+reproduziert ("The transaction ended in the trigger. The batch has been aborted." bzw. "Die
+Transaktion endete mit dem Trigger.").
+
+Fix: `Invoke-sqmTempSysadminAction` deaktiviert jetzt zusaetzlich (Default `-DisableServerTriggers
+$true`) ALLE aktuell aktivierten serverweiten DDL-Trigger fuer die Dauer der Aktion und stellt in
+einem finally-Block GENAU den vorherigen Zustand wieder her (kein pauschales "alle wieder an") -
+unabhaengig davon, welche/wie viele Policies aktiv sind oder ob der Trigger CREATE LOGIN,
+ALTER SERVER ROLE oder etwas anderes abfaengt. Die bisherige `DisablePolicy`-Logik bleibt als
+zweite, unabhaengige Absicherung bestehen. Ein fehlgeschlagenes Wiederaktivieren eines Triggers
+wird zusaetzlich als Eventlog-Fehler eskaliert (Governance-relevant).
+
+### Neu: SQL-Logins UND `dbcreator`-Rolle zusaetzlich zu Windows-Logins/sysadmin
+
+`Grant-sqmTemporarySysadmin`/`Invoke-sqmTempSysadminAction` unterstuetzten bisher ausschliesslich
+Windows-/AD-Logins und ausschliesslich die sysadmin-Rolle. Neu:
+
+- Neuer Parameter `-Role` ('sysadmin' Default, oder 'dbcreator') auf beiden Funktionen - die
+  ALTER SERVER ROLE-Anweisung ist jetzt parametrisiert statt fest auf `[sysadmin]` verdrahtet.
+- Bereits vorhandene SQL-Auth-Logins koennen jetzt ebenfalls temporaer eine Rolle erhalten (nicht
+  nur Windows-/AD-Logins) - automatisches Anlegen bei Fehlen (`-CreateLoginIfMissing`) bleibt auf
+  Windows-/AD-Logins beschraenkt (CREATE LOGIN ... FROM WINDOWS ergibt fuer SQL-Logins keinen
+  Sinn ohne Kennwortvorgabe), mit klarer Fehlermeldung statt stillschweigendem Fehlschlag.
+- Job-Namen enthalten jetzt die Rolle (`sqmTempDbcreator_...` statt nur `sqmTempSysadmin_...`),
+  damit z.B. ein temporaeres sysadmin und ein temporaeres dbcreator fuer denselben Login
+  nebeneinander bestehen koennen.
+
+Verifiziert gegen DEV01: `-Role dbcreator` fuer einen bestehenden SQL-Login (`sqmTestLogin`) im
+vollen Grant+Revoke-Rundlauf (inkl. Trigger-Deaktivierung/-Wiederherstellung), sowie
+`Grant-sqmTemporarySysadmin` akzeptiert einen bloßen SQL-Loginnamen jetzt ohne den frueheren
+Windows-Format-Fehler.
+
 ## [1.9.58.0] — 2026-08-05
 
 ### Fix: `Install.ps1` scheiterte unter PowerShell 5.1 beim Lesen des dbatools-Versions-Caps

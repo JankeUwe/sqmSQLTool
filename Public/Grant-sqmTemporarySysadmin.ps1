@@ -1,33 +1,41 @@
 ﻿<#
 .SYNOPSIS
-    Vergibt einem AD-Login temporaer sysadmin-Rechte fuer X Tage und entzieht sie
-    danach automatisch ueber einen selbstloeschenden SQL-Agent-Job - bei AlwaysOn
-    failover-robust auf allen Replicas.
+    Vergibt einem Login temporaer eine feste Serverrolle (sysadmin oder dbcreator) fuer
+    X Tage und entzieht sie danach automatisch ueber einen selbstloeschenden SQL-Agent-Job -
+    bei AlwaysOn failover-robust auf allen Replicas.
 
 .DESCRIPTION
-    Fuer Patch-/Installationssituationen: macht einen AD-Anwender (oder eine
-    AD-Gruppe) zeitlich befristet zum sysadmin.
+    Fuer Patch-/Installationssituationen: macht einen Login (Windows-/AD-Konto oder
+    -Gruppe, oder ein bereits vorhandener SQL-Auth-Login) zeitlich befristet Mitglied
+    einer festen Serverrolle.
 
       - Ohne -StartDate wird SOFORT vergeben (inline) und ein Revoke-Job auf
         heute + X Tage angelegt.
       - Mit -StartDate (in der Zukunft) wird ein Grant-Job auf das Startdatum und
         ein Revoke-Job auf Startdatum + X Tage angelegt.
 
-    Es werden AUSSCHLIESSLICH Windows-/AD-Logins unterstuetzt (DOMAIN\Konto oder
-    AD-Gruppe). SQL-Auth-Logins werden abgewiesen.
+    Windows-/AD-Logins (DOMAIN\Konto oder AD-Gruppe) UND bereits vorhandene SQL-Auth-Logins
+    werden unterstuetzt. Automatisches Anlegen bei Fehlen ist auf Windows-/AD-Logins
+    beschraenkt (siehe Login-Handling) - ein fehlender SQL-Login fuehrt zu einem klaren
+    Fehler statt einer automatischen Kennwortvergabe.
+
+    Waehrend Login-Anlage/Rollenaenderung/Login-Entfernung werden serverweite DDL-Trigger
+    UND die konfigurierte PBM-Policy (DefaultPolicy) temporaer deaktiviert und exakt in den
+    vorherigen Zustand zurueckversetzt - siehe Invoke-sqmTempSysadminAction fuer den
+    Hintergrund (der eingebaute syspolicy_server_trigger kann sonst jede betroffene
+    Anweisung per Rollback abbrechen: "The transaction ended in the trigger.").
 
     Login-Handling:
-      - Existiert der Login nicht, wird er angelegt (CREATE LOGIN ... FROM WINDOWS).
-        Eine konfigurierte PBM-Policy (DefaultPolicy) wird dafuer kurz deaktiviert
-        und danach wieder aktiviert.
+      - Existiert ein Windows-/AD-Login nicht, wird er angelegt (CREATE LOGIN ... FROM
+        WINDOWS). Ein fehlender SQL-Login fuehrt stattdessen zu einem Fehler.
       - Wurde der Login von diesem Tool angelegt, wird er beim Entzug wieder
         entfernt (sofern er an keiner weiteren Serverrolle haengt).
-      - War der Login bereits vorhanden, bleibt er bestehen - nur die sysadmin-Rolle
+      - War der Login bereits vorhanden, bleibt er bestehen - nur die Rolle
         wird entzogen.
 
     AlwaysOn (Default):
       Ist die Instanz Teil einer Availability Group, werden Login-Anlage,
-      sysadmin-Vergabe und Entzug/Cleanup auf ALLEN Replicas durchgefuehrt. Jede
+      Rollen-Vergabe und Entzug/Cleanup auf ALLEN Replicas durchgefuehrt. Jede
       Replica erhaelt ihre eigenen, lokal arbeitenden, selbstloeschenden Jobs - so
       bleiben die temporaeren Rechte auch nach einem Failover bestehen und der
       Cleanup laeuft ueberall zuverlaessig. Mit -PrimaryOnly wird nur die
@@ -45,10 +53,14 @@
     KEINE gespeicherten Credentials.
 
 .PARAMETER Login
-    AD-Login / -Gruppe (DOMAIN\Konto), der temporaer sysadmin werden soll.
+    Login/-Gruppe, der/die temporaer die Rolle erhalten soll: Windows-/AD-Konto
+    (DOMAIN\Konto), AD-Gruppe, oder ein bereits vorhandener SQL-Auth-Login.
+
+.PARAMETER Role
+    Feste Serverrolle: 'sysadmin' (Default) oder 'dbcreator'.
 
 .PARAMETER Days
-    Dauer der sysadmin-Rechte in Tagen.
+    Dauer der Rollenmitgliedschaft in Tagen.
 
 .PARAMETER StartDate
     Optionaler Aktivierungszeitpunkt. Fehlt er (oder liegt in der Vergangenheit),
@@ -85,6 +97,10 @@
     Grant-sqmTemporarySysadmin -SqlInstance SQL01 -Login 'DOM\u.maier' -Days 2 -PrimaryOnly -WhatIf
     # Zeigt nur, was passieren wuerde - nur auf SQL01, ohne Replicas.
 
+.EXAMPLE
+    Grant-sqmTemporarySysadmin -SqlInstance SQL01 -Login 'app_deploy' -Role dbcreator -Days 1 -TicketNumber 'CHG9001'
+    # dbcreator statt sysadmin, fuer einen bestehenden SQL-Login.
+
 .NOTES
     Requires: dbatools, Invoke-sqmLogging, Invoke-sqmTempSysadminAction.
     Aufrufer braucht fuer die Sofort-Vergabe sysadmin/ALTER auf der Serverrolle.
@@ -109,6 +125,9 @@ function Grant-sqmTemporarySysadmin
 		[Parameter(Mandatory = $true)]
 		[ValidateNotNullOrEmpty()]
 		[string]$Login,
+		[Parameter(Mandatory = $false)]
+		[ValidateSet('sysadmin', 'dbcreator')]
+		[string]$Role = 'sysadmin',
 		[Parameter(Mandatory = $true)]
 		[ValidateRange(1, 3650)]
 		[int]$Days,
@@ -143,11 +162,10 @@ function Grant-sqmTemporarySysadmin
 
 	process
 	{
-		# --- Punkt 4: ausschliesslich AD-/Windows-Logins zulassen ---
-		if ($Login -notmatch '\\')
-		{
-			throw "Login '$Login' ist kein Windows-/AD-Login. Es werden ausschliesslich AD-Logins im Format 'DOMAIN\Konto' unterstuetzt."
-		}
+		# Windows-/AD-Logins UND bereits vorhandene SQL-Auth-Logins sind erlaubt - die
+		# Einschraenkung "nur Windows-Logins" gilt nur noch fuer das automatische Anlegen bei
+		# Fehlen (CREATE LOGIN ... FROM WINDOWS macht fuer einen SQL-Login keinen Sinn) und wird
+		# dafuer in Invoke-sqmTempSysadminAction geprueft, nicht hier pauschal fuer jeden Login.
 
 		# --- Zeiten bestimmen ---
 		$now = Get-Date
@@ -232,9 +250,12 @@ EXEC msdb.dbo.sp_attach_schedule @job_name = N'$Name', @schedule_name = N'$sched
 			$tConn = @{ SqlInstance = $target }
 			if ($SqlCredential) { $tConn['SqlCredential'] = $SqlCredential }
 
-			# Jobnamen je Replica eindeutig
+			# Jobnamen je Replica eindeutig - Rolle im Namen, damit z.B. ein temporaeres
+			# sysadmin und ein temporaeres dbcreator fuer denselben Login nebeneinander
+			# bestehen koennen, statt sich gegenseitig zu ueberschreiben.
+			$roleTitle = (Get-Culture).TextInfo.ToTitleCase($Role)
 			$sani      = (($Login + '_' + $target) -replace '[^A-Za-z0-9._-]', '_')
-			$jobBase   = "sqmTempSysadmin_$sani`_$($activation.ToString('yyyyMMddHHmm'))"
+			$jobBase   = "sqmTemp${roleTitle}_$sani`_$($activation.ToString('yyyyMMddHHmm'))"
 			$revokeJob = "${jobBase}_Revoke"
 			$grantJob  = "${jobBase}_Grant"
 
@@ -247,27 +268,27 @@ EXEC msdb.dbo.sp_attach_schedule @job_name = N'$Name', @schedule_name = N'$sched
 			try
 			{
 				$cnt = Invoke-DbaQuery @tConn -Database master -EnableException -ErrorAction Stop `
-					-Query "SELECT COUNT(*) AS Cnt FROM sys.server_principals WHERE name = N'$loginLit' AND type IN ('U','G');"
+					-Query "SELECT COUNT(*) AS Cnt FROM sys.server_principals WHERE name = N'$loginLit' AND type IN ('U','G','S');"
 				$loginExistsNow = ($cnt -and [int]$cnt.Cnt -gt 0)
 			}
 			catch
 			{
 				Invoke-sqmLogging -Message "[$target] Login-Pruefung fehlgeschlagen: $($_.Exception.Message)" -FunctionName $functionName -Level 'ERROR'
 				$results.Add([PSCustomObject]@{
-						SqlInstance = $target; Login = $Login; Days = $Days; ActivationTime = $activation
+						SqlInstance = $target; Login = $Login; Role = $Role; Days = $Days; ActivationTime = $activation
 						RevocationTime = $revocation; TicketNumber = $TicketNumber; Status = 'Error'
 						Message = "Login-Pruefung fehlgeschlagen: $($_.Exception.Message)"
 					})
 				continue
 			}
 
-			$desc = "sqmSQLTool: temporaerer sysadmin fuer '$Login' bis $($revocation.ToString('yyyy-MM-dd HH:mm')). Auftragsnummer: $(if ($TicketNumber){$TicketNumber}else{'(keine)'})"
+			$desc = "sqmSQLTool: temporaerer $Role fuer '$Login' bis $($revocation.ToString('yyyy-MM-dd HH:mm')). Auftragsnummer: $(if ($TicketNumber){$TicketNumber}else{'(keine)'})"
 			$opText = if ($immediate) { 'SOFORT' } else { "ab $($activation.ToString('yyyy-MM-dd HH:mm'))" }
 
-			if (-not $PSCmdlet.ShouldProcess($target, "sysadmin fuer '$Login' $opText fuer $Days Tage (Entzug $($revocation.ToString('yyyy-MM-dd HH:mm')))"))
+			if (-not $PSCmdlet.ShouldProcess($target, "$Role fuer '$Login' $opText fuer $Days Tage (Entzug $($revocation.ToString('yyyy-MM-dd HH:mm')))"))
 			{
 				$results.Add([PSCustomObject]@{
-						SqlInstance = $target; Login = $Login; Days = $Days; ActivationTime = $activation
+						SqlInstance = $target; Login = $Login; Role = $Role; Days = $Days; ActivationTime = $activation
 						RevocationTime = $revocation; TicketNumber = $TicketNumber
 						GrantJob = if ($immediate) { $null } else { $grantJob }; RevokeJob = $revokeJob
 						Immediate = $immediate; LoginExisted = $loginExistsNow; Status = 'WhatIf'
@@ -281,15 +302,15 @@ EXEC msdb.dbo.sp_attach_schedule @job_name = N'$Name', @schedule_name = N'$sched
 				if ($immediate)
 				{
 					# Sofort vergeben (legt Login bei Bedarf an) -> erfahre, ob neu angelegt
-					$grantRes = Invoke-sqmTempSysadminAction @tConn -Login $Login -Action Grant -CreateLoginIfMissing -TicketNumber $TicketNumber
+					$grantRes = Invoke-sqmTempSysadminAction @tConn -Login $Login -Role $Role -Action Grant -CreateLoginIfMissing -TicketNumber $TicketNumber
 					$loginCreated = [bool]$grantRes.LoginCreated
 
 					# Revoke-Job lokal auf dieser Replica; entfernt Login nur wenn wir ihn anlegten
 					$rmSwitch  = if ($loginCreated) { ' -RemoveLogin' } else { '' }
-					$revokeCmd = "$psExe -NoProfile -ExecutionPolicy Bypass -Command `"Import-Module sqmSQLTool; Invoke-sqmTempSysadminAction -SqlInstance '$instEsc' -Login '$loginEsc' -Action Revoke -TicketNumber '$ticketEsc' -JobName '$revokeJob'$rmSwitch`""
+					$revokeCmd = "$psExe -NoProfile -ExecutionPolicy Bypass -Command `"Import-Module sqmSQLTool; Invoke-sqmTempSysadminAction -SqlInstance '$instEsc' -Login '$loginEsc' -Role '$Role' -Action Revoke -TicketNumber '$ticketEsc' -JobName '$revokeJob'$rmSwitch`""
 					New-sqmOneTimeJob -TargetInstance $target -Name $revokeJob -Command $revokeCmd -When $revocation -Description $desc
 
-					$msg = "sysadmin sofort vergeben$(if($loginCreated){' (Login neu angelegt)'}); automatischer Entzug am $($revocation.ToString('yyyy-MM-dd HH:mm')) via Job '$revokeJob'."
+					$msg = "$Role sofort vergeben$(if($loginCreated){' (Login neu angelegt)'}); automatischer Entzug am $($revocation.ToString('yyyy-MM-dd HH:mm')) via Job '$revokeJob'."
 				}
 				else
 				{
@@ -297,10 +318,10 @@ EXEC msdb.dbo.sp_attach_schedule @job_name = N'$Name', @schedule_name = N'$sched
 					# Cleanup-Heuristik: fehlt der Login JETZT, wird der Grant-Job ihn anlegen -> RemoveLogin.
 					$rmSwitch  = if (-not $loginExistsNow) { ' -RemoveLogin' } else { '' }
 
-					$grantCmd  = "$psExe -NoProfile -ExecutionPolicy Bypass -Command `"Import-Module sqmSQLTool; Invoke-sqmTempSysadminAction -SqlInstance '$instEsc' -Login '$loginEsc' -Action Grant -CreateLoginIfMissing -TicketNumber '$ticketEsc' -JobName '$grantJob'`""
+					$grantCmd  = "$psExe -NoProfile -ExecutionPolicy Bypass -Command `"Import-Module sqmSQLTool; Invoke-sqmTempSysadminAction -SqlInstance '$instEsc' -Login '$loginEsc' -Role '$Role' -Action Grant -CreateLoginIfMissing -TicketNumber '$ticketEsc' -JobName '$grantJob'`""
 					New-sqmOneTimeJob -TargetInstance $target -Name $grantJob -Command $grantCmd -When $activation -Description $desc
 
-					$revokeCmd = "$psExe -NoProfile -ExecutionPolicy Bypass -Command `"Import-Module sqmSQLTool; Invoke-sqmTempSysadminAction -SqlInstance '$instEsc' -Login '$loginEsc' -Action Revoke -TicketNumber '$ticketEsc' -JobName '$revokeJob'$rmSwitch`""
+					$revokeCmd = "$psExe -NoProfile -ExecutionPolicy Bypass -Command `"Import-Module sqmSQLTool; Invoke-sqmTempSysadminAction -SqlInstance '$instEsc' -Login '$loginEsc' -Role '$Role' -Action Revoke -TicketNumber '$ticketEsc' -JobName '$revokeJob'$rmSwitch`""
 					New-sqmOneTimeJob -TargetInstance $target -Name $revokeJob -Command $revokeCmd -When $revocation -Description $desc
 
 					$msg = "Vergabe am $($activation.ToString('yyyy-MM-dd HH:mm')) (Job '$grantJob'), Entzug am $($revocation.ToString('yyyy-MM-dd HH:mm')) (Job '$revokeJob')."
@@ -309,7 +330,7 @@ EXEC msdb.dbo.sp_attach_schedule @job_name = N'$Name', @schedule_name = N'$sched
 				Invoke-sqmLogging -Message "[$target] $msg Login '$Login', Auftragsnummer: $(if($TicketNumber){$TicketNumber}else{'(keine)'})" -FunctionName $functionName -Level "INFO"
 
 				$results.Add([PSCustomObject]@{
-						SqlInstance = $target; Login = $Login; Days = $Days; ActivationTime = $activation
+						SqlInstance = $target; Login = $Login; Role = $Role; Days = $Days; ActivationTime = $activation
 						RevocationTime = $revocation; TicketNumber = $TicketNumber
 						GrantJob = if ($immediate) { $null } else { $grantJob }; RevokeJob = $revokeJob
 						Immediate = $immediate; LoginExisted = $loginExistsNow; Status = 'Success'; Message = $msg
@@ -317,9 +338,9 @@ EXEC msdb.dbo.sp_attach_schedule @job_name = N'$Name', @schedule_name = N'$sched
 			}
 			catch
 			{
-				Invoke-sqmLogging -Message "[$target] Fehler bei temporaerer sysadmin-Vergabe fuer '$Login': $($_.Exception.Message)" -FunctionName $functionName -Level "ERROR"
+				Invoke-sqmLogging -Message "[$target] Fehler bei temporaerer $Role-Vergabe fuer '$Login': $($_.Exception.Message)" -FunctionName $functionName -Level "ERROR"
 				$results.Add([PSCustomObject]@{
-						SqlInstance = $target; Login = $Login; Days = $Days; ActivationTime = $activation
+						SqlInstance = $target; Login = $Login; Role = $Role; Days = $Days; ActivationTime = $activation
 						RevocationTime = $revocation; TicketNumber = $TicketNumber; Status = 'Error'
 						Message = $_.Exception.Message
 					})
