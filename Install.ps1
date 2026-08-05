@@ -153,7 +153,7 @@ if ($Scope -eq 'AllUsers') {
 # ---------------------------------------------------------------------------
 Write-Host "Installing sqmSQLTool to: $Destination" -ForegroundColor Cyan
 robocopy $Source $Destination /E /PURGE /NJH /NJS /NDL /COPY:DAT `
-    /XD .git tests bin `
+    /XD .git tests bin Assets `
     /XF .gitignore README.md LICENSE `
           Install.cmd Install.ps1 Start-sqmToolGui.cmd `
           "*.TempPoint.*" "*.RestorePoint.*" "*.psproj" "*.psproj.psbuild" "*.psprojs" `
@@ -281,6 +281,13 @@ if ($importOk -and $Scope -eq 'AllUsers') {
         Unblock-File -Path $launcherPath -ErrorAction SilentlyContinue
         Write-Host "  Launcher kopiert nach: $launcherPath" -ForegroundColor Gray
 
+        $iconSource = Join-Path $Source 'Assets\sqmSQLTool.ico'
+        $iconPath   = Join-Path $launcherDir 'sqmSQLTool.ico'
+        if (Test-Path $iconSource) {
+            Copy-Item -Path $iconSource -Destination $iconPath -Force
+            Unblock-File -Path $iconPath -ErrorAction SilentlyContinue
+        }
+
         $startMenuDir = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs'
         $shortcutPath = Join-Path $startMenuDir 'sqmSQLTool GUI.lnk'
         $wshShell = New-Object -ComObject WScript.Shell
@@ -288,8 +295,18 @@ if ($importOk -and $Scope -eq 'AllUsers') {
         $shortcut.TargetPath = $launcherPath
         $shortcut.WorkingDirectory = $launcherDir
         $shortcut.Description = 'sqmSQLTool GUI (elevated)'
+        if (Test-Path $iconPath) { $shortcut.IconLocation = "$iconPath,0" }
         $shortcut.Save()
         Write-Host "  Startmenue-Verknuepfung (AllUsers) angelegt: $shortcutPath" -ForegroundColor Green
+
+        # "An Start anheften" ist seit Windows 10 2004 / Windows 11 nicht mehr scriptbar - der
+        # frueher gaengige Trick (FolderItem.InvokeVerb('pintostartscreen') ueber Shell.Application)
+        # wurde von Microsoft fuer Desktop-Verknuepfungen entfernt und ist auf dieser OS-Version ein
+        # stiller No-Op. Es gibt dafuer keine unterstuetzte Ersatz-API - deshalb hier bewusst KEIN
+        # Automatisierungsversuch (der nur Erfolg vortaeuschen wuerde), sondern nur der Hinweis auf
+        # den einmaligen manuellen Schritt.
+        Write-Host "  Hinweis: Anheften an Start ist unter Windows 10/11 nicht automatisierbar -" -ForegroundColor Yellow
+        Write-Host "           bitte einmalig manuell im Startmenue: Rechtsklick auf 'sqmSQLTool GUI' > 'An Start anheften'." -ForegroundColor Yellow
     } catch {
         Write-Warning "  GUI-Launcher/Startmenue-Verknuepfung konnte nicht eingerichtet werden: $_"
         Write-Warning "  Die GUI laesst sich trotzdem manuell starten: Import-Module sqmSQLTool; Show-sqmToolGui"

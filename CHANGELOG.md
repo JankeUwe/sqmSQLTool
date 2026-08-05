@@ -1,5 +1,22 @@
 # sqmSQLTool — Changelog
 
+## [1.9.48.0] — 2026-08-05
+
+### Neu: eigenes Icon fuer die Startmenue-Verknuepfung der GUI
+
+`Assets\sqmSQLTool.ico` (neu, 16/32/48/256px, PNG-in-ICO) - ein einfaches, im Marken-Farbschema
+von powershelldba.de gehaltenes Datenbank-Zylinder-Symbol (dunkles Navy-Badge, Akzentblau
+`#2e86c1`/`#5dade2`) statt des Standard-`.cmd`-Icons. `Install.ps1` kopiert die Datei bei einer
+`AllUsers`-Installation zusammen mit dem Launcher nach `C:\Program Files\sqmSQLTool` und setzt
+sie als `IconLocation` der Startmenue-Verknuepfung. `Assets\` ist vom robocopy-Modul-Payload
+(Schritt 4) ausgenommen - die Datei wird gezielt fuer den Launcher kopiert, nicht als Modulinhalt.
+
+Kein automatisches Anheften an Start: der fruehere Trick (`FolderItem.InvokeVerb('pintostartscreen')`
+ueber `Shell.Application`) wurde von Microsoft fuer Desktop-Verknuepfungen seit Windows 10 2004 /
+Windows 11 entfernt und liefe hier nur als stiller No-Op, ohne unterstuetzte Ersatz-API. Install.ps1
+gibt daher nur einen Hinweis auf den einmaligen manuellen Schritt aus (Rechtsklick > "An Start
+anheften"), statt eine Automatisierung vorzutaeuschen, die auf dieser OS-Version nichts bewirkt.
+
 ## [1.9.47.0] — 2026-08-05
 
 ### Neu: `Get-sqmLoginSettings` zeigt jetzt Kennwort-Richtlinie, Kennwortablauf und "Kennwort muss geaendert werden"
