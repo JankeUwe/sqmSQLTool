@@ -224,8 +224,13 @@ if ($isFitsInstall) {
     }
 }
 
-$dbatoolsMaxVersion = ($PSD1 = Import-PowerShellDataFile (Join-Path $Source 'sqmSQLTool.psd1')).RequiredModules |
-    Where-Object { $_.ModuleName -eq 'dbatools' } | Select-Object -ExpandProperty MaximumVersion -First 1
+# WICHTIG: RequiredModules-Eintraege sind Hashtables. -ExpandProperty findet Hashtable-Keys nicht
+# (Adapter-Unterschied) - funktioniert unter PowerShell 7 zufaellig, wirft aber unter Windows
+# PowerShell 5.1 "Die MaximumVersion-Eigenschaft kann nicht gefunden werden." Direkter
+# Punkt-Zugriff nach dem Filtern funktioniert in beiden Versionen.
+$PSD1 = Import-PowerShellDataFile (Join-Path $Source 'sqmSQLTool.psd1')
+$dbatoolsRequiredModule = $PSD1.RequiredModules | Where-Object { $_.ModuleName -eq 'dbatools' } | Select-Object -First 1
+$dbatoolsMaxVersion = if ($dbatoolsRequiredModule) { $dbatoolsRequiredModule.MaximumVersion } else { $null }
 if (-not $dbatoolsMaxVersion) { $dbatoolsMaxVersion = '2.999.999' }
 
 $auDbatools = Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules\dbatools'

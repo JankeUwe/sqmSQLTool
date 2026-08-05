@@ -1,5 +1,22 @@
 # sqmSQLTool — Changelog
 
+## [1.9.58.0] — 2026-08-05
+
+### Fix: `Install.ps1` scheiterte unter PowerShell 5.1 beim Lesen des dbatools-Versions-Caps
+
+Nachtrag zu 1.9.55.0: `Select-Object -ExpandProperty MaximumVersion` auf einem
+`RequiredModules`-Eintrag (eine Hashtable) warf unter echtem `powershell.exe` 5.1 "Die
+MaximumVersion-Eigenschaft kann nicht gefunden werden." - `-ExpandProperty` findet Hashtable-Keys
+in Windows PowerShell 5.1 nicht (Adapter-Unterschied), waehrend derselbe Code unter PowerShell 7
+klaglos durchlief. Genau die Art Bug, die beim Entwickeln/Testen unter `pwsh` unsichtbar bleibt -
+der Import-Test des pre-push-Hooks laeuft zwar unter echtem PS 5.1, fuehrt `Install.ps1` selbst
+aber nicht aus, daher ist das durchgerutscht.
+
+Fix: direkter Punkt-Zugriff (`.MaximumVersion`) auf das per `Select-Object -First 1` gefilterte
+Objekt statt `-ExpandProperty` - funktioniert in beiden PowerShell-Versionen. Gesamte
+dbatools-Versionspruefung end-to-end unter echtem `powershell.exe` 5.1 (5.1.26100.8875)
+nachgestellt und verifiziert (Cap-Ermittlung, installierte Version, PSGallery-Vergleich).
+
 ## [1.9.57.0] — 2026-08-05
 
 ### Neu: `DbatoolsSharePath`-Konfigurationsschluessel fuer die dbatools-Freigabe
