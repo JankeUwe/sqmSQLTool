@@ -1,5 +1,23 @@
 # sqmSQLTool — Changelog
 
+## [1.9.51.0] — 2026-08-05
+
+### Fix: `Start-sqmToolGui.cmd` - fragilen zweiten Elevation-Hop entfernt
+
+Nachtrag zu 1.9.50.0: auf DEV03 direkt aus einer bereits elevated Shell gestartet lief
+`Start-sqmToolGui.ps1` (`powershell -File ...`) einwandfrei durch - der UAC-Doppelklick-Weg
+brach aber weiterhin kommentarlos ab. Eingrenzung damit auf die Elevation-Kette selbst: der
+bisherige Weg elevierte `cmd.exe` (`Start-Process cmd.exe -ArgumentList '/c "..."' -Verb RunAs`),
+das dann `Start-sqmToolGui.cmd` von vorn komplett neu durchlief (zweiter `net session`-Check,
+dann erst der eigentliche `powershell -File`-Aufruf) - irgendwo in diesem zweiten Hop brach es ab,
+ohne dass unsere eigene Fehlerbehandlung in `Start-sqmToolGui.ps1` je erreicht wurde (die griff ja
+erst NACH diesem Hop).
+
+Fix: `powershell.exe` wird jetzt direkt elevated (`Start-Process powershell.exe -ArgumentList
+'... -File "..."' -Verb RunAs`), nicht mehr ueber ein sich selbst neu aufrufendes `cmd.exe`. Der
+elevated Pfad ist damit strukturell identisch zu dem bereits erfolgreich getesteten manuellen
+Aufruf aus einer elevated Shell - nur die Elevation selbst kommt jetzt per UAC statt manuell.
+
 ## [1.9.50.0] — 2026-08-05
 
 ### Fix: `Start-sqmToolGui.cmd` konnte auf DEV03 nach dem UAC-"Zulassen" kommentarlos beenden

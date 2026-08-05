@@ -3,12 +3,18 @@
 :: Startet Show-sqmToolGui elevated: viele GUI-Funktionen (z.B. Invoke-sqmNtfsSetup,
 :: Eventlog-Quellen registrieren) brauchen lokale Adminrechte. Relauncht sich bei Bedarf
 :: per UAC selbst - kein CurrentUser-Zweig, die GUI braucht ohnehin immer Adminrechte.
+::
+:: Elevated direkt powershell.exe -File (nicht mehr ueber ein sich selbst neu aufrufendes
+:: cmd.exe): der fruehere 2-Hop-Weg (Start-Process cmd.exe -Verb RunAs, das dieses .cmd dann
+:: von vorn neu durchlaeuft) brach auf DEV03 irgendwo im zweiten Hop kommentarlos ab - ein
+:: bereits elevated direkter Aufruf von "powershell -File Start-sqmToolGui.ps1" funktionierte
+:: dagegen einwandfrei. Direktes Elevaten von powershell.exe spart genau diesen fragilen Hop.
 
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo sqmSQLTool GUI - Adminrechte erforderlich, UAC-Abfrage wird gestartet ...
     powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-        "Start-Process cmd.exe -ArgumentList '/c ""%~f0""' -Verb RunAs"
+        "Start-Process powershell.exe -ArgumentList '-NoProfile -ExecutionPolicy Bypass -WindowStyle Normal -File ""%~dp0Start-sqmToolGui.ps1""' -Verb RunAs"
     exit /b 0
 )
 
