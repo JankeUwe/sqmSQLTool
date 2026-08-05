@@ -16,7 +16,15 @@
       SQL-Logins gefuellt (via sys.sql_logins / LOGINPROPERTY), bei Windows-Logins/
       -Gruppen $null, da deren Kennwortrichtlinie ueber AD und nicht ueber SQL Server
       verwaltet wird.
-    - Mitgliedschaft in der festen Serverrolle sysadmin (IsSysAdmin).
+    - Mitgliedschaft in der festen Serverrolle sysadmin, in zwei Auspraegungen:
+      IsSysAdmin = privilegiert ueber IRGENDEINEN Pfad (effektiv per IS_SRVROLEMEMBER, also
+      inklusive Vererbung ueber Windows-/AD-Gruppen, ODER direkt laut Katalogsicht) - das ist
+      die sicherheitsrelevante Sicht, denn wer nur ueber eine AD-Gruppe sysadmin ist, hat
+      dieselben Rechte, taucht aber in sys.server_role_members nicht auf.
+      IsSysAdminDirect = ausschliesslich direkte Mitgliedschaft laut sys.server_role_members.
+      Weichen beide voneinander ab (IsSysAdmin=True, IsSysAdminDirect=False), sind die Rechte
+      ueber eine Gruppe geerbt und lassen sich nicht per ALTER SERVER ROLE ... DROP MEMBER am
+      Login selbst entziehen, sondern nur ueber die Gruppenmitgliedschaft.
     - Ein daraus abgeleitetes RiskLevel ('Critical' / 'Warning' / 'OK' / 'N/A') plus
       RiskIcon (roter/gelber/gruener/grauer Punkt) fuer eine kompakte Sicherheitsampel:
       Kennwort-Richtlinie oder -Ablauf deaktiviert bei einem sysadmin-Login ist Critical,
@@ -141,7 +149,20 @@ SELECT
     CAST(LOGINPROPERTY(sp.name, 'IsExpired') AS bit)     AS PasswordExpired,
     CAST(LOGINPROPERTY(sp.name, 'IsMustChange') AS bit)  AS MustChangePassword,
     LOGINPROPERTY(sp.name, 'DaysUntilExpiration')        AS DaysUntilExpiration,
-    CASE WHEN srm.member_principal_id IS NOT NULL THEN 1 ELSE 0 END AS IsSysAdmin
+    -- IsSysAdmin = privilegiert ueber IRGENDEINEN Pfad. Bewusst die Kombination aus beidem:
+    --   IS_SRVROLEMEMBER() = EFFEKTIVE Mitgliedschaft inkl. Vererbung ueber Windows-/AD-Gruppen
+    --     (ein Login, das nur ueber eine AD-Gruppe sysadmin ist, taucht in server_role_members
+    --      gar nicht auf - allein per Katalogsicht wuerde der Report ihn als harmlos ausweisen),
+    --   sys.server_role_members = DIREKTE Mitgliedschaft
+    --     (IS_SRVROLEMEMBER() kann seinerseits 0 liefern, obwohl direkte Mitgliedschaft besteht -
+    --      auf DEV01 mit 'NT Service\MSSQLSERVER' reproduziert).
+    -- Nur eine der beiden Quellen wuerde also je nach Richtung untertreiben. ISNULL(), weil
+    -- IS_SRVROLEMEMBER() NULL liefert, wenn der Login nicht aufloesbar ist (z.B. verwaiste
+    -- AD-Konten) - das darf nicht als "privilegiert" durchgehen, die Direktpruefung bleibt.
+    CASE WHEN ISNULL(IS_SRVROLEMEMBER('sysadmin', sp.name), 0) = 1
+              OR srm.member_principal_id IS NOT NULL
+         THEN 1 ELSE 0 END AS IsSysAdmin,
+    CASE WHEN srm.member_principal_id IS NOT NULL THEN 1 ELSE 0 END AS IsSysAdminDirect
 FROM sys.server_principals sp
 LEFT JOIN sys.sql_logins sl ON sl.principal_id = sp.principal_id
 LEFT JOIN sys.server_role_members srm
@@ -194,6 +215,7 @@ ORDER BY sp.type_desc, sp.name
 					$policyEnforced     = if ($row.PasswordPolicyEnforced -is [DBNull]) { $null } else { [bool]$row.PasswordPolicyEnforced }
 					$expirationEnforced = if ($row.PasswordExpirationEnforced -is [DBNull]) { $null } else { [bool]$row.PasswordExpirationEnforced }
 					$isSysAdmin         = [bool]$row.IsSysAdmin
+					$isSysAdminDirect   = [bool]$row.IsSysAdminDirect
 
 					# Sicherheitsampel: Kennwort-Richtlinie/-Ablauf gilt nur fuer SQL-Logins (bei
 					# Windows-Logins/-Gruppen sind die Felder oben bewusst $null - AD, nicht SQL Server,
@@ -219,6 +241,7 @@ ORDER BY sp.type_desc, sp.name
 						LoginName                  = $row.LoginName
 						LoginType                  = $row.LoginType
 						IsSysAdmin                 = $isSysAdmin
+						IsSysAdminDirect           = $isSysAdminDirect
 						RiskLevel                  = $riskLevel
 						RiskIcon                   = $riskIcon
 						DefaultDatabase            = $row.DefaultDatabase

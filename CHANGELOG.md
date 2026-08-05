@@ -1,5 +1,34 @@
 # sqmSQLTool — Changelog
 
+## [1.9.62.0] — 2026-08-05
+
+### Fix: `Get-sqmLoginSettings` untertrieb sysadmin-Privilegien, die ueber AD-Gruppen geerbt sind
+
+Direkte Folge der Erkenntnis aus 1.9.61.0: die `IsSysAdmin`-Spalte pruefte ausschliesslich die
+direkte Mitgliedschaft (`sys.server_role_members`). Ein Login, das nur ueber eine Windows-/
+AD-Gruppe sysadmin ist, taucht dort gar nicht auf - der Sicherheitsreport wies ihn also als
+harmlos aus, obwohl er dieselben Vollrechte hat. Fuer einen Report, dessen Zweck das Aufspueren
+privilegierter Konten ist, ist das die gefaehrlichere Fehlrichtung.
+
+Umgestellt auf "privilegiert ueber IRGENDEINEN Pfad" - bewusst die Kombination beider Quellen
+statt eines simplen Austauschs, weil beide je nach Richtung untertreiben:
+`IS_SRVROLEMEMBER()` erfasst die Vererbung ueber Gruppen, liefert aber seinerseits `0` fuer
+manche direkten Mitglieder (auf DEV01 mit `NT Service\MSSQLSERVER` reproduziert);
+`sys.server_role_members` erfasst nur direkte Mitgliedschaft. `IsSysAdmin` ist jetzt wahr, wenn
+eine der beiden Quellen anschlaegt (`ISNULL()`-gesichert, damit nicht aufloesbare Logins - z.B.
+verwaiste AD-Konten, `IS_SRVROLEMEMBER()` liefert dann NULL - nicht faelschlich als privilegiert
+gelten).
+
+Neue Spalte `IsSysAdminDirect` weist die direkte Mitgliedschaft weiterhin separat aus. Weichen
+beide ab (`IsSysAdmin=True`, `IsSysAdminDirect=False`), sind die Rechte ueber eine Gruppe geerbt
+und lassen sich nicht per `ALTER SERVER ROLE ... DROP MEMBER` am Login selbst entziehen, sondern
+nur ueber die Gruppenmitgliedschaft - eine betrieblich wichtige Unterscheidung. `RiskLevel`
+bewertet weiterhin auf Basis von `IsSysAdmin`, jetzt also inklusive geerbter Privilegien.
+
+Verifiziert gegen DEV01: `NT Service\MSSQLSERVER` wird korrekt als `IsSysAdmin=True` erkannt,
+obwohl `IS_SRVROLEMEMBER()` dafuer `0` liefert. Der umgekehrte Fall (nur ueber AD-Gruppe geerbt)
+liess sich mangels Domaene in der Testumgebung nicht live nachstellen.
+
 ## [1.9.61.0] — 2026-08-05
 
 ### Fix (Ursache gefunden): `IS_SRVROLEMEMBER()` prueft EFFEKTIVE, nicht direkte Rollenmitgliedschaft
