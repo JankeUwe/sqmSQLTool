@@ -1,5 +1,25 @@
 # sqmSQLTool — Changelog
 
+## [1.9.56.0] — 2026-08-05
+
+### Fix: dbatools-Update in FITS-Umgebungen von PSGallery auf Freigabelaufwerk-Sideload umgestellt
+
+Nachtrag zu 1.9.55.0: der dortige PSGallery-basierte Versionscheck ist fuer FI-TS-gehostete
+Instanzen (wie DWP1W02SQLT0001) der falsche Weg - PSGallery ist auf einer abgeschotteten
+Produktivinstanz nicht erreichbar. Unter `<SQLSources>\Modules` (Geschwisterordner von `Tools`,
+wo `sqmSQLTool` selbst per UNC-Installation herkommt) liegt dort bereits ein von FI-TS gepflegtes,
+fertiges Ordnerpaar `dbatools` + `dbatools.library` (das binaere Begleitmodul von dbatools 2.x).
+
+Fix: Schritt 5b erkennt eine FITS-Installation jetzt VOR dem PSGallery-Zweig (gleiche Erkennung
+wie die bestehende FI-TS-Konfiguration in Schritt 7 - `$isFitsInstall` wird jetzt einmalig
+berechnet und in beiden Schritten wiederverwendet statt dupliziert). Ist der abgeleitete
+`Modules`-Pfad relativ zu `-Source` vorhanden und enthaelt beide Ordner, werden `dbatools` und
+`dbatools.library` per `robocopy /MIR` in den Ziel-Scope gespiegelt - PSGallery bleibt der Weg
+fuer alle anderen (Nicht-FITS-)Umgebungen. Pfad-Ableitung gegen die reale
+`InstallSourcePath`-Konfiguration von DWP1W02SQLT0001 verifiziert
+(`\\tsclient\W\75084-Datenbanken\MSSQL\SQLSources\Tools\sqmSQLTool-main` ->
+`...\SQLSources\Modules`, exakter Treffer).
+
 ## [1.9.55.0] — 2026-08-05
 
 ### Neu: `Grant-sqmTemporarySysadmin` fragt standardmaessig nicht mehr interaktiv nach

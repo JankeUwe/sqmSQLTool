@@ -185,7 +185,24 @@ Get-ChildItem -Path $Destination -Recurse -File | ForEach-Object {
 #     ermittelt und bei Rueckstand ein Update angestossen - ist PSGallery nicht erreichbar
 #     (typisch fuer eine abgeschottete Produktivinstanz), wird die erkannte installierte
 #     Version wenigstens sichtbar geloggt, statt stillschweigend als "ok" durchzugehen.
+#
+#     FITS-Umgebung (Quelle unter W:\ bzw. \\tsclient\W\ - Citrix-Freigabelaufwerk, Erkennung wie
+#     in Schritt 7 unten): PSGallery ist auf einer abgeschotteten Produktivinstanz typischerweise
+#     NICHT erreichbar. Dort liegt unter <SQLSources>\Modules (Geschwisterordner von Tools, wo
+#     sqmSQLTool selbst herkommt) bereits ein von FI-TS gepflegtes, fertiges Ordnerpaar
+#     'dbatools' + 'dbatools.library' (das binaere Begleitmodul von dbatools 2.x) - Quelle der
+#     Wahrheit ist in diesem Fall das Freigabelaufwerk, nicht PSGallery.
 # ---------------------------------------------------------------------------
+$isFitsInstall = ($Source -like 'W:\*') -or ($Source -like '\\tsclient\W\*')
+$fitsModulesShare = $null
+if ($isFitsInstall) {
+    $candidateShare = Join-Path (Split-Path (Split-Path $Source -Parent) -Parent) 'Modules'
+    if ((Test-Path (Join-Path $candidateShare 'dbatools') -PathType Container) -and
+        (Test-Path (Join-Path $candidateShare 'dbatools.library') -PathType Container)) {
+        $fitsModulesShare = $candidateShare
+    }
+}
+
 $dbatoolsMaxVersion = ($PSD1 = Import-PowerShellDataFile (Join-Path $Source 'sqmSQLTool.psd1')).RequiredModules |
     Where-Object { $_.ModuleName -eq 'dbatools' } | Select-Object -ExpandProperty MaximumVersion -First 1
 if (-not $dbatoolsMaxVersion) { $dbatoolsMaxVersion = '2.999.999' }
@@ -205,7 +222,30 @@ $dbatoolsInstalledVersion = if ($dbatoolsInScope) {
 } else { $null }
 
 Write-Host "Pruefe Abhaengigkeit 'dbatools' (Scope $Scope)..." -ForegroundColor Cyan
-if ($dbatoolsInScope) {
+if ($fitsModulesShare) {
+    Write-Host "  FITS-Umgebung erkannt (Quelle: $Source) - synchronisiere dbatools + dbatools.library von '$fitsModulesShare'..." -ForegroundColor Cyan
+    $targetModulesRoot = if ($Scope -eq 'AllUsers') { Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules' }
+    else { Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsPowerShell\Modules' }
+    $fitsSyncFailed = $false
+    foreach ($modName in @('dbatools', 'dbatools.library')) {
+        $srcMod = Join-Path $fitsModulesShare $modName
+        $dstMod = Join-Path $targetModulesRoot $modName
+        robocopy $srcMod $dstMod /MIR /NJH /NJS /NDL /COPY:DAT | Out-Null
+        if ($LASTEXITCODE -ge 8) {
+            Write-Warning "  robocopy fuer '$modName' meldete einen Fehler (Exitcode $LASTEXITCODE) - $srcMod -> $dstMod."
+            $fitsSyncFailed = $true
+        } else {
+            Get-ChildItem -Path $dstMod -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
+                Unblock-File -Path $_.FullName -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    if (-not $fitsSyncFailed) {
+        Write-Host "  dbatools + dbatools.library vom FI-TS-Freigabelaufwerk synchronisiert (-Scope $Scope)." -ForegroundColor Green
+    } else {
+        Write-Warning "  Synchronisation unvollstaendig - bitte den Zustand von '$targetModulesRoot' manuell pruefen."
+    }
+} elseif ($dbatoolsInScope) {
     Write-Host "  dbatools $dbatoolsInstalledVersion im passenden Scope vorhanden. Pruefe auf neuere Version..." -ForegroundColor Gray
     try {
         $latest = Find-Module dbatools -Repository PSGallery -MaximumVersion $dbatoolsMaxVersion -ErrorAction Stop |
@@ -353,11 +393,11 @@ if ($importOk -and $Scope -eq 'AllUsers') {
 
 # ---------------------------------------------------------------------------
 # 7. FI-TS-Konfiguration automatisch setzen
-#    Kriterium: Installation wurde von W:\ oder \\tsclient\W\ gestartet.
+#    Kriterium: Installation wurde von W:\ oder \\tsclient\W\ gestartet ($isFitsInstall,
+#    bereits in Schritt 5b berechnet und dort auch fuer das dbatools-Sideloading genutzt).
 #    Setzt alle FI-TS-Standardwerte via Set-sqmConfig (persistiert in config.json).
 #    Laeuft nur wenn der Import erfolgreich war.
 # ---------------------------------------------------------------------------
-$isFitsInstall = ($Source -like 'W:\*') -or ($Source -like '\\tsclient\W\*')
 if ($importOk -and $isFitsInstall) {
     Write-Host ""
     Write-Host "FI-TS-Umgebung erkannt (Quelle: $Source)" -ForegroundColor Cyan
