@@ -15,11 +15,16 @@
     Es werden ausschliesslich Windows-/AD-Logins (DOMAIN\Konto bzw. AD-Gruppe)
     unterstuetzt.
 
+    Ist in der Modulkonfiguration eine 'DefaultPolicy' gesetzt und -DisablePolicy aktiv
+    ($true, Default), wird diese PBM-Policy via Set-sqmSqlPolicyState fuer die GESAMTE
+    Dauer der Aktion deaktiviert und in einem finally-Block garantiert wieder aktiviert -
+    nicht nur um ein optionales CREATE LOGIN, sondern auch um ALTER SERVER ROLE ADD/DROP
+    MEMBER und DROP LOGIN. Siehe .PARAMETER DisablePolicy fuer den Hintergrund
+    (syspolicy_server_trigger kann jede dieser Anweisungen abfangen, nicht nur die
+    Login-Anlage).
+
     -CreateLoginIfMissing (nur Grant):
         Fehlt der Login, wird er per 'CREATE LOGIN [..] FROM WINDOWS' angelegt.
-        Ist in der Modulkonfiguration eine 'DefaultPolicy' gesetzt und -DisablePolicy
-        aktiv ($true, Default), wird diese PBM-Policy vor dem Anlegen via
-        Set-sqmSqlPolicyState deaktiviert und anschliessend wieder aktiviert.
         Im Ergebnis wird LoginCreated = $true zurueckgegeben.
 
     -RemoveLogin (nur Revoke):
@@ -56,8 +61,14 @@
     keiner weiteren festen Serverrolle haengt.
 
 .PARAMETER DisablePolicy
-    Beim Anlegen eines Logins die konfigurierte PBM-Policy (DefaultPolicy) vorher
-    deaktivieren und danach wieder aktivieren. Default: $true.
+    Die konfigurierte PBM-Policy (DefaultPolicy) fuer die gesamte Dauer der Aktion vorher
+    deaktivieren und danach wieder aktivieren - nicht nur um ein optionales CREATE LOGIN,
+    sondern auch um ALTER SERVER ROLE [sysadmin] ADD/DROP MEMBER (und DROP LOGIN bei
+    -RemoveLogin). Eine Policy mit Auswertungsmodus "On Change: Prevent" haengt serverweit
+    am eingebauten syspolicy_server_trigger und kann JEDE DDL_SERVER_LEVEL_EVENTS-Anweisung
+    per Rollback abbrechen ("The transaction ended in the trigger. The batch has been
+    aborted."), nicht nur die Login-Anlage - das betrifft also genauso den eigentlichen
+    sysadmin-Grant/-Revoke. Default: $true.
 
 .PARAMETER TicketNumber
     Optionale Auftrags-/Ticketnummer fuer die Protokollierung.
@@ -124,37 +135,45 @@ function Invoke-sqmTempSysadminAction
 
 		try
 		{
-			if ($Action -eq 'Grant')
+			# PBM-Policy (DefaultPolicy) rund um die GESAMTE Aktion deaktivieren, nicht nur um
+			# ein optionales CREATE LOGIN: eine Policy mit Auswertungsmodus "On Change: Prevent"
+			# haengt serverweit am eingebauten syspolicy_server_trigger und kann JEDE
+			# DDL_SERVER_LEVEL_EVENTS-Anweisung per Rollback abbrechen ("The transaction ended
+			# in the trigger. The batch has been aborted.") - das betrifft ALTER SERVER ROLE
+			# ADD/DROP MEMBER und DROP LOGIN genauso wie CREATE LOGIN. Frueher war die
+			# Deaktivierung nur um CREATE LOGIN gelegt, wodurch der eigentliche sysadmin-Grant
+			# (und - schwerwiegender - der automatische Revoke-Job Tage spaeter) auf Instanzen
+			# mit einer solchen Policy weiterhin fehlschlug, obwohl das genau der Zweck dieser
+			# Funktion ist.
+			$policyDisabled = $false
+			$policyName     = if ($DisablePolicy) { Get-sqmConfig -Key 'DefaultPolicy' 3>$null } else { $null }
+			try
 			{
-				# --- 1. Login-Existenz pruefen (nur Windows-/AD-Principals U/G) ---
-				$exists = Invoke-DbaQuery @connParams -Database master -EnableException -ErrorAction Stop `
-					-Query "SELECT COUNT(*) AS Cnt FROM sys.server_principals WHERE name = N'$loginLit' AND type IN ('U','G');"
-				$loginPresent = ($exists -and [int]$exists.Cnt -gt 0)
-
-				# --- 2. Fehlt der Login: optional anlegen (mit Policy-Handling) ---
-				if (-not $loginPresent)
+				if ($DisablePolicy -and -not [string]::IsNullOrWhiteSpace($policyName))
 				{
-					if (-not $CreateLoginIfMissing)
+					$pd = Set-sqmSqlPolicyState @connParams -State Disable -ContinueOnError -ErrorAction Stop
+					if (($pd | Select-Object -ExpandProperty Status -First 1) -eq 'Success')
 					{
-						throw "Login '$Login' existiert auf '$SqlInstance' nicht und -CreateLoginIfMissing wurde nicht gesetzt."
+						$policyDisabled = $true
+						Invoke-sqmLogging -Message "PBM-Policy '$policyName' auf '$SqlInstance' fuer sysadmin-$Action temporaer deaktiviert." -FunctionName $functionName -Level 'INFO'
 					}
+				}
 
-					$policyDisabled = $false
-					$policyName     = if ($DisablePolicy) { Get-sqmConfig -Key 'DefaultPolicy' 3>$null } else { $null }
-					try
+				if ($Action -eq 'Grant')
+				{
+					# --- 1. Login-Existenz pruefen (nur Windows-/AD-Principals U/G) ---
+					$exists = Invoke-DbaQuery @connParams -Database master -EnableException -ErrorAction Stop `
+						-Query "SELECT COUNT(*) AS Cnt FROM sys.server_principals WHERE name = N'$loginLit' AND type IN ('U','G');"
+					$loginPresent = ($exists -and [int]$exists.Cnt -gt 0)
+
+					# --- 2. Fehlt der Login: optional anlegen ---
+					if (-not $loginPresent)
 					{
-						# 2a. PBM-Policy vor dem Anlegen deaktivieren (nur wenn konfiguriert)
-						if ($DisablePolicy -and -not [string]::IsNullOrWhiteSpace($policyName))
+						if (-not $CreateLoginIfMissing)
 						{
-							$pd = Set-sqmSqlPolicyState @connParams -State Disable -ContinueOnError -ErrorAction Stop
-							if (($pd | Select-Object -ExpandProperty Status -First 1) -eq 'Success')
-							{
-								$policyDisabled = $true
-								Invoke-sqmLogging -Message "PBM-Policy '$policyName' auf '$SqlInstance' fuer Login-Anlage deaktiviert." -FunctionName $functionName -Level 'INFO'
-							}
+							throw "Login '$Login' existiert auf '$SqlInstance' nicht und -CreateLoginIfMissing wurde nicht gesetzt."
 						}
 
-						# 2b. Login anlegen
 						Invoke-DbaQuery @connParams -Database master -EnableException -ErrorAction Stop `
 							-Query "CREATE LOGIN $loginBracket FROM WINDOWS;"
 						$loginCreated = $true
@@ -162,74 +181,76 @@ function Invoke-sqmTempSysadminAction
 						Invoke-sqmLogging -Message $createMsg -FunctionName $functionName -Level 'INFO'
 						Write-sqmEventLogSafe -Message $createMsg -EntryType 'Information' -EventId 9003
 					}
-					finally
-					{
-						# 2c. PBM-Policy in jedem Fall wieder aktivieren
-						if ($policyDisabled)
-						{
-							try
-							{
-								Set-sqmSqlPolicyState @connParams -State Enable -ContinueOnError -ErrorAction Stop | Out-Null
-								Invoke-sqmLogging -Message "PBM-Policy '$policyName' auf '$SqlInstance' wieder aktiviert." -FunctionName $functionName -Level 'INFO'
-							}
-							catch
-							{
-								Invoke-sqmLogging -Message "WARNUNG: PBM-Policy '$policyName' auf '$SqlInstance' konnte NICHT reaktiviert werden: $($_.Exception.Message)" -FunctionName $functionName -Level 'WARNING'
-							}
-						}
-					}
-				}
 
-				# --- 3. sysadmin vergeben (idempotent) ---
-				$sql = @"
+					# --- 3. sysadmin vergeben (idempotent) ---
+					$sql = @"
 IF IS_SRVROLEMEMBER('sysadmin', N'$loginLit') = 0
     ALTER SERVER ROLE [sysadmin] ADD MEMBER $loginBracket;
 "@
-				Invoke-DbaQuery @connParams -Database master -Query $sql -EnableException -ErrorAction Stop
+					Invoke-DbaQuery @connParams -Database master -Query $sql -EnableException -ErrorAction Stop
 
-				$msg = "sysadmin Grant fuer Login '$Login' auf '$SqlInstance' erfolgreich$(if($loginCreated){' (Login neu angelegt)'}). Auftragsnummer: $ticketText."
-				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "INFO"
-				Write-sqmEventLogSafe -Message $msg -EntryType 'Information' -EventId 9001
-			}
-			else # Revoke
-			{
-				# --- 1. sysadmin entziehen (idempotent) ---
-				$sql = @"
+					$msg = "sysadmin Grant fuer Login '$Login' auf '$SqlInstance' erfolgreich$(if($loginCreated){' (Login neu angelegt)'}). Auftragsnummer: $ticketText."
+					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "INFO"
+					Write-sqmEventLogSafe -Message $msg -EntryType 'Information' -EventId 9001
+				}
+				else # Revoke
+				{
+					# --- 1. sysadmin entziehen (idempotent) ---
+					$sql = @"
 IF IS_SRVROLEMEMBER('sysadmin', N'$loginLit') = 1
     ALTER SERVER ROLE [sysadmin] DROP MEMBER $loginBracket;
 "@
-				Invoke-DbaQuery @connParams -Database master -Query $sql -EnableException -ErrorAction Stop
+					Invoke-DbaQuery @connParams -Database master -Query $sql -EnableException -ErrorAction Stop
 
-				$msg = "sysadmin Revoke fuer Login '$Login' auf '$SqlInstance' erfolgreich. Auftragsnummer: $ticketText."
-				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "INFO"
-				Write-sqmEventLogSafe -Message $msg -EntryType 'Information' -EventId 9002
+					$msg = "sysadmin Revoke fuer Login '$Login' auf '$SqlInstance' erfolgreich. Auftragsnummer: $ticketText."
+					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "INFO"
+					Write-sqmEventLogSafe -Message $msg -EntryType 'Information' -EventId 9002
 
-				# --- 2. Optional: selbst angelegten Login wieder entfernen ---
-				if ($RemoveLogin)
-				{
-					# Sicherheitsnetz: nur droppen, wenn der Login an KEINER weiteren
-					# festen Serverrolle ausser 'public' haengt.
-					$roleCheck = Invoke-DbaQuery @connParams -Database master -EnableException -ErrorAction Stop -Query @"
+					# --- 2. Optional: selbst angelegten Login wieder entfernen ---
+					if ($RemoveLogin)
+					{
+						# Sicherheitsnetz: nur droppen, wenn der Login an KEINER weiteren
+						# festen Serverrolle ausser 'public' haengt.
+						$roleCheck = Invoke-DbaQuery @connParams -Database master -EnableException -ErrorAction Stop -Query @"
 SELECT COUNT(*) AS Cnt
 FROM sys.server_role_members rm
 JOIN sys.server_principals r ON r.principal_id = rm.role_principal_id
 JOIN sys.server_principals m ON m.principal_id = rm.member_principal_id
 WHERE m.name = N'$loginLit' AND r.name <> 'public';
 "@
-					if ($roleCheck -and [int]$roleCheck.Cnt -gt 0)
-					{
-						$keepMsg = "Login '$Login' auf '$SqlInstance' NICHT entfernt: noch Mitglied weiterer Serverrolle(n). Auftragsnummer: $ticketText."
-						Invoke-sqmLogging -Message $keepMsg -FunctionName $functionName -Level 'WARNING'
-						Write-sqmEventLogSafe -Message $keepMsg -EntryType 'Warning' -EventId 9004
+						if ($roleCheck -and [int]$roleCheck.Cnt -gt 0)
+						{
+							$keepMsg = "Login '$Login' auf '$SqlInstance' NICHT entfernt: noch Mitglied weiterer Serverrolle(n). Auftragsnummer: $ticketText."
+							Invoke-sqmLogging -Message $keepMsg -FunctionName $functionName -Level 'WARNING'
+							Write-sqmEventLogSafe -Message $keepMsg -EntryType 'Warning' -EventId 9004
+						}
+						else
+						{
+							Invoke-DbaQuery @connParams -Database master -EnableException -ErrorAction Stop `
+								-Query "IF EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'$loginLit' AND type IN ('U','G')) DROP LOGIN $loginBracket;"
+							$loginRemoved = $true
+							$dropMsg = "AD-Login '$Login' auf '$SqlInstance' nach Ablauf entfernt (DROP LOGIN). Auftragsnummer: $ticketText."
+							Invoke-sqmLogging -Message $dropMsg -FunctionName $functionName -Level 'INFO'
+							Write-sqmEventLogSafe -Message $dropMsg -EntryType 'Information' -EventId 9005
+						}
 					}
-					else
+				}
+			}
+			finally
+			{
+				# PBM-Policy in jedem Fall wieder aktivieren, auch wenn eine der obigen
+				# Anweisungen fehlschlug (der aeussere catch faengt/formatiert den Fehler
+				# trotzdem noch ab - dieser finally-Block laeuft davor).
+				if ($policyDisabled)
+				{
+					try
 					{
-						Invoke-DbaQuery @connParams -Database master -EnableException -ErrorAction Stop `
-							-Query "IF EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'$loginLit' AND type IN ('U','G')) DROP LOGIN $loginBracket;"
-						$loginRemoved = $true
-						$dropMsg = "AD-Login '$Login' auf '$SqlInstance' nach Ablauf entfernt (DROP LOGIN). Auftragsnummer: $ticketText."
-						Invoke-sqmLogging -Message $dropMsg -FunctionName $functionName -Level 'INFO'
-						Write-sqmEventLogSafe -Message $dropMsg -EntryType 'Information' -EventId 9005
+						Set-sqmSqlPolicyState @connParams -State Enable -ContinueOnError -ErrorAction Stop | Out-Null
+						Invoke-sqmLogging -Message "PBM-Policy '$policyName' auf '$SqlInstance' wieder aktiviert." -FunctionName $functionName -Level 'INFO'
+					}
+					catch
+					{
+						Invoke-sqmLogging -Message "WARNUNG: PBM-Policy '$policyName' auf '$SqlInstance' konnte NICHT reaktiviert werden: $($_.Exception.Message)" -FunctionName $functionName -Level 'WARNING'
 					}
 				}
 			}

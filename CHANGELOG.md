@@ -1,5 +1,30 @@
 # sqmSQLTool — Changelog
 
+## [1.9.53.0] — 2026-08-05
+
+### Fix: `Invoke-sqmTempSysadminAction` scheiterte auf Instanzen mit "On Change: Prevent"-PBM-Policy an ALTER SERVER ROLE
+
+Auf DWP1W02SQLT0001 (DWPBANK-PROD) schlug `Grant-sqmTemporarySysadmin` fehl mit "The transaction
+ended in the trigger. The batch has been aborted." - Ursache: der eingebaute
+`syspolicy_server_trigger` (Policy-Based Management) fing die `ALTER SERVER ROLE [sysadmin] ADD
+MEMBER`-Anweisung ab und rollte sie zurueck, weil dort eine Policy mit Auswertungsmodus
+"On Change: Prevent" aktiv ist. Kein Kennwortrichtlinien-Thema (der betroffene Login ist ohnehin
+ein Windows-/AD-Login, fuer den SQL Server gar keine Kennwortrichtlinie fuehrt) - dieser
+serverweite Trigger kann JEDE `DDL_SERVER_LEVEL_EVENTS`-Anweisung abfangen.
+
+Der Bug: die vorhandene Policy-Deaktivierung (`DefaultPolicy` via `Set-sqmSqlPolicyState`) war nur
+um das optionale `CREATE LOGIN` gelegt, nicht um `ALTER SERVER ROLE ADD/DROP MEMBER` oder
+`DROP LOGIN` - also nicht um die eigentliche sysadmin-Vergabe/-Entziehung selbst. Schwerwiegender
+als der Grant-Fehlschlag: der automatische Revoke-Job Tage spaeter waere auf einer solchen Instanz
+genauso gescheitert und haette sich (Job wird bei Fehler bewusst NICHT geloescht) nicht selbst
+entfernt - der Login waere unbefristet sysadmin geblieben.
+
+Fix: die Policy-Deaktivierung umschliesst jetzt die GESAMTE Grant-/Revoke-Aktion (Login-Anlage +
+Rollenaenderung + optionales Login-Entfernen), garantiert wieder aktiviert per `finally` auch bei
+Fehlern. Regressionstest (Grant + Revoke Rundlauf) gegen DEV01 verifiziert - DEV01 hat selbst keine
+PBM-Policy konfiguriert, das eigentliche Trigger-Szenario liess sich also nur indirekt bestaetigen
+(Root Cause + Fix-Scope, nicht der volle Fehlerfall selbst).
+
 ## [1.9.52.0] — 2026-08-05
 
 ### Neu: `Get-sqmLoginSettings` mit sysadmin-Mitgliedschaft und Sicherheitsampel (RiskLevel/RiskIcon)
