@@ -66,6 +66,13 @@
 .PARAMETER Force
     Ueberschreibt bereits vorhandene gleichnamige Grant-/Revoke-Jobs.
 
+.PARAMETER Confirm
+    Erzwingt eine interaktive Rueckfrage vor der Vergabe (Standard: keine Rueckfrage - siehe
+    .NOTES).
+
+.PARAMETER WhatIf
+    Zeigt nur, was passieren wuerde, ohne etwas zu aendern.
+
 .EXAMPLE
     Grant-sqmTemporarySysadmin -SqlInstance SQL01 -Login 'DOM\u.maier' -Days 3 -TicketNumber 'INC0012345'
     # Sofort sysadmin fuer 3 Tage (auf allen AG-Replicas), danach automatischer Entzug.
@@ -83,6 +90,12 @@
     Aufrufer braucht fuer die Sofort-Vergabe sysadmin/ALTER auf der Serverrolle.
     Das SQL-Agent-Dienstkonto braucht sysadmin (fuer DROP/Self-Delete) und das
     Modul maschinenweit (AllUsers).
+
+    ConfirmImpact ist 'High' (zurecht - Rechte-Eskalation auf Produktion), $ConfirmPreference
+    wird aber intern auf 'None' gesetzt: -TicketNumber ist bereits der Nachweis einer bewussten
+    Entscheidung, und eine interaktive Rueckfrage wuerde einen skriptgesteuerten Aufruf (z.B.
+    aus einer Ticket-/ServiceNow-Automatisierung ohne interaktive Session) haengen lassen.
+    -Confirm explizit angeben, um die Rueckfrage bewusst wieder einzuschalten.
 #>
 function Grant-sqmTemporarySysadmin
 {
@@ -116,6 +129,16 @@ function Grant-sqmTemporarySysadmin
 		$functionName = $MyInvocation.MyCommand.Name
 		$connParams = @{ SqlInstance = $SqlInstance }
 		if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
+
+		# ConfirmImpact bleibt 'High' (dokumentiert weiterhin zurecht als hochriskante Aktion),
+		# aber PowerShells Default $ConfirmPreference = 'High' wuerde dafuer automatisch die
+		# interaktive "Moechten Sie diesen Vorgang ausfuehren?"-Abfrage einblenden - Reibung, die
+		# bei ticketbasierten (-TicketNumber ist bereits der Nachweis fuer eine bewusste
+		# Entscheidung) oder skriptgesteuerten Aufrufen (z.B. aus einer ServiceNow-Automatisierung)
+		# nicht gewuenscht ist und dort sogar haengen bleiben wuerde (keine interaktive Session zum
+		# Beantworten). Default daher ohne Rueckfrage; wer die Abfrage bewusst will, kann -Confirm
+		# explizit anhaengen - das ueberstimmt diesen Default fuer den einzelnen Aufruf wieder.
+		$ConfirmPreference = 'None'
 	}
 
 	process

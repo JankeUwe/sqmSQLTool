@@ -169,24 +169,59 @@ Get-ChildItem -Path $Destination -Recurse -File | ForEach-Object {
 }
 
 # ---------------------------------------------------------------------------
-# 5b. dbatools-Abhaengigkeit im PASSENDEN Scope sicherstellen
+# 5b. dbatools-Abhaengigkeit im PASSENDEN Scope sicherstellen UND aktuell halten
 #     sqmSQLTool.psd1 hat RequiredModules = @('dbatools') -> ohne dbatools
 #     schlaegt der Import-Test (Schritt 6) fehl. Auf einem frischen Server ist
 #     dbatools nicht vorhanden. Installation im GLEICHEN Scope wie sqmSQLTool,
 #     sonst Scope-Mismatch: AllUsers-Modul wuerde ein nur in CurrentUser
 #     liegendes dbatools in fremden/Admin-Sessions nicht finden.
+#
+#     "Vorhanden" allein reicht nicht: auf DWP1W02SQLT0001 stand seit 2022 dbatools
+#     1.1.95 - ein bisher unbemerkter, mehrere Major-Versionen alter Stand, der
+#     Get-DbaPbmPolicy in einer Rueckgabeform lieferte, die aeltere Annahmen im Modul
+#     nicht abdeckten. Diese Pruefung war bisher rein binaer (Ordner da -> ok) und haette
+#     das nie aufgedeckt. Jetzt wird zusaetzlich die auf PSGallery neueste verfuegbare
+#     Version (innerhalb des MaximumVersion-Caps aus sqmSQLTool.psd1, also < dbatools 3.0)
+#     ermittelt und bei Rueckstand ein Update angestossen - ist PSGallery nicht erreichbar
+#     (typisch fuer eine abgeschottete Produktivinstanz), wird die erkannte installierte
+#     Version wenigstens sichtbar geloggt, statt stillschweigend als "ok" durchzugehen.
 # ---------------------------------------------------------------------------
+$dbatoolsMaxVersion = ($PSD1 = Import-PowerShellDataFile (Join-Path $Source 'sqmSQLTool.psd1')).RequiredModules |
+    Where-Object { $_.ModuleName -eq 'dbatools' } | Select-Object -ExpandProperty MaximumVersion -First 1
+if (-not $dbatoolsMaxVersion) { $dbatoolsMaxVersion = '2.999.999' }
+
 $auDbatools = Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules\dbatools'
 $cuDbatools = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsPowerShell\Modules\dbatools'
-if ($Scope -eq 'AllUsers') {
-    $dbatoolsInScope = Test-Path $auDbatools                       # AllUsers braucht dbatools systemweit
+$dbatoolsPathInScope = if ($Scope -eq 'AllUsers') {
+    if (Test-Path $auDbatools) { $auDbatools } else { $null }         # AllUsers braucht dbatools systemweit
 } else {
-    $dbatoolsInScope = (Test-Path $cuDbatools) -or (Test-Path $auDbatools)  # CurrentUser: beides ok
+    if (Test-Path $cuDbatools) { $cuDbatools } elseif (Test-Path $auDbatools) { $auDbatools } else { $null }
 }
+$dbatoolsInScope = [bool]$dbatoolsPathInScope
+$dbatoolsInstalledVersion = if ($dbatoolsInScope) {
+    (Get-ChildItem -Path $dbatoolsPathInScope -Directory -ErrorAction SilentlyContinue |
+        ForEach-Object { try { [version]$_.Name } catch { $null } } |
+        Sort-Object -Descending | Select-Object -First 1)
+} else { $null }
 
 Write-Host "Pruefe Abhaengigkeit 'dbatools' (Scope $Scope)..." -ForegroundColor Cyan
 if ($dbatoolsInScope) {
-    Write-Host "  dbatools im passenden Scope vorhanden." -ForegroundColor Gray
+    Write-Host "  dbatools $dbatoolsInstalledVersion im passenden Scope vorhanden. Pruefe auf neuere Version..." -ForegroundColor Gray
+    try {
+        $latest = Find-Module dbatools -Repository PSGallery -MaximumVersion $dbatoolsMaxVersion -ErrorAction Stop |
+            Sort-Object -Property { [version]$_.Version } -Descending | Select-Object -First 1
+        if ($latest -and (-not $dbatoolsInstalledVersion -or [version]$latest.Version -gt $dbatoolsInstalledVersion)) {
+            Write-Host "  Neuere Version verfuegbar: $($latest.Version) (installiert: $dbatoolsInstalledVersion) - aktualisiere..." -ForegroundColor Yellow
+            Install-Module dbatools -Scope $Scope -RequiredVersion $latest.Version -Force -AllowClobber -ErrorAction Stop
+            Write-Host "  dbatools auf $($latest.Version) aktualisiert (-Scope $Scope)." -ForegroundColor Green
+        } else {
+            Write-Host "  dbatools ist aktuell (innerhalb des Caps $dbatoolsMaxVersion)." -ForegroundColor Gray
+        }
+    } catch {
+        Write-Warning "  Konnte PSGallery nicht nach einer neueren dbatools-Version abfragen (evtl. keine Internet-/PSGallery-Verbindung): $_"
+        Write-Warning "  Installiert ist aktuell: dbatools $dbatoolsInstalledVersion. Bei Verdacht auf Versionsprobleme manuell pruefen/aktualisieren:"
+        Write-Warning "    Update-Module dbatools -Force   (oder auf einer abgeschotteten Instanz: von einem Freigabelaufwerk/Offline-Repository sideloaden)"
+    }
 } else {
     Write-Host "  dbatools fehlt im Scope '$Scope' - installiere von der PSGallery..." -ForegroundColor Yellow
     try {

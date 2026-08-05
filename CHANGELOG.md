@@ -1,5 +1,36 @@
 # sqmSQLTool — Changelog
 
+## [1.9.55.0] — 2026-08-05
+
+### Neu: `Grant-sqmTemporarySysadmin` fragt standardmaessig nicht mehr interaktiv nach
+
+`ConfirmImpact = 'High'` liess PowerShell bei jedem Aufruf automatisch die "Moechten Sie diesen
+Vorgang ausfuehren?"-Rueckfrage einblenden (Default `$ConfirmPreference = 'High'`) - Reibung bei
+ticketbasierten oder skriptgesteuerten Aufrufen (z.B. aus einer Automatisierung ohne interaktive
+Session, wo die Abfrage schlicht haengen bleiben wuerde). `-TicketNumber` ist bereits der Nachweis
+einer bewussten Entscheidung.
+
+Fix: `$ConfirmPreference = 'None'` intern gesetzt - `ConfirmImpact = 'High'` bleibt als Metadatum
+bestehen (weiterhin zurecht als hochriskante Aktion dokumentiert), aber es wird nicht mehr
+automatisch nachgefragt. `-WhatIf` funktioniert unveraendert; wer die Rueckfrage bewusst will,
+kann `-Confirm` explizit anhaengen. Verifiziert gegen DEV01: `-WhatIf` zeigt weiterhin die Absicht
+ohne Aenderung, ein echter Aufruf ohne `-Confirm` laeuft ohne Prompt/Haengenbleiben durch.
+
+### Neu: `Install.ps1` erkennt und aktualisiert veraltete dbatools-Installationen
+
+Auf DWP1W02SQLT0001 stand seit 2022 unbemerkt dbatools 1.1.95 - mehrere Major-Versionen veraltet,
+sehr wahrscheinlich Ursache fuer eine abweichende `Get-DbaPbmPolicy`-Rueckgabeform, die aeltere
+Codepfade in `Set-sqmSqlPolicyState` nicht abdeckten. Die bisherige Pruefung war rein binaer
+("Ordner vorhanden -> ok") und haette das nie aufgedeckt, unabhaengig davon wie alt die Version war.
+
+Fix: Schritt 5b prueft jetzt zusaetzlich die installierte Version gegen die auf PSGallery neueste
+verfuegbare (innerhalb des bestehenden `MaximumVersion`-Caps aus `RequiredModules`, liest also den
+Cap direkt aus `sqmSQLTool.psd1` statt ihn zu duplizieren) und aktualisiert bei Rueckstand
+automatisch. Ist PSGallery nicht erreichbar (typisch fuer eine abgeschottete Produktivinstanz),
+wird die erkannte installierte Version als Warnung ausgegeben statt stillschweigend als "ok"
+durchzugehen. Verifiziert (Versionserkennung + PSGallery-Vergleich) gegen die hier installierte
+dbatools 2.8.2 - erkannte korrekt 2.8.4 als neuere verfuegbare Version.
+
 ## [1.9.54.0] — 2026-08-05
 
 ### Fix: `Invoke-sqmTempSysadminAction` - Fehlschlag der Policy-Deaktivierung war unsichtbar
