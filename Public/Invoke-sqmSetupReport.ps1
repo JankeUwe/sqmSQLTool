@@ -335,6 +335,45 @@ ORDER BY sp.name
             $xpStatus = if ($xpCmdEnabled) { 'ENABLED (security risk)' } else { 'OK (disabled)' }
             $xpColor = if ($xpCmdEnabled) { 'orange' } else { 'green' }
 
+            # SQL Browser Dienst
+            # Der SQL Browser ermoeglicht ueber UDP 1434 das Auffinden benannter Instanzen und ihrer
+            # dynamischen Ports im Netzwerk. Noetig ist er nur fuer benannte Instanzen mit dynamischem
+            # Port - laeuft er darueber hinaus, ist das ein zusaetzlicher Angriffsvektor zur
+            # Instanz-Enumeration und wird deshalb als Warnung ausgewiesen, nicht als reine Information.
+            $browserStatus = 'Nicht ermittelbar'
+            $browserColor = 'orange'
+            try
+            {
+                $browserRow = Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException -Query @"
+SELECT TOP 1 status_desc, startup_type_desc
+FROM sys.dm_server_services
+WHERE servicename LIKE N'%Browser%'
+"@
+                if ($browserRow)
+                {
+                    if ($browserRow.status_desc -eq 'Running')
+                    {
+                        $browserStatus = "WARNUNG (aktiv - Instanz-Enumeration per UDP 1434 moeglich, Start: $($browserRow.startup_type_desc))"
+                        $browserColor = 'orange'
+                    }
+                    else
+                    {
+                        $browserStatus = "OK ($($browserRow.status_desc), Start: $($browserRow.startup_type_desc))"
+                        $browserColor = 'green'
+                    }
+                }
+                else
+                {
+                    $browserStatus = 'OK (nicht installiert)'
+                    $browserColor = 'green'
+                }
+            }
+            catch
+            {
+                $browserStatus = "Nicht ermittelbar: $($_.Exception.Message)"
+                $browserColor = 'orange'
+            }
+
             # ==========================================
             # SERVICE ACCOUNTS & INFRASTRUCTURE
             # ==========================================
@@ -783,6 +822,8 @@ JOIN sys.availability_groups ag ON ag.group_id = l.group_id
                 -CLRColor $clrColor `
                 -XPStatus $xpStatus `
                 -XPColor $xpColor `
+                -BrowserStatus $browserStatus `
+                -BrowserColor $browserColor `
                 -ServiceAccounts $serviceAccounts `
                 -SPNList $spnLines `
                 -SPNStatus $spnStatus `
@@ -851,6 +892,8 @@ function _Build-ModernReportHtml
         [string]$CLRColor,
         [string]$XPStatus,
         [string]$XPColor,
+        [string]$BrowserStatus,
+        [string]$BrowserColor,
         [string[]]$ServiceAccounts,
         [string[]]$SPNList,
         [string]$SPNStatus,
@@ -991,6 +1034,7 @@ function _Build-ModernReportHtml
       <h3>Server-Level Features</h3>
       <p><span class="info-label">CLR:</span> $CLRStatus</p>
       <p><span class="info-label">xp_cmdshell:</span> $XPStatus</p>
+      <p><span class="info-label">SQL Browser:</span> <strong style="color: $(_SpnColorHex $BrowserColor);">$(_HtmlEncode $BrowserStatus)</strong></p>
     </div>
     <div class="info-block">
       <h3>Infrastructure</h3>

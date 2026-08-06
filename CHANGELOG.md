@@ -1,5 +1,17 @@
 # sqmSQLTool — Changelog
 
+## [1.9.65.0] — 2026-08-06
+
+### Feature: SQL-Browser-Dienststatus im Setup-Report
+
+`Invoke-sqmSetupReport` prueft jetzt zusaetzlich den Status des SQL Server Browser-Dienstes
+(`sys.dm_server_services`, `servicename LIKE '%Browser%'`) und weist ihn im Abschnitt
+"Server-Level Features" aus. Laeuft der Dienst, erscheint eine Warnung (orange): der Browser
+ermoeglicht per UDP 1434 das Auffinden benannter Instanzen und ihrer dynamischen Ports im
+Netzwerk und ist nur fuer genau diesen Fall noetig - laeuft er unnoetig mit, ist das ein
+zusaetzlicher Angriffsvektor zur Instanz-Enumeration. Ist er gestoppt oder nicht installiert,
+erscheint OK (gruen).
+
 ## [1.9.64.0] — 2026-08-05
 
 ### Fix: PBM-Policy-Handling scheiterte unter PowerShell 7 STILLSCHWEIGEND
