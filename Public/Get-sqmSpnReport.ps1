@@ -790,6 +790,34 @@ WHERE ag.group_id IN (
 						# Fehler bei Listener-Pruefung blockiert nicht die Instanz-SPNs
 					}
 
+					# --------------------------------------------------------
+					# Widerspruechliche Doppel-Zeilen fuer Listener-SPNs bereinigen
+					#
+					# Der generische "Unexpected"-Durchlauf oben (vor dem Listener-Check) kennt nur
+					# die 4 eigenen Instanz-SPNs. Da AG-Repliken und ihr Listener typischerweise
+					# dasselbe Dienstkonto nutzen, liefert setspn -L auch die Listener-SPNs zurueck -
+					# die wurden dort faelschlich als 'Unexpected' markiert, weil der generische
+					# Vergleich die Listener-Erwartungsliste noch nicht kennt. Der Listener-Check
+					# direkt darueber bewertet dieselbe SPN anschliessend korrekt (OK/Missing), fuegt
+					# aber nur eine ZUSAETZLICHE Zeile hinzu, statt die aeltere zu ersetzen - dieselbe
+					# SPN stand deshalb zweimal im Bericht, mit widerspruechlichem Status. Die
+					# veraltete generische 'Unexpected'-Zeile hier entfernen; die Listener-spezifische
+					# Bewertung ist die praezisere und bleibt stehen.
+					$listenerEvaluatedSpns = $detailRows |
+						Where-Object { $_.Note -like 'AlwaysOn Listener SPN (AG:*' } |
+						Select-Object -ExpandProperty Spn -Unique
+
+					if ($listenerEvaluatedSpns)
+					{
+						$obsoleteUnexpectedRows = $detailRows |
+							Where-Object {
+								$_.Status -eq 'Unexpected' -and
+								$_.Note -notlike 'AlwaysOn Listener SPN*' -and
+								$listenerEvaluatedSpns -contains $_.Spn
+							}
+						foreach ($row in $obsoleteUnexpectedRows) { [void]$detailRows.Remove($row) }
+					}
+
 					$cntOk         = ($detailRows | Where-Object Status -eq 'OK').Count
 					$cntMissing    = ($detailRows | Where-Object Status -eq 'Missing').Count
 					$cntUnexpected = ($detailRows | Where-Object Status -eq 'Unexpected').Count

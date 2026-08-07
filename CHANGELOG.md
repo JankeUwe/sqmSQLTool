@@ -1,5 +1,30 @@
 # sqmSQLTool — Changelog
 
+## [1.9.68.0] — 2026-08-07
+
+### Fix: Get-sqmSpnReport zeigte Listener-SPNs doppelt mit widerspruechlichem Status
+
+Bei einer AlwaysOn-Instanz, deren Repliken und Listener dasselbe Dienstkonto nutzen (Kerberos
+zum Listener setzt das praktisch voraus), liefert `setspn -L` fuer dieses eine Konto auch die
+SPNs der anderen Repliken und des Listeners zurueck. Der generische Soll-/Ist-Vergleich kennt
+aber nur die 4 eigenen Instanz-SPNs und markierte alles andere - inklusive der Listener-SPNs -
+pauschal als `Unexpected`. Der separate, spaeter laufende AG-Listener-Check bewertete dieselben
+SPNs anschliessend korrekt gegen die Listener-Erwartungsliste (`OK`/`Missing`), fuegte dafuer aber
+nur eine ZUSAETZLICHE Zeile hinzu statt die aeltere zu ersetzen - dieselbe SPN stand danach
+zweimal im Bericht, einmal `[Unexpected]` und einmal `[OK]`.
+
+Beispiel (2-Knoten-AG, Listener `LFCS20DBSQL1`, geteiltes Dienstkonto):
+
+```
+MSSQLSvc/LFCS20DBSQL1:1433 [Unexpected]   <- generischer Vergleich, kennt Listener-SPNs nicht
+MSSQLSvc/LFCS20DBSQL1:1433 [OK]           <- Listener-Check, korrekt
+```
+
+Nach dem Listener-Check wird jetzt die veraltete generische `Unexpected`-Zeile fuer jede SPN
+entfernt, die der Listener-Check bereits eigenstaendig bewertet hat - die praezisere
+Listener-Bewertung bleibt als einzige Zeile stehen. Echte Fremd-SPNs (z.B. der anderen AG-Replik)
+werden weiterhin unveraendert als `Unexpected` gemeldet.
+
 ## [1.9.67.0] — 2026-08-07
 
 ### Fix: FI-TS-Installation synchronisierte dbatools bei JEDER Installation neu, auch wenn aktuell
