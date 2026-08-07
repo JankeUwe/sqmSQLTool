@@ -1,5 +1,28 @@
 # sqmSQLTool — Changelog
 
+## [1.9.73.0] — 2026-08-07
+
+### Feature: HTML-Report fuer drei weitere Funktionen ergaenzt
+
+`Get-sqmAlwaysOnFailoverHistory`, `Get-sqmTlsStatus` und `Invoke-sqmInstanceInventory` schrieben
+bislang nur TXT + CSV, obwohl sie wie die anderen "voll ausgebauten" Reports (z.B.
+`Get-sqmSysadminAccounts`) laengst einen sinnvoll farbcodierbaren Status pro Zeile berechnen. Alle
+drei bekommen jetzt zusaetzlich einen HTML-Report im etablierten Stil (`ConvertTo-sqmHtmlReport`):
+
+- `Get-sqmAlwaysOnFailoverHistory`: FailoverType farblich markiert (Forced=rot, Automatic=gelb,
+  Planned=gruen).
+- `Get-sqmTlsStatus`: Status farblich markiert (Critical=rot, Warning=gelb, OK=gruen), Ergebnisse
+  nach Schweregrad sortiert.
+- `Invoke-sqmInstanceInventory`: alle TXT-Abschnitte (Instanz, Datenbanken, Logins, Linked Server,
+  Agent Jobs, Konfigurationsabweichungen, Always On) als HTML-Tabellen; Datenbanken ohne
+  Vollsicherung und sysadmin-Logins gelb markiert, fehlgeschlagene Agent-Jobs rot. Bekam dabei
+  auch den bislang fehlenden `-NoOpen`-Switch und das automatische Oeffnen des Reports, analog zu
+  den anderen Funktionen.
+
+Alle drei zusaetzlich gegen DEV01 verifiziert (Instance Inventory und TLS-Status remote, Failover-
+Historie lokal - RPC-Zugriff auf das entfernte Application-Event-Log ist in diesem Workgroup-Labor
+ohne Domaene nicht verfuegbar, unabhaengig von dieser Aenderung).
+
 ## [1.9.72.0] — 2026-08-07
 
 ### Feature: 33 weitere Report-Funktionen bekommen ein eigenes Unterverzeichnis

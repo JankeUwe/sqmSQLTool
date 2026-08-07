@@ -12,6 +12,7 @@
     - Always On (AGs, replicas, listeners)
 
     Output is generated as:
+    - HTML report (same sections as TXT, status colour-coded - opened automatically unless -NoOpen)
     - TXT file with readable report
     - CSV file with the database list
 
@@ -40,6 +41,9 @@
 .PARAMETER WhatIf
     Test only, do not write files.
 
+.PARAMETER NoOpen
+    Do not automatically open the HTML report after creation.
+
 .EXAMPLE
     Invoke-sqmInstanceInventory
 
@@ -60,11 +64,13 @@ function Invoke-sqmInstanceInventory
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = (Get-sqmDefaultOutputPath),
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'InstanceInventory'),
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen
 	)
 	
 	begin
@@ -294,7 +300,8 @@ ORDER BY name;
 				$safeInst = $instance -replace '[\\/:*?"<>|]', '_'
 				$txtFile = Join-Path $OutputPath "InstanceInventory_${safeInst}_${datestamp}.txt"
 				$csvFile = Join-Path $OutputPath "InstanceInventory_${safeInst}_${datestamp}.csv"
-				
+				$htmlFile = Join-Path $OutputPath "InstanceInventory_${safeInst}_${datestamp}.html"
+
 				if ($PSCmdlet.ShouldProcess($instance, "Erstelle Inventar-Dateien in $OutputPath"))
 				{
 					# Verzeichnis anlegen
@@ -303,13 +310,114 @@ ORDER BY name;
 						New-Item -ItemType Directory -Path $OutputPath -Force -ErrorAction Stop | Out-Null
 						Invoke-sqmLogging -Message "Verzeichnis $OutputPath wurde erstellt." -FunctionName $functionName -Level "INFO"
 					}
-					
+
 					$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
 					$dbCsvList | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
-					
+
+					# ========== HTML-Bericht aufbauen (gleiche Gliederung wie TXT) ==========
+					function _Enc { param([string]$t) [System.Net.WebUtility]::HtmlEncode($t) }
+
+					$bodySections = [System.Collections.Generic.List[string]]::new()
+					$bodySections.Add("<h3>Instanz</h3><table>" +
+							"<tr><td class='pl'>Version</td><td>$(_Enc $srv.Version)</td></tr>" +
+							"<tr><td class='pl'>Edition</td><td>$(_Enc $srv.Edition)</td></tr>" +
+							"<tr><td class='pl'>Product Level</td><td>$(_Enc $srv.ProductLevel) $(_Enc $srv.ProductUpdateLevel)</td></tr>" +
+							"<tr><td class='pl'>Collation</td><td>$(_Enc $srv.Collation)</td></tr>" +
+							"<tr><td class='pl'>Auth-Modus</td><td>$($srv.LoginMode)</td></tr>" +
+							"<tr><td class='pl'>Max/Min Memory (MB)</td><td>$($srv.Configuration.MaxServerMemory.ConfigValue) / $($srv.Configuration.MinServerMemory.ConfigValue)</td></tr>" +
+							"<tr><td class='pl'>CPUs (logisch)</td><td>$($srv.Processors)</td></tr>" +
+							"<tr><td class='pl'>MAXDOP</td><td>$($srv.Configuration.MaxDegreeOfParallelism.ConfigValue)</td></tr>" +
+							"<tr><td class='pl'>BackupDirectory</td><td>$(_Enc $srv.BackupDirectory)</td></tr>" +
+							"<tr><td class='pl'>DefaultDataPath</td><td>$(_Enc $srv.DefaultFile)</td></tr>" +
+							"<tr><td class='pl'>DefaultLogPath</td><td>$(_Enc $srv.DefaultLog)</td></tr>" +
+							"</table>")
+
+					$dbRowsHtml = foreach ($db in ($databases | Sort-Object IsSystemObject, Name))
+					{
+						$lastFull = $backupLookup["$($db.Name)|D"]
+						$fullStr = if ($lastFull) { $lastFull.ToString('yyyy-MM-dd HH:mm') } else { '(keins)' }
+						$sevClass = if ($db.Status -ne 'Normal') { ' class="crit"' } elseif (-not $lastFull) { ' class="warn"' } else { '' }
+						"<tr><td$sevClass>$(_Enc $db.Name)</td><td>$($db.Status)</td><td>$($db.RecoveryModel)</td>" +
+							"<td>$([math]::Round($db.Size, 0))</td><td>$($db.CompatibilityLevel)</td><td>$fullStr</td><td>$(_Enc $db.Owner)</td></tr>"
+					}
+					$bodySections.Add("<h3>Datenbanken ($(@($databases).Count))</h3><table>" +
+							"<tr><th>Name</th><th>Status</th><th>Recovery</th><th>SizeMB</th><th>CompatLvl</th><th>Letztes Full</th><th>Owner</th></tr>" +
+							($dbRowsHtml -join '') + "</table>")
+
+					$loginRowsHtml = foreach ($l in ($logins | Sort-Object LoginType, Name))
+					{
+						$roles = if ($roleLookup[$l.Name]) { $roleLookup[$l.Name] -join ', ' } else { '-' }
+						$sevClass = if (-not $l.IsDisabled -and $roles -match 'sysadmin') { ' class="warn"' } else { '' }
+						"<tr><td$sevClass>$(_Enc $l.Name)</td><td>$($l.LoginType)</td><td>$(-not $l.IsDisabled)</td><td>$(_Enc $roles)</td></tr>"
+					}
+					$bodySections.Add("<h3>Logins ($(@($logins).Count))</h3><table>" +
+							"<tr><th>Name</th><th>Typ</th><th>Enabled</th><th>Serverrollen</th></tr>" +
+							($loginRowsHtml -join '') + "</table>")
+
+					if ($linkedServers)
+					{
+						$lsRowsHtml = foreach ($ls in ($linkedServers | Sort-Object Name))
+						{
+							"<tr><td>$(_Enc $ls.Name)</td><td>$(_Enc $ls.ProductName)</td><td>$(_Enc $ls.ProviderName)</td><td>$(_Enc $ls.DataSource)</td></tr>"
+						}
+						$bodySections.Add("<h3>Linked Server ($(@($linkedServers).Count))</h3><table>" +
+								"<tr><th>Name</th><th>Produkt</th><th>Provider</th><th>Datenquelle</th></tr>" +
+								($lsRowsHtml -join '') + "</table>")
+					}
+
+					if ($jobs)
+					{
+						$jobRowsHtml = foreach ($j in ($jobs | Sort-Object IsEnabled, Name))
+						{
+							$lastRun = if ($j.LastRunDate -and $j.LastRunDate.Year -gt 1990) { $j.LastRunDate.ToString('yyyy-MM-dd HH:mm') } else { '(nie)' }
+							$sevClass = if ($j.IsEnabled -and $j.LastRunOutcome -eq 'Failed') { ' class="crit"' } else { '' }
+							"<tr><td$sevClass>$(_Enc $j.Name)</td><td>$($j.IsEnabled)</td><td>$(_Enc $j.OwnerLoginName)</td><td>$lastRun</td><td>$($j.LastRunOutcome)</td></tr>"
+						}
+						$bodySections.Add("<h3>SQL Agent Jobs ($(@($jobs).Count))</h3><table>" +
+								"<tr><th>Name</th><th>Enabled</th><th>Owner</th><th>Letzte Ausfuehrung</th><th>Status</th></tr>" +
+								($jobRowsHtml -join '') + "</table>")
+					}
+
+					if ($configRows)
+					{
+						$cfgRowsHtml = foreach ($c in $configRows)
+						{
+							"<tr><td>$(_Enc $c.name)</td><td>$(_Enc $c.value_in_use)</td><td>$(_Enc $c.description)</td></tr>"
+						}
+						$bodySections.Add("<h3>Konfiguration (Abweichungen vom Standard)</h3><table>" +
+								"<tr><th>Name</th><th>Wert</th><th>Beschreibung</th></tr>" +
+								($cfgRowsHtml -join '') + "</table>")
+					}
+
+					if ($ags)
+					{
+						$agHtml = foreach ($ag in $ags)
+						{
+							$replicas = Get-DbaAgReplica @connParams -AvailabilityGroup $ag.Name -ErrorAction SilentlyContinue
+							$replicaRows = foreach ($r in $replicas)
+							{
+								"<tr><td>$(_Enc $r.Name)</td><td>$($r.Role)</td><td>$($r.AvailabilityMode)</td></tr>"
+							}
+							$agListeners = $listeners | Where-Object AvailabilityGroup -eq $ag.Name
+							$listenerRows = foreach ($l in $agListeners)
+							{
+								"<tr><td>$(_Enc $l.Name)</td><td>$($l.PortNumber)</td><td>$(_Enc (($l.IpAddress -join ', ')))</td></tr>"
+							}
+							"<p><strong>$(_Enc $ag.Name)</strong> | Primary: $(_Enc $ag.PrimaryReplica) | AutomatedBackup: $($ag.AutomatedBackupPreference)</p>" +
+								"<table><tr><th>Replikat</th><th>Rolle</th><th>Mode</th></tr>$($replicaRows -join '')</table>" +
+								$(if ($agListeners) { "<table><tr><th>Listener</th><th>Port</th><th>IPs</th></tr>$($listenerRows -join '')</table>" } else { '' })
+						}
+						$bodySections.Add("<h3>Always On ($(@($ags).Count) AG(s))</h3>" + ($agHtml -join ''))
+					}
+
+					$html = ConvertTo-sqmHtmlReport -Title "Instanz-Inventar - $instance" -Subtitle "Erstellt: $timestamp" -BodyHtml ($bodySections -join '')
+					$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+
 					# In zentrales Verzeichnis kopieren (falls konfiguriert)
-					Copy-sqmToCentralPath -Path $txtFile, $csvFile
-					
+					Copy-sqmToCentralPath -Path $txtFile, $csvFile, $htmlFile
+
+					Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
+
 					Invoke-sqmLogging -Message "[$instance] Inventar erstellt: $txtFile" -FunctionName $functionName -Level "INFO"
 				}
 				else
@@ -317,8 +425,9 @@ ORDER BY name;
 					Invoke-sqmLogging -Message "[$instance] WhatIf: Dateien wuerden erstellt werden." -FunctionName $functionName -Level "VERBOSE"
 					$txtFile = $null
 					$csvFile = $null
+					$htmlFile = $null
 				}
-				
+
 				# Ergebnisobjekt
 				$result = [PSCustomObject]@{
 					SqlInstance = $instance
@@ -330,6 +439,7 @@ ORDER BY name;
 					AgCount	    = @($ags).Count
 					TxtFile	    = $txtFile
 					CsvFile	    = $csvFile
+					HtmlFile    = $htmlFile
 					Status	    = 'OK'
 					Timestamp   = $timestamp
 				}

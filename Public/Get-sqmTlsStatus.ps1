@@ -18,7 +18,8 @@
     - Warning  : cert expires within 60 days, ForceEncryption = 0, or TLS 1.0 / TLS 1.1 enabled
     - OK       : cert trusted, not expiring soon, ForceEncryption = 1, TLS 1.0 and TLS 1.1 disabled
 
-    Results are written to a CSV and a TXT summary report in OutputPath, and returned as PSCustomObjects.
+    Results are written to a CSV, a TXT summary report, and an HTML report (Status colour-coded)
+    in OutputPath, and returned as PSCustomObjects.
 
 .PARAMETER ComputerName
     One or more computer names to audit. Default: current computer ($env:COMPUTERNAME).
@@ -68,7 +69,7 @@ function Get-sqmTlsStatus
 		[System.Management.Automation.PSCredential]$Credential,
 
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'TlsStatus'),
 
 		[Parameter(Mandatory = $false)]
 		[int]$WarnDaysBeforeExpiry = 60,
@@ -448,6 +449,7 @@ function Get-sqmTlsStatus
 		$timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 		$csvPath   = Join-Path -Path $OutputPath -ChildPath "TlsStatus_$timestamp.csv"
 		$txtPath   = Join-Path -Path $OutputPath -ChildPath "TlsStatus_$timestamp.txt"
+		$htmlPath  = Join-Path -Path $OutputPath -ChildPath "TlsStatus_$timestamp.html"
 
 		# --- CSV export ---
 		try
@@ -499,14 +501,46 @@ function Get-sqmTlsStatus
 
 			$lines | Out-File -FilePath $txtPath -Encoding UTF8
 
-			Invoke-sqmOpenReport -TxtFile $txtPath -NoOpen:$NoOpen
-
 			Invoke-sqmLogging -Message "TXT report saved: $txtPath" -FunctionName $functionName -Level "INFO"
 		}
 		catch
 		{
 			Invoke-sqmLogging -Message "Failed to write TXT report: $($_.Exception.Message)" -FunctionName $functionName -Level "ERROR"
 		}
+
+		# --- HTML report ---
+		try
+		{
+			$classByStatus = @{ Critical = 'crit'; Warning = 'warn'; OK = 'ok' }
+			$rowsHtml = foreach ($r in ($allResults | Sort-Object @{ Expression = { @{ Critical = 0; Warning = 1; OK = 2 }[$_.Status] } }, ComputerName, InstanceName))
+			{
+				$sevClass  = $classByStatus[$r.Status]
+				$cssAttr   = if ($sevClass) { " class='$sevClass'" } else { '' }
+				$certExpiryDisp = if ($r.CertExpiry) { "$($r.CertExpiry.ToString('yyyy-MM-dd')) ($($r.CertDaysLeft)d)" } else { 'N/A' }
+				"<tr><td$cssAttr>$($r.Status)</td>" +
+					"<td>$([System.Net.WebUtility]::HtmlEncode($r.ComputerName))</td>" +
+					"<td>$([System.Net.WebUtility]::HtmlEncode($r.InstanceName))</td>" +
+					"<td>$($r.ForceEncryption)</td>" +
+					"<td>$([System.Net.WebUtility]::HtmlEncode($r.CertSubject))</td>" +
+					"<td>$certExpiryDisp</td><td>$($r.CertTrusted)</td>" +
+					"<td>$($r.TLS10)</td><td>$($r.TLS11)</td><td>$($r.TLS12)</td><td>$($r.TLS13)</td>" +
+					"<td>$([System.Net.WebUtility]::HtmlEncode($r.StatusDetail))</td></tr>"
+			}
+			$bodyHtml = "<p>OK: $okCount | Warning: $warningCount | Critical: $criticalCount</p>" +
+				"<table><tr><th>Status</th><th>Computer</th><th>Instanz</th><th>ForceEncryption</th><th>Cert Subject</th>" +
+				"<th>Cert Ablauf</th><th>Vertrauenswuerdig</th><th>TLS 1.0</th><th>TLS 1.1</th><th>TLS 1.2</th><th>TLS 1.3</th><th>Details</th></tr>" +
+				($rowsHtml -join '') + "</table>"
+			$html = ConvertTo-sqmHtmlReport -Title "TLS / SSL Status" -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') | Computer: $($ComputerName -join ', ')" -BodyHtml $bodyHtml
+			$html | Out-File -FilePath $htmlPath -Encoding UTF8 -Force
+
+			Invoke-sqmLogging -Message "HTML report saved: $htmlPath" -FunctionName $functionName -Level "INFO"
+		}
+		catch
+		{
+			Invoke-sqmLogging -Message "Failed to write HTML report: $($_.Exception.Message)" -FunctionName $functionName -Level "ERROR"
+		}
+
+		Invoke-sqmOpenReport -HtmlFile $htmlPath -TxtFile $txtPath -NoOpen:$NoOpen
 
 		Invoke-sqmLogging -Message "$functionName completed. Total instances audited: $($allResults.Count). Critical=$criticalCount Warning=$warningCount OK=$okCount" -FunctionName $functionName -Level "INFO"
 

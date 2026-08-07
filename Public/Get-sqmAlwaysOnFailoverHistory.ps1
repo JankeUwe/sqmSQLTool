@@ -28,6 +28,7 @@
     - 'Unknown'   : Kein eindeutiges Merkmal erkennbar
 
     Ausgabe:
+        AlwaysOnFailoverHistory_<computer>_<datum>.html - Report (FailoverType farblich markiert)
         AlwaysOnFailoverHistory_<computer>_<datum>.txt  - Lesbarer Bericht
         AlwaysOnFailoverHistory_<computer>_<datum>.csv  - Maschinenlesbar
 
@@ -103,7 +104,7 @@ function Get-sqmAlwaysOnFailoverHistory
 		[switch]$IncludeClusterLog,
 
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = 'C:\System\WinSrvLog\MSSQL',
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'AlwaysOnFailoverHistory'),
 
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
@@ -386,6 +387,7 @@ WHERE ars.is_local = 1
 					$safeComp  = $computer -replace '[\\/:*?"<>|]', '_'
 					$txtFile   = Join-Path $OutputPath "AlwaysOnFailoverHistory_${safeComp}_${datestamp}.txt"
 					$csvFile   = Join-Path $OutputPath "AlwaysOnFailoverHistory_${safeComp}_${datestamp}.csv"
+					$htmlFile  = Join-Path $OutputPath "AlwaysOnFailoverHistory_${safeComp}_${datestamp}.html"
 
 					$lines = [System.Collections.Generic.List[string]]::new()
 					$lines.Add('# ================================================================')
@@ -421,7 +423,26 @@ WHERE ars.is_local = 1
 					$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
 					$sorted | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
 
-					Invoke-sqmOpenReport -TxtFile $txtFile -NoOpen:$NoOpen
+					# HTML: Forced-Failover rot (unerwarteter Verlust der Verbindung/Lease), Automatic
+					# gelb (ungeplant, aber sauberer Rollentausch), Planned/RoleStartTime gruen.
+					$classByType = @{ Forced = 'crit'; Automatic = 'warn'; Planned = 'ok' }
+					$rowsHtml = foreach ($ev in $sorted)
+					{
+						$sevClass = $classByType[$ev.FailoverType]
+						$cssAttr  = if ($sevClass) { " class='$sevClass'" } else { '' }
+						"<tr><td>$($ev.FailoverTime.ToString('yyyy-MM-dd HH:mm:ss'))</td>" +
+							"<td>$([System.Net.WebUtility]::HtmlEncode($ev.AvailabilityGroup))</td>" +
+							"<td>$($ev.NewRole)</td><td$cssAttr>$($ev.FailoverType)</td><td>$($ev.Source)</td><td>$($ev.EventId)</td>" +
+							"<td>$([System.Net.WebUtility]::HtmlEncode($ev.Message))</td></tr>"
+					}
+					$bodyHtml = "<p>Zeitraum: ab $($Since.ToString('yyyy-MM-dd HH:mm')) | Ereignisse: $($computerResults.Count)</p>" +
+						"<table><tr><th>Zeitpunkt</th><th>AG</th><th>Neue Rolle</th><th>Typ</th><th>Quelle</th><th>EventId</th><th>Meldung</th></tr>" +
+						($rowsHtml -join '') + "</table>"
+					if ($computerResults.Count -eq 0) { $bodyHtml += "<p>Keine Failover-Ereignisse im Zeitraum gefunden.</p>" }
+					$html = ConvertTo-sqmHtmlReport -Title "AlwaysOn Failover-Historie - $computer" -Subtitle "Erstellt: $timestamp" -BodyHtml $bodyHtml
+					$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+
+					Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
 
 					Invoke-sqmLogging -Message "[$computer] Bericht erstellt: $txtFile" `
 						-FunctionName $functionName -Level 'INFO'
