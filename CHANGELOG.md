@@ -1,5 +1,14 @@
 # sqmSQLTool — Changelog
 
+## [1.9.74.0] — 2026-08-07
+
+### Fix: Get-sqmLoginSettings-Bericht zeigte DefaultDatabase/DefaultLanguage nicht an
+
+Die zurueckgegebenen Objekte enthalten `DefaultDatabase` und `DefaultLanguage` (die CSV hatte sie
+deshalb schon immer, da sie die vollen Objekte exportiert) - TXT und HTML liessen beide Felder
+aber aus. Beide Spalten jetzt in TXT (unter jedem Login) und HTML (eigene Tabellenspalten,
+HTML-encodiert) ergaenzt. Gegen DEV01 verifiziert.
+
 ## [1.9.73.0] — 2026-08-07
 
 ### Feature: HTML-Report fuer drei weitere Funktionen ergaenzt

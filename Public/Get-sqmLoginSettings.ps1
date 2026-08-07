@@ -342,6 +342,7 @@ ORDER BY sp.type_desc, sp.name
 							{
 								$lines.Add(("  {0,-20} {1,-40} PolicyEnforced:{2,-6} ExpirationEnforced:{3,-6} SysAdmin:{4}" -f `
 									$e.SqlInstance, $e.LoginName, $e.PasswordPolicyEnforced, $e.PasswordExpirationEnforced, $e.IsSysAdmin))
+								$lines.Add(("    DefaultDatabase: {0,-25} DefaultLanguage: {1}" -f $e.DefaultDatabase, $e.DefaultLanguage))
 							}
 						}
 						else { $lines.Add("  (keine)") }
@@ -360,12 +361,14 @@ ORDER BY sp.type_desc, sp.name
 							"<td>$([System.Net.WebUtility]::HtmlEncode($e.SqlInstance))</td>" +
 							"<td>$([System.Net.WebUtility]::HtmlEncode($e.LoginName))</td>" +
 							"<td>$($e.LoginType)</td><td>$($e.IsSysAdmin)</td><td>$($e.IsDisabled)</td>" +
+							"<td>$([System.Net.WebUtility]::HtmlEncode($e.DefaultDatabase))</td>" +
+							"<td>$([System.Net.WebUtility]::HtmlEncode($e.DefaultLanguage))</td>" +
 							"<td>$($e.PasswordPolicyEnforced)</td><td>$($e.PasswordExpirationEnforced)</td>" +
 							"<td>$($e.DaysUntilExpiration)</td></tr>"
 					}
 					$bodyHtml = "<p>Gesamt: $($allResults.Count) | Critical: $cntCritical | Warning: $cntWarning | OK: $cntOk | N/A: $cntNa</p>" +
 						"<table><tr><th>Risiko</th><th>Instanz</th><th>Login</th><th>Typ</th><th>SysAdmin</th><th>Disabled</th>" +
-						"<th>PolicyEnforced</th><th>ExpirationEnforced</th><th>Tage bis Ablauf</th></tr>" +
+						"<th>DefaultDatabase</th><th>DefaultLanguage</th><th>PolicyEnforced</th><th>ExpirationEnforced</th><th>Tage bis Ablauf</th></tr>" +
 						($rowsHtml -join '') + "</table>"
 					$html = ConvertTo-sqmHtmlReport -Title "Login Settings" -Subtitle "Instanz(en): $instanceList | Erstellt: $timestamp" -BodyHtml $bodyHtml
 					$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
