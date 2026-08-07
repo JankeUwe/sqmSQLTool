@@ -83,7 +83,8 @@ Alternative credentials for the target instance.
 
 .PARAMETER BackupFile
 Path to the full backup file (.bak). Can also be an array for striped backups.
-For sequential restore (Full + Diff + Logs) use `-BackupFiles`.
+For sequential restore (Full + Diff + Logs) use `-BackupFiles`. If neither `-BackupFile` nor
+`-BackupFiles` is given, pass `-DatabaseName` alone instead - see there.
 
 .PARAMETER BackupFiles
 Array of backup files in order: Full, then Diff (optional), then Logs (optional).
@@ -91,16 +92,23 @@ Example: @("C:\Backup\Full.bak", "C:\Backup\Diff.bak", "C:\Backup\Log1.trn", "C:
 Can be used instead of `-BackupFile`.
 
 .PARAMETER DatabaseName
-Optional: name of the database as it appears in the backup file. If omitted, it is read directly
-from the backup's own header via RESTORE HEADERONLY - the backup already carries this name, so
-there is normally no need to type it again just to restore under the same name. Only pass this
-explicitly if you already know it and want to avoid the extra header-lookup round trip, or if
-you're piecing together a restore from files whose header you don't want to rely on. Used for
-logging, for looking up the existing database of that name (AG membership check, pre-restore
-backup, user export, single-user handling - only relevant when -NewDatabaseName is NOT used), and
-as the restore target if -NewDatabaseName is not given. It does NOT need to match anything for the
-restore itself to work - Restore-DbaDatabase reads the actual logical/physical file names straight
-out of the backup file regardless of this parameter.
+Name of the database as it appears in the backup file. If `-BackupFile`/`-BackupFiles` is also
+given, this is optional and is read directly from the backup's own header via RESTORE HEADERONLY
+if omitted - the backup already carries this name, so there is normally no need to type it again
+just to restore under the same name.
+
+If NEITHER `-BackupFile` NOR `-BackupFiles` is given, `-DatabaseName` becomes REQUIRED and the
+most recent backup chain (latest Full plus any Diff/Log backups since) is looked up automatically
+from the instance's backup history (`Get-DbaDbBackupHistory -Database <name> -Last`, i.e.
+msdb.dbo.backupset) and restored to the most recent possible point - no need to know or type the
+actual file path(s) at all. Throws if no backup history exists for that database name.
+
+Used for logging, for looking up the existing database of that name (AG membership check,
+pre-restore backup, user export, single-user handling - only relevant when -NewDatabaseName is NOT
+used), and as the restore target if -NewDatabaseName is not given. It does NOT need to match
+anything for the restore itself to work - Restore-DbaDatabase reads the actual logical/physical
+file names straight out of the backup file regardless of this parameter (except when it drives the
+backup-history lookup above, where it IS the lookup key).
 
 .PARAMETER NewDatabaseName
 Optional: restores the backup directly as a new/different database, e.g. as a copy alongside the
@@ -194,6 +202,12 @@ Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\AdventureW
 Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\AdventureWorks.bak"
 
 .EXAMPLE
+# Neither -BackupFile nor -BackupFiles given - the most recent backup chain (latest Full plus
+# any Diff/Log backups since) is looked up automatically from the instance's backup history and
+# restored to the most recent possible point. No file path needed at all.
+Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -DatabaseName "AdventureWorks"
+
+.EXAMPLE
 # Restore with Full + Diff + Logs
 $backupSequence = @(
     "D:\Backup\AdventureWorks_Full.bak",
@@ -241,6 +255,7 @@ function Invoke-sqmRestoreDatabase
 		[string[]]$BackupFile,
 		[Parameter(Mandatory = $true, ParameterSetName = 'Sequence')]
 		[string[]]$BackupFiles,
+		[Parameter(Mandatory = $true, ParameterSetName = 'FromHistory')]
 		[Parameter(Mandatory = $false)]
 		[string]$DatabaseName,
 		[Parameter(Mandatory = $false)]
@@ -338,9 +353,43 @@ function Invoke-sqmRestoreDatabase
 		$policyWasEnabled = $false
 		$policyDeactivated = $false
 
-		# Bestimme die Liste der Backup-Dateien je nach Parametersatz
-		$backupFileList = if ($PSCmdlet.ParameterSetName -eq 'Sequence') { $BackupFiles }
-		else { $BackupFile }
+		# Bestimme die Liste der Backup-Dateien je nach Parametersatz. Im Set 'FromHistory' (weder
+		# -BackupFile noch -BackupFiles angegeben) wird die aktuellste Wiederherstellungskette
+		# (neuestes Full + alle seitherigen Diff/Log) automatisch aus der Backup-Historie der
+		# Instanz ermittelt - der Aufrufer muss den/die Dateipfad(e) dafuer nicht kennen. Laeuft
+		# bewusst hier in begin, nicht erst in process: Get-DbaDbBackupHistory verbindet sich
+		# selbststaendig (unabhaengig vom spaeter in process ermittelten $server), ein Fehlschlag
+		# soll den Lauf so frueh wie moeglich abbrechen, bevor irgendetwas Zustandsveraenderndes
+		# passiert (Policy-Deaktivierung, User-Export, etc.).
+		$backupFileList = switch ($PSCmdlet.ParameterSetName)
+		{
+			'Sequence' { $BackupFiles }
+			'FromHistory'
+			{
+				Invoke-sqmLogging -Message "Weder -BackupFile noch -BackupFiles angegeben - ermittle die aktuellste Wiederherstellungskette aus der Backup-Historie fuer '$DatabaseName' auf '$SqlInstance'." -FunctionName $functionName -Level "INFO"
+
+				$histRows = Get-DbaDbBackupHistory -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
+					-Database $DatabaseName -Last -EnableException -ErrorAction Stop
+
+				if (-not $histRows)
+				{
+					$errMsg = "Keine Backup-Historie fuer Datenbank '$DatabaseName' auf '$SqlInstance' gefunden (msdb.dbo.backupset) - -BackupFile oder -BackupFiles muss dann explizit angegeben werden."
+					Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+					throw $errMsg
+				}
+
+				# Get-DbaDbBackupHistory -Last liefert eine Zeile pro Backup (Full, ggf. Diff, ggf.
+				# mehrere Logs), .Path ist bei gestreiften Backups selbst ein Array - beides hier
+				# chronologisch (Start) zu einer flachen Liste zusammenfuehren, in exakt der
+				# Reihenfolge, die die 'Sequence'-Restorelogik weiter unten ohnehin erwartet.
+				$resolvedFiles = [System.Collections.Generic.List[string]]::new()
+				foreach ($histRow in ($histRows | Sort-Object Start)) { foreach ($p in @($histRow.Path)) { $resolvedFiles.Add($p) } }
+
+				Invoke-sqmLogging -Message "Wiederherstellungskette aus Historie ermittelt ($($resolvedFiles.Count) Datei(en)): $($resolvedFiles -join ', ')" -FunctionName $functionName -Level "INFO"
+				$resolvedFiles.ToArray()
+			}
+			default { $BackupFile }
+		}
 	}
 
 	process
@@ -1210,6 +1259,35 @@ WHERE dp.type IN ('U', 'G')
 					try
 					{
 						Invoke-sqmLogging -Message $rejoinAction -FunctionName $functionName -Level "INFO"
+
+						# Eine AG verlangt zwingend Full Recovery mit einer luecklosen Log-Chain. Ein
+						# Restore aus einem Backup, das unter SIMPLE gezogen wurde (oder dessen Recovery
+						# Model beim Restore vom Quellsystem uebernommen wurde), kommt sonst als SIMPLE
+						# wieder hoch und Add-DbaAgDatabase schlaegt zuverlaessig mit "RecoveryModel of
+						# database [...] is not Full, but Simple" fehl. SET RECOVERY FULL allein reicht
+						# nicht: bis zum naechsten FULL-Backup danach bleibt die Log-Chain unterbrochen
+						# (SQL Server verhaelt sich bis dahin weiterhin wie SIMPLE, sog. "pseudo-simple") -
+						# deshalb hier direkt danach ein FULL-Backup anstossen, bevor Add-DbaAgDatabase
+						# ueberhaupt versucht wird.
+						$currentRecoveryModel = (Invoke-DbaQuery -SqlInstance $primaryInstance -SqlCredential $SqlCredential -Database master `
+								-Query "SELECT recovery_model_desc FROM sys.databases WHERE name = N'$($finalDbName.Replace("'", "''"))'" `
+								-EnableException -ErrorAction Stop).recovery_model_desc
+
+						if ($currentRecoveryModel -ne 'FULL')
+						{
+							Invoke-sqmLogging -Message "Datenbank '$finalDbName' hat Recovery Model '$currentRecoveryModel' - fuer AG-Mitgliedschaft wird FULL benoetigt. Stelle um und erstelle ein FULL-Backup." `
+								-FunctionName $functionName -Level "INFO"
+
+							Invoke-DbaQuery -SqlInstance $primaryInstance -SqlCredential $SqlCredential -Database master `
+								-Query "ALTER DATABASE [$finalDbName] SET RECOVERY FULL" -EnableException -ErrorAction Stop
+
+							$null = Backup-DbaDatabase -SqlInstance $primaryInstance -SqlCredential $SqlCredential `
+								-Database $finalDbName -Type Full -CompressBackup -EnableException -ErrorAction Stop
+
+							Invoke-sqmLogging -Message "Recovery Model von '$finalDbName' auf FULL umgestellt und FULL-Backup erstellt." `
+								-FunctionName $functionName -Level "INFO"
+							$results += [PSCustomObject]@{ Action = "EnsureFullRecoveryModel"; Status = "Success"; Message = "Recovery Model war '$currentRecoveryModel' - auf FULL umgestellt und FULL-Backup erstellt." }
+						}
 
 						# Pruefe SeedingMode aller Sekundaer-Replikate  - stelle Automatic Seeding sicher.
 						# Sekundaer = Name weicht von $primaryInstance ab (siehe Schritt 4) - nicht ueber

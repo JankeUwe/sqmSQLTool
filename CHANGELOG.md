@@ -1,5 +1,49 @@
 # sqmSQLTool — Changelog
 
+## [1.9.76.0] — 2026-08-07
+
+### Fix: `Invoke-sqmRestoreDatabase` scheiterte beim AG-Rejoin mit "RecoveryModel ... is not Full, but Simple"
+
+Vorfall auf `SFCSDBS103IHZ`: Restore von `Test` aus einem Backup, das (oder dessen Quelldatenbank)
+in SIMPLE Recovery stand. Restore, User-Import und Owner-Zuweisung liefen erfolgreich durch, aber
+`Add-DbaAgDatabase` scheiterte zuverlaessig mit "RecoveryModel of database [Test] is not Full, but
+Simple" - eine AG verlangt zwingend Full Recovery mit luecklosser Log-Chain.
+
+Vor dem eigentlichen Rejoin-Versuch wird das Recovery Model jetzt geprueft; steht es nicht auf
+FULL, stellt die Funktion automatisch um (`ALTER DATABASE ... SET RECOVERY FULL`) und erstellt
+sofort danach ein FULL-Backup - SET RECOVERY FULL allein reicht nicht, bis zum naechsten
+FULL-Backup verhaelt sich die Datenbank weiterhin wie SIMPLE ("pseudo-simple"), das haette
+`Add-DbaAgDatabase` also unveraendert scheitern lassen. Neuer Ergebniseintrag `Action =
+EnsureFullRecoveryModel` zeigt, ob/dass umgestellt wurde.
+
+### Feature: `Invoke-sqmRestoreDatabase` findet das Backup automatisch, wenn nur `-DatabaseName` angegeben wird
+
+Bisher musste immer `-BackupFile` oder `-BackupFiles` angegeben werden. Neuer Parameter-Set
+`FromHistory`: wird WEDER `-BackupFile` NOCH `-BackupFiles` angegeben, wird `-DatabaseName`
+zwingend erforderlich, und die aktuellste Wiederherstellungskette (neuestes Full plus alle
+seitherigen Diff/Log-Backups) wird automatisch aus der Backup-Historie der Instanz ermittelt
+(`Get-DbaDbBackupHistory -Database <name> -Last`, d.h. msdb.dbo.backupset) und zum
+spaetestmoeglichen Zeitpunkt wiederhergestellt - der Aufrufer muss keinen Dateipfad mehr kennen:
+
+```
+Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -DatabaseName "AdventureWorks"
+```
+
+Gegen DEV01 verifiziert (`-WhatIf`): die Funktion findet und verwendet korrekt die tatsaechlich
+neueste Full-Backup-Datei aus der Historie, ohne dass ein Pfad angegeben wurde.
+
+### Fix: Backup-Zielverzeichnis-Pruefung verlangte "User-Db" statt der tatsaechlich verwendeten "Usr-db"
+
+`Invoke-sqmUserDatabaseBackup` verlangte bislang, dass der Backup-Pfad auf "User-Db" endet - eine
+andere Schreibweise als die im Rest des Moduls tatsaechlich verwendete und angelegte "Usr-db"
+(siehe `New-sqmOlaUsrDbBackupJob`: legt real `<BackupDirectory>\Usr-db` an). Ein voellig
+regelkonformer, von den eigenen Backup-Job-Funktionen selbst angelegter Pfad waere von
+`Invoke-sqmUserDatabaseBackup` also faelschlich abgelehnt worden. Dieselbe falsche Annahme
+("User-db" statt "Usr-db") steckte auch in `Invoke-sqmTsmConfiguration`s Standard-INCLUDE-Regel -
+das TSM-INCLUDE zeigte auf einen Ordner, den keine der Backup-Job-Funktionen je befuellt, das
+tatsaechliche "Usr-db"-Verzeichnis waere von TSM nie gesichert worden. Beide jetzt auf "Usr-db"
+korrigiert.
+
 ## [1.9.75.0] — 2026-08-07
 
 ### Fix: `Show-sqmToolGui` markierte Alternativ-Parameter (z.B. BackupFile/BackupFiles) faelschlich als Pflichtfeld

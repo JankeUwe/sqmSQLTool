@@ -10,7 +10,7 @@
 
     Configured sections (within the managed block):
     - EXCLUDE patterns (default: SQL Server *.mdf/*.ndf/*.ldf; override via -ExcludePatterns)
-    - INCLUDE directories with per-path management class (default: User-db/Sys-db;
+    - INCLUDE directories with per-path management class (default: Usr-db/Sys-db;
       override via -IncludeRule for arbitrary path -> management class mappings)
 
     Target file: by default the dsm.opt itself. Real environments often outsource
@@ -39,7 +39,7 @@
     Determined automatically when not specified.
 
 .PARAMETER BackupDirectory
-    Base backup directory. The subdirectories \User-db and \Sys-db
+    Base backup directory. The subdirectories \Usr-db and \Sys-db
     are added as INCLUDE entries.
     Default: read from the SQL instance (BackupDirectory property).
 
@@ -62,7 +62,7 @@
     Array of hashtables @{ Path = '...'; ManagementClass = '...' } to bind a
     management class to a specific include path. Path is taken verbatim (include
     the pattern, e.g. 'F:\Daten\SQL\Backup\...\*'). ManagementClass is optional
-    and falls back to -ManagementClass. When omitted, the classic User-db/Sys-db
+    and falls back to -ManagementClass. When omitted, the classic Usr-db/Sys-db
     model (plus -AdditionalIncludePaths) is used with the default class.
 
 .PARAMETER UseInclExclFile
@@ -393,7 +393,7 @@ SELECT @BackupDirectory AS BackupDirectory;
 			# Mit -IncludeRule (@{ Path = '...'; ManagementClass = '...' }) lassen sich pro Pfad
 			# eigene Managementklassen setzen (z. B. 365-Tage-Klasse für ein 01Year-Verzeichnis).
 			# Path wird verbatim übernommen (inkl. Pattern wie \...\* ). Ohne -IncludeRule gilt
-			# das klassische User-db/Sys-db-Modell mit der Default-$ManagementClass.
+			# das klassische Usr-db/Sys-db-Modell mit der Default-$ManagementClass.
 			$effIncludeRules = [System.Collections.Generic.List[object]]::new()
 			if ($IncludeRule -and $IncludeRule.Count -gt 0)
 			{
@@ -408,7 +408,10 @@ SELECT @BackupDirectory AS BackupDirectory;
 			}
 			else
 			{
-				$effIncludeRules.Add([PSCustomObject]@{ Path = "$effBackupDir\User-db\*"; ManagementClass = $ManagementClass })
+				# "Usr-db" ist die tatsaechlich verwendete Konvention (siehe New-sqmOlaUsrDbBackupJob:
+				# legt real "<BackupDirectory>\Usr-db" an) - vorher stand hier "User-db" (mit "e"),
+				# ein TSM-INCLUDE fuer einen Ordner, den keine der Backup-Job-Funktionen je befuellt.
+				$effIncludeRules.Add([PSCustomObject]@{ Path = "$effBackupDir\Usr-db\*"; ManagementClass = $ManagementClass })
 				$effIncludeRules.Add([PSCustomObject]@{ Path = "$effBackupDir\Sys-db\*"; ManagementClass = $ManagementClass })
 				foreach ($p in $AdditionalIncludePaths)
 				{

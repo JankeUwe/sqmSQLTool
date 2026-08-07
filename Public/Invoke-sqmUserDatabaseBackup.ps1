@@ -4,7 +4,7 @@ Backs up user databases on a SQL Server instance.
 
 .DESCRIPTION
 Backs up all or selected user databases (no system databases) in full backup mode.
-The target path is read from the server properties (BackupDirectory) and must end with "User-Db".
+The target path is read from the server properties (BackupDirectory) and must end with "Usr-db".
 
 If the SqlInstance parameter is not specified, the current computer name
 ($env:COMPUTERNAME) is used by default. This rule applies to all future versions.
@@ -38,7 +38,7 @@ When set, all user databases on the instance are backed up.
 
 .PARAMETER BackupPath
 Optional direct backup path (overrides the value from server properties).
-The path must end with "User-Db".
+The path must end with "Usr-db".
 
 .PARAMETER UseExcludeTable
 When set, reads master.dbo.sqm_BackupExclude and skips databases where IsActive=1
@@ -75,7 +75,7 @@ Invoke-sqmUserDatabaseBackup -SqlInstance "SQL01" -Database "SalesDB", "Inventor
 
 .EXAMPLE
 # With an alternative path
-Invoke-sqmUserDatabaseBackup -All -BackupPath "D:\Backup\User-Db"
+Invoke-sqmUserDatabaseBackup -All -BackupPath "D:\Backup\Usr-db"
 
 .EXAMPLE
 # Back up all user databases, skipping databases listed in sqm_BackupExclude
@@ -105,7 +105,7 @@ Invoke-sqmUserDatabaseBackup -SqlInstance "SQL01" -All -UseExcludeTable `
 .NOTES
 Requires the dbatools module and existing Invoke-sqmLogging, Get-sqmServerSetting (for the
 default backup path) and Invoke-sqmNtfsSetup (used to grant the SQL service account NTFS write
-access when a new backup directory has to be created) functions. The path must end with 'User-Db'.
+access when a new backup directory has to be created) functions. The path must end with 'Usr-db'.
 Default for SqlInstance: $env:COMPUTERNAME (applies to all future versions).
 #>
 
@@ -183,10 +183,14 @@ function Invoke-sqmUserDatabaseBackup
 			}
 		}
 
-		# Pruefen, ob der Pfad auf "User-Db" endet
-		if (-not ($BackupPath -match '\\User-Db$'))
+		# Pruefen, ob der Pfad auf "Usr-db" endet - das ist die tatsaechlich verwendete Konvention
+		# (siehe New-sqmOlaUsrDbBackupJob: legt real "<BackupDirectory>\Usr-db" an). Diese Pruefung
+		# verlangte bisher "User-Db" (mit "e") - eine andere Schreibweise als die ueberall sonst im
+		# Modul tatsaechlich verwendete und angelegte "Usr-db", wodurch ein voellig regelkonformer
+		# Pfad hier faelschlich abgelehnt worden waere.
+		if (-not ($BackupPath -match '\\Usr-db$'))
 		{
-			$errMsg = "Der Backup-Pfad '$BackupPath' endet nicht mit 'User-Db'. Bitte korrigieren Sie die Server-Eigenschaft BackupDirectory oder geben Sie einen gueltigen Pfad an."
+			$errMsg = "Der Backup-Pfad '$BackupPath' endet nicht mit 'Usr-db'. Bitte korrigieren Sie die Server-Eigenschaft BackupDirectory oder geben Sie einen gueltigen Pfad an."
 			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 			throw $errMsg
 		}
