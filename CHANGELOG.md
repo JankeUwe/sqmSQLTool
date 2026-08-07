@@ -1,5 +1,26 @@
 # sqmSQLTool — Changelog
 
+## [1.9.71.0] — 2026-08-07
+
+### Feature: Get-sqmLoginSettings schreibt jetzt automatisch einen Bericht
+
+Bisher gab `Get-sqmLoginSettings` nur Objekte zurueck; ein CSV+HTML-Export existierte, war aber
+rein opt-in (nur bei explizit angegebenem `-OutputPath`), erzeugte keine TXT-Datei, und das HTML
+war eine generische `ConvertTo-Html -Fragment`-Tabelle ohne jede farbliche Kennzeichnung - obwohl
+die Funktion pro Login laengst ein `RiskLevel`/`RiskIcon` berechnet (Critical/Warning/OK/N-A).
+
+`-OutputPath` hat jetzt einen Standardwert (`<Modul-Standardpfad>\LoginSettings` - eigenes
+Unterverzeichnis, analog zu `Get-sqmServerHardwareReport`\HardwareReports) und der Bericht wird
+bei jedem Aufruf automatisch geschrieben:
+    LoginSettings_<instanzen>_<datum>.html   - nach RiskLevel farblich markiert (rot/gelb/gruen)
+    LoginSettings_<instanzen>_<datum>.txt    - gruppiert nach Critical/Warning
+    LoginSettings_<instanzen>_<datum>.csv    - maschinenlesbar
+Rueckgabewert (flache Login-Objektliste) bleibt unveraendert - bestehende Aufrufe/Pipelines
+brechen nicht.
+
+Gegen DEV01 bestaetigt: HTML korrekt nach Risiko sortiert und eingefaerbt (Critical/Warning rot/
+gelb, N/A ungefaerbt), TXT korrekt gruppiert, CSV vollstaendig.
+
 ## [1.9.70.0] — 2026-08-07
 
 ### Fix: Setup-Report zeigte JEDE Datenbank als "Never" gesichert, unabhaengig vom echten Stand

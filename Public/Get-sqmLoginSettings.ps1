@@ -32,7 +32,12 @@
       SQL-Logins (bei Windows-Logins/-Gruppen greift die Kennwortrichtlinie von AD, nicht
       von SQL Server - dort N/A statt eines falschen Befundes).
 
-    Ausgabe direkt als Objekte. Optional als CSV nach OutputPath.
+    Ausgabe direkt als Objekte (ein Objekt pro Login, ueber alle abgefragten Instanzen hinweg).
+    Zusaetzlich wird automatisch ein kombinierter Bericht geschrieben:
+        LoginSettings_<instanzen>_<datum>.html   - Report, nach RiskLevel farblich markiert
+        LoginSettings_<instanzen>_<datum>.txt    - Lesbarer Bericht, gruppiert nach Critical/Warning
+        LoginSettings_<instanzen>_<datum>.csv    - Maschinenlesbar
+    Standardverzeichnis: <OutputPath>\LoginSettings (eigenes Unterverzeichnis, siehe -OutputPath).
 
 .PARAMETER SqlInstance
     SQL Server-Instanz(en). Pipeline-faehig. Standard: aktueller Computername.
@@ -53,14 +58,24 @@
     Filter: nur Logins mit dieser Sprache anzeigen.
 
 .PARAMETER OutputPath
-    Wenn angegeben, wird eine CSV-Datei geschrieben.
-    Standard: kein Export.
+    Ausgabeverzeichnis fuer den Bericht (HTML/TXT/CSV).
+    Standard: <Modul-Standardpfad>\LoginSettings (eigenes Unterverzeichnis, analog zu
+    Get-sqmServerHardwareReport - haelt den flachen Wurzelpfad frei von Report-Wildwuchs).
 
 .PARAMETER ContinueOnError
     Bei Fehler auf einer Instanz fortfahren.
 
 .PARAMETER EnableException
     Fehler sofort als Ausnahme ausloesen.
+
+.PARAMETER NoOpen
+    Bericht nach dem Erstellen NICHT automatisch oeffnen.
+
+.PARAMETER Confirm
+    Vor dem Schreiben der Berichtsdateien nachfragen.
+
+.PARAMETER WhatIf
+    Zeigt, welche Berichtsdateien erstellt wuerden, ohne sie zu schreiben.
 
 .EXAMPLE
     Get-sqmLoginSettings
@@ -88,7 +103,7 @@
 #>
 function Get-sqmLoginSettings
 {
-	[CmdletBinding()]
+	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]
 	[OutputType([PSCustomObject])]
 	param (
 		[Parameter(Mandatory = $false, ValueFromPipeline = $true)]
@@ -111,7 +126,7 @@ function Get-sqmLoginSettings
 		[string]$DefaultLanguage,
 
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath,
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'LoginSettings'),
 
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
@@ -271,28 +286,102 @@ ORDER BY sp.type_desc, sp.name
 
 	end
 	{
-		# Optionaler CSV-Export
-		if ($OutputPath -and $allResults.Count -gt 0)
+		if ($allResults.Count -gt 0)
 		{
-			try
-			{
-				if (-not (Test-Path $OutputPath))
-				{
-					New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
-				}
-				$csvFile = Join-Path $OutputPath "LoginSettings_$(Get-Date -Format 'yyyy-MM-dd').csv"
-				$allResults | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
-				Invoke-sqmLogging -Message "CSV geschrieben: $csvFile" -FunctionName $functionName -Level 'INFO'
+			$cntCritical = @($allResults | Where-Object RiskLevel -eq 'Critical').Count
+			$cntWarning  = @($allResults | Where-Object RiskLevel -eq 'Warning').Count
+			$cntOk       = @($allResults | Where-Object RiskLevel -eq 'OK').Count
+			$cntNa       = @($allResults | Where-Object RiskLevel -eq 'N/A').Count
+			$instanceList = ($SqlInstance -join ', ')
 
-				$htmlFile = Join-Path $OutputPath "LoginSettings_$(Get-Date -Format 'yyyy-MM-dd').html"
-				$bodyHtml = ($allResults | ConvertTo-Html -Fragment -As Table | Out-String)
-				$html = ConvertTo-sqmHtmlReport -Title "Login Settings" -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -BodyHtml $bodyHtml
-				$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
-				Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
-			}
-			catch
+			if ($PSCmdlet.ShouldProcess($instanceList, "Erstelle Login-Settings-Bericht in $OutputPath"))
 			{
-				Invoke-sqmLogging -Message "CSV-Export fehlgeschlagen: $($_.Exception.Message)" -FunctionName $functionName -Level 'WARNING'
+				try
+				{
+					if (-not (Test-Path $OutputPath))
+					{
+						New-Item -ItemType Directory -Path $OutputPath -Force -ErrorAction Stop | Out-Null
+						Invoke-sqmLogging -Message "Verzeichnis $OutputPath wurde erstellt." -FunctionName $functionName -Level 'INFO'
+					}
+
+					$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+					$datestamp = Get-Date -Format 'yyyy-MM-dd'
+					$safeInst  = ($SqlInstance -join '_') -replace '[\\/:*?"<>|]', '_'
+					if ($safeInst.Length -gt 60) { $safeInst = $safeInst.Substring(0, 60) }
+					$txtFile  = Join-Path $OutputPath "LoginSettings_${safeInst}_${datestamp}.txt"
+					$csvFile  = Join-Path $OutputPath "LoginSettings_${safeInst}_${datestamp}.csv"
+					$htmlFile = Join-Path $OutputPath "LoginSettings_${safeInst}_${datestamp}.html"
+
+					$riskRank = @{ Critical = 0; Warning = 1; OK = 2; 'N/A' = 3 }
+					$sorted = $allResults | Sort-Object @{ Expression = { $riskRank[$_.RiskLevel] } }, SqlInstance, LoginName
+
+					# -- TXT --
+					$lines = [System.Collections.Generic.List[string]]::new()
+					$lines.Add("# ================================================================")
+					$lines.Add("# sqmSQLTool - Login Settings Bericht")
+					$lines.Add("# $(Get-sqmReportReference)")
+					$lines.Add("# Instanz(en): $instanceList")
+					$lines.Add("# Erstellt   : $timestamp")
+					$lines.Add("# Gesamt     : $($allResults.Count) Logins")
+					$lines.Add("# Critical   : $cntCritical  (sysadmin ohne Kennwort-Richtlinie/-Ablauf)")
+					$lines.Add("# Warning    : $cntWarning  (Kennwort-Richtlinie/-Ablauf deaktiviert)")
+					$lines.Add("# OK         : $cntOk")
+					$lines.Add("# N/A        : $cntNa  (Windows-Logins/-Gruppen, Richtlinie via AD)")
+					$lines.Add("# ================================================================")
+
+					foreach ($grp in @('Critical', 'Warning'))
+					{
+						$entries = $allResults | Where-Object RiskLevel -eq $grp
+						$lines.Add("")
+						$lines.Add("# ----------------------------------------------------------------")
+						$lines.Add("# $($grp.ToUpper()) ($($entries.Count))")
+						$lines.Add("# ----------------------------------------------------------------")
+						if ($entries)
+						{
+							foreach ($e in ($entries | Sort-Object SqlInstance, LoginName))
+							{
+								$lines.Add(("  {0,-20} {1,-40} PolicyEnforced:{2,-6} ExpirationEnforced:{3,-6} SysAdmin:{4}" -f `
+									$e.SqlInstance, $e.LoginName, $e.PasswordPolicyEnforced, $e.PasswordExpirationEnforced, $e.IsSysAdmin))
+							}
+						}
+						else { $lines.Add("  (keine)") }
+					}
+
+					$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
+					$allResults | Export-Csv -Path $csvFile -Encoding UTF8 -NoTypeInformation -Force
+
+					# -- HTML: nach RiskLevel farblich markiert --
+					$classByRisk = @{ Critical = 'crit'; Warning = 'warn'; OK = 'ok' }
+					$rowsHtml = foreach ($e in $sorted)
+					{
+						$sevClass = $classByRisk[$e.RiskLevel]
+						$cssAttr  = if ($sevClass) { " class='$sevClass'" } else { '' }
+						"<tr><td$cssAttr>$($e.RiskIcon) $($e.RiskLevel)</td>" +
+							"<td>$([System.Net.WebUtility]::HtmlEncode($e.SqlInstance))</td>" +
+							"<td>$([System.Net.WebUtility]::HtmlEncode($e.LoginName))</td>" +
+							"<td>$($e.LoginType)</td><td>$($e.IsSysAdmin)</td><td>$($e.IsDisabled)</td>" +
+							"<td>$($e.PasswordPolicyEnforced)</td><td>$($e.PasswordExpirationEnforced)</td>" +
+							"<td>$($e.DaysUntilExpiration)</td></tr>"
+					}
+					$bodyHtml = "<p>Gesamt: $($allResults.Count) | Critical: $cntCritical | Warning: $cntWarning | OK: $cntOk | N/A: $cntNa</p>" +
+						"<table><tr><th>Risiko</th><th>Instanz</th><th>Login</th><th>Typ</th><th>SysAdmin</th><th>Disabled</th>" +
+						"<th>PolicyEnforced</th><th>ExpirationEnforced</th><th>Tage bis Ablauf</th></tr>" +
+						($rowsHtml -join '') + "</table>"
+					$html = ConvertTo-sqmHtmlReport -Title "Login Settings" -Subtitle "Instanz(en): $instanceList | Erstellt: $timestamp" -BodyHtml $bodyHtml
+					$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+
+					Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
+					Invoke-sqmLogging -Message "Bericht erstellt: $htmlFile" -FunctionName $functionName -Level 'INFO'
+				}
+				catch
+				{
+					Invoke-sqmLogging -Message "Bericht konnte nicht geschrieben werden: $($_.Exception.Message)" -FunctionName $functionName -Level 'WARNING'
+				}
+			}
+
+			if ($cntCritical -gt 0)
+			{
+				Invoke-sqmLogging -Message "$cntCritical Login(s) mit RiskLevel Critical gefunden." -FunctionName $functionName -Level 'WARNING'
 			}
 		}
 
