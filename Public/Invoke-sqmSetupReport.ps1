@@ -340,31 +340,53 @@ ORDER BY sp.name
             # dynamischen Ports im Netzwerk. Noetig ist er nur fuer benannte Instanzen mit dynamischem
             # Port - laeuft er darueber hinaus, ist das ein zusaetzlicher Angriffsvektor zur
             # Instanz-Enumeration und wird deshalb als Warnung ausgewiesen, nicht als reine Information.
+            #
+            # sys.dm_server_services listet NUR den SQL Server-, den Agent- und ggf. den Full-Text-
+            # Dienst DER VERBUNDENEN INSTANZ - der SQL Browser ist maschinenweit und taucht dort NIE
+            # auf. Die alte Abfrage darueber lieferte deshalb IMMER 0 Zeilen und meldete den Browser
+            # dauerhaft als "nicht installiert", auch wenn er lief oder nur gestoppt/deaktiviert war
+            # (bestaetigt gegen DEV01: sys.dm_server_services zeigt dort nur Engine + Agent).
+            # Stattdessen Laufzustand ueber xp_servicecontrol und Starttyp ueber die Registry lesen -
+            # beides ohne WinRM, ueber die bestehende SQL-Verbindung.
             $browserStatus = 'Nicht ermittelbar'
             $browserColor = 'orange'
             try
             {
-                $browserRow = Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException -Query @"
-SELECT TOP 1 status_desc, startup_type_desc
-FROM sys.dm_server_services
-WHERE servicename LIKE N'%Browser%'
+                $browserState = Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException -Query @"
+EXEC master.dbo.xp_servicecontrol N'QUERYSTATE', N'SQLBROWSER'
 "@
-                if ($browserRow)
+                $stateText = [string]$browserState.'Current Service State'
+
+                $startType = 'unbekannt'
+                try
                 {
-                    if ($browserRow.status_desc -eq 'Running')
+                    $regResult = Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException -Query @"
+DECLARE @Start INT;
+EXEC master.dbo.xp_regread
+    N'HKEY_LOCAL_MACHINE',
+    N'SYSTEM\CurrentControlSet\Services\SQLBrowser',
+    N'Start',
+    @Start OUTPUT;
+SELECT @Start AS StartType;
+"@
+                    $startType = switch ([int]$regResult.StartType)
                     {
-                        $browserStatus = "WARNUNG (aktiv - Instanz-Enumeration per UDP 1434 moeglich, Start: $($browserRow.startup_type_desc))"
-                        $browserColor = 'orange'
+                        2 { 'Automatic' }
+                        3 { 'Manual' }
+                        4 { 'Disabled' }
+                        default { "Unbekannt ($($regResult.StartType))" }
                     }
-                    else
-                    {
-                        $browserStatus = "OK ($($browserRow.status_desc), Start: $($browserRow.startup_type_desc))"
-                        $browserColor = 'green'
-                    }
+                }
+                catch { }
+
+                if ($stateText -match '^Running')
+                {
+                    $browserStatus = "WARNUNG (aktiv - Instanz-Enumeration per UDP 1434 moeglich, Start: $startType)"
+                    $browserColor = 'orange'
                 }
                 else
                 {
-                    $browserStatus = 'OK (nicht installiert)'
+                    $browserStatus = "OK ($stateText, Start: $startType)"
                     $browserColor = 'green'
                 }
             }

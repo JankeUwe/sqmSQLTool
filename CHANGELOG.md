@@ -1,5 +1,22 @@
 # sqmSQLTool — Changelog
 
+## [1.9.66.0] — 2026-08-07
+
+### Fix: SQL-Browser-Check meldete laufenden/gestoppten Dienst als "nicht installiert"
+
+`sys.dm_server_services` listet nur den SQL Server-, Agent- und ggf. Full-Text-Dienst DER
+VERBUNDENEN INSTANZ - der SQL Server Browser ist maschinenweit und taucht dort NIE auf. Die in
+1.9.65.0 eingefuehrte Abfrage (`servicename LIKE '%Browser%'`) lieferte deshalb *immer* 0 Zeilen
+und meldete den Browser dauerhaft als "OK (nicht installiert)", unabhaengig vom tatsaechlichen
+Zustand - auch wenn er lief oder nur gestoppt/deaktiviert war.
+
+Gegen DEV01 bestaetigt: `sys.dm_server_services` zeigt dort ausschliesslich Engine + Agent, kein
+Browser-Eintrag, obwohl der Dienst laeuft (Start: Automatic).
+
+Ersetzt durch `xp_servicecontrol N'QUERYSTATE', N'SQLBROWSER'` fuer den Laufzustand und
+`xp_regread` gegen `HKLM\SYSTEM\CurrentControlSet\Services\SQLBrowser\Start` fuer den Starttyp -
+beides weiterhin ohne WinRM, ueber die bestehende SQL-Verbindung.
+
 ## [1.9.65.0] — 2026-08-06
 
 ### Feature: SQL-Browser-Dienststatus im Setup-Report
