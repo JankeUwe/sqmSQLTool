@@ -82,7 +82,16 @@ function Get-sqmServerUtilization
 
 		if (-not $OutputPath)
 		{
-			$OutputPath = Get-sqmDefaultOutputPath
+			$OutputPath = Join-Path (Get-sqmDefaultOutputPath) 'ServerUtilization'
+		}
+
+		# Bislang gab es hier keine Verzeichniserstellung - das fiel nie auf, solange $OutputPath
+		# auf den flachen Wurzelpfad zeigte, der durch andere Funktionen schon existierte. Seit
+		# $OutputPath auf ein eigenes Unterverzeichnis zeigt, muss es explizit angelegt werden.
+		if (-not (Test-Path $OutputPath))
+		{
+			New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
+			Invoke-sqmLogging -Message "Verzeichnis $OutputPath wurde erstellt." -FunctionName $functionName -Level "INFO"
 		}
 
 		Invoke-sqmLogging -Message "Starting $functionName for $SqlInstance (Samples: $SampleCount, Interval: $SampleIntervalSeconds sec)" `

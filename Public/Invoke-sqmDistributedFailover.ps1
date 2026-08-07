@@ -66,7 +66,7 @@ function Invoke-sqmDistributedFailover
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'DistributedFailover'),
 		[Parameter(Mandatory = $false)]
 		[switch]$Force,
 		[Parameter(Mandatory = $false)]

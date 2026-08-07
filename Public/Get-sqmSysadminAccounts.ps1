@@ -79,7 +79,7 @@ function Get-sqmSysadminAccounts
 		[Parameter(Mandatory = $false)]
 		[bool]$IncludeDisabled = $true,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'SysadminAccounts'),
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]

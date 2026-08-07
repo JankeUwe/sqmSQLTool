@@ -61,7 +61,7 @@ function Get-sqmAgentJobScheduleReport {
         [System.Management.Automation.PSCredential]$SqlCredential,
 
         [Parameter(Mandatory = $false)]
-        [string]$OutputPath = 'C:\System\WinSrvLog\MSSQL',
+        [string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'AgentJobSchedule'),
 
         [Parameter(Mandatory = $false)]
         [switch]$OutputCsv,

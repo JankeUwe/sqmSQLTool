@@ -80,7 +80,7 @@ function Invoke-sqmServiceBrokerAlwaysOn
 		[Parameter(Mandatory = $false)]
 		[switch]$Force,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'ServiceBrokerAlwaysOn'),
 		[Parameter(Mandatory = $false)]
 		[int]$WaitBetweenFailovers = 15,
 		[Parameter(Mandatory = $false)]

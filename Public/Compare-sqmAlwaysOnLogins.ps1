@@ -110,7 +110,7 @@ function Compare-sqmAlwaysOnLogins
 		[switch]$OnlyDifferences,
 
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = (Get-sqmDefaultOutputPath),
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'AlwaysOnLoginCompare'),
 
 		[Parameter(Mandatory = $false)]
 		[switch]$NoOpen,

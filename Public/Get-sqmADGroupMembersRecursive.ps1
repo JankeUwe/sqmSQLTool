@@ -51,7 +51,7 @@ function Get-sqmADGroupMembersRecursive
         [int]$Depth = 2,
 
         [Parameter(Mandatory = $false)]
-        [string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+        [string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'ADGroupMembers'),
 
         [Parameter(Mandatory = $false)]
         [switch]$NoOpen

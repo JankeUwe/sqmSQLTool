@@ -90,7 +90,7 @@ function New-sqmDistributedAvailabilityGroup
 		[ValidateSet('Automatic', 'Manual')]
 		[string]$SeedingMode = 'Automatic',
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'DistributedAG'),
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)

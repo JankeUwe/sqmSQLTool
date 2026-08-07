@@ -93,7 +93,7 @@ function Compare-sqmServerConfiguration
 		[Parameter(Mandatory = $false)]
 		[switch]$IncludeMigrationObjects,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = (Get-sqmDefaultOutputPath),
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'ServerConfigCompare'),
 		[Parameter(Mandatory = $false)]
 		[switch]$NoOpen,
 		[Parameter(Mandatory = $false)]

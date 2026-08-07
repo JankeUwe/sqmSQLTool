@@ -59,7 +59,7 @@ function Enable-sqmServiceBroker
 		[Parameter(Mandatory = $false)]
 		[switch]$Force,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'ServiceBroker'),
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]

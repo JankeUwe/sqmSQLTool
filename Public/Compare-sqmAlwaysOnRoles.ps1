@@ -115,7 +115,7 @@ function Compare-sqmAlwaysOnRoles
 		[switch]$OnlyDifferences,
 
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = (Get-sqmDefaultOutputPath),
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'AlwaysOnRoleCompare'),
 
 		[Parameter(Mandatory = $false)]
 		[switch]$NoOpen,

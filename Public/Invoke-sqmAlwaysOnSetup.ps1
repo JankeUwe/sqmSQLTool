@@ -134,7 +134,7 @@ function Invoke-sqmAlwaysOnSetup
 		[bool]$GenerateSpnReport = $true,
 
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = (Get-sqmDefaultOutputPath),
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'AlwaysOnSetup'),
 
 		[Parameter(Mandatory = $false)]
 		[switch]$SkipLoginSync,

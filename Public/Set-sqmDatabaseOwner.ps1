@@ -113,7 +113,7 @@ function Set-sqmDatabaseOwner
 			throw $msg
 		}
 		
-		if (-not $OutputPath) { $OutputPath = Get-sqmDefaultOutputPath }
+		if (-not $OutputPath) { $OutputPath = Join-Path (Get-sqmDefaultOutputPath) 'DatabaseOwnerChanges' }
 		
 		Invoke-sqmLogging -Message ("Starte " + $functionName) -FunctionName $functionName -Level "INFO"
 	}

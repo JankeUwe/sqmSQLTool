@@ -50,7 +50,7 @@ function Get-sqmServiceBrokerHealth
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'ServiceBrokerHealth'),
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]

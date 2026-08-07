@@ -135,7 +135,7 @@ function Get-sqmSpnReport
 		[System.Management.Automation.PSCredential]$SqlCredential,
 
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = (Get-sqmConfig -Key 'OutputPath'),
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'SpnReports'),
 
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,

@@ -158,7 +158,7 @@ function Invoke-sqmTsmConfiguration
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$Credential,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = (Get-sqmDefaultOutputPath),
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'TsmConfiguration'),
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]

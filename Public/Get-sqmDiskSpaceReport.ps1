@@ -97,7 +97,7 @@ function Get-sqmDiskSpaceReport
 		[Parameter(Mandatory = $false)]
 		[int]$HistoryDays = 30,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'DiskSpaceReports'),
 		[Parameter(Mandatory = $false)]
 		[string]$HistoryPath,
 		[Parameter(Mandatory = $false)]

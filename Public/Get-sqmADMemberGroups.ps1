@@ -48,7 +48,7 @@ function Get-sqmADMemberGroups
         [int]$Depth = 2,
 
         [Parameter(Mandatory = $false)]
-        [string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+        [string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'ADMemberGroups'),
 
         [Parameter(Mandatory = $false)]
         [switch]$NoOpen

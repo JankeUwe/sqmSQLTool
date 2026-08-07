@@ -163,7 +163,7 @@ function Install-sqmCertificate
 			throw $msg
 		}
 		
-		if (-not $OutputPath) { $OutputPath = Get-sqmDefaultOutputPath }
+		if (-not $OutputPath) { $OutputPath = Join-Path (Get-sqmDefaultOutputPath) 'CertInstall' }
 		
 		# SSL setzt Windows-Store-Import voraus
 		if ($Purpose -eq 'SSL') { $ImportToWindowsStore = $true }

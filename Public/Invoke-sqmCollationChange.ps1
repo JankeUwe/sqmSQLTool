@@ -93,7 +93,7 @@ function Invoke-sqmCollationChange
 		[ValidateRange(30, 600)]
 		[int]$StartupTimeoutSeconds = 120,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = (Get-sqmDefaultOutputPath),
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'CollationChange'),
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]

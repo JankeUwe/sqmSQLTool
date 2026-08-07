@@ -83,7 +83,7 @@ function Get-sqmDatabaseHealth
 		[Parameter(Mandatory = $false)]
 		[switch]$IncludeSystemDatabases,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'DatabaseHealth'),
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]

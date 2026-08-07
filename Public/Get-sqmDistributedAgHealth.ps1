@@ -49,7 +49,7 @@ function Get-sqmDistributedAgHealth
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'DistributedAgHealth'),
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]

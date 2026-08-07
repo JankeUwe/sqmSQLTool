@@ -122,7 +122,7 @@ function Get-sqmCertificateReport
 		
 		if (-not $OutputPath)
 		{
-			$OutputPath = Get-sqmDefaultOutputPath
+			$OutputPath = Join-Path (Get-sqmDefaultOutputPath) 'CertificateReports'
 		}
 		
 		Invoke-sqmLogging -Message "Starte $functionName (Warning=${WarningThresholdDays}d, Critical=${CriticalThresholdDays}d)" -FunctionName $functionName -Level "INFO"

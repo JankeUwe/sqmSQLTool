@@ -148,7 +148,7 @@ function Invoke-sqmSsisConfiguration
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$WinRmCredential,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = (Get-sqmDefaultOutputPath),
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'SsisConfiguration'),
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]

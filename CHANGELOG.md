@@ -1,5 +1,51 @@
 # sqmSQLTool — Changelog
 
+## [1.9.72.0] — 2026-08-07
+
+### Feature: 33 weitere Report-Funktionen bekommen ein eigenes Unterverzeichnis
+
+`C:\System\WinSrvLog\MSSQL` (der Standard-Ausgabepfad) sammelte die TXT/CSV/HTML-Dateien von
+mittlerweile ueber 40 verschiedenen Funktionen gemischt im selben flachen Ordner - die Anzahl der
+Dateien darin wuchs entsprechend schnell. `Get-sqmServerHardwareReport` machte es von Anfang an
+richtig (eigenes Unterverzeichnis `HardwareReports`); alle anderen schrieben direkt in die Wurzel.
+
+33 weitere Funktionen (siehe Liste unten) bekommen jetzt jeweils ihr eigenes Unterverzeichnis nach
+demselben Muster, z.B. `Get-sqmSysadminAccounts` -> `SysadminAccounts`, `Get-sqmDatabaseHealth` ->
+`DatabaseHealth`. Die drei Listener-Migrationsschritte (`Prepare-sqmListenerForMigration`,
+`Move-sqmAlwaysOnListener`, `Complete-sqmListenerMigration`) teilen sich bewusst EIN Verzeichnis
+(`ListenerMigration`), da sie Phasen desselben Vorgangs sind. Reine Pfad-Aenderung an den jeweiligen
+`-OutputPath`-Standardwerten, keine Aenderung an der Report-Erstellung selbst. Bereits vorhandene
+Dateien im Wurzelordner bleiben unangetastet liegen - nur neue Laeufe landen im Unterordner.
+
+Nebenbei vereinheitlicht: mehrere Funktionen nutzten bislang einen hartcodierten Pfad-String statt
+der zentralen `Get-sqmDefaultOutputPath`, wodurch eine ueber `Set-sqmConfig` gesetzte abweichende
+`OutputPath`-Konfiguration fuer sie ignoriert wurde. Jetzt einheitlich ueber die zentrale Funktion.
+
+**Bugfix dabei gefunden**: `Get-sqmServerUtilization` legte sein Ausgabeverzeichnis nie selbst an -
+das fiel nie auf, solange `$OutputPath` auf die (durch andere Funktionen laengst vorhandene) flache
+Wurzel zeigte. Mit eigenem Unterverzeichnis schlug der erste Lauf mit "Could not find a part of the
+path" fehl. Verzeichniserstellung ergaenzt, gegen DEV01 verifiziert.
+
+Betroffene Funktionen (neues Unterverzeichnis in Klammern): Get-sqmSpnReport (SpnReports),
+Get-sqmCertificateReport (CertificateReports), Get-sqmAgentJobScheduleReport (AgentJobSchedule),
+Get-sqmAlwaysOnHealthReport (AlwaysOnHealth), Get-sqmDiskSpaceReport (DiskSpaceReports),
+Compare-sqmServerConfiguration (ServerConfigCompare), Get-sqmADMemberGroups (ADMemberGroups),
+Get-sqmDatabaseHealth (DatabaseHealth), Compare-sqmAlwaysOnRoles (AlwaysOnRoleCompare),
+Get-sqmADGroupMembersRecursive + Get-sqmADGroupMembers (ADGroupMembers, geteilt - rekursive und
+nicht-rekursive Variante desselben Reports), Get-sqmServerUtilization (ServerUtilization),
+Compare-sqmAlwaysOnLogins (AlwaysOnLoginCompare), Get-sqmSysadminAccounts (SysadminAccounts),
+Export-sqmAlwaysOnConfiguration (AlwaysOnConfiguration), Get-sqmDistributedAgHealth
+(DistributedAgHealth), Export-sqmDatabaseDocumentation (DatabaseDocumentation),
+Get-sqmServiceBrokerHealth (ServiceBrokerHealth), Invoke-sqmLoginAudit (LoginAudit),
+Invoke-sqmSetupReport (SetupReports), Set-sqmDatabaseOwner (DatabaseOwnerChanges),
+Enable-sqmServiceBroker (ServiceBroker), Invoke-sqmServiceBrokerAlwaysOn (ServiceBrokerAlwaysOn),
+Invoke-sqmDistributedFailover (DistributedFailover), New-sqmDistributedAvailabilityGroup
+(DistributedAG), Prepare-sqmListenerForMigration + Move-sqmAlwaysOnListener +
+Complete-sqmListenerMigration (ListenerMigration, geteilt), Invoke-sqmAlwaysOnSetup
+(AlwaysOnSetup), Invoke-sqmCollationChange (CollationChange), Invoke-sqmTsmConfiguration
+(TsmConfiguration), Invoke-sqmSsisConfiguration (SsisConfiguration), Set-sqmSsrsConfiguration
+(SsrsConfiguration), Install-sqmCertificate (CertInstall).
+
 ## [1.9.71.0] — 2026-08-07
 
 ### Feature: Get-sqmLoginSettings schreibt jetzt automatisch einen Bericht

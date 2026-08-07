@@ -75,6 +75,7 @@ function Invoke-sqmSetupReport
         {
             $OutputPath = Get-sqmConfig -Key 'OutputPath'
             if (-not $OutputPath) { $OutputPath = "C:\System\WinSrvLog\MSSQL" }
+            $OutputPath = Join-Path $OutputPath 'SetupReports'
         }
 
         Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance" -FunctionName $functionName -Level 'INFO'

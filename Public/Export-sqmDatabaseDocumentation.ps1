@@ -95,7 +95,7 @@ function Export-sqmDatabaseDocumentation
 		[Parameter(Mandatory = $false)]
 		[bool]$IncludeObjectSummary = $true,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = (Get-sqmDefaultOutputPath),
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'DatabaseDocumentation'),
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]

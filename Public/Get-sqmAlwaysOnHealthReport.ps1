@@ -69,7 +69,7 @@ function Get-sqmAlwaysOnHealthReport
 		[Parameter(Mandatory = $false)]
 		[int]$MaxSendQueueMB = 50,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = "C:\System\WinSrvLog\MSSQL",
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'AlwaysOnHealth'),
 		[Parameter(Mandatory = $false)]
 		[switch]$OutputHtml = $true,
 		[Parameter(Mandatory = $false)]

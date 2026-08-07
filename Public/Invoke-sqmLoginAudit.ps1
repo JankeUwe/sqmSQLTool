@@ -120,7 +120,7 @@ function Invoke-sqmLoginAudit
 		[ValidateSet('Standard', 'Compact', 'Detailed')]
 		[string]$HtmlReportTemplate = 'Standard',
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath = (Get-sqmDefaultOutputPath),
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'LoginAudit'),
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
