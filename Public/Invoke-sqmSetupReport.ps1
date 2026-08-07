@@ -791,8 +791,17 @@ JOIN sys.availability_groups ag ON ag.group_id = l.group_id
                 foreach ($db in $allDbs)
                 {
                     $dbo = $db.Owner
-                    $lastBackup = $db.LastFullBackupDate
-                    $daysAgo = if ($lastBackup) { (New-TimeSpan -Start $lastBackup -End (Get-Date)).Days } else { -1 }
+                    # 'LastFullBackupDate' existiert auf dem SMO/dbatools-Datenbankobjekt nicht - die
+                    # richtige Property heisst 'LastBackupDate'. Der Tippfehler warf keinen Fehler
+                    # (PowerShell liefert bei einer nicht existierenden Property auf diesem Objekttyp
+                    # stillschweigend $null zurueck), $lastBackup war deshalb IMMER $null und jede
+                    # Datenbank wurde als "Never" gemeldet, unabhaengig von tatsaechlich vorhandenen
+                    # Vollsicherungen. Zusaetzlich liefert SMO fuer eine Datenbank OHNE jede
+                    # Vollsicherung nicht $null, sondern DateTime.MinValue (01.01.0001) - das ist ein
+                    # "wahrer" Wert in PowerShell, ohne die Year-Pruefung haette das eine astronomische
+                    # Tageszahl statt "Never" ergeben.
+                    $lastBackup = $db.LastBackupDate
+                    $daysAgo = if ($lastBackup -and $lastBackup.Year -gt 1900) { (New-TimeSpan -Start $lastBackup -End (Get-Date)).Days } else { -1 }
                     $backupStatus = if ($daysAgo -lt 0) { 'Never' } elseif ($daysAgo -eq 0) { 'Today' } elseif ($daysAgo -le 7) { "$daysAgo days" } else { "$daysAgo days ⚠️" }
 
                     # Kompatibilitaetsgrad als Jahreszahl - die reine Zahl (150, 160, ...) sagt im

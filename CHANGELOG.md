@@ -1,5 +1,25 @@
 # sqmSQLTool — Changelog
 
+## [1.9.70.0] — 2026-08-07
+
+### Fix: Setup-Report zeigte JEDE Datenbank als "Never" gesichert, unabhaengig vom echten Stand
+
+Die Datenbank-Tabelle in `Invoke-sqmSetupReport` las `$db.LastFullBackupDate` - diese Property
+existiert auf dem SMO/dbatools-Datenbankobjekt gar nicht (richtiger Name: `LastBackupDate`). Der
+Tippfehler warf keinen Fehler, PowerShell liefert bei einer nicht existierenden Property auf
+diesem Objekttyp stillschweigend `$null` zurueck - `$lastBackup` war deshalb fuer JEDE Datenbank
+auf JEDER Instanz immer `$null`, und die Spalte "Letzte Vollsicherung" zeigte ausnahmslos "Never",
+auch wenn tatsaechlich taeglich gesichert wurde.
+
+Zusaetzlich liefert SMO fuer eine Datenbank OHNE jede Vollsicherung nicht `$null`, sondern
+`DateTime.MinValue` (01.01.0001) - ein "wahrer" Wert in PowerShell. Die reine Umbenennung auf
+`LastBackupDate` haette fuer echte "nie gesicherte" Datenbanken deshalb eine astronomische
+Tageszahl statt "Never" erzeugt; eine zusaetzliche `Year -gt 1900`-Prufung faengt das ab.
+
+Gegen DEV01 bestaetigt: Datenbanken mit vorhandener Vollsicherung zeigen jetzt den echten
+Tagesabstand ("4 days" statt immer "Never"), echte Nie-gesichert-Faelle zeigen weiterhin korrekt
+"Never".
+
 ## [1.9.69.0] — 2026-08-07
 
 ### Fix: Get-sqmSpnReport meldete SPNs der AG-Partnerreplik als Unexpected
