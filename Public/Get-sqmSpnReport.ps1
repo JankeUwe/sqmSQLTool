@@ -791,29 +791,112 @@ WHERE ag.group_id IN (
 					}
 
 					# --------------------------------------------------------
-					# Widerspruechliche Doppel-Zeilen fuer Listener-SPNs bereinigen
+					# AlwaysOn Partner-Repliken ermitteln (SPNs unter demselben Dienstkonto)
 					#
-					# Der generische "Unexpected"-Durchlauf oben (vor dem Listener-Check) kennt nur
-					# die 4 eigenen Instanz-SPNs. Da AG-Repliken und ihr Listener typischerweise
-					# dasselbe Dienstkonto nutzen, liefert setspn -L auch die Listener-SPNs zurueck -
-					# die wurden dort faelschlich als 'Unexpected' markiert, weil der generische
-					# Vergleich die Listener-Erwartungsliste noch nicht kennt. Der Listener-Check
-					# direkt darueber bewertet dieselbe SPN anschliessend korrekt (OK/Missing), fuegt
-					# aber nur eine ZUSAETZLICHE Zeile hinzu, statt die aeltere zu ersetzen - dieselbe
-					# SPN stand deshalb zweimal im Bericht, mit widerspruechlichem Status. Die
-					# veraltete generische 'Unexpected'-Zeile hier entfernen; die Listener-spezifische
-					# Bewertung ist die praezisere und bleibt stehen.
-					$listenerEvaluatedSpns = $detailRows |
-						Where-Object { $_.Note -like 'AlwaysOn Listener SPN (AG:*' } |
+					# AG-Repliken nutzen fuer den Listener meist dasselbe Dienstkonto wie die
+					# Partnerinstanz(en) - setspn -L liefert deshalb auch deren SPNs zurueck. Der
+					# generische Soll-/Ist-Vergleich oben kennt nur die 4 eigenen Instanz-SPNs und
+					# markiert diese Partner-SPNs faelschlich als 'Unexpected', obwohl sie im
+					# AG-Kontext normal und korrekt sind (z.B. SFCSDBS104IHZ-SPNs im Bericht von
+					# SFCSDBS103IHZ). Bekannte Partner-SPNs werden hier stattdessen als OK mit
+					# erklaerendem Hinweis ausgewiesen; die Bereinigung direkt darunter entfernt
+					# dafuer die aeltere, generische 'Unexpected'-Zeile.
+					try
+					{
+						if (Get-Command -Name Invoke-DbaQuery -ErrorAction SilentlyContinue)
+						{
+							$replicaSqlTarget = if ($isDefaultInstance) { $hostName } else { "$hostName\$instanceName" }
+							$replicaConnParams = @{ SqlInstance = $replicaSqlTarget }
+							if ($SqlCredential) { $replicaConnParams['SqlCredential'] = $SqlCredential }
+
+							$replicaQuery = @"
+SELECT ar.replica_server_name AS ReplicaServerName
+FROM sys.availability_replicas ar
+WHERE ar.group_id IN (
+    SELECT group_id FROM sys.dm_hadr_availability_replica_states
+    WHERE is_local = 1
+)
+"@
+							$replicas = Invoke-DbaQuery @replicaConnParams -Query $replicaQuery -ErrorAction SilentlyContinue
+						}
+						else
+						{
+							$replicas = $null
+						}
+
+						if ($replicas)
+						{
+							$siblingHostTokens = [System.Collections.Generic.List[string]]::new()
+							foreach ($replica in $replicas)
+							{
+								$replicaServerName = $replica.ReplicaServerName
+								if (-not $replicaServerName) { continue }
+
+								$replicaHost = ($replicaServerName -split '\\')[0]   # Host\Instanz -> nur Host
+								if ($replicaHost -ieq $hostName) { continue }        # eigene Replik ueberspringen
+
+								$siblingHostTokens.Add($replicaHost)
+								try
+								{
+									$siblingHostTokens.Add([System.Net.Dns]::GetHostEntry($replicaHost).HostName)
+								}
+								catch { }
+							}
+
+							foreach ($existingSpn in $existingSpns)
+							{
+								$spnHost = ($existingSpn -replace '^MSSQLSvc/', '') -replace ':.*$', ''
+								$matchedSibling = $siblingHostTokens | Where-Object { $_ -ieq $spnHost } | Select-Object -First 1
+								if ($matchedSibling)
+								{
+									$detailRows.Add([PSCustomObject]@{
+										ComputerName   = $computer
+										InstanceName   = $instanceName
+										ServiceName    = $svc.Name
+										ServiceAccount = $serviceAccount
+										AccountType    = $accountInfo.AccountType
+										SpnAccount     = $spnAccount
+										Spn            = $existingSpn
+										Status         = 'OK'
+										SetSpnCommand  = $null
+										Note           = "AlwaysOn Partner-SPN (Replik: $matchedSibling, gemeinsames Dienstkonto) - kein Handlungsbedarf."
+									})
+								}
+							}
+						}
+					}
+					catch
+					{
+						Invoke-sqmLogging -Message "[$computer\$instanceName] Ermittlung der AG-Partnerrepliken fehlgeschlagen: $($_.Exception.Message)" `
+										  -FunctionName $functionName -Level 'WARNING'
+						# Fehler bei der Partnerrepliken-Ermittlung blockiert nicht die Instanz-SPNs
+					}
+
+					# --------------------------------------------------------
+					# Widerspruechliche Doppel-Zeilen fuer Listener-/Partner-SPNs bereinigen
+					#
+					# Der generische "Unexpected"-Durchlauf oben (vor den beiden Bloecken oben) kennt
+					# nur die 4 eigenen Instanz-SPNs. Da AG-Repliken und ihr Listener typischerweise
+					# dasselbe Dienstkonto nutzen, liefert setspn -L auch deren SPNs zurueck - die
+					# wurden dort faelschlich als 'Unexpected' markiert, weil der generische Vergleich
+					# weder die Listener- noch die Partner-Erwartungsliste kennt. Die Bloecke direkt
+					# darueber bewerten dieselben SPNs anschliessend korrekt (OK/Missing), fuegen aber
+					# nur eine ZUSAETZLICHE Zeile hinzu statt die aeltere zu ersetzen - dieselbe SPN
+					# stand deshalb zweimal im Bericht, mit widerspruechlichem Status. Die veraltete
+					# generische 'Unexpected'-Zeile hier entfernen; die spezifischere Bewertung
+					# (Listener oder Partner-Replik) ist praeziser und bleibt stehen.
+					$reevaluatedSpns = $detailRows |
+						Where-Object { $_.Note -like 'AlwaysOn Listener SPN (AG:*' -or $_.Note -like 'AlwaysOn Partner-SPN (Replik:*' } |
 						Select-Object -ExpandProperty Spn -Unique
 
-					if ($listenerEvaluatedSpns)
+					if ($reevaluatedSpns)
 					{
 						$obsoleteUnexpectedRows = $detailRows |
 							Where-Object {
 								$_.Status -eq 'Unexpected' -and
 								$_.Note -notlike 'AlwaysOn Listener SPN*' -and
-								$listenerEvaluatedSpns -contains $_.Spn
+								$_.Note -notlike 'AlwaysOn Partner-SPN*' -and
+								$reevaluatedSpns -contains $_.Spn
 							}
 						foreach ($row in $obsoleteUnexpectedRows) { [void]$detailRows.Remove($row) }
 					}

@@ -1,5 +1,24 @@
 # sqmSQLTool — Changelog
 
+## [1.9.69.0] — 2026-08-07
+
+### Fix: Get-sqmSpnReport meldete SPNs der AG-Partnerreplik als Unexpected
+
+Folgefix zu 1.9.68.0: dieselbe Ursache (geteiltes Dienstkonto ueber alle AG-Repliken +
+Listener), aber fuer die Partnerreplik selbst statt nur fuer den Listener. Der generische
+Soll-/Ist-Vergleich kennt nur die 4 eigenen Instanz-SPNs - SPNs, die im `setspn -L`-Ergebnis
+auftauchen, aber zu einer anderen Replik derselben AG gehoeren (z.B. `sfcsdbs104ihz` im Bericht
+von `sfcsdbs103ihz`), wurden faelschlich als `Unexpected` gemeldet, obwohl das im AG-Kontext mit
+geteiltem Dienstkonto normal und korrekt ist.
+
+`Get-sqmSpnReport` ermittelt jetzt zusaetzlich ueber `sys.availability_replicas` die
+Partnerrepliken der lokalen AG(s) und erkennt SPNs, deren Host-Anteil zu einer Partnerreplik
+gehoert, als `OK` mit erklaerendem Hinweis ("AlwaysOn Partner-SPN (Replik: ..., gemeinsames
+Dienstkonto) - kein Handlungsbedarf."). Die dabei entstehende veraltete generische
+`Unexpected`-Zeile fuer dieselbe SPN wird durch dieselbe Bereinigung wie in 1.9.68.0 entfernt
+(jetzt erweitert um das Partner-SPN-Notat). Echte, nicht einer bekannten Replik oder dem Listener
+zuordenbare Fremd-SPNs werden weiterhin als `Unexpected` gemeldet.
+
 ## [1.9.68.0] — 2026-08-07
 
 ### Fix: Get-sqmSpnReport zeigte Listener-SPNs doppelt mit widerspruechlichem Status
