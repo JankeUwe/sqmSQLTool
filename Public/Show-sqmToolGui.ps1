@@ -498,26 +498,48 @@
 			if ($common -contains $p.Name) { continue }
 			if ($p.Name -in @('WhatIf', 'Confirm')) { continue }
 
-			$isMandatory = $false
-			foreach ($a in $p.Attributes)
-			{
-				if ($a -is [System.Management.Automation.ParameterAttribute] -and $a.Mandatory) { $isMandatory = $true }
-			}
+			# Mandatory-ness must be judged per ParameterSet, not "mandatory in ANY attribute" -
+			# a parameter that's only Mandatory within ONE set (e.g. BackupFile in 'SingleFile'
+			# vs. BackupFiles in 'Sequence' for Invoke-sqmRestoreDatabase) is an ALTERNATIVE to
+			# another parameter, not something the user must fill in on top of it. The old check
+			# here flagged BOTH BackupFile and BackupFiles with the bold "*" required-marker,
+			# even though only one of them needs a value - exactly the same bug class already
+			# fixed below for the Run-button validation (see comment near $isValueFilled), just
+			# never applied to the label. Only mark "*" when mandatory in EVERY set the command
+			# has (unconditionally required); alternatives get a lighter "+" hint instead, with
+			# the alternative set(s) named in the tooltip.
+			# Denominator MUST be the total number of parameter sets the COMMAND has (not just the
+			# sets this parameter happens to be a member of) - BackupFile belongs to only the
+			# 'SingleFile' set, so "mandatory in every set it's a member of" is trivially true for
+			# it alone and would wrongly still classify it as unconditionally required. Comparing
+			# against the command's full set count correctly reflects "you only need this if you
+			# picked that particular set".
+			$totalSets = $cmd.ParameterSets.Count
+			$mandatoryInSets = @($cmd.ParameterSets | Where-Object { ($_.Parameters | Where-Object Name -eq $p.Name).IsMandatory })
+			$isMandatory = ($mandatoryInSets.Count -gt 0) -and ($mandatoryInSets.Count -eq $totalSets)
+			$isAlternative = ($mandatoryInSets.Count -gt 0) -and ($mandatoryInSets.Count -lt $totalSets)
+
 			# ValidateSet -> allowed values for a dropdown
 			$validValues = $null
 			$vsAttr = $p.Attributes | Where-Object { $_ -is [System.Management.Automation.ValidateSetAttribute] } | Select-Object -First 1
 			if ($vsAttr) { $validValues = $vsAttr.ValidValues }
 
 			$lbl = New-Object System.Windows.Forms.Label
-			$lbl.Text = $p.Name + $(if ($isMandatory) { ' *' } else { '' })
+			$lbl.Text = $p.Name + $(if ($isMandatory) { ' *' } elseif ($isAlternative) { ' +' } else { '' })
 			$lbl.AutoSize = $false
 			$lbl.Location = New-Object System.Drawing.Point(3, 6)
 			$lbl.Width = 185
 			$lbl.Height = 20
 			$lbl.TextAlign = 'MiddleLeft'
-			$lbl.ForeColor = if ($isMandatory) { $cText } else { $cDim }
+			$lbl.ForeColor = if ($isMandatory -or $isAlternative) { $cText } else { $cDim }
 			if ($isMandatory) { $lbl.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold) }
-			$tip.SetToolTip($lbl, "$($p.ParameterType.Name)")
+			$tipText = "$($p.ParameterType.Name)"
+			if ($isAlternative)
+			{
+				$altSetNames = ($mandatoryInSets | Select-Object -ExpandProperty Name) -join ', '
+				$tipText += " - required together with the other parameters of: $altSetNames (alternative to another parameter)"
+			}
+			$tip.SetToolTip($lbl, $tipText)
 
 			$pt = $p.ParameterType
 			$isCred = $false
@@ -603,6 +625,26 @@
 			if (-not $isCred) { $script:guiState.Controls[$p.Name] = $ctrl }
 			$row++
 		}
+		# Spezialfall JobName/BackupType: New-sqmBackupMaintenanceJob (und jede andere Funktion mit
+		# derselben Kombination) soll den Jobnamen automatisch aus der Konfiguration befuellen,
+		# abhaengig von der gewaehlten BackupType-Auswahl (FULL/DIFF/LOG) - siehe Set-sqmConfig
+		# -BackupMaintenanceJobNameFull/-Diff/-Log. Der Anwender muss den Namen so im Regelfall
+		# nicht mehr selbst eintippen, kann ihn danach aber weiterhin frei ueberschreiben.
+		if ($script:guiState.Controls.ContainsKey('JobName') -and $script:guiState.Controls.ContainsKey('BackupType'))
+		{
+			$jobNameCtrl = $script:guiState.Controls['JobName']
+			$backupTypeCtrl = $script:guiState.Controls['BackupType']
+			# Keys muessen exakt den in Set-sqmConfig definierten entsprechen
+			# (BackupMaintenanceJobNameFull/-Diff/-Log) - siehe New-sqmBackupMaintenanceJob.
+			$cfgKeyByType = @{ FULL = 'BackupMaintenanceJobNameFull'; DIFF = 'BackupMaintenanceJobNameDiff'; LOG = 'BackupMaintenanceJobNameLog' }
+			$backupTypeCtrl.Add_SelectedIndexChanged({
+					$sel = [string]$backupTypeCtrl.SelectedItem
+					if (-not $sel -or -not $cfgKeyByType.ContainsKey($sel)) { return }
+					$cfgVal = (Get-sqmConfig)[$cfgKeyByType[$sel]]
+					$jobNameCtrl.Text = if ($cfgVal) { $cfgVal } else { "sqm-BackupMaintenance-$sel" }
+				}.GetNewClosure())
+		}
+
 		if ($row -eq 0)
 		{
 			$none = New-Object System.Windows.Forms.Label

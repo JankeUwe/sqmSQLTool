@@ -1,5 +1,49 @@
 # sqmSQLTool — Changelog
 
+## [1.9.75.0] — 2026-08-07
+
+### Fix: `Show-sqmToolGui` markierte Alternativ-Parameter (z.B. BackupFile/BackupFiles) faelschlich als Pflichtfeld
+
+Die Label-Anzeige im GUI-Launcher markierte ein Parameterfeld mit einem fett gedruckten "*"
+(Pflichtfeld), sobald IRGENDEINE seiner `ParameterAttribute`-Auspraegungen `Mandatory = $true`
+gesetzt hatte - unabhaengig vom Parameter-Set. Bei `Invoke-sqmRestoreDatabase` ist `-BackupFile`
+nur im Set `SingleFile`, `-BackupFiles` nur im Set `Sequence` Mandatory - beides sind
+Alternativen, keine zwei gleichzeitig auszufuellenden Pflichtfelder. Das GUI zeigte deshalb bei
+BEIDEN ein "*", obwohl nur eines gebraucht wird - genau dieselbe Fehlerklasse, die fuer die
+Run-Button-Validierung bereits in 1.9.43.0 behoben wurde, hier aber nie nachgezogen.
+
+Fix: Die Mandatory-Pruefung fuer das Label vergleicht jetzt wie die Run-Validierung ueber
+`Command.ParameterSets` - "*" (fett) erscheint nur noch, wenn ein Parameter in JEDEM
+Parameter-Set der Funktion Pflicht ist (also unbedingt noetig, egal welches Set gewaehlt wird).
+Parameter, die nur in EINIGEN Sets Pflicht sind (Alternativen wie BackupFile/BackupFiles),
+bekommen stattdessen ein leichteres "+"-Zeichen; der Tooltip nennt das/die betroffene(n)
+Parameter-Set(s). Betrifft neben `Invoke-sqmRestoreDatabase` auch `Get-sqmDiskBlockSize`,
+`Get-sqmServerSetting` und `New-sqmRestoreDatabaseJob`, die dasselbe Alternativ-Muster haben.
+
+### Feature: `New-sqmBackupMaintenanceJob` liest den Jobnamen jetzt aus der Konfiguration
+
+`-JobName` hatte bisher den fest verdrahteten Default `'sqm-BackupMaintenance-FULL'` -
+unabhaengig vom gewaehlten `-BackupType`. Ein Aufruf mit `-BackupType DIFF` ohne `-JobName` legte
+also einen SQL-Agent-Job an, der `sqm-BackupMaintenance-FULL` hiess, obwohl er tatsaechlich ein
+DIFF-Job war.
+
+`-JobName` hat jetzt keinen festen Default mehr; ohne explizite Angabe wird der Name aus der
+Konfiguration gelesen, abhaengig vom gewaehlten `-BackupType`
+(`Set-sqmConfig -BackupMaintenanceJobNameFull/-Diff/-Log`), analog zum bereits bestehenden Muster
+bei `New-sqmOlaUsrDbBackupJob` (`OlaJobNameFull/Diff/Log`). Ist auch das nicht konfiguriert, greift
+weiterhin ein typspezifischer Default (`sqm-BackupMaintenance-<BackupType>`), diesmal korrekt
+abhaengig vom Typ statt immer "FULL".
+
+Im GUI-Launcher (`Show-sqmToolGui`) fuellt eine Auswahl in der BackupType-Dropdown-Liste (FULL/
+DIFF/LOG) das JobName-Feld jetzt automatisch mit dem konfigurierten bzw. Default-Namen - der
+Anwender muss ihn im Regelfall nicht mehr selbst eintippen, kann ihn danach aber weiterhin frei
+ueberschreiben.
+
+Alle drei Aenderungen gegen DEV01 verifiziert (Jobname-Aufloesung inkl. mit und ohne konfiguriertem
+Wert; DEV01 selbst war waehrend eines Teils der Tests wegen eines offensichtlich voruebergehenden
+DNS-Ausfalls im Labor nicht erreichbar - unabhaengig von dieser Aenderung, die Namensaufloesung
+selbst wurde unabhaengig davon per direktem Objektvergleich bestaetigt).
+
 ## [1.9.74.0] — 2026-08-07
 
 ### Fix: Get-sqmLoginSettings-Bericht zeigte DefaultDatabase/DefaultLanguage nicht an

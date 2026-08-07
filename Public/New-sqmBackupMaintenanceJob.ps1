@@ -30,7 +30,9 @@
 	PSCredential for the SQL connection.
 
 .PARAMETER JobName
-	Name of the SQL Agent job to create. Default: 'sqm-BackupMaintenance-FULL'.
+	Name of the SQL Agent job to create. When not specified, the name is read from the
+	module configuration depending on -BackupType (Set-sqmConfig -BackupMaintenanceJobNameFull/
+	-Diff/-Log); if that isn't configured either, defaults to 'sqm-BackupMaintenance-<BackupType>'.
 
 .PARAMETER BackupType
 	Backup type: 'FULL', 'DIFF', or 'LOG'. Default: 'FULL'.
@@ -123,7 +125,7 @@ function New-sqmBackupMaintenanceJob
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
 		[Parameter(Mandatory = $false)]
-		[string]$JobName = 'sqm-BackupMaintenance-FULL',
+		[string]$JobName,
 		[Parameter(Mandatory = $false)]
 		[ValidateSet('FULL', 'DIFF', 'LOG')]
 		[string]$BackupType = 'FULL',
@@ -182,6 +184,23 @@ function New-sqmBackupMaintenanceJob
 				'DIFF' { $ScheduleDays = @('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday') }
 				'LOG'  { $ScheduleDays = @('EveryDay') }
 			}
+		}
+
+		# JobName ohne explizite Angabe aus der Konfiguration lesen, abhaengig von -BackupType -
+		# analog zu New-sqmOlaUsrDbBackupJob (OlaJobNameFull/Diff/Log). Vorher war der Default fest
+		# auf 'sqm-BackupMaintenance-FULL' verdrahtet, unabhaengig vom gewaehlten BackupType - ein
+		# Aufruf mit -BackupType DIFF ohne -JobName legte also einen Job an, der "...FULL" hiess,
+		# obwohl er tatsaechlich ein DIFF-Job war.
+		if (-not $PSBoundParameters.ContainsKey('JobName') -or [string]::IsNullOrWhiteSpace($JobName))
+		{
+			$cfg = Get-sqmConfig
+			$cfgKey = switch ($BackupType)
+			{
+				'FULL' { 'BackupMaintenanceJobNameFull' }
+				'DIFF' { 'BackupMaintenanceJobNameDiff' }
+				'LOG'  { 'BackupMaintenanceJobNameLog' }
+			}
+			$JobName = if ($cfg[$cfgKey]) { $cfg[$cfgKey] } else { "sqm-BackupMaintenance-$BackupType" }
 		}
 
 		$connParams = @{ SqlInstance = $SqlInstance }

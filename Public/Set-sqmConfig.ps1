@@ -39,6 +39,18 @@
 .PARAMETER OlaJobNameSysDbBackup
     Name of the full backup job for system databases.
 
+.PARAMETER BackupMaintenanceJobNameFull
+    Name of the SQL Agent job New-sqmBackupMaintenanceJob creates for -BackupType FULL.
+    Default (when not configured): 'sqm-BackupMaintenance-FULL'.
+
+.PARAMETER BackupMaintenanceJobNameDiff
+    Name of the SQL Agent job New-sqmBackupMaintenanceJob creates for -BackupType DIFF.
+    Default (when not configured): 'sqm-BackupMaintenance-DIFF'.
+
+.PARAMETER BackupMaintenanceJobNameLog
+    Name of the SQL Agent job New-sqmBackupMaintenanceJob creates for -BackupType LOG.
+    Default (when not configured): 'sqm-BackupMaintenance-LOG'.
+
 .PARAMETER TsmManagementClasses
     Array of valid TSM management classes (e.g. 'MC_B_NL.NL_42.42.NA').
 
@@ -150,6 +162,12 @@ function Set-sqmConfig
 		[string]$OlaJobNameIntSysDb,
 		[Parameter(Mandatory = $false)]
 		[string]$OlaJobNameSysDbBackup,
+		[Parameter(Mandatory = $false)]
+		[string]$BackupMaintenanceJobNameFull,
+		[Parameter(Mandatory = $false)]
+		[string]$BackupMaintenanceJobNameDiff,
+		[Parameter(Mandatory = $false)]
+		[string]$BackupMaintenanceJobNameLog,
 		[Parameter(Mandatory = $false)]
 		[string[]]$TsmManagementClasses,
 		[Parameter(Mandatory = $false)]
@@ -334,6 +352,35 @@ function Set-sqmConfig
 			$updated = $true
 		}
 		else { Write-Error "OlaJobNameSysDbBackup darf nicht leer sein."; return }
+	}
+
+	# Backup-Maintenance-Job-Namen (New-sqmBackupMaintenanceJob, je nach -BackupType)
+	if ($PSBoundParameters.ContainsKey('BackupMaintenanceJobNameFull'))
+	{
+		if (-not [string]::IsNullOrWhiteSpace($BackupMaintenanceJobNameFull))
+		{
+			$globalConfig['BackupMaintenanceJobNameFull'] = $BackupMaintenanceJobNameFull
+			$updated = $true
+		}
+		else { Write-Error "BackupMaintenanceJobNameFull darf nicht leer sein."; return }
+	}
+	if ($PSBoundParameters.ContainsKey('BackupMaintenanceJobNameDiff'))
+	{
+		if (-not [string]::IsNullOrWhiteSpace($BackupMaintenanceJobNameDiff))
+		{
+			$globalConfig['BackupMaintenanceJobNameDiff'] = $BackupMaintenanceJobNameDiff
+			$updated = $true
+		}
+		else { Write-Error "BackupMaintenanceJobNameDiff darf nicht leer sein."; return }
+	}
+	if ($PSBoundParameters.ContainsKey('BackupMaintenanceJobNameLog'))
+	{
+		if (-not [string]::IsNullOrWhiteSpace($BackupMaintenanceJobNameLog))
+		{
+			$globalConfig['BackupMaintenanceJobNameLog'] = $BackupMaintenanceJobNameLog
+			$updated = $true
+		}
+		else { Write-Error "BackupMaintenanceJobNameLog darf nicht leer sein."; return }
 	}
 	
 	# TSM Management-Klassen
