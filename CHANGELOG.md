@@ -1,5 +1,21 @@
 # sqmSQLTool — Changelog
 
+## [1.9.67.0] — 2026-08-07
+
+### Fix: FI-TS-Installation synchronisierte dbatools bei JEDER Installation neu, auch wenn aktuell
+
+Im FITS-Zweig von `Install.ps1` (Quelle `W:\...` bzw. `\\tsclient\W\...`) lief `robocopy ... /MIR`
+fuer `dbatools` und `dbatools.library` bislang bedingungslos bei jeder Installation - anders als
+der PSGallery-Zweig gab es keinen "ist eh schon aktuell"-Kurzschluss. `/MIR` muss dafuer den
+kompletten Dateibaum auf beiden Seiten enumerieren und vergleichen (dbatools: mehrere tausend
+kleine `.ps1`-Dateien), ueber die Citrix-Freigabe `\\tsclient\W\` mit spuerbarer Latenz pro Datei -
+das dauerte lange, selbst wenn am Ende nichts zu kopieren war.
+
+Jetzt wird vorab die hoechste Versions-Ordnernummer auf Quelle und Ziel verglichen
+(`Get-sqmModuleFolderVersion`); stimmen sie ueberein, wird robocopy fuer das jeweilige Modul
+komplett uebersprungen. Muss synchronisiert werden (fehlende/veraltete Installation), laeuft
+robocopy zusaetzlich mit `/MT:8` (Multithread) statt seriell.
+
 ## [1.9.66.0] — 2026-08-07
 
 ### Fix: SQL-Browser-Check meldete laufenden/gestoppten Dienst als "nicht installiert"

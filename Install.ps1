@@ -247,16 +247,36 @@ $dbatoolsInstalledVersion = if ($dbatoolsInScope) {
         Sort-Object -Descending | Select-Object -First 1)
 } else { $null }
 
+# Hoechste Versions-Ordnernummer unter einem Modul-Root ermitteln (Modulordner sind nach SemVer
+# benannt, z.B. 'dbatools\2.8.2\'). Dient dem Kurzschluss unten: robocopy /MIR muss sonst bei
+# JEDER Installation den kompletten Dateibaum auf beiden Seiten enumerieren und vergleichen -
+# bei dbatools mehrere tausend kleine .ps1-Dateien, ueber eine Citrix-Freigabe (\\tsclient\W\)
+# pro Datei mit spuerbarer Netzwerk-Latenz. Das dauert lange, selbst wenn am Ende nichts zu
+# kopieren ist. Stimmt die Version auf beiden Seiten ueberein, wird robocopy komplett uebersprungen.
+function Get-sqmModuleFolderVersion {
+    param([string]$Path)
+    if (-not (Test-Path $Path -PathType Container)) { return $null }
+    Get-ChildItem -Path $Path -Directory -ErrorAction SilentlyContinue |
+        ForEach-Object { try { [version]$_.Name } catch { $null } } |
+        Sort-Object -Descending | Select-Object -First 1
+}
+
 Write-Host "Pruefe Abhaengigkeit 'dbatools' (Scope $Scope)..." -ForegroundColor Cyan
 if ($fitsModulesShare) {
-    Write-Host "  FITS-Umgebung erkannt (Quelle: $Source) - synchronisiere dbatools + dbatools.library von '$fitsModulesShare'..." -ForegroundColor Cyan
+    Write-Host "  FITS-Umgebung erkannt (Quelle: $Source) - pruefe dbatools + dbatools.library gegen '$fitsModulesShare'..." -ForegroundColor Cyan
     $targetModulesRoot = if ($Scope -eq 'AllUsers') { Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules' }
     else { Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsPowerShell\Modules' }
     $fitsSyncFailed = $false
     foreach ($modName in @('dbatools', 'dbatools.library')) {
         $srcMod = Join-Path $fitsModulesShare $modName
         $dstMod = Join-Path $targetModulesRoot $modName
-        robocopy $srcMod $dstMod /MIR /NJH /NJS /NDL /COPY:DAT | Out-Null
+        $srcVersion = Get-sqmModuleFolderVersion -Path $srcMod
+        $dstVersion = Get-sqmModuleFolderVersion -Path $dstMod
+        if ($srcVersion -and $dstVersion -and $srcVersion -eq $dstVersion) {
+            Write-Host "  '$modName' bereits aktuell (Version $dstVersion) - kein Sync noetig." -ForegroundColor Gray
+            continue
+        }
+        robocopy $srcMod $dstMod /MIR /MT:8 /NJH /NJS /NDL /COPY:DAT | Out-Null
         if ($LASTEXITCODE -ge 8) {
             Write-Warning "  robocopy fuer '$modName' meldete einen Fehler (Exitcode $LASTEXITCODE) - $srcMod -> $dstMod."
             $fitsSyncFailed = $true
