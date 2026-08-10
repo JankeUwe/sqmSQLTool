@@ -1,5 +1,66 @@
 # sqmSQLTool — Changelog
 
+## [1.9.79.0] — 2026-08-10
+
+### Feature: `New-sqmAgentCommandJob` — beliebige sqmSQLTool-Funktionen generisch als Agent-Job-Step
+
+Hintergrund: Die bisherigen `New-sqm*Job`-Funktionen (`New-sqmRestoreDatabaseJob`,
+`New-sqmAlwaysOnRepairJob`, ...) sind jeweils fest auf EINE Zielfunktion mit fest verdrahteten
+Parametern zugeschnitten - jede baut ihre eigene Argument-String-Zeile per Hand. Fuer beliebige
+sqmSQLTool-Funktionen mit unterschiedlichsten Parametersaetzen skaliert das nicht; ein frueherer
+generischer Versuch (`Private\New-sqmCmdExecJobStep.ps1` / `_CreateCmdExecJobStep`) baute
+Parameter per doppelt-quotierter String-Interpolation in den generierten Wrapper ein und brach bei
+`$`-Zeichen in Pfaden sowie durch hartkodierte, nicht auf jede Funktion zutreffende Flags
+(`-Verbose -ContinueOnError`) - wird seither von den produktiven Job-Funktionen nicht mehr
+verwendet (siehe deren Kommentare zu `_q`-Escaping).
+
+`New-sqmAgentCommandJob` loest das strukturell statt durch besseres Escaping: Parameter werden nie
+als Text in generierten PowerShell-Quellcode eingebettet, sondern per `Export-Clixml` typisiert in
+eine Datei pro Step geschrieben. Ein einziger, wiederverwendbarer Wrapper (`generic-invoke.ps1`,
+unter `...\sqmSQLTool\jobs\`) laedt die Datei per `Import-Clixml` und ruft die per `-FunctionName`
+uebergebene Zielfunktion per Splatting auf - dieselbe Wrapper-Datei bedient jede beliebige
+sqmSQLTool-Funktion, ohne pro Funktion neuen Code zu generieren. `-EnableException`/`-Confirm:$false`
+werden nur gesetzt, wenn `Get-Command` bestaetigt, dass die Zielfunktion den Parameter ueberhaupt
+kennt - der Bug mit den hartkodierten Flags aus dem alten Ansatz kann so nicht mehr auftreten.
+`Get-Command -Module sqmSQLTool` wirkt zusaetzlich als Allowlist (nur exportierte Funktionen sind
+aufrufbar) und faengt Tippfehler im Funktionsnamen schon vor dem Anlegen ab.
+
+Zwei Achsen sind unabhaengig waehlbar:
+- **Ein Job/mehrere Steps**: `-Command` nimmt ein Array von Hashtables (`FunctionName`,
+  `Parameters`, optional `StepName`) - jeder Eintrag wird ein eigener, per `GoToNextStep`
+  verketteter CmdExec-Step; jeder Step beendet den Job bei Fehler sofort (`QuitWithFailure`,
+  Fail-Fast). `-AppendStep` haengt spaeter weitere Steps an einen bestehenden Job an; dabei wird
+  der bisher letzte Step automatisch von `QuitWithSuccess` auf `GoToNextStep` umgestellt (per
+  `Set-DbaAgentJobStep -StepName` - dieses Cmdlet hat kein `-StepId`, siehe Fix in [1.7.x] weiter
+  unten), sonst wuerden die neuen Steps nie erreicht.
+- **On-Demand/Scheduled**: `-ScheduleType None` (Default) vs. `Daily`/`Weekly`/`Monthly` via
+  `New-DbaAgentSchedule` (gleiches Muster wie `New-sqmRestoreTestJob`), plus `-StartJob` fuer den
+  sofortigen ersten Lauf unabhaengig vom Schedule.
+
+Sicherheitshinweis in den Function-Docs: keine `PSCredential`/`SecureString`-Werte in `-Parameters`
+- `Export-Clixml` verschluesselt SecureStrings per DPAPI nur fuer das aktuelle Windows-Konto; laeuft
+der Job unter einem anderen Konto (Dienstkonto/Proxy), schlaegt die Entschluesselung fehl. Fuer
+erhoehte Rechte stattdessen einen dedizierten Agent-Proxy (`New-sqmAgentProxy`) verwenden.
+
+Beim Live-Test per `-WhatIf` gegen DEV01 (workgroup, kein Domaenen-Trust) zwei Dinge gefunden und
+korrigiert:
+- Ein Bug in der Step-Schleife: die lokale Variable hiess `$command` - kollidiert case-insensitiv
+  mit dem typisierten Pflichtparameter `$Command` ([hashtable[]]). PowerShell erzwingt bei jeder
+  Zuweisung an eine parametertypisierte Variable weiterhin deren Typ; die Zuweisung des generierten
+  Kommando-Strings brach deshalb bei JEDEM echten Aufruf mit "Cannot convert ... to Hashtable[]" ab
+  - unabhaengig von `-WhatIf`. Fix: umbenannt zu `$stepCommand`.
+- `-SqlCredential` ergaenzt (optional, wie bei `New-sqmAgentProxy`): ohne Domaenen-Trust zum
+  `-SqlInstance` schlagen die internen `Get/New/Set-DbaAgentJob*`-Aufrufe sonst mit Windows-Auth
+  fehl. Aendert nichts daran, wie der Job-Step selbst spaeter authentifiziert (siehe .NOTES) - gilt
+  nur fuer die Verbindung, mit der der Job ANGELEGT wird.
+
+Beide Fixes und alle Pfade (Single-Step, Multi-Step-Kette mit Daily/Weekly-Schedule, `-AppendStep`
+gegen einen echten vorhandenen Job inkl. automatischer `GoToNextStep`-Umstellung des bisher letzten
+Steps, Allowlist-Ablehnung eines Tippfehler-Funktionsnamens) per `-WhatIf` gegen DEV01 verifiziert.
+Echte Job-Anlage (ohne `-WhatIf`) erfordert eine elevated PowerShell-Session (Schreibzugriff auf
+`C:\Program Files\...` - gilt fuer alle `New-sqm*Job`-Funktionen dieses Moduls) und wurde in dieser
+Session mangels Elevation nicht ausgefuehrt.
+
 ## [1.9.78.0] — 2026-08-10
 
 ### Feature: `Export-sqmDatabaseLogins` / `Import-sqmDatabaseLogins` / `Sync-sqmDatabaseLogins`
