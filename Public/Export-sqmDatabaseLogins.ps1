@@ -155,7 +155,7 @@ WHERE dp.type = 'S'
   AND dp.sid IS NOT NULL
   AND dp.name NOT IN ('dbo', 'guest', 'INFORMATION_SCHEMA', 'sys')
 "@
-			$dbUsers = @(Invoke-DbaQuery @connParams -Database $Database -Query $userQuery -EnableException -ErrorAction Stop | Select-Object -ExpandProperty UserName)
+			$dbUsers = @(Invoke-DbaQuery @connParams -Database $Database -Query $userQuery -EnableException | Select-Object -ExpandProperty UserName)
 
 			if ($dbUsers.Count -eq 0)
 			{
@@ -186,7 +186,7 @@ WHERE dp.type = 'S'
 			try
 			{
 				$query = "SELECT name FROM sys.server_principals WHERE (is_srvrolemember('sysadmin', name) = 1 OR sid = 0x01) AND name NOT LIKE '##%'"
-				$sysAdminLogins = @((Invoke-DbaQuery @connParams -Query $query -EnableException -ErrorAction Stop).name)
+				$sysAdminLogins = @((Invoke-DbaQuery @connParams -Query $query -EnableException).name)
 			}
 			catch
 			{
@@ -240,7 +240,7 @@ FROM sys.server_principals sp
 JOIN sys.sql_logins sl ON sl.principal_id = sp.principal_id
 WHERE sp.type = 'S' AND sp.name IN ($inClause)
 "@
-			$loginRows = @(Invoke-DbaQuery @connParams -Query $metaQuery -EnableException -ErrorAction Stop)
+			$loginRows = @(Invoke-DbaQuery @connParams -Query $metaQuery -EnableException)
 
 			$missingOnSource = @($candidateNames | Where-Object { $_ -notin $loginRows.LoginName })
 			foreach ($m in $missingOnSource)

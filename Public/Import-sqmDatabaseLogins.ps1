@@ -232,7 +232,7 @@ function Import-sqmDatabaseLogins
 					{
 						try
 						{
-							$msgOutput = @(Invoke-DbaQuery @connParams -Database master -Query $block.Sql -MessagesToOutput -EnableException -ErrorAction Stop)
+							$msgOutput = @(Invoke-DbaQuery @connParams -Database master -Query $block.Sql -MessagesToOutput -EnableException)
 							$joinedMsg = ($msgOutput -join ' ').Trim()
 							$status = if ($joinedMsg -match 'SICHERHEIT') { 'SkippedSysadmin' }
 							elseif ($joinedMsg -match 'UEBERSPRUNGEN') { 'SkippedSidCollision' }
