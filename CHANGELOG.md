@@ -1,5 +1,35 @@
 # sqmSQLTool — Changelog
 
+## [1.9.80.0] — 2026-08-10
+
+### Fix: `Get-sqmWaitStatistics` und fünf Batch-B3-Geschwister schreiben jetzt auch ohne `-OutputPath` einen Report
+
+Gemeldet: "Get-sqmWaitStatistics erstellt keinen HTML-Report mehr". Live-Test gegen DEV01 mit
+sowohl dem aktuellen Source-Stand als auch der auf einem Testrechner installierten Version
+(v1.9.51.0) zeigte in beiden Staenden korrekten, funktionierenden CSV+HTML-Code - kein
+Regressions-Bug. Ursache war Aufruf ohne `-OutputPath`: Anders als z. B. `Get-sqmDiskSpaceReport`
+oder `Get-sqmLoginSettings` hatte `Get-sqmWaitStatistics` (und mit ihr vier weitere Funktionen aus
+dem selben "Report-Standardisierung Batch B3", die im Juni zusammen die HTML-Ausgabe erhielten)
+keinen Default-Wert fuer `-OutputPath` - ohne den Parameter wurde nie eine Datei geschrieben, auch
+keine CSV, nur Objekte/Log.
+
+Fix (Default-Wert nach dem bereits etablierten Muster `(Join-Path (Get-sqmDefaultOutputPath)
+'<Unterordner>')`, wie es `Get-sqmLoginSettings`/`Get-sqmDiskSpaceReport` bereits nutzen):
+- `Get-sqmWaitStatistics` → `...\WaitStatistics`
+- `Get-sqmPerfCounters` → `...\PerfCounters`
+- `Get-sqmConnectionStats` → `...\ConnectionStats`
+- `Get-sqmMissingIndexes` → `...\MissingIndexes`
+- `Get-sqmLongRunningQueries` → `...\LongRunningQueries`
+
+`Get-sqmLoginSettings` hatte bereits einen Default und war nicht betroffen.
+
+Live gegen DEV01 verifiziert (frischer Modul-Reimport aus dem Source-Verzeichnis, nicht die
+lokal installierte Kopie - siehe Hinweis in [[feedback_sqmsqltool_installed_vs_source]]):
+`Get-sqmWaitStatistics`, `Get-sqmConnectionStats` und `Get-sqmPerfCounters` schreiben jetzt ohne
+`-OutputPath` automatisch CSV+HTML in den Default-Ordner. `Get-sqmMissingIndexes` schreibt bei 0
+Treffern weiterhin bewusst keine Datei (eigene, unveraenderte Bedingung `-and $results.Count -gt
+0`) - kein Bug, sondern vermeidet leere Reports.
+
 ## [1.9.79.0] — 2026-08-10
 
 ### Feature: `New-sqmAgentCommandJob` — beliebige sqmSQLTool-Funktionen generisch als Agent-Job-Step

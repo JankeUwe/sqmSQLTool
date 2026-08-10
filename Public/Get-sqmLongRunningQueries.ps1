@@ -40,7 +40,7 @@
     Retrieve the XML execution plan as well (expensive - only on demand). Default: $false.
 
 .PARAMETER OutputPath
-    If specified, a CSV snapshot is written to this directory.
+    Directory for the CSV/HTML report. Default: <OutputPath config>\LongRunningQueries.
 
 .PARAMETER EnableException
     Throw exceptions immediately instead of returning as errors.
@@ -94,7 +94,7 @@ function Get-sqmLongRunningQueries
 		[Parameter(Mandatory = $false)]
 		[switch]$IncludeQueryPlan,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath,
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'LongRunningQueries'),
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException,
 		[Parameter(Mandatory = $false)]

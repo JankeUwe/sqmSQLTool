@@ -35,7 +35,7 @@
     Returns a snapshot array that can later be used as SnapshotBefore.
 
 .PARAMETER OutputPath
-    If specified, a CSV report is saved.
+    Directory for the CSV/HTML report. Default: <OutputPath config>\WaitStatistics.
 
 .PARAMETER EnableException
     Throw exceptions immediately.
@@ -70,7 +70,7 @@ function Get-sqmWaitStatistics
 		[Parameter(Mandatory = $false)]
 		[switch]$SaveSnapshot,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath,
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'WaitStatistics'),
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException,
 		[Parameter(Mandatory = $false)]

@@ -38,8 +38,8 @@
     Return at most this number of recommendations (sorted by impact score). Default: 50.
 
 .PARAMETER OutputPath
-    If specified, a CSV file with the recommendations and CREATE statements
-    is written to this directory.
+    Directory for the CSV/HTML report (recommendations and CREATE statements).
+    Default: <OutputPath config>\MissingIndexes.
 
 .PARAMETER EnableException
     Throw exceptions immediately.
@@ -87,7 +87,7 @@ function Get-sqmMissingIndexes
 		[Parameter(Mandatory = $false)]
 		[int]$Top = 50,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath,
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'MissingIndexes'),
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException,
 		[Parameter(Mandatory = $false)]

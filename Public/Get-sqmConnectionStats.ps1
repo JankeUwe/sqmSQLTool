@@ -24,7 +24,7 @@
     Include system connections (is_user_process = 0).
 
 .PARAMETER OutputPath
-    If specified, a CSV report is saved.
+    Directory for the CSV/HTML report. Default: <OutputPath config>\ConnectionStats.
 
 .PARAMETER EnableException
     Throw exceptions immediately.
@@ -60,7 +60,7 @@ function Get-sqmConnectionStats
 		[Parameter(Mandatory = $false)]
 		[switch]$IncludeSystemConnections,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath,
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'ConnectionStats'),
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException,
 		[Parameter(Mandatory = $false)]

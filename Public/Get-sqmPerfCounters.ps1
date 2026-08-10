@@ -22,7 +22,7 @@
     Maximum number of results. Default: 50.
 
 .PARAMETER OutputPath
-    If specified, a CSV report is saved.
+    Directory for the CSV/HTML report. Default: <OutputPath config>\PerfCounters.
 
 .PARAMETER EnableException
     Throw exceptions immediately.
@@ -52,7 +52,7 @@ function Get-sqmPerfCounters
 		[ValidateRange(1, 500)]
 		[int]$TopN = 50,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath,
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'PerfCounters'),
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException,
 		[Parameter(Mandatory = $false)]
