@@ -4,11 +4,19 @@
 
 A comprehensive PowerShell module for SQL Server 2016+ administration, with specialized support for AlwaysOn Availability Groups, performance reporting, and security auditing.
 
-**Latest Release:** [v1.9.26.1](https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.9.26.1) | **Functions:** 156 | **Documentation:** [Full Reference](https://www.powershelldba.de/sqmsqltool/commands-en/)
+**Latest Release:** [v1.9.80.0](https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.9.80.0) | **Functions:** 162 | **Documentation:** [Full Reference](https://www.powershelldba.de/sqmsqltool/commands-en/)
 
 ---
 
-## 🎯 What's New in v1.9.26
+## 🕐 Recent Highlights (v1.9.60 - v1.9.80)
+
+- `New-sqmAgentCommandJob` - generic SQL Agent job/step builder that wraps any sqmSQLTool function via a Clixml-serialized parameter splat
+- `Export-sqmDatabaseLogins` / `Import-sqmDatabaseLogins` / `Sync-sqmDatabaseLogins` - database-level login export, import, and sync
+- AlwaysOn rejoin fixes: correct recovery model on rejoin, automatic backup lookup by database name
+- `Get-sqmLoginSettings`, `Get-sqmAlwaysOnFailoverHistory`, `Get-sqmTlsStatus`, `Invoke-sqmInstanceInventory` and 33 other report functions now write automatic TXT/CSV/HTML output to their own subfolder by default
+- `Get-sqmSpnReport` no longer flags AG partner-replica SPNs or duplicate listener SPN rows as errors
+
+## 🎯 Execution Plan Analysis & Login Sync
 
 ### Execution Plan Analysis
 `Get-sqmPlanInsights` parses ShowPlan XML (.sqlplan/.xml) and reports cardinality-estimate mismatches, SARGability violations, parameter-sniffing risk, tempdb spills, and missing-index suggestions — with runtime-evidence-based severity scoring instead of relying on optimizer cost estimates:
@@ -63,7 +71,7 @@ Import-Module ./sqmSQLTool/sqmSQLTool.psd1 -Force
 ### Verify Installation
 ```powershell
 Get-Command -Module sqmSQLTool | Measure-Object
-# Output: 156 functions
+# Output: 162 functions
 ```
 
 ---
@@ -103,7 +111,7 @@ Get-Command -Module sqmSQLTool | Measure-Object
 ## 📚 Documentation
 
 ### Full Command Reference
-Complete documentation with examples for all 156 functions:
+Complete documentation with examples for all 162 functions:
 - **HTML Reference**: https://www.powershelldba.de/sqmsqltool/commands-en/
 - **GitHub Releases**: https://github.com/JankeUwe/sqmSQLTool/releases
 
