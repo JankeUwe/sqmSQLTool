@@ -13,6 +13,7 @@
       Get-sqmReportReference    - Standard-Referenzzeile (www.powershelldba.de)
       Invoke-sqmOpenReport      - Oeffnet Report (HTML vor TXT, nie CSV, -NoOpen)
       ConvertTo-sqmHtmlReport   - HTML-Geruest im sqmSQLTool-Theme
+      Get-sqmDirectCpuMemory    - Momentaufnahme CPU% + Memory MB (ein DMV-Call)
     ===========================================================================
 #>
 
@@ -293,4 +294,59 @@ $BodyHtml
 </body>
 </html>
 "@
+}
+
+# Momentaufnahme von CPU-Auslastung und Speicher direkt aus den DMVs, in einem
+# einzigen Call (CROSS APPLY statt getrennter Queries), damit alle Werte vom
+# selben Zeitpunkt stammen. Gemeinsam genutzt von Get-sqmServerUtilization
+# (Sampling-Loop) und Invoke-sqmPerfBaseline (Einzel-Snapshot).
+function Get-sqmDirectCpuMemory
+{
+	[CmdletBinding()]
+	[OutputType([PSCustomObject])]
+	param (
+		[Parameter(Mandatory = $true)]
+		[string]$SqlInstance,
+		[Parameter(Mandatory = $false)]
+		[System.Management.Automation.PSCredential]$SqlCredential
+	)
+
+	$connParams = @{ SqlInstance = $SqlInstance }
+	if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
+
+	$sql = @"
+SELECT
+    pm.SQLPhysicalMemoryBytes,
+    sm.ServerTotalMemoryBytes,
+    sm.AvailableMemoryBytes,
+    cpu.CPUUtilizationPercent
+FROM
+    (SELECT CAST(physical_memory_in_use_kb AS BIGINT) * 1024 AS SQLPhysicalMemoryBytes
+     FROM sys.dm_os_process_memory) AS pm
+CROSS JOIN
+    (SELECT CAST(total_physical_memory_kb AS BIGINT) * 1024 AS ServerTotalMemoryBytes,
+            CAST(available_physical_memory_kb AS BIGINT) * 1024 AS AvailableMemoryBytes
+     FROM sys.dm_os_sys_memory) AS sm
+OUTER APPLY
+    (SELECT TOP 1
+        x.record.value('(./Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int') AS CPUUtilizationPercent
+     FROM
+        (SELECT CONVERT(XML, record) AS record, [timestamp]
+         FROM sys.dm_os_ring_buffers
+         WHERE ring_buffer_type = N'RING_BUFFER_SCHEDULER_MONITOR') AS x
+     ORDER BY x.[timestamp] DESC) AS cpu;
+"@
+
+	$result = Invoke-DbaQuery @connParams -Database master -Query $sql -ErrorAction Stop
+	$row = @($result)[0]
+
+	$cpuRaw = $row.CPUUtilizationPercent
+	$cpuPercent = if ($null -eq $cpuRaw -or $cpuRaw -is [System.DBNull]) { 0.0 } else { [double]$cpuRaw }
+
+	return [PSCustomObject]@{
+		CPUUtilizationPercent = $cpuPercent
+		SQLMemoryMB           = [math]::Round([int64]$row.SQLPhysicalMemoryBytes / 1MB, 2)
+		AvailableMemoryMB     = [math]::Round([int64]$row.AvailableMemoryBytes / 1MB, 2)
+		ServerTotalMemoryMB   = [math]::Round([int64]$row.ServerTotalMemoryBytes / 1MB, 2)
+	}
 }

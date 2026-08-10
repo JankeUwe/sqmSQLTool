@@ -1,11 +1,14 @@
 ﻿<#
 .SYNOPSIS
-    Creates, compares or lists performance baselines (wait stats + perf counters).
+    Creates, compares or lists performance baselines (wait stats + perf counters + CPU/memory).
 
 .DESCRIPTION
     Capture: Saves the current snapshot of sys.dm_os_wait_stats and
-    sys.dm_os_performance_counters as a JSON file.
-    Compare: Calculates the delta between two baselines.
+    sys.dm_os_performance_counters as a JSON file, plus a direct point-in-time
+    reading of CPU utilization % and SQL/available/total memory (MB).
+    Compare: Calculates the delta between two baselines for wait stats and perf
+    counters. CPU/memory are point-in-time readings, not cumulative counters,
+    so they are shown side by side (A vs. B) instead of as a delta.
     List:    Lists all saved baseline files.
 
 .PARAMETER SqlInstance
@@ -194,11 +197,21 @@ WHERE (
 "@
 				$counterRows = Invoke-DbaQuery @connParams -Database master -Query $counterSql -ErrorAction Stop
 
+				# Direkte CPU/Memory-Momentaufnahme (kein kumulativer Zaehler, deshalb
+				# separat vom Delta-Vergleich der Perf Counter)
+				$direct = Get-sqmDirectCpuMemory @connParams
+
 				# Als JSON speichern
 				$snapshot = [PSCustomObject]@{
 					SqlInstance  = $SqlInstance
 					BaselineName = $label
 					CapturedAt   = (Get-Date -Format 'o')
+					DirectMetrics = [PSCustomObject]@{
+						CPUUtilizationPercent = $direct.CPUUtilizationPercent
+						SQLMemoryMB           = $direct.SQLMemoryMB
+						AvailableMemoryMB     = $direct.AvailableMemoryMB
+						ServerTotalMemoryMB   = $direct.ServerTotalMemoryMB
+					}
 					WaitStats    = @($waitRows | ForEach-Object {
 						[PSCustomObject]@{
 							wait_type           = $_.wait_type
@@ -231,6 +244,8 @@ WHERE (
 					FileName       = $outFile
 					WaitStatCount  = $snapshot.WaitStats.Count
 					CounterCount   = $snapshot.PerfCounters.Count
+					CPUPercent     = $snapshot.DirectMetrics.CPUUtilizationPercent
+					SQLMemoryMB    = $snapshot.DirectMetrics.SQLMemoryMB
 					Timestamp      = $snapshot.CapturedAt
 				}
 			}
@@ -271,6 +286,23 @@ WHERE (
 
 				Invoke-sqmLogging -Message (_s 'Baseline_Comparing' $snapA.BaselineName, $snapB.BaselineName) -FunctionName $functionName -Level "INFO"
 
+				# Direct Metrics (CPU % / Memory MB) - Momentaufnahmen, deshalb A/B nebeneinander
+				# statt Delta. Aeltere Baseline-Dateien (vor Einfuehrung dieses Felds) liefern $null.
+				$directMetrics = if ($snapA.DirectMetrics -and $snapB.DirectMetrics)
+				{
+					[PSCustomObject]@{
+						CPUPercent_A       = $snapA.DirectMetrics.CPUUtilizationPercent
+						CPUPercent_B       = $snapB.DirectMetrics.CPUUtilizationPercent
+						SQLMemoryMB_A      = $snapA.DirectMetrics.SQLMemoryMB
+						SQLMemoryMB_B      = $snapB.DirectMetrics.SQLMemoryMB
+						AvailMemoryMB_A    = $snapA.DirectMetrics.AvailableMemoryMB
+						AvailMemoryMB_B    = $snapB.DirectMetrics.AvailableMemoryMB
+						ServerTotalMemoryMB_A = $snapA.DirectMetrics.ServerTotalMemoryMB
+						ServerTotalMemoryMB_B = $snapB.DirectMetrics.ServerTotalMemoryMB
+					}
+				}
+				else { $null }
+
 				# Wait Stats Delta
 				$waitHashA = @{}
 				foreach ($w in $snapA.WaitStats) { $waitHashA[$w.wait_type] = $w }
@@ -310,7 +342,7 @@ WHERE (
 				# HTML-Vergleichsbericht
 				$htmlFile = $null
 				$ctrChanged = @($ctrDelta | Where-Object { $_.Delta -ne 0 })
-				if ($waitDelta.Count -gt 0 -or $ctrChanged.Count -gt 0)
+				if ($waitDelta.Count -gt 0 -or $ctrChanged.Count -gt 0 -or $directMetrics)
 				{
 					$body = [System.Text.StringBuilder]::new()
 
@@ -319,6 +351,19 @@ WHERE (
 								BaselineA = "$($snapA.BaselineName)  ($($snapA.CapturedAt))"
 								BaselineB = "$($snapB.BaselineName)  ($($snapB.CapturedAt))"
 							} | ConvertTo-Html -Fragment -As List | Out-String))
+
+					[void]$body.AppendLine('<h2>CPU &amp; Memory (Zeitpunkt der Erfassung)</h2>')
+					if ($directMetrics)
+					{
+						$directRows = @(
+							[PSCustomObject]@{ Metric = 'CPU %'; A = $directMetrics.CPUPercent_A; B = $directMetrics.CPUPercent_B }
+							[PSCustomObject]@{ Metric = 'SQL Memory (MB)'; A = $directMetrics.SQLMemoryMB_A; B = $directMetrics.SQLMemoryMB_B }
+							[PSCustomObject]@{ Metric = 'Available Memory (MB)'; A = $directMetrics.AvailMemoryMB_A; B = $directMetrics.AvailMemoryMB_B }
+							[PSCustomObject]@{ Metric = 'Server Total Memory (MB)'; A = $directMetrics.ServerTotalMemoryMB_A; B = $directMetrics.ServerTotalMemoryMB_B }
+						)
+						[void]$body.AppendLine(($directRows | ConvertTo-Html -Fragment -As Table | Out-String))
+					}
+					else { [void]$body.AppendLine('<p>Nicht verfuegbar (mindestens eine Baseline stammt von vor dieser Funktion).</p>') }
 
 					[void]$body.AppendLine("<h2>Wait Stats  - Zunahme B gegenueber A ($($waitDelta.Count))</h2>")
 					if ($waitDelta.Count -gt 0)
@@ -353,6 +398,7 @@ WHERE (
 					BaselineB    = $snapB.BaselineName
 					CapturedA    = $snapA.CapturedAt
 					CapturedB    = $snapB.CapturedAt
+					DirectMetrics = $directMetrics
 					WaitDeltas   = @($waitDelta)
 					CounterDeltas = @($ctrDelta)
 					HtmlFile     = $htmlFile

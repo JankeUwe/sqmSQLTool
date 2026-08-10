@@ -115,27 +115,9 @@ function Get-sqmServerUtilization
 			{
 				$sampleTime = Get-Date
 
-				# Query 1: Memory snapshot (single result set via CROSS JOIN)
-				$memSql = @"
-SELECT
-    pm.SQLPhysicalMemoryBytes,
-    sm.ServerTotalMemoryBytes,
-    sm.AvailableMemoryBytes
-FROM
-    (SELECT CAST(physical_memory_in_use_kb AS BIGINT) * 1024 AS SQLPhysicalMemoryBytes
-     FROM sys.dm_os_process_memory) AS pm
-CROSS JOIN
-    (SELECT CAST(total_physical_memory_kb AS BIGINT) * 1024 AS ServerTotalMemoryBytes,
-            CAST(available_physical_memory_kb AS BIGINT) * 1024 AS AvailableMemoryBytes
-     FROM sys.dm_os_sys_memory) AS sm;
-"@
-
-				$memResult = Invoke-DbaQuery @connParams -Database master -Query $memSql -ErrorAction Stop
-
-				# Extract values (single row)
-				$sqlMemoryBytes = [int64]($memResult.SQLPhysicalMemoryBytes)
-				$serverTotalMemory = [int64]($memResult.ServerTotalMemoryBytes)
-				$availableMemory = [int64]($memResult.AvailableMemoryBytes)
+				# Query 1+3: CPU + Memory snapshot in einem DMV-Call (Get-sqmDirectCpuMemory),
+				# damit beide Werte vom selben Zeitpunkt stammen.
+				$direct = Get-sqmDirectCpuMemory @connParams
 
 				# Query 2: Worker threads (T-SQL: CASE, not PostgreSQL FILTER)
 				$threadSql = @"
@@ -149,21 +131,6 @@ FROM sys.dm_os_workers;
 				$threadRow = @($threadResult)[0]
 				$runnableThreads = [int]($threadRow.RunnableThreads)
 				$activeThreads = [int]($threadRow.ActiveThreads)
-
-				# Query 3: CPU utilization from ring buffer (record column is XML, not JSON)
-				$cpuSql = @"
-SELECT TOP 1
-    x.record.value('(./Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int') AS CPUUtilizationPercent
-FROM
-    (SELECT CONVERT(XML, record) AS record, [timestamp]
-     FROM sys.dm_os_ring_buffers
-     WHERE ring_buffer_type = N'RING_BUFFER_SCHEDULER_MONITOR') AS x
-ORDER BY x.[timestamp] DESC;
-"@
-
-				$cpuResult = Invoke-DbaQuery @connParams -Database master -Query $cpuSql -ErrorAction Stop
-				$cpuRaw = @($cpuResult)[0].CPUUtilizationPercent
-				$cpuUtilPercent = if ($null -eq $cpuRaw -or $cpuRaw -is [System.DBNull]) { 0.0 } else { [double]$cpuRaw }
 
 				# Query 4: Compilations
 				$compSql = @"
@@ -182,10 +149,10 @@ FROM sys.dm_exec_query_stats;
 				# Build sample object
 				$sample = [PSCustomObject]@{
 					Timestamp             = $sampleTime
-					CPUUtilizationPercent = $cpuUtilPercent
-					SQLMemoryMB           = [math]::Round($sqlMemoryBytes / 1MB, 2)
-					AvailableMemoryMB     = [math]::Round($availableMemory / 1MB, 2)
-					ServerTotalMemoryMB   = [math]::Round($serverTotalMemory / 1MB, 2)
+					CPUUtilizationPercent = $direct.CPUUtilizationPercent
+					SQLMemoryMB           = $direct.SQLMemoryMB
+					AvailableMemoryMB     = $direct.AvailableMemoryMB
+					ServerTotalMemoryMB   = $direct.ServerTotalMemoryMB
 					RunnableThreads       = $runnableThreads
 					ActiveThreads         = $activeThreads
 					CachedPlans           = $cachedPlans

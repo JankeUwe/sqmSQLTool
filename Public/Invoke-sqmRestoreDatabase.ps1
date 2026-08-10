@@ -241,6 +241,15 @@ Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\NewApp.bak
 .NOTES
 Requires dbatools module, Invoke-sqmLogging, Get-sqmConfig, Set-sqmSqlPolicyState.
 The function assumes that the executing login has sysadmin rights on the target instance and all secondary replicas.
+
+For databases whose users are backed by their own SQL Server authentication logins rather than
+Windows logins (e.g. an application database with hundreds/thousands of SQL logins such as
+"Frontarena"), this function's own orphan-user repair (step 7) only fixes SID mismatches for
+logins that already exist by name on the target - it does not know about password changes that
+happened on the source since the target's logins were created. Run Sync-sqmDatabaseLogins (or the
+Export-sqmDatabaseLogins / Import-sqmDatabaseLogins pair, if source and target cannot reach each
+other directly) against the same database right after this function completes to bring those
+logins' passwords and SIDs in line with the source.
 #>
 function Invoke-sqmRestoreDatabase
 {

@@ -1,5 +1,73 @@
 # sqmSQLTool — Changelog
 
+## [1.9.78.0] — 2026-08-10
+
+### Feature: `Export-sqmDatabaseLogins` / `Import-sqmDatabaseLogins` / `Sync-sqmDatabaseLogins`
+
+Hintergrund: Datenbanken wie `Frontarena` werden regelmaessig von Prod nach Test kopiert und dort
+per `Invoke-sqmRestoreDatabase` restored. Die Datenbank enthaelt ca. 1500 SQL-Server-Logins als
+Datenbank-User; die zugehoerigen Server-Logins mit den aktuellen Kennwoertern liegen nur auf Prod
+und aendern sich dort von Zeit zu Zeit (Passwortrichtlinie/Ablauf) - Test bekommt das nie
+mitgeteilt. Nach einem Refresh landen die Datenbank-User zwar korrekt (mit Prod-SIDs) in der
+Test-DB, aber ein ggf. bereits vorhandenes gleichnamiges Test-Login hat eine andere SID und/oder
+ein veraltetes Kennwort - Endanwender koennen sich mit ihrem aktuellen Prod-Kennwort nicht an Test
+anmelden.
+
+Prod und Test koennen dabei in unterschiedlichen, sich gegenseitig nicht sehenden Domaenen/Netzen
+liegen (muss aber nicht so sein) - eine gleichzeitige Live-Verbindung von einer Kontrollmaschine zu
+beiden Instanzen (wie es das bestehende `Copy-sqmLogins` voraussetzt) ist deshalb keine verlaessliche
+Annahme. Die neue Loesung ist daher rein dateibasiert:
+
+- **`Export-sqmDatabaseLogins`** verbindet sich NUR zur Quelle (Prod), ermittelt die SQL-Auth-User
+  einer Datenbank, schliesst sysadmin-/`sa`-/System-Logins ohne Override-Moeglichkeit aus, und
+  schreibt pro Login einen eigenstaendigen, idempotenten T-SQL-Block (SID + Kennwort-Hash +
+  Policy-Flags) in ein menschenlesbares, auch manuell in SSMS ausfuehrbares Skript an einen
+  beliebigen Pfad. Jeder Block prueft zusaetzlich zur Laufzeit erneut, ob das Ziel-Login sysadmin/
+  `sa` ist, und laesst es dann unangetastet - ein zweites, unabhaengiges Sicherheitsnetz, das auch
+  bei versehentlicher Ausfuehrung gegen die falsche Instanz greift.
+- **`Import-sqmDatabaseLogins`** verbindet sich NUR zum Ziel (Test), liest die von einem externen,
+  nicht von diesem Modul gesteuerten Kopiervorgang dorthin transportierte Datei, deaktiviert/
+  reaktiviert die konfigurierte PBM-Policy exakt wie `Copy-sqmLogins`, wendet jeden Login-Block
+  einzeln an (eigenes Status-Ergebnis pro Login: `Success`/`SkippedSysadmin`/
+  `SkippedSidCollision`/`Failed`) und ruft abschliessend `Repair-DbaDbOrphanUser` auf.
+- **`Sync-sqmDatabaseLogins`** ist ein reiner Orchestrierungs-Wrapper fuer den Fall, dass eine
+  Kontrollmaschine tatsaechlich beide Instanzen erreicht: Export in eine Temp-Datei, sofort
+  Import, Temp-Datei loeschen - keine eigene Fachlogik, deckt beide Konnektivitaets-Faelle mit
+  denselben zwei Bausteinen ab.
+
+`Invoke-sqmRestoreDatabase` selbst wurde NICHT veraendert (kein zusaetzlicher Parameterpfad in einer
+bereits sehr umfangreichen, AG-sensiblen Funktion) - fuer Datenbanken mit eigenstaendigen SQL-Logins
+wie `Frontarena` wird `Sync-sqmDatabaseLogins` (oder das Export-/Import-Paar) direkt im Anschluss an
+den Restore aufgerufen, siehe Verweis in dessen `.NOTES`.
+
+## [1.9.77.0] — 2026-08-08
+
+### Feature: `Invoke-sqmPerfBaseline` erfasst jetzt direkt CPU% und Memory (MB)
+
+Anwenderwunsch: neben Wait Stats und Perf-Counter-Deltas sollen CPU und Memory auch direkt
+ausgewertet werden. Jeder Snapshot (`-Action Capture`) enthaelt jetzt zusaetzlich eine
+Momentaufnahme aus `sys.dm_os_ring_buffers` (CPU%) und `sys.dm_os_process_memory` /
+`sys.dm_os_sys_memory` (SQL-, Available- und Total-Memory in MB), gespeichert als
+`DirectMetrics`-Feld im Baseline-JSON. Da es sich - anders als Wait Stats/Perf Counter - um
+Momentwerte statt kumulative Zaehler handelt, zeigt `-Action Compare` sie nicht als Delta,
+sondern als neue Sektion "CPU & Memory (Zeitpunkt der Erfassung)" mit A/B nebeneinander (HTML-
+Report + Rueckgabeobjekt `.DirectMetrics`). Baseline-Dateien von vor diesem Feature (kein
+`DirectMetrics`-Feld) werden erkannt und im Report als "Nicht verfuegbar" markiert statt einen
+Fehler zu werfen.
+
+Die dafuer noetigen DMV-Queries (CPU-Ring-Buffer, Memory) gab es in `Get-sqmServerUtilization`
+bereits einzeln; beide wurden in den neuen privaten Helper `Get-sqmDirectCpuMemory` (ein
+DMV-Call via `OUTER APPLY` statt zwei getrennte Queries) ausgelagert und `Get-sqmServerUtilization`
+darauf umgestellt, um die Query-Logik nicht zu duplizieren.
+
+**Live gegen Docker-Testcontainer (`mssql-2022-test`) verifiziert:** Capture, Compare (inkl.
+neuer HTML-Sektion), sowie der Ruecksprung auf einen synthetischen Alt-Snapshot ohne
+`DirectMetrics`. Dabei zeigte sich ein Bug in der ersten Implementierung: `CROSS APPLY` verhaelt
+sich wie ein Inner Join, sodass bei leerem Ring-Buffer (z. B. kurz nach Instanz-Neustart, wie im
+frisch gestarteten Testcontainer) die komplette Ergebniszeile inkl. Memory-Werten wegfiel - mit
+`OUTER APPLY` behoben, CPU% faellt in diesem Fall korrekt auf 0 zurueck statt Memory mit
+wegzureissen.
+
 ## [1.9.76.0] — 2026-08-07
 
 ### Fix: `Invoke-sqmRestoreDatabase` scheiterte beim AG-Rejoin mit "RecoveryModel ... is not Full, but Simple"
