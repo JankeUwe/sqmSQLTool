@@ -11,11 +11,14 @@ function _sqmSplunkWriteLog {
     Write-Host $entry
 }
 
-# Gibt Nachricht an GUI-Callback oder Write-Host aus (aeussere Funktionen)
+# Gibt Nachricht an GUI-Callback und/oder Logdatei aus (aeussere Funktionen).
+# Schreibt IMMER in die Logdatei, wenn eine angegeben ist - Protokollierung ist
+# Standardverhalten, kein Opt-in.
 function _sqmSplunkGuiLog {
-    param([string]$Message, [ScriptBlock]$LogCallback)
+    param([string]$Message, [ScriptBlock]$LogCallback, [string]$LogFile)
+    if ($LogFile) { _sqmSplunkWriteLog $LogFile $Message }
+    else          { Write-Host $Message }
     if ($LogCallback) { & $LogCallback $Message }
-    else              { Write-Host $Message }
 }
 
 # Lokale Kernlogik: SQL-Instanzen ermitteln, Env-Vars setzen, Dienst verwalten.
@@ -23,15 +26,15 @@ function _sqmSplunkGuiLog {
 # Darf KEINE externen Abhaengigkeiten haben.
 # Verwendet _sqmSplunkWriteLog - wird zusammen mit dieser Funktion serialisiert.
 function _sqmSplunk_LocalCore {
-    param([string]$LogPath, [bool]$TestMode)
+    param([string]$LogFile, [bool]$TestMode)
 
     $ErrorActionPreference = 'Continue'
 
-    if (-not (Test-Path $LogPath)) {
-        $null = New-Item -ItemType Directory -Path $LogPath -Force
+    $logFile = $LogFile
+    $logDir  = Split-Path -Parent $logFile
+    if ($logDir -and -not (Test-Path $logDir)) {
+        $null = New-Item -ItemType Directory -Path $logDir -Force
     }
-    $ts      = Get-Date -Format 'yyyyMMdd_HHmmss'
-    $logFile = Join-Path $LogPath "SplunkConfig_$ts.log"
 
     $modeLabel = if ($TestMode) { 'Test' } else { 'Set' }
     _sqmSplunkWriteLog $logFile "=== Invoke-sqmSplunkConfiguration | Modus: $modeLabel | $(hostname) ==="
@@ -223,16 +226,17 @@ function _sqmSplunk_OnComputers {
         [string[]]$ComputerNames,
         [string]$Mode,
         [string]$LogPath,
+        [string]$LogFile,
         [System.Management.Automation.PSCredential]$Credential,
         [ScriptBlock]$LogCallback
     )
 
     if ($ComputerNames.Count -eq 0) {
-        _sqmSplunkGuiLog 'Keine Computer angegeben.' $LogCallback
+        _sqmSplunkGuiLog 'Keine Computer angegeben.' $LogCallback $LogFile
         return
     }
 
-    _sqmSplunkGuiLog "$($ComputerNames.Count) Computer werden verarbeitet..." $LogCallback
+    _sqmSplunkGuiLog "$($ComputerNames.Count) Computer werden verarbeitet..." $LogCallback $LogFile
 
     # Beide Funktionen serialisieren - _sqmSplunk_LocalCore benoetigt _sqmSplunkWriteLog remote
     $coreStr    = ${function:_sqmSplunk_LocalCore}.ToString()
@@ -240,10 +244,14 @@ function _sqmSplunk_OnComputers {
     $testMode   = ($Mode -eq 'Test')
     $combined   = "function _sqmSplunkWriteLog {$writeStr} ; function _sqmSplunk_LocalCore {$coreStr}"
 
+    # Jeder Zielrechner schreibt sein eigenes lokales Log unter $LogPath (auf sich selbst) -
+    # unabhaengig vom Controller-Log ($LogFile), das die Orchestrierung hier dokumentiert.
     $remoteBlock = {
         param([string]$LogPath, [bool]$TestMode, [string]$Combined)
         . ([ScriptBlock]::Create($Combined))
-        _sqmSplunk_LocalCore -LogPath $LogPath -TestMode $TestMode
+        if (-not (Test-Path $LogPath)) { $null = New-Item -ItemType Directory -Path $LogPath -Force }
+        $rLogFile = Join-Path $LogPath ("SplunkConfig_{0}.log" -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
+        _sqmSplunk_LocalCore -LogFile $rLogFile -TestMode $TestMode
     }
 
     $splat = @{
@@ -259,7 +267,7 @@ function _sqmSplunk_OnComputers {
         $name = $name.Trim()
         if (-not $name) { continue }
 
-        _sqmSplunkGuiLog "Verbinde zu $name ..." $LogCallback
+        _sqmSplunkGuiLog "Verbinde zu $name ..." $LogCallback $LogFile
         $entry = [PSCustomObject]@{ Computer = $name; Status = ''; Fehler = '' }
 
         if (-not (Test-Connection -ComputerName $name -Count 1 -Quiet)) {
@@ -272,7 +280,7 @@ function _sqmSplunk_OnComputers {
         try {
             Invoke-Command -ComputerName $name @splat
             $entry.Status = 'Erfolgreich'
-            _sqmSplunkGuiLog "  $name - OK" $LogCallback
+            _sqmSplunkGuiLog "  $name - OK" $LogCallback $LogFile
         } catch {
             Write-Warning "Fehler bei $name : $_"
             $entry.Status = 'Fehler'
@@ -281,9 +289,11 @@ function _sqmSplunk_OnComputers {
         $results += $entry
     }
 
-    _sqmSplunkGuiLog '' $LogCallback
-    _sqmSplunkGuiLog '=== Zusammenfassung ===' $LogCallback
-    $results | Format-Table -AutoSize
+    _sqmSplunkGuiLog '' $LogCallback $LogFile
+    _sqmSplunkGuiLog '=== Zusammenfassung ===' $LogCallback $LogFile
+    $tableText = $results | Format-Table -AutoSize | Out-String
+    Write-Host $tableText
+    if ($LogFile) { Add-Content -Path $LogFile -Value $tableText -Encoding UTF8 }
     return $results
 }
 
@@ -293,6 +303,7 @@ function _sqmSplunk_ForOU {
         [string]$SearchOU,
         [string]$Mode,
         [string]$LogPath,
+        [string]$LogFile,
         [System.Management.Automation.PSCredential]$Credential,
         [ScriptBlock]$LogCallback
     )
@@ -302,7 +313,7 @@ function _sqmSplunk_ForOU {
     $domainDN   = (Get-ADDomain).DistinguishedName
     $searchBase = if ($SearchOU -match '^OU=') { $SearchOU } else { "OU=$SearchOU,$domainDN" }
 
-    _sqmSplunkGuiLog "AD-Suche unter: $searchBase" $LogCallback
+    _sqmSplunkGuiLog "AD-Suche unter: $searchBase" $LogCallback $LogFile
 
     $adSplat = @{ Filter = '*'; SearchBase = $searchBase; Properties = 'OperatingSystem' }
     if ($Credential) { $adSplat['Credential'] = $Credential }
@@ -310,15 +321,15 @@ function _sqmSplunk_ForOU {
     $computers = Get-ADComputer @adSplat | Where-Object { $_.OperatingSystem -match 'Server' }
 
     if ($computers.Count -eq 0) {
-        _sqmSplunkGuiLog "Keine Server in der OU '$SearchOU' gefunden." $LogCallback
+        _sqmSplunkGuiLog "Keine Server in der OU '$SearchOU' gefunden." $LogCallback $LogFile
         return
     }
 
     $names = $computers | Select-Object -ExpandProperty Name
-    _sqmSplunkGuiLog "$($names.Count) Server in der OU gefunden." $LogCallback
+    _sqmSplunkGuiLog "$($names.Count) Server in der OU gefunden." $LogCallback $LogFile
 
-    _sqmSplunk_OnComputers -ComputerNames $names -Mode $Mode `
-                           -LogPath $LogPath -Credential $Credential -LogCallback $LogCallback
+    _sqmSplunk_OnComputers -ComputerNames $names -Mode $Mode -LogPath $LogPath -LogFile $LogFile `
+                           -Credential $Credential -LogCallback $LogCallback
 }
 
 # Explizite Computerliste (Array oder Textdatei)
@@ -327,6 +338,7 @@ function _sqmSplunk_ForList {
         [string[]]$ComputerList,
         [string]$Mode,
         [string]$LogPath,
+        [string]$LogFile,
         [System.Management.Automation.PSCredential]$Credential,
         [ScriptBlock]$LogCallback
     )
@@ -338,7 +350,7 @@ function _sqmSplunk_ForList {
         if (-not $entry) { continue }
 
         if (Test-Path -LiteralPath $entry -PathType Leaf) {
-            _sqmSplunkGuiLog "Lese Computernamen aus Datei: $entry" $LogCallback
+            _sqmSplunkGuiLog "Lese Computernamen aus Datei: $entry" $LogCallback $LogFile
             $lines = Get-Content -LiteralPath $entry -Encoding UTF8 |
                      Where-Object { $_ -and $_.Trim() -ne '' -and -not $_.TrimStart().StartsWith('#') }
             foreach ($line in $lines) {
@@ -351,15 +363,15 @@ function _sqmSplunk_ForList {
     }
 
     if ($resolved.Count -eq 0) {
-        _sqmSplunkGuiLog 'Keine Computernamen in der Liste gefunden.' $LogCallback
+        _sqmSplunkGuiLog 'Keine Computernamen in der Liste gefunden.' $LogCallback $LogFile
         return
     }
 
     $unique = $resolved | Select-Object -Unique
-    _sqmSplunkGuiLog "$($unique.Count) eindeutige Computer." $LogCallback
+    _sqmSplunkGuiLog "$($unique.Count) eindeutige Computer." $LogCallback $LogFile
 
-    _sqmSplunk_OnComputers -ComputerNames $unique -Mode $Mode `
-                           -LogPath $LogPath -Credential $Credential -LogCallback $LogCallback
+    _sqmSplunk_OnComputers -ComputerNames $unique -Mode $Mode -LogPath $LogPath -LogFile $LogFile `
+                           -Credential $Credential -LogCallback $LogCallback
 }
 
 
@@ -408,23 +420,21 @@ function Invoke-sqmSplunkConfiguration {
         Set mode requires local administrator rights.
         Remote: WinRM must be active on target servers.
         AD OU mode: ActiveDirectory module is automatically installed if needed.
+        A log file is always written under -LogPath - this is standard behavior, not opt-in.
+        In Remote/List mode this covers the controller-side orchestration (AD search, per-host
+        connection attempts, summary); each target server additionally writes its own local log.
     #>
-    [CmdletBinding(DefaultParameterSetName = 'Local')]
+    [CmdletBinding()]
     param(
         [ValidateSet('Set', 'Test')]
         [string]$Mode = 'Set',
 
-        [Parameter(ParameterSetName = 'Remote')]
         [switch]$Remote,
 
-        [Parameter(ParameterSetName = 'Remote')]
         [string]$SearchOU = 'OUServDatabase',
 
-        [Parameter(ParameterSetName = 'List')]
         [string[]]$ComputerList,
 
-        [Parameter(ParameterSetName = 'Remote')]
-        [Parameter(ParameterSetName = 'List')]
         [System.Management.Automation.PSCredential]$Credential,
 
         [string]$LogPath,
@@ -437,6 +447,11 @@ function Invoke-sqmSplunkConfiguration {
         if (-not $LogPath) { $LogPath = Join-Path $env:ProgramData 'sqmSQLTool\Logs' }
     }
 
+    # Ein Log pro Aufruf ist Standardverhalten - unabhaengig vom gewaehlten Modus (Local/Remote/List)
+    # und ohne dass der Aufrufer dafuer etwas angeben muss.
+    if (-not (Test-Path $LogPath)) { $null = New-Item -ItemType Directory -Path $LogPath -Force }
+    $LogFile = Join-Path $LogPath ("SplunkConfig_{0}.log" -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
+
     $result = [PSCustomObject]@{
         ComputerName = $env:COMPUTERNAME
         Mode         = $Mode
@@ -446,22 +461,23 @@ function Invoke-sqmSplunkConfiguration {
         ServiceStatus = $null
     }
 
-    _sqmSplunkGuiLog "Invoke-sqmSplunkConfiguration | Modus: $Mode | ParameterSet: $($PSCmdlet.ParameterSetName)" $LogCallback
+    $execTarget = if ($Remote) { 'Remote (AD OU)' } elseif ($ComputerList) { 'List' } else { 'Local' }
+    _sqmSplunkGuiLog "Invoke-sqmSplunkConfiguration | Modus: $Mode | Ziel: $execTarget" $LogCallback $LogFile
 
     try
     {
         if ($Remote) {
-            return (_sqmSplunk_ForOU -SearchOU $SearchOU -Mode $Mode `
-                                     -LogPath $LogPath -Credential $Credential -LogCallback $LogCallback)
+            return (_sqmSplunk_ForOU -SearchOU $SearchOU -Mode $Mode -LogPath $LogPath -LogFile $LogFile `
+                                     -Credential $Credential -LogCallback $LogCallback)
         }
         elseif ($ComputerList) {
-            return (_sqmSplunk_ForList -ComputerList $ComputerList -Mode $Mode `
-                                       -LogPath $LogPath -Credential $Credential -LogCallback $LogCallback)
+            return (_sqmSplunk_ForList -ComputerList $ComputerList -Mode $Mode -LogPath $LogPath -LogFile $LogFile `
+                                       -Credential $Credential -LogCallback $LogCallback)
         }
         else
         {
             # Local execution - must return PSCustomObject
-            _sqmSplunk_LocalCore -LogPath $LogPath -TestMode ($Mode -eq 'Test')
+            _sqmSplunk_LocalCore -LogFile $LogFile -TestMode ($Mode -eq 'Test')
 
             # Check actual configuration
             $envVars = [Environment]::GetEnvironmentVariables([System.EnvironmentVariableTarget]::Machine)

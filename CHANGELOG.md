@@ -1,5 +1,53 @@
 # sqmSQLTool — Changelog
 
+## [1.9.82.0] — 2026-08-11
+
+### Fix: `Invoke-sqmSplunkConfiguration` schrieb im Remote-/List-Modus kein Controller-Log
+
+Gemeldet: "Ebenso soll ein Log als Standardverhalten geschrieben werden." Im Local-Modus schrieb
+`_sqmSplunk_LocalCore` bereits immer ein vollstaendiges Log. Im Remote- (AD-OU) und List-Modus
+ging jede Meldung des Controllers (AD-Suche, Verbindungsversuche pro Zielrechner, Abschluss-
+Zusammenfassung) nur an `Write-Host`/GUI-Callback - ohne Log-Datei auf dem Rechner, von dem aus
+der Befehl gestartet wurde. Nur die Zielrechner selbst schrieben (via `Invoke-Command`) ihr
+eigenes lokales Log.
+
+Fix: `_sqmSplunkGuiLog` schreibt jetzt immer zusaetzlich in eine Log-Datei, wenn eine angegeben
+ist (Protokollierung ist Standardverhalten, kein Opt-in-Parameter noetig). Ein Log-Dateipfad wird
+zentral einmal pro Aufruf berechnet und durchgereicht (`_sqmSplunk_ForOU` → `_sqmSplunk_ForList` →
+`_sqmSplunk_OnComputers`), inklusive der Abschluss-Tabelle. `_sqmSplunk_LocalCore` nimmt jetzt
+direkt einen fertigen Dateipfad entgegen statt selbst einen zu erzeugen - Zielrechner im
+Remote-/List-Modus erzeugen ihren eigenen Dateinamen weiterhin selbst (auf sich selbst, getrennt
+vom Controller-Log).
+
+Live verifiziert (powershell.exe 5.1, DEV03): Local-, List- (inkl. nicht erreichbarem Host und
+leerer Liste) und Remote-Modus erzeugen jeweils genau eine Log-Datei mit vollstaendigem
+Nachrichtenverlauf; die zuvor behobene `AmbiguousParameterSet`-Regression (siehe [1.9.81.0])
+bleibt bestehen.
+
+## [1.9.81.0] — 2026-08-11
+
+### Fix: `Invoke-sqmSplunkConfiguration` wirft ParameterBindingException beim Setzen von `-Remote` oder `-SearchOU`
+
+Gemeldet: "Error beim ParameterBinding" beim Setzen von Remote oder SearchOU. Live nachgestellt
+(powershell.exe 5.1): Sobald `-ComputerList` zusammen mit `-Remote`/`-SearchOU` gebunden wird -
+auch mit leerem Array, `$null` oder `Remote:$false` reicht bereits die reine Angabe des Parameters -
+wirft PowerShell `AmbiguousParameterSet` ("Der Parametersatz kann mit den angegebenen benannten
+Parametern nicht aufgeloest werden."), noch bevor der Funktionsrumpf laeuft.
+
+Ursache: Die `param()`-Deklaration hatte `Remote`/`SearchOU` und `ComputerList` ueber
+`ParameterSetName` als hart gegenseitig exklusiv markiert - obwohl der Funktionsrumpf selbst
+bereits eine Prioritaetskette dafuer implementiert (`if ($Remote) ... elseif ($ComputerList) ...
+else`). Diese Rumpf-Logik war durch die strikte Set-Pruefung nie erreichbar, sobald beide Parameter
+gleichzeitig gebunden wurden - z. B. wenn im GUI-Formular sowohl `SearchOU` befuellt als auch aus
+einem vorherigen Versuch noch Text in `ComputerList` steht.
+
+Fix: `ParameterSetName`-Attribute von `Remote`, `SearchOU`, `ComputerList` und `Credential`
+entfernt. Die Funktion hat jetzt nur noch einen Parametersatz; welcher Ausfuehrungspfad
+(Remote/List/Local) genutzt wird, entscheidet weiterhin die bereits vorhandene Prioritaetslogik im
+Rumpf. Live verifiziert (powershell.exe 5.1, DEV03): alle zuvor fehlschlagenden Kombinationen
+(`SearchOU` + leeres/`$null`/gesetztes `ComputerList`, `Remote:$false` + `SearchOU`, `Remote:$true`
++ leeres `ComputerList`) binden jetzt fehlerfrei und laufen im jeweils korrekten Zweig.
+
 ## [1.9.80.0] — 2026-08-10
 
 ### Fix: `Get-sqmWaitStatistics` und fünf Batch-B3-Geschwister schreiben jetzt auch ohne `-OutputPath` einen Report
