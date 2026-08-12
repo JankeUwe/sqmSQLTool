@@ -1,5 +1,28 @@
 # sqmSQLTool — Changelog
 
+## [1.9.84.0] — 2026-08-12
+
+### Neu: `Get-sqmDatabaseRestoreHistory` - letzter Restore-Zeitpunkt je Datenbank
+
+Bislang gab es im Modul keine Funktion, die auflistet, wann eine Datenbank zuletzt restauriert
+wurde - relevant fuer Compliance-Nachweise, Migrations-/Test-Nachverfolgung und um zu erkennen,
+ob eine erwartete Restore-Prozedur tatsaechlich gelaufen ist.
+
+`Get-sqmDatabaseRestoreHistory` listet fuer jede Datenbank auf der Instanz (gleiche
+Filterung wie `Get-sqmDatabaseHealth`: exkl. tempdb, System-DBs standardmaessig ausgeschlossen,
+`-ExcludeDatabase`-Wildcards) den letzten Restore-Vorgang aus `msdb.dbo.restorehistory` (via
+dbatools `Get-DbaDbRestoreHistory -Last`): Zeitpunkt, Typ (Database/Log/Differential/...),
+durchfuehrender Login und Quelldatei. Datenbanken ohne jede Restore-Historie - der Normalfall bei
+den meisten Produktivdatenbanken - werden explizit als "(nie restauriert)" ausgewiesen statt
+stillschweigend aus der Liste zu fehlen (reines `Get-DbaDbRestoreHistory` liefert nur Zeilen fuer
+tatsaechlich restaurierte Datenbanken).
+
+Berichte werden wie bei den uebrigen `Get-sqm*`-Reportfunktionen als CSV/TXT/HTML unter
+`-OutputPath` abgelegt (Default: `<OutputPath config>\DatabaseRestoreHistory`).
+
+Unit-Tests (Pester, gemockt dbatools): 10/10 gruen. Gesamte Modul-Testsuite (229 Tests) gruen.
+Funktionsanzahl im Modul: 162 -> 163 (README aktualisiert).
+
 ## [1.9.83.0] — 2026-08-12
 
 ### Fix: `Invoke-sqmRestoreDatabase` scheiterte trotz erfolgreichem SetSingleUser mit "Exclusive access could not be obtained"

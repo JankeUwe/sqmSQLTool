@@ -4,7 +4,7 @@
 
 A comprehensive PowerShell module for SQL Server 2016+ administration, with specialized support for AlwaysOn Availability Groups, performance reporting, and security auditing.
 
-**Latest Release:** [v1.9.80.0](https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.9.80.0) | **Functions:** 162 | **Documentation:** [Full Reference](https://www.powershelldba.de/sqmsqltool/commands-en/)
+**Latest Release:** [v1.9.80.0](https://github.com/JankeUwe/sqmSQLTool/releases/tag/v1.9.80.0) | **Functions:** 163 | **Documentation:** [Full Reference](https://www.powershelldba.de/sqmsqltool/commands-en/)
 
 ---
 
@@ -71,7 +71,7 @@ Import-Module ./sqmSQLTool/sqmSQLTool.psd1 -Force
 ### Verify Installation
 ```powershell
 Get-Command -Module sqmSQLTool | Measure-Object
-# Output: 162 functions
+# Output: 163 functions
 ```
 
 ---
@@ -89,6 +89,7 @@ Get-Command -Module sqmSQLTool | Measure-Object
 - `Get-sqmPlanInsights` - Execution plan analysis: CE mismatches, SARGability, spills, missing indexes
 - `Get-sqmWaitStatistics` - SQL Server wait statistics
 - `Get-sqmDiskSpaceReport` - Disk utilization and growth trends
+- `Get-sqmDatabaseRestoreHistory` - Last restore date per database, flags never-restored databases
 - `Get-sqmMissingIndexes` - Index recommendations with CREATE statements
 - `Get-sqmAutoGrowthReport` - Database autogrowth tracking
 - `Get-sqmIndexFragmentation` - Index fragmentation analysis
@@ -111,7 +112,7 @@ Get-Command -Module sqmSQLTool | Measure-Object
 ## 📚 Documentation
 
 ### Full Command Reference
-Complete documentation with examples for all 162 functions:
+Complete documentation with examples for all 163 functions:
 - **HTML Reference**: https://www.powershelldba.de/sqmsqltool/commands-en/
 - **GitHub Releases**: https://github.com/JankeUwe/sqmSQLTool/releases
 
