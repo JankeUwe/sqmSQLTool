@@ -162,10 +162,17 @@ Describe 'Invoke-sqmRestoreDatabase - AG-Erkennung' {
             {
                 Invoke-sqmRestoreDatabase -SqlInstance 'SQL01' -BackupFile $fakeBackup `
                     -DatabaseName 'amb' -EnableException -Confirm:$false
-            } | Should -Throw
+            } | Should -Throw -ExpectedMessage '*AG-Mitgliedschaft von "amb" konnte nicht ermittelt werden*'
+            # Regression (2026-08-12): ein zu allgemeines "Should -Throw" ohne Meldungsabgleich hatte
+            # bislang unbemerkt eine ganz andere, davor liegende Ursache verdeckt - ein
+            # ParameterBindingException beim Parameter-Binding selbst (-BackupFile zusammen mit
+            # -DatabaseName liess sich wegen eines unbenannten Parameter-Attributs auf $DatabaseName
+            # nicht mehr auf ein Parameterset abbilden). Get-sqmDatabaseAgMembership wurde dadurch nie
+            # aufgerufen, obwohl der Test "bestand". Der explizite Meldungsabgleich haelt das fest.
 
             # Entscheidend: kein Schritt darf gelaufen sein. Genau das war der Fehler - der Lauf
             # kam bis zum User-Export und zum Restore, bevor SQL Server ihn abgewiesen hat.
+            Should -Invoke Get-sqmDatabaseAgMembership -Times 1
             Should -Invoke Export-DbaUser -Times 0
             Should -Invoke Restore-DbaDatabase -Times 0
 
@@ -303,5 +310,79 @@ Describe 'Invoke-sqmRestoreDatabase - AG-Erkennung' {
         $source | Should -Match '\$dropResult\s*=\s*Remove-DbaDatabase'
         $source | Should -Match "\`$dropResult\.Status\s*-eq\s*'Dropped'"
         $source | Should -Match "\`$dropResult\.Status\s*-match\s*'does not exist'"
+    }
+
+    It 'beendet fremde Sessions per Stop-DbaProcess und versucht den Restore erneut, statt bei "Exclusive access" sofort aufzugeben' {
+        # Hintergrund (Ausgabe.txt, 2026-08-12, SFCSDBS103IHZ/arena): SetSingleUser meldete Erfolg,
+        # der direkt darauffolgende Restore-DbaDatabase-Aufruf scheiterte trotzdem mit "Exclusive
+        # access could not be obtained because the database is in use" - eine fremde Session hatte
+        # sich zwischen dem SET SINGLE_USER-Schritt und dem eigentlichen RESTORE neu verbunden und
+        # den einzigen Verbindungs-Slot belegt. Ein erneutes ALTER DATABASE SET SINGLE_USER haette
+        # dort nicht geholfen (braucht selbst exklusiven Zugriff - Henne-Ei-Problem), daher beendet
+        # der Fix die Session(s) direkt per Stop-DbaProcess und versucht den Restore erneut.
+        InModuleScope sqmSQLTool {
+            $fakeBackup = Join-Path ([System.IO.Path]::GetTempPath()) 'sqmRestoreTest_exclusive.bak'
+            Set-Content -Path $fakeBackup -Value 'dummy' -Encoding Ascii
+
+            Mock Invoke-sqmLogging { }
+            # Datenbank existiert (leere Databases-Collection) nicht auf der Instanz - haelt das
+            # Mocking fuer diesen Test schlank (kein Single-User-/Export-Vorlauf noetig), der
+            # eigentliche Restore-Retry laeuft davon unabhaengig genauso.
+            Mock Connect-DbaInstance { [PSCustomObject]@{ Name = 'SQL01'; Databases = @{} } }
+            Mock Get-sqmDatabaseAgMembership { [PSCustomObject]@{ IsAgDatabase = $false; HadrEnabled = $false } }
+            Mock Invoke-DbaQuery { $null }
+            Mock Repair-DbaDbOrphanUser { $null }
+            Mock Set-DbaDbOwner { $null }
+            Mock Stop-DbaProcess { }
+
+            $script:exclusiveAccessRestoreAttempts = 0
+            Mock Restore-DbaDatabase {
+                $script:exclusiveAccessRestoreAttempts++
+                if ($script:exclusiveAccessRestoreAttempts -lt 3)
+                {
+                    throw "Exclusive access could not be obtained because the database is in use."
+                }
+                [PSCustomObject]@{ Database = 'amb'; RestoreComplete = $true }
+            }
+
+            $result = Invoke-sqmRestoreDatabase -SqlInstance 'SQL01' -BackupFile $fakeBackup `
+                -DatabaseName 'amb' -Confirm:$false
+
+            Should -Invoke Restore-DbaDatabase -Times 3
+            Should -Invoke Stop-DbaProcess -Times 2 -ParameterFilter { $Database -eq 'amb' }
+
+            $restoreStep = $result | Where-Object { $_.Action -eq 'RestoreStep' }
+            $restoreStep.Status | Should -Be 'Success'
+
+            Remove-Item $fakeBackup -ErrorAction SilentlyContinue
+            Remove-Variable -Name exclusiveAccessRestoreAttempts -Scope Script -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'gibt nach dem letzten Retry-Versuch endgueltig auf, statt endlos zu wiederholen' {
+        InModuleScope sqmSQLTool {
+            $fakeBackup = Join-Path ([System.IO.Path]::GetTempPath()) 'sqmRestoreTest_exclusive_giveup.bak'
+            Set-Content -Path $fakeBackup -Value 'dummy' -Encoding Ascii
+
+            Mock Invoke-sqmLogging { }
+            Mock Connect-DbaInstance { [PSCustomObject]@{ Name = 'SQL01'; Databases = @{} } }
+            Mock Get-sqmDatabaseAgMembership { [PSCustomObject]@{ IsAgDatabase = $false; HadrEnabled = $false } }
+            Mock Invoke-DbaQuery { $null }
+            Mock Repair-DbaDbOrphanUser { $null }
+            Mock Set-DbaDbOwner { $null }
+            Mock Stop-DbaProcess { }
+            Mock Restore-DbaDatabase { throw "Exclusive access could not be obtained because the database is in use." }
+
+            $result = Invoke-sqmRestoreDatabase -SqlInstance 'SQL01' -BackupFile $fakeBackup `
+                -DatabaseName 'amb' -Confirm:$false
+
+            # Genau 3 Restore-Versuche (der in der Funktion fest verdrahtete $maxRestoreAttempts),
+            # danach Abbruch mit Status "Failed" statt eines Endlos-Retries.
+            Should -Invoke Restore-DbaDatabase -Times 3
+            $restoreStep = $result | Where-Object { $_.Action -eq 'RestoreStep' }
+            $restoreStep.Status | Should -Be 'Failed'
+
+            Remove-Item $fakeBackup -ErrorAction SilentlyContinue
+        }
     }
 }

@@ -264,8 +264,17 @@ function Invoke-sqmRestoreDatabase
 		[string[]]$BackupFile,
 		[Parameter(Mandatory = $true, ParameterSetName = 'Sequence')]
 		[string[]]$BackupFiles,
+		# WICHTIG: explizit je Set benannte Attribute statt eines zusaetzlichen unbenannten
+		# [Parameter(Mandatory = $false)] (== '__AllParameterSets'). Gemischt mit den anderen, klar
+		# benannten Sets (SingleFile/Sequence ueber -BackupFile/-BackupFiles) fuehrte die unbenannte
+		# Variante dazu, dass PowerShell den Parametersatz nicht mehr auflösen konnte, sobald sowohl
+		# -BackupFile ALS AUCH -DatabaseName angegeben wurden ("Parameter set cannot be resolved") -
+		# also fuer den in .EXAMPLE dokumentierten Standardfall
+		# "Invoke-sqmRestoreDatabase -BackupFile ... -DatabaseName ...". Der Aufruf scheiterte bereits
+		# beim Parameter-Binding, bevor auch nur eine Zeile der Funktion lief.
+		[Parameter(Mandatory = $false, ParameterSetName = 'SingleFile')]
+		[Parameter(Mandatory = $false, ParameterSetName = 'Sequence')]
 		[Parameter(Mandatory = $true, ParameterSetName = 'FromHistory')]
-		[Parameter(Mandatory = $false)]
 		[string]$DatabaseName,
 		[Parameter(Mandatory = $false)]
 		[string]$NewDatabaseName,
@@ -1049,35 +1058,71 @@ function Invoke-sqmRestoreDatabase
 
 				if ($PSCmdlet.ShouldProcess($DatabaseName, $restoreAction))
 				{
-					try
+					# "Exclusive access could not be obtained because the database is in use" - eine
+					# fremde Session kann sich zwischen dem SET SINGLE_USER-Schritt (3b) und diesem
+					# Restore-Aufruf neu verbinden und den einzigen Verbindungs-Slot belegen (z.B.
+					# RESTORE FILELISTONLY fuer das Auto-FileMapping oben liegt bereits dazwischen). Ein
+					# erneutes ALTER DATABASE SET SINGLE_USER wuerde hier NICHT helfen: dieser Befehl
+					# braucht selbst exklusiven Zugriff, der ja gerade durch die fremde Session blockiert
+					# ist (Henne-Ei-Problem) - im schlimmsten Fall schlaegt dann bereits das erneute SET
+					# SINGLE_USER mit derselben Meldung fehl. Stattdessen werden bei genau dieser
+					# Fehlermeldung alle Sessions auf der Zieldatenbank direkt per Stop-DbaProcess (KILL)
+					# beendet (wirkt unabhaengig vom aktuellen User-Access-Modus, da das Beenden einzelner
+					# Sessions keinen exklusiven Zugriff auf die Ziel-DB selbst braucht) und der Restore
+					# wird erneut versucht.
+					$maxRestoreAttempts = 3
+					$restoreAttempt = 0
+					$restoreDone = $false
+					do
 					{
-						Invoke-sqmLogging -Message $restoreAction -FunctionName $functionName -Level "INFO"
-						$restoreResult = Restore-DbaDatabase @restoreParams
-						# WICHTIG (1.9.35.0): -EnableException oben im $restoreParams-Hash ist zwingend -
-						# ohne diesen Parameter meldet Restore-DbaDatabase interne Ablehnungen (z.B. "RESTORE
-						# cannot operate on database ... because it is ... an availability group") nur als
-						# PSFramework-Warning und gibt $null zurueck, OHNE eine Exception zu werfen. -ErrorAction
-						# Stop allein faengt das NICHT ab, weil dabei kein regulaerer PowerShell-Fehlerdatensatz
-						# entsteht. Das war exakt der Grund, warum ein echter Lauf (SFCSDBS103IHZ, Restore aus
-						# F:\DB_Transfer_Prod\*.bak) "Restore erfolgreich" protokollierte, obwohl in
-						# msdb.dbo.restorehistory ueberhaupt kein neuer Eintrag auftauchte - der eigentliche
-						# RESTORE-Befehl war nie gelaufen. Zusaetzlich zur Exception hier auch das Ergebnis
-						# selbst pruefen, statt uns allein auf "es wurde nichts geworfen" zu verlassen.
-						if (-not $restoreResult)
+						$restoreAttempt++
+						try
 						{
-							throw "Restore-DbaDatabase lieferte kein Ergebnis zurueck (Restore vermutlich nicht ausgefuehrt)."
+							Invoke-sqmLogging -Message $restoreAction -FunctionName $functionName -Level "INFO"
+							$restoreResult = Restore-DbaDatabase @restoreParams
+							# WICHTIG (1.9.35.0): -EnableException oben im $restoreParams-Hash ist zwingend -
+							# ohne diesen Parameter meldet Restore-DbaDatabase interne Ablehnungen (z.B. "RESTORE
+							# cannot operate on database ... because it is ... an availability group") nur als
+							# PSFramework-Warning und gibt $null zurueck, OHNE eine Exception zu werfen. -ErrorAction
+							# Stop allein faengt das NICHT ab, weil dabei kein regulaerer PowerShell-Fehlerdatensatz
+							# entsteht. Das war exakt der Grund, warum ein echter Lauf (SFCSDBS103IHZ, Restore aus
+							# F:\DB_Transfer_Prod\*.bak) "Restore erfolgreich" protokollierte, obwohl in
+							# msdb.dbo.restorehistory ueberhaupt kein neuer Eintrag auftauchte - der eigentliche
+							# RESTORE-Befehl war nie gelaufen. Zusaetzlich zur Exception hier auch das Ergebnis
+							# selbst pruefen, statt uns allein auf "es wurde nichts geworfen" zu verlassen.
+							if (-not $restoreResult)
+							{
+								throw "Restore-DbaDatabase lieferte kein Ergebnis zurueck (Restore vermutlich nicht ausgefuehrt)."
+							}
+							Invoke-sqmLogging -Message "Restore von $file erfolgreich." -FunctionName $functionName -Level "INFO"
+							$results += [PSCustomObject]@{ Action = "RestoreStep"; File = $file; Step = $restoreCount; Status = "Success"; Message = "Wiederhergestellt." }
+							$restoreDone = $true
 						}
-						Invoke-sqmLogging -Message "Restore von $file erfolgreich." -FunctionName $functionName -Level "INFO"
-						$results += [PSCustomObject]@{ Action = "RestoreStep"; File = $file; Step = $restoreCount; Status = "Success"; Message = "Wiederhergestellt." }
-					}
-					catch
-					{
-						$errMsg = "Fehler beim Restore von $file : $($_.Exception.Message)"
-						Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
-						if ($EnableException) { throw }
-						$results += [PSCustomObject]@{ Action = "RestoreStep"; File = $file; Step = $restoreCount; Status = "Failed"; Message = $errMsg }
-						return
-					}
+						catch
+						{
+							$isExclusiveAccessError = $_.Exception.Message -match 'Exclusive access could not be obtained'
+							if ($isExclusiveAccessError -and $restoreAttempt -lt $maxRestoreAttempts)
+							{
+								Invoke-sqmLogging -Message "Restore-Versuch $restoreAttempt/$maxRestoreAttempts fuer $file fehlgeschlagen (Exclusive access - vermutlich neue Fremdverbindung nach dem SET SINGLE_USER-Schritt). Beende alle Sessions auf '$finalDbName' per Stop-DbaProcess und versuche erneut." -FunctionName $functionName -Level "WARNING"
+								try
+								{
+									Stop-DbaProcess -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -Confirm:$false -EnableException -ErrorAction Stop
+									Start-Sleep -Milliseconds 500
+								}
+								catch
+								{
+									Invoke-sqmLogging -Message "Konnte fremde Sessions auf '$finalDbName' nicht beenden: $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
+								}
+								continue
+							}
+
+							$errMsg = "Fehler beim Restore von $file : $($_.Exception.Message)"
+							Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+							if ($EnableException) { throw }
+							$results += [PSCustomObject]@{ Action = "RestoreStep"; File = $file; Step = $restoreCount; Status = "Failed"; Message = $errMsg }
+							return
+						}
+					} while (-not $restoreDone -and $restoreAttempt -lt $maxRestoreAttempts)
 				}
 				else
 				{

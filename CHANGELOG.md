@@ -1,5 +1,45 @@
 # sqmSQLTool — Changelog
 
+## [1.9.83.0] — 2026-08-12
+
+### Fix: `Invoke-sqmRestoreDatabase` scheiterte trotz erfolgreichem SetSingleUser mit "Exclusive access could not be obtained"
+
+Gemeldet anhand eines echten Laufs (SFCSDBS103IHZ, Restore von `arena` aus
+`F:\DB_Transfer_Prod\arena.bak`): `SetSingleUser` protokollierte Erfolg, der direkt
+anschliessende `Restore-DbaDatabase`-Aufruf scheiterte trotzdem mit "Exclusive access could not
+be obtained because the database is in use."
+
+Ursache: `ALTER DATABASE ... SET SINGLE_USER WITH ROLLBACK IMMEDIATE` lief ueber
+`Invoke-DbaQuery`, dessen Verbindung danach geschlossen wird - der einzige Verbindungs-Slot war
+damit wieder frei. Bis `Restore-DbaDatabase` seine eigene, neue Verbindung aufbaute (dazwischen
+liegt zusaetzlich noch `RESTORE FILELISTONLY` fuer das Auto-FileMapping), konnte sich eine fremde
+Session neu verbinden und den Slot belegen - der eigentliche RESTORE-Befehl fand die Datenbank
+dann wieder "in use" vor.
+
+Fix: Der Restore-Schritt erkennt genau diese Fehlermeldung jetzt und beendet alle Sessions auf der
+Zieldatenbank per `Stop-DbaProcess`, bevor er es erneut versucht (bis zu 3 Versuche). Ein erneutes
+`ALTER DATABASE SET SINGLE_USER` haette hier NICHT geholfen - dieser Befehl braucht selbst
+exklusiven Zugriff, der ja gerade durch die fremde Session blockiert ist (Henne-Ei-Problem);
+`Stop-DbaProcess` wirkt dagegen unabhaengig vom aktuellen User-Access-Modus.
+
+Beim Schreiben der Regressionstests dafuer zusaetzlich einen unabhaengigen, vorbestehenden Bug
+gefunden und mitbehoben: `-DatabaseName` hatte neben dem an das `FromHistory`-Set gebundenen
+Attribut ein zweites, unbenanntes `[Parameter(Mandatory = $false)]` (== `__AllParameterSets`).
+Kombiniert mit den explizit benannten Sets `SingleFile`/`Sequence` (ueber `-BackupFile`/
+`-BackupFiles`) konnte PowerShell den Parametersatz nicht mehr auflösen, sobald `-BackupFile`
+UND `-DatabaseName` gemeinsam angegeben wurden - exakt der in `.EXAMPLE` dokumentierte
+Standardfall. Der Aufruf scheiterte dadurch bereits beim Parameter-Binding mit
+"Parameter set cannot be resolved", bevor auch nur eine Zeile der Funktion lief. Ein bestehender
+Unit-Test hatte das unbemerkt ueberdeckt, weil er nur pauschal `Should -Throw` ohne
+Meldungsabgleich pruefte - die eigentlich getestete Ursache (`Get-sqmDatabaseAgMembership`
+schlaegt fehl) wurde dadurch nie erreicht. Fix: `$DatabaseName` bekommt jetzt fuer jedes Set ein
+eigenes, explizit benanntes `[Parameter(...)]`-Attribut statt der unbenannten Variante.
+
+Unit-Tests (Pester, gemockt): 17/17 gruen inkl. zweier neuer Regressionstests fuer den
+Exclusive-Access-Retry (erfolgreicher Retry nach 2 Fehlversuchen, endgueltiger Abbruch nach 3
+Versuchen ohne Endlos-Retry) sowie einem verschaerften Test fuer den Parameterset-Fix. Gesamte
+Modul-Testsuite (219 Tests) weiterhin gruen.
+
 ## [1.9.82.0] — 2026-08-11
 
 ### Fix: `Invoke-sqmSplunkConfiguration` schrieb im Remote-/List-Modus kein Controller-Log
