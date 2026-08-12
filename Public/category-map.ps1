@@ -122,6 +122,7 @@ $categoryMap = @{
     'Register-sqmBackupExcludeTrigger'    = 'Backup & Recovery'
     'Repair-sqmAlwaysOnDatabases'         = 'Always On & Availability Groups'
     'Repair-sqmServerName'                = 'Configuration Management'
+    'Restore-sqmSysadminAccess'           = 'Login & User Security'
     'Set-sqmBackupExcludePermission'      = 'Backup & Recovery'
     'Show-sqmBackupExcludeForm'           = 'Backup & Recovery'
     'Set-sqmConfig'                       = 'Configuration Management'

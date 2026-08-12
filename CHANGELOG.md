@@ -1,5 +1,32 @@
 # sqmSQLTool — Changelog
 
+## [1.9.85.0] — 2026-08-12
+
+### Neu: `Restore-sqmSysadminAccess` - Notfall-Wiederherstellung bei komplettem DBA-Lockout
+
+Bislang gab es im Modul keine Funktion fuer den Fall, dass auf einer Instanz KEIN
+funktionierender sysadmin-Login mehr existiert (Logins geloescht, Passwoerter verloren,
+versehentlich alle sysadmin-Mitgliedschaften entzogen). Bisher blieb dafuer nur die
+manuelle Prozedur: Dienst stoppen, mit Startparameter `-m"..."` (Single-User-Mode) neu
+starten, per `sqlcmd` als lokaler Administrator verbinden (im Single-User-Mode implizit
+sysadmin), Login anlegen/Passwort zuruecksetzen, `sp_addrolemember`/`ALTER SERVER ROLE`,
+Dienst wieder normal starten.
+
+`Restore-sqmSysadminAccess` automatisiert genau das (dbatools
+`Stop-DbaService`/`Set-DbaStartupParameter -SingleUser`/`Start-DbaService`), fuehrt
+Login-Anlage/-Reset + Rollenvergabe + Trigger-Deaktivierung/-Reaktivierung dabei in
+EINEM einzigen T-SQL-Batch/EINER einzigen Verbindung aus (Single-User-Mode erlaubt nur
+genau eine Verbindung - jeder zusaetzliche Roundtrip waere ein Zeitfenster fuer einen
+konkurrierenden Verbindungsversuch) und baut den Single-User-Mode im `finally`-Block in
+JEDEM Fall wieder zurueck, auch nach einem Fehler mitten in der Prozedur. Generiertes
+Passwort wird nur im Rueckgabeobjekt ausgegeben, nie geloggt.
+
+ConfirmImpact bleibt bewusst 'High' MIT aktivem interaktivem Rueckfrage-Dialog (anders
+als z.B. `Grant-sqmTemporarySysadmin`) - gedacht als manuelle Notfallmassnahme am
+Keyboard, nicht fuer unbeaufsichtigte Automation.
+
+Funktionsanzahl im Modul: 163 -> 164.
+
 ## [1.9.84.0] — 2026-08-12
 
 ### Neu: `Get-sqmDatabaseRestoreHistory` - letzter Restore-Zeitpunkt je Datenbank
