@@ -1,5 +1,28 @@
 # sqmSQLTool — Changelog
 
+## [1.9.86.0] — 2026-08-13
+
+### Neu: `Get-sqmFileGrowthHistory` - Datei-Wachstum ueber die Zeit aufzeichnen und prognostizieren
+
+`Get-sqmAutoGrowthReport` liefert nur eine Momentaufnahme der AutoGrowth-Konfiguration
+(aktuelle Groesse, Growth-Typ/-Wert, MaxSize) - keine Historie und keinen Trend.
+
+`Get-sqmFileGrowthHistory` schliesst diese Luecke nach dem gleichen Muster (Methode B1)
+wie `Get-sqmDiskSpaceReport`: Bei jedem Lauf wird `Get-sqmAutoGrowthReport -Detailed` als
+alleinige Datenquelle abgefragt und die aktuelle Groesse jeder Datei in eine
+Snapshot-Historie pro Instanz (`FileGrowthHistory_<Instanz>.json`) angehaengt. Eine
+lineare Regression ueber das `-HistoryDays`-Fenster liefert MB/Tag Wachstum je Datei und,
+bei begrenzter MaxSize, die Prognose in wie vielen Tagen die Grenze erreicht wird. Die
+Regressions-/Konfidenzberechnung selbst wird nicht neu geschrieben, sondern die bereits
+vorhandene modulinterne Hilfsfunktion `Get-sqmVolumeForecast` (aus `Get-sqmDiskSpaceReport.ps1`,
+generisch fuer beliebige Timestamp/Groesse-Zeitreihen) wiederverwendet. Ergebnis wird wie
+gewohnt als TXT/CSV/HTML-Bericht abgelegt.
+
+Braucht mindestens `-MinDataPoints` (Default 5) wiederkehrende Laeufe (z. B. taeglicher
+Agent-Job) bevor eine Prognose statt "sammelt noch" ausgegeben wird.
+
+Funktionsanzahl im Modul: 164 -> 165.
+
 ## [1.9.85.0] — 2026-08-12
 
 ### Neu: `Restore-sqmSysadminAccess` - Notfall-Wiederherstellung bei komplettem DBA-Lockout
