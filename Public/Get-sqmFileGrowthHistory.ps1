@@ -131,6 +131,7 @@ function Get-sqmFileGrowthHistory
 				$growthParams = @{
 					SqlInstance = $instance
 					Detailed    = $true
+					NoReport    = $true
 					EnableException = $true
 				}
 				if ($SqlCredential) { $growthParams['SqlCredential'] = $SqlCredential }

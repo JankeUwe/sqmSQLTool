@@ -1,5 +1,22 @@
 # sqmSQLTool — Changelog
 
+## [1.9.87.0] — 2026-08-14
+
+### Erweitert: `Get-sqmAutoGrowthReport` - TXT/HTML-Bericht ergaenzt
+
+Bisher gab `Get-sqmAutoGrowthReport` nur das Objekt-Array zurueck, ohne Berichtsdateien
+zu schreiben (anders als die uebrigen Report-Funktionen im Modul). Jetzt werden - wie bei
+`Get-sqmDiskSpaceReport` - zusaetzlich ein TXT- und ein HTML-Bericht (nach Status sortiert,
+farbcodiert) in `-OutputPath` abgelegt (Default: `AutoGrowthReports`-Unterordner unter dem
+konfigurierten Standard-Ausgabepfad) und per `Invoke-sqmOpenReport` geoeffnet (`-NoOpen`
+unterdrueckt das).
+
+Die Funktion wird auch intern von `Get-sqmFileGrowthHistory` als reine Datenquelle
+aufgerufen; damit dort nicht bei jedem Lauf zusaetzlich ein eigener AutoGrowth-Bericht
+entsteht, ruft `Get-sqmFileGrowthHistory` jetzt mit dem neuen Schalter `-NoReport` auf.
+Das zurueckgegebene Objekt-Array selbst ist unveraendert (bestehende Aufrufer funktionieren
+unveraendert weiter).
+
 ## [1.9.86.0] — 2026-08-13
 
 ### Neu: `Get-sqmFileGrowthHistory` - Datei-Wachstum ueber die Zeit aufzeichnen und prognostizieren

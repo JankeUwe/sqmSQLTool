@@ -7,6 +7,10 @@
     Returns warnings for percent-based growth, growth values that are too small or too large, and
     unbounded log files.
 
+    Results are additionally saved as TXT and HTML report in -OutputPath. The function still
+    returns the flat array of per-file result objects (unchanged, so existing callers such as
+    Get-sqmFileGrowthHistory keep working).
+
 .PARAMETER SqlInstance
     SQL Server instance (default: current computer name).
 
@@ -22,6 +26,18 @@
 .PARAMETER Detailed
     When set, additional file properties (physical path) are included in the output.
 
+.PARAMETER OutputPath
+    Output directory for the TXT/HTML report files. Default: 'AutoGrowthReports' subfolder
+    under the configured default output path (see Get-sqmDefaultOutputPath).
+
+.PARAMETER NoOpen
+    Suppresses automatically opening the generated report (HTML has priority over TXT).
+
+.PARAMETER NoReport
+    Skips writing the TXT/HTML report files entirely (only the object array is returned).
+    Used internally by functions such as Get-sqmFileGrowthHistory that consume this
+    function purely as a data source and write their own report.
+
 .PARAMETER EnableException
     Throw exceptions immediately.
 
@@ -31,12 +47,16 @@
 .EXAMPLE
     Get-sqmAutoGrowthReport -SqlInstance "SQL01" -Detailed -IncludeSystem
 
+.EXAMPLE
+    Get-sqmAutoGrowthReport -SqlInstance "SQL01" -OutputPath "D:\Reports" -NoOpen
+
 .NOTES
     Requires: dbatools, Invoke-sqmLogging
+    Default output path: <Get-sqmDefaultOutputPath>\AutoGrowthReports
 #>
 function Get-sqmAutoGrowthReport
 {
-	[CmdletBinding()]
+	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]
 	param (
 		[Parameter(Mandatory = $false, Position = 0)]
 		[string]$SqlInstance,
@@ -49,9 +69,15 @@ function Get-sqmAutoGrowthReport
 		[Parameter(Mandatory = $false)]
 		[switch]$Detailed,
 		[Parameter(Mandatory = $false)]
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'AutoGrowthReports'),
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoReport,
+		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
-	
+
 	begin
 	{
 		$functionName = $MyInvocation.MyCommand.Name
@@ -183,6 +209,81 @@ function Get-sqmAutoGrowthReport
 	
 	end
 	{
+		if ($results -and -not $NoReport -and $PSCmdlet.ShouldProcess($SqlInstance, "Erstelle AutoGrowth-Bericht in $OutputPath"))
+		{
+			try
+			{
+				if (-not (Test-Path $OutputPath))
+				{
+					New-Item -ItemType Directory -Path $OutputPath -Force -ErrorAction Stop | Out-Null
+					Invoke-sqmLogging -Message "Verzeichnis $OutputPath wurde erstellt." -FunctionName $functionName -Level "INFO"
+				}
+
+				$safeInst = $SqlInstance -replace '[\\/:*?"<>|]', '_'
+				$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+				$datestamp = Get-Date -Format 'yyyy-MM-dd'
+				$txtFile = Join-Path $OutputPath "AutoGrowthReport_${safeInst}_${datestamp}.txt"
+				$htmlFile = Join-Path $OutputPath "AutoGrowthReport_${safeInst}_${datestamp}.html"
+
+				$cntWarn = ($results | Where-Object Status -eq 'Warning').Count
+				$cntInfo = ($results | Where-Object Status -eq 'Info').Count
+				$sorted = $results | Sort-Object @{ Expression = { switch ($_.Status) { 'Warning' { 0 } 'Info' { 1 } default { 2 } } } }, DatabaseName, FileName
+
+				# TXT-Bericht
+				$reference = Get-sqmReportReference
+				$lines = [System.Collections.Generic.List[string]]::new()
+				$lines.Add("# ================================================================")
+				$lines.Add("# sqmSQLTool - AutoGrowth Report")
+				$lines.Add("# $reference")
+				$lines.Add("# Instanz   : $SqlInstance")
+				$lines.Add("# Erstellt  : $timestamp")
+				$lines.Add("# Warning: $cntWarn | Info: $cntInfo | Dateien gesamt: $($results.Count)")
+				$lines.Add("# ================================================================")
+				$lines.Add("")
+				$lines.Add(("{0,-8} {1,-25} {2,-6} {3,-30} {4,-8} {5,-10} {6,-10} {7,-10} {8}" -f
+						'Status', 'Datenbank', 'Typ', 'Datei', 'Growth', 'Wert', 'AktGroesseMB', 'MaxMB', 'Bewertung'))
+				$lines.Add(("-" * 130))
+				foreach ($e in $sorted)
+				{
+					$lines.Add(("{0,-8} {1,-25} {2,-6} {3,-30} {4,-8} {5,-10} {6,-10} {7,-10} {8}" -f
+							$e.Status, $e.DatabaseName, $e.FileType, $e.FileName, $e.GrowthType, $e.GrowthValue, $e.CurrentSizeMB, $e.MaxSizeMB, $e.Assessment))
+				}
+				$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
+
+				# HTML-Bericht (farbcodiert nach Status)
+				$rowsHtml = ''
+				foreach ($e in $sorted)
+				{
+					$cls = switch ($e.Status) { 'Warning' { 'warn' } 'Info' { 'warn' } default { 'ok' } }
+					$dbEnc = [string]$e.DatabaseName -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;'
+					$fileEnc = [string]$e.FileName -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;'
+					$assessEnc = [string]$e.Assessment -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;'
+					$rowsHtml += "<tr><td class='$cls'>$($e.Status)</td><td>$dbEnc</td><td>$($e.FileType)</td><td>$fileEnc</td><td>$($e.GrowthType)</td><td>$($e.GrowthValue)</td><td>$($e.CurrentSizeMB)</td><td>$($e.MaxSizeMB)</td><td>$assessEnc</td></tr>`n"
+				}
+				$bodyHtml = @"
+<table>
+<thead><tr><th>Status</th><th>Datenbank</th><th>Typ</th><th>Datei</th><th>Growth</th><th>Wert</th><th>Akt. Groesse MB</th><th>Max MB</th><th>Bewertung</th></tr></thead>
+<tbody>
+$rowsHtml
+</tbody>
+</table>
+<p style="color:#94a8c0;font-size:12px;">Warning: $cntWarn &nbsp;|&nbsp; Info: $cntInfo &nbsp;|&nbsp; Dateien gesamt: $($results.Count)</p>
+"@
+				$html = ConvertTo-sqmHtmlReport -Title "AutoGrowth Report - $SqlInstance" -Subtitle "Erstellt: $timestamp" -BodyHtml $bodyHtml
+				$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
+
+				Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
+
+				Invoke-sqmLogging -Message "AutoGrowth-Bericht erstellt: $htmlFile" -FunctionName $functionName -Level "INFO"
+			}
+			catch
+			{
+				$errMsg = "Berichtsdateien konnten nicht erstellt werden: $($_.Exception.Message)"
+				Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "WARNING"
+				if ($EnableException) { throw }
+			}
+		}
+
 		Invoke-sqmLogging -Message "$functionName abgeschlossen. $($results.Count) Dateien analysiert." -FunctionName $functionName -Level "INFO"
 		return $results
 	}
