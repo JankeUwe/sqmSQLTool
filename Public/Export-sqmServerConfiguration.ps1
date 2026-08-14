@@ -34,12 +34,17 @@ Included in the JSON metadata.
 .PARAMETER IncludeDatabases
 When set, includes database-level settings (slower operation).
 
+.PARAMETER NoOpen
+Suppresses automatically opening the generated HTML report after the export completes.
+
 .PARAMETER EnableException
 Switch to allow exceptions to pass through (default: errors logged as warnings).
 
 .OUTPUTS
 [PSCustomObject] with properties:
 - SnapshotPath: Full path to saved JSON file
+- ReportPath: Full path to the saved HTML report (same folder/basename, .html) - a
+  customer-presentable summary of everything captured, opened automatically unless -NoOpen
 - Timestamp: When snapshot was created (ISO 8601 format)
 - ItemCount: Total settings captured
 - Categories: List of captured categories
@@ -85,6 +90,9 @@ function Export-sqmServerConfiguration
 
 		[Parameter(Mandatory = $false)]
 		[switch]$IncludeDatabases,
+
+		[Parameter(Mandatory = $false)]
+		[switch]$NoOpen,
 
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
@@ -191,12 +199,18 @@ function Export-sqmServerConfiguration
 				Invoke-sqmLogging -Message "Lese sp_configure Einstellungen..." `
 					-FunctionName $functionName -Level "DEBUG"
 
+				# $server.Configuration selbst ist ein einzelnes SMO-Objekt (kein Enumerable) -
+				# die eigentliche Liste der ~95 sp_configure-Werte liegt unter .Properties.
+				# Ein direktes "foreach ($x in $server.Configuration)" liefert nur dieses eine
+				# leere Objekt und wuerde die Konfiguration praktisch nicht erfassen.
+				# .ConfigName ist auf manchen SMO-Versionen leer - DisplayName als Fallback,
+				# da Set-DbaSpConfigure -Name beide Formen akzeptiert.
 				$spConfigValues = @()
-				foreach ($config in $server.Configuration)
+				foreach ($config in $server.Configuration.Properties)
 				{
 					$spConfigValues += [PSCustomObject]@{
 						Name         = $config.DisplayName
-						ConfigName   = $config.ConfigName
+						ConfigName   = if ($config.ConfigName) { $config.ConfigName } else { $config.DisplayName }
 						Minimum      = $config.Minimum
 						Maximum      = $config.Maximum
 						RunValue     = $config.RunValue
@@ -504,6 +518,60 @@ function Export-sqmServerConfiguration
 			Invoke-sqmLogging -Message "Snapshot erfolgreich gespeichert: $filepath" `
 				-FunctionName $functionName -Level "INFO"
 
+			# ========================================================================
+			# 10b. HTML-Bericht bauen (kundenpraesentabel, gleiche Kategorien wie das JSON)
+			# ========================================================================
+			function _Enc($s)
+			{
+				if ($null -eq $s) { return '' }
+				return ([string]$s) -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;'
+			}
+			function _BuildTable($items, [string[]]$Columns)
+			{
+				$rows = @($items)
+				if ($rows.Count -eq 0) { return "<p style='color:#94a8c0;'>Keine Eintraege.</p>" }
+				$headerHtml = ($Columns | ForEach-Object { "<th>$(_Enc $_)</th>" }) -join ''
+				$rowsHtml = ($rows | ForEach-Object {
+						$item = $_
+						$cells = ($Columns | ForEach-Object { "<td>$(_Enc $item.$_)</td>" }) -join ''
+						"<tr>$cells</tr>"
+					}) -join "`n"
+				return "<table><thead><tr>$headerHtml</tr></thead><tbody>$rowsHtml</tbody></table>"
+			}
+			function _BuildKVTable($obj)
+			{
+				if (-not $obj) { return "<p style='color:#94a8c0;'>Keine Daten.</p>" }
+				$rows = ($obj.PSObject.Properties | ForEach-Object { "<tr><td>$(_Enc $_.Name)</td><td>$(_Enc $_.Value)</td></tr>" }) -join "`n"
+				return "<table><tbody>$rows</tbody></table>"
+			}
+
+			$metaTable = _BuildKVTable ([PSCustomObject]@{
+					Instanz    = "$serverName\$instanceName"
+					Label	   = if ($Label) { $Label } else { '-' }
+					Exportiert = $timestampIso
+					Von	       = $env:USERNAME
+				})
+			$h2Style = "color:#5dade2;margin-top:26px;"
+			$bodyHtml = "<h2 style='$h2Style'>Zusammenfassung</h2>$metaTable"
+			$bodyHtml += "<h2 style='$h2Style'>sp_configure ($($spConfigValues.Count))</h2>" + (_BuildTable $spConfigValues @('Name', 'RunValue', 'ConfigValue', 'Minimum', 'Maximum', 'IsDynamic'))
+			$bodyHtml += "<h2 style='$h2Style'>Instance Properties</h2>" + (_BuildKVTable $instanceProps)
+			$bodyHtml += "<h2 style='$h2Style'>Services ($($serviceList.Count))</h2>" + (_BuildTable $serviceList @('ServiceName', 'ServiceType', 'State', 'StartMode', 'ServiceAccount'))
+			$bodyHtml += "<h2 style='$h2Style'>TempDb-Dateien ($($fileList.Count))</h2>" + (_BuildTable $fileList @('LogicalName', 'Type', 'Size', 'Growth', 'GrowthType', 'IsPercentGrowth'))
+			$bodyHtml += "<h2 style='$h2Style'>Database Mail Profile ($($profileList.Count))</h2>" + (_BuildTable $profileList @('Name', 'Description', 'IsPublic', 'IsDefault'))
+			$bodyHtml += "<h2 style='$h2Style'>Linked Servers ($($linkedServerList.Count))</h2>" + (_BuildTable $linkedServerList @('Name', 'DataSource', 'Provider', 'Catalog'))
+			if ($IncludeDatabases)
+			{
+				$bodyHtml += "<h2 style='$h2Style'>Datenbanken ($($dbList.Count))</h2>" + (_BuildTable $dbList @('Name', 'RecoveryModel', 'CompatibilityLevel', 'Status', 'AutoClose', 'AutoShrink', 'Trustworthy'))
+			}
+
+			$htmlFilename = "$($serverName)_$($instanceName)_$($timestampFile).html"
+			$htmlFilepath = Join-Path $OutputPath $htmlFilename
+			$html = ConvertTo-sqmHtmlReport -Title "Server Configuration Report - $serverName\$instanceName" `
+											-Subtitle "Label: $(if ($Label) { $Label } else { '-' }) | Exportiert: $timestampIso" -BodyHtml $bodyHtml
+			Set-Content -Path $htmlFilepath -Value $html -Encoding UTF8 -ErrorAction Stop
+			Invoke-sqmLogging -Message "HTML-Bericht gespeichert: $htmlFilepath" -FunctionName $functionName -Level "INFO"
+			Invoke-sqmOpenReport -HtmlFile $htmlFilepath -NoOpen:$NoOpen
+
 			# Count total items captured
 			$totalItems = $allSettings.Values |
 				ForEach-Object {
@@ -522,6 +590,7 @@ function Export-sqmServerConfiguration
 			# Return result object
 			return [PSCustomObject]@{
 				SnapshotPath = $filepath
+				ReportPath   = $htmlFilepath
 				Timestamp    = $timestampIso
 				ItemCount    = $totalItems
 				Categories   = $capturedCategories

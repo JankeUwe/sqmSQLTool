@@ -1,5 +1,56 @@
 # sqmSQLTool — Changelog
 
+## [1.9.88.0] — 2026-08-14
+
+### Neu: `Import-sqmServerConfiguration` - Counterpart zu `Export-sqmServerConfiguration`
+
+Der Export erzeugte bisher nur Snapshots (fuer Dokumentation/Vergleich/Rollback), es gab keinen Weg
+sie wieder anzuwenden. `Import-sqmServerConfiguration` liest eine per Export-sqmServerConfiguration
+geschriebene JSON-Datei und wendet davon alles an, was auf einer bereits installierten Instanz
+tatsaechlich restaurierbar ist: sp_configure (per `Set-DbaSpConfigure`), BackupDirectory/DefaultFile/
+DefaultLog (per `Set-DbaDefaultPath`), TempDb-Dateigroessen/-Growth (per `ALTER DATABASE tempdb
+MODIFY FILE`, verkleinert nie) und Dienst-StartMode. Aktueller und Zielwert werden vorher verglichen,
+sodass nur tatsaechliche Abweichungen angefasst werden - jede Einstellung bekommt eine eigene
+Ergebniszeile (Success/Skipped/Failed/WhatIf), analog zu `Import-sqmDatabaseLogins`. Nicht
+restaurierbare Kategorien (Edition/Collation/LoginMode als reine Serverinstallations-Eigenschaften,
+DatabaseMail, LinkedServers, das Databases-Inventar) werden als 'Informational' ausgewiesen statt
+stillschweigend ignoriert.
+
+### Neu: `Export-sqmDatabaseSettings` / `Import-sqmDatabaseSettings` - Datenbank-Options (SSMS "Options"-Seite)
+
+Ergaenzt die bereits vorhandenen Server-weiten Snapshots um die Datenbank-Ebene: erfasst bzw.
+restauriert die komplette Options-Seite der SSMS Database Properties (Compatibility Level, Recovery
+Model, Page Verify, Target Recovery Time, Delayed Durability, alle ANSI-/ARITHABORT-/AUTO_*-Flags,
+Cursor-Default, Parameterization, DB Chaining, Trustworthy, sowie - nur mit
+`-IncludeExclusiveOptions`, da sie aktive Verbindungen trennen koennen - ReadOnly,
+ReadCommittedSnapshot und BrokerEnabled). Beide Funktionen teilen sich die Settings-Definition
+(`Get-sqmDatabaseSettingsDefinition` in Private/), damit Export und Import nie auseinanderlaufen.
+`Export-sqmDatabaseSettings` liest alle Datenbanken in einer einzigen Abfrage gegen sys.databases
+(kein Connect je Datenbank noetig), `Import-sqmDatabaseSettings` vergleicht vor jeder Aenderung den
+Live-Wert und wendet ausschliesslich Abweichungen per `ALTER DATABASE ... SET` an - eine
+Ergebniszeile pro Einstellung und Datenbank.
+
+### Neu: HTML-Bericht bei `Export-sqmServerConfiguration` und `Export-sqmDatabaseSettings`
+
+Beide Export-Funktionen schreiben jetzt zusaetzlich zur JSON-Snapshot-Datei einen HTML-Bericht mit
+gleichem Dateinamen (.html statt .json) im sqmSQLTool-Theme (`ConvertTo-sqmHtmlReport`), gedacht zum
+direkten Zeigen beim Kunden statt der rohen JSON-Datei. `Export-sqmServerConfiguration` listet
+sp_configure, Instance Properties, Services, TempDb-Dateien, Database-Mail-Profile und Linked
+Servers tabellarisch auf; `Export-sqmDatabaseSettings` zeigt eine Uebersichtstabelle aller
+Datenbanken plus je Datenbank ein aufklappbares Detail (`<details>`) mit allen erfassten
+Options-Werten. Wird wie bei den uebrigen Report-Funktionen des Moduls automatisch geoeffnet, `-NoOpen`
+unterdrueckt das; der Pfad kommt als neues `ReportPath`-Feld im Rueckgabeobjekt.
+
+### Fix: `Export-sqmServerConfiguration` erfasste praktisch keine sp_configure-Werte
+
+`$server.Configuration` ist selbst kein Enumerable (ein `foreach` darueber liefert nur ein einzelnes
+leeres SMO-Objekt) - die eigentlichen ~95 sp_configure-Eintraege liegen unter
+`$server.Configuration.Properties`. Live gegen DEV01 getestet: vor dem Fix enthielt der Snapshot nur
+einen leeren SpConfigure-Eintrag, `ConfigName` war ausserdem auf dieser SMO-Version durchgehend leer
+(jetzt Fallback auf `DisplayName`, das Set-DbaSpConfigure -Name ebenfalls akzeptiert). Ohne diesen Fix
+haette `Import-sqmServerConfiguration` nie etwas zum Anwenden gehabt. Betrifft nur die
+SpConfigure-Erfassung, alle anderen Kategorien waren bereits korrekt.
+
 ## [1.9.87.0] — 2026-08-14
 
 ### Erweitert: `Get-sqmAutoGrowthReport` - TXT/HTML-Bericht ergaenzt
