@@ -1,5 +1,21 @@
 # sqmSQLTool — Changelog
 
+## [1.9.89.0] — 2026-08-15
+
+### Fix: Show-sqmToolGui - Mehrfachwerte bei Array-Parametern (z.B. -Database) gingen verloren
+
+Array-Parameter wie `[string[]]$Database` (z.B. bei `Invoke-sqmUserDatabaseBackup`) wurden in der
+GUI als normale einzeilige Textbox dargestellt. Beim Klick auf "Run" wurde der eingegebene Text
+unveraendert als EIN String an den Parameter uebergeben (`$params[$pname] = $ctrl.Text`). Gab der
+Anwender z.B. "DB1, DB2" ein, band PowerShell diesen String als Array mit genau EINEM Element
+("DB1, DB2") an den Parameter, statt zwei getrennte Datenbanknamen zu liefern. Die Folge:
+`Invoke-sqmUserDatabaseBackup` fand keine passende Datenbank und meldete "Keine Benutzerdatenbanken
+fuer Backup gefunden", obwohl beide Datenbanken existierten. Behoben, indem der Run-Handler und die
+Kommandovorschau (Copy to clipboard) den Textbox-Inhalt bei Array-Parametern jetzt an Komma/Semikolon
+splitten und ein echtes Array binden; das Parameter-Tooltip weist bei Array-Typen zusaetzlich auf die
+Komma-Trennung hin. Live gegen DEV01 verifiziert (vorher: "NotFound"/"NoDatabasesFound" bei
+kommagetrennter Eingabe, danach: beide Datenbanken korrekt aufgeloest).
+
 ## [1.9.88.0] — 2026-08-14
 
 ### Neu: `Import-sqmServerConfiguration` - Counterpart zu `Export-sqmServerConfiguration`

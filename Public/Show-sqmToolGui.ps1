@@ -440,8 +440,23 @@
 				$val = $ctrl.Text
 				if (-not [string]::IsNullOrWhiteSpace($val))
 				{
-					if ($val -match '[\s'']') { $val = "'" + ($val -replace "'", "''") + "'" }
-					$parts.Add("-$pname $val")
+					# Array-typed parameters (e.g. [string[]]$Database) get a single-line textbox
+					# same as scalars, so a comma/semicolon-separated entry like "DB1, DB2" must be
+					# split here - otherwise it is quoted as ONE literal value and, once bound by
+					# PowerShell, becomes a one-element array containing the whole string instead of
+					# two separate database names (see the matching fix in the Run button handler).
+					$pType = $script:guiState.Command.Parameters[$pname].ParameterType
+					if ($pType.IsArray)
+					{
+						$items = @($val -split '\s*[,;]\s*' | Where-Object { $_ -ne '' })
+						$quoted = $items | ForEach-Object { if ($_ -match '[\s'']') { "'" + ($_ -replace "'", "''") + "'" } else { $_ } }
+						$parts.Add("-$pname " + ($quoted -join ' '))
+					}
+					else
+					{
+						if ($val -match '[\s'']') { $val = "'" + ($val -replace "'", "''") + "'" }
+						$parts.Add("-$pname $val")
+					}
 				}
 			}
 		}
@@ -534,6 +549,7 @@
 			$lbl.ForeColor = if ($isMandatory -or $isAlternative) { $cText } else { $cDim }
 			if ($isMandatory) { $lbl.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold) }
 			$tipText = "$($p.ParameterType.Name)"
+			if ($p.ParameterType.IsArray) { $tipText += ' - comma-separated for multiple values' }
 			if ($isAlternative)
 			{
 				$altSetNames = ($mandatoryInSets | Select-Object -ExpandProperty Name) -join ', '
@@ -747,7 +763,23 @@
 				$ctrl = $script:guiState.Controls[$pname]
 				if ($ctrl -is [System.Windows.Forms.CheckBox]) { if ($ctrl.Checked) { $params[$pname] = $true } }
 				elseif ($ctrl -is [System.Windows.Forms.ComboBox]) { if ($ctrl.SelectedItem) { $params[$pname] = [string]$ctrl.SelectedItem } }
-				else { if (-not [string]::IsNullOrWhiteSpace($ctrl.Text)) { $params[$pname] = $ctrl.Text } }
+				else
+				{
+					if (-not [string]::IsNullOrWhiteSpace($ctrl.Text))
+					{
+						# Split comma/semicolon-separated input into a real array for array-typed
+						# parameters - see matching comment in $buildCommand for why this is needed.
+						$pType = $script:guiState.Command.Parameters[$pname].ParameterType
+						if ($pType.IsArray)
+						{
+							$params[$pname] = @($ctrl.Text -split '\s*[,;]\s*' | Where-Object { $_ -ne '' })
+						}
+						else
+						{
+							$params[$pname] = $ctrl.Text
+						}
+					}
+				}
 			}
 			foreach ($cn in $script:guiState.Creds.Keys)
 			{
