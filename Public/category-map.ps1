@@ -136,6 +136,7 @@ $categoryMap = @{
     'Set-sqmSsrsHttpsCertificate'         = 'Certificates & TLS Security'
     'Set-sqmTcpPort'                      = 'Configuration Management'
     'Show-sqmToolGui'                     = 'Module & Update Management'
+    'Stop-sqmSqlProcess'                  = 'Monitoring & Health Checks'
     'Sync-sqmAgNode'                      = 'Always On & Availability Groups'
     'Sync-sqmBackupExcludeTable'          = 'Backup & Recovery'
     'Sync-sqmLoginsToAlwaysOn'            = 'Always On & Availability Groups'

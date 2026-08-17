@@ -1,5 +1,23 @@
 # sqmSQLTool — Changelog
 
+## [1.9.90.0] — 2026-08-17
+
+### Neu: `Stop-sqmSqlProcess` - SQL-Session beenden mit optionaler Besitzerbenachrichtigung
+
+Bisher gab es in sqmSQLTool keine eigene Funktion zum gezielten Beenden einzelner SQL-Sessions
+(nur den internen KILL-Aufruf in `Invoke-sqmRestoreDatabase` fuer Restore-Retries).
+`Stop-sqmSqlProcess` liest vor dem Kill Login/Hostname/Programm/Datenbank der Ziel-SPID(s) aus
+`sys.dm_exec_sessions`, beendet sie per `Stop-DbaProcess` und sendet bei `-NotifyOwner`
+anschliessend eine Nachricht per `msg.exe` an den Hostnamen der Session ("net send" existiert
+seit Vista nicht mehr). `-NotifyOwner` ist standardmaessig AUS, damit automatisierte/Job-Kills
+keine Popups ausloesen. Ein Fehlschlag der Benachrichtigung (Host offline, keine Rechte, kein
+Hostname bekannt) bricht den bereits erfolgten Kill nicht ab, sondern wird nur als eigenes
+`NotifyStatus`-Feld im Ergebnis protokolliert. Unterstuetzt Mehrfach-SPIDs in einem Aufruf (z.B.
+direkt aus `Get-sqmBlockingReport` gespeist) sowie `-WhatIf`/`-Confirm` (ConfirmImpact = High).
+msg.exe-Zustellung selbst wurde noch nicht live gegen die Workgroup-Laborumgebung verifiziert -
+host_name ist ein vom Client gemeldeter, nicht verifizierter Wert und bei Verbindungen ueber
+Anwendungsserver/Service-Accounts sitzt dort haeufig niemand Interaktives.
+
 ## [1.9.89.0] — 2026-08-15
 
 ### Fix: Show-sqmToolGui - Mehrfachwerte bei Array-Parametern (z.B. -Database) gingen verloren
