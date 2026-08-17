@@ -1,5 +1,27 @@
 # sqmSQLTool — Changelog
 
+## [1.9.92.0] — 2026-08-17
+
+### Neu: `Invoke-sqmSplunkConfiguration` - Modus `Remove` zum Rueckbau der Splunk-Konfiguration
+
+Bisher konnte die Funktion die Splunk-Konfiguration nur einrichten (`Set`) oder pruefen (`Test`),
+aber nicht wieder entfernen. Neuer Modus `Remove`: loescht alle `MSSQLn_Log`-Umgebungsvariablen
+(unabhaengig von noch vorhandenen SQL-Instanzen, da beim Ausbau/Deinstallieren einer Instanz die
+Registry-Eintraege bereits weg sein koennen) und stoppt den `SplunkForwarder`-Dienst. Funktioniert
+lokal sowie ueber die bestehenden `-Remote`/`-ComputerList`-Wege, da die interne Kernlogik jetzt
+den Modus als String statt als Set/Test-Bool durchreicht.
+
+### Fix: `Invoke-sqmSplunkConfiguration` - fehlende Administratorrechte wurden als `Success` gemeldet
+
+`_sqmSplunk_LocalCore` bricht bei fehlenden Administratorrechten (Modus `Set`/`Remove`) fruehzeitig
+ab, aber der oeffentliche Rueckgabewert wurde davon unabhaengig nur anhand des tatsaechlichen
+Ist-Zustands (vorhandene Env-Vars/Dienststatus) gebildet - dadurch meldete die Funktion faelschlich
+`Status = Success` bzw. `NotConfigured`, obwohl gar nichts ausgefuehrt wurde. `_sqmSplunk_LocalCore`
+gibt jetzt `$true`/`$false` zurueck; ein `$false` fuehrt lokal zu `Status = Error` mit der
+eigentlichen Fehlermeldung. Im Remote-/List-Pfad wird der Rueckgabewert jetzt abgefangen (statt
+unterhalb in `$results` einzusickern) und markiert den betroffenen Zielrechner als
+`Fehler (siehe Zielrechner-Log)`.
+
 ## [1.9.91.0] — 2026-08-17
 
 ### Fix: Stop-sqmSqlProcess - Benachrichtigungstext nannte nur die Session, nicht die Konsequenz

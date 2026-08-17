@@ -26,7 +26,7 @@ function _sqmSplunkGuiLog {
 # Darf KEINE externen Abhaengigkeiten haben.
 # Verwendet _sqmSplunkWriteLog - wird zusammen mit dieser Funktion serialisiert.
 function _sqmSplunk_LocalCore {
-    param([string]$LogFile, [bool]$TestMode)
+    param([string]$LogFile, [string]$Mode)
 
     $ErrorActionPreference = 'Continue'
 
@@ -36,25 +36,63 @@ function _sqmSplunk_LocalCore {
         $null = New-Item -ItemType Directory -Path $logDir -Force
     }
 
-    $modeLabel = if ($TestMode) { 'Test' } else { 'Set' }
-    _sqmSplunkWriteLog $logFile "=== Invoke-sqmSplunkConfiguration | Modus: $modeLabel | $(hostname) ==="
+    _sqmSplunkWriteLog $logFile "=== Invoke-sqmSplunkConfiguration | Modus: $Mode | $(hostname) ==="
     _sqmSplunkWriteLog $logFile "Logdatei: $logFile"
 
-    if (-not $TestMode) {
+    if ($Mode -ne 'Test') {
         $id = [Security.Principal.WindowsIdentity]::GetCurrent()
         $pr = New-Object Security.Principal.WindowsPrincipal($id)
         if (-not $pr.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
             $msg = 'FEHLER: Administratorrechte erforderlich. PowerShell als Administrator starten und erneut ausfuehren.'
             _sqmSplunkWriteLog $logFile $msg
             Write-Warning $msg
-            return
+            return $false
         }
+    }
+
+    # Remove-Modus ist eine vollstaendige Rueckbau-Aktion (Env-Vars weg, Dienst gestoppt) und
+    # setzt bewusst KEINE vorhandene SQL-Instanz voraus - sie kann beim Ausbau/Deinstallieren
+    # der Instanz bereits entfernt worden sein. Deshalb eigener, fruehzeitiger Zweig ohne die
+    # Instanz-Erkennung weiter unten.
+    if ($Mode -eq 'Remove') {
+        $existingVars = foreach ($varName in ([Environment]::GetEnvironmentVariables([EnvironmentVariableTarget]::Machine)).Keys) {
+            if ($varName -match '^MSSQL\d+_Log$') { $varName }
+        }
+
+        if ($existingVars.Count -eq 0) {
+            _sqmSplunkWriteLog $logFile 'Keine MSSQLn_Log-Umgebungsvariablen vorhanden.'
+        } else {
+            foreach ($varName in $existingVars) {
+                [Environment]::SetEnvironmentVariable($varName, $null, [EnvironmentVariableTarget]::Machine)
+                _sqmSplunkWriteLog $logFile "  Umgebungsvariable '$varName' entfernt."
+            }
+        }
+
+        $svcName = 'SplunkForwarder'
+        $svc     = Get-Service -Name $svcName -ErrorAction SilentlyContinue
+        if (-not $svc) {
+            _sqmSplunkWriteLog $logFile "WARN: Dienst '$svcName' nicht vorhanden."
+        } elseif ($svc.Status -eq 'Stopped') {
+            _sqmSplunkWriteLog $logFile "Dienst '$svcName' war bereits gestoppt."
+        } else {
+            try {
+                # -ErrorAction Stop ist noetig, damit ein fehlgeschlagener Stop hier landet statt
+                # (bei $ErrorActionPreference = 'Continue') stillschweigend als Erfolg durchzulaufen.
+                Stop-Service -Name $svcName -Force -ErrorAction Stop
+                _sqmSplunkWriteLog $logFile "Dienst '$svcName' gestoppt."
+            } catch {
+                _sqmSplunkWriteLog $logFile "FEHLER beim Stoppen: $_"
+            }
+        }
+
+        _sqmSplunkWriteLog $logFile '=== Invoke-sqmSplunkConfiguration Ende ==='
+        return $true
     }
 
     $instKey = 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL'
     if (-not (Test-Path $instKey)) {
         _sqmSplunkWriteLog $logFile 'Keine SQL Server-Instanzen gefunden.'
-        return
+        return $true
     }
 
     $instances     = Get-ItemProperty -Path $instKey
@@ -64,7 +102,7 @@ function _sqmSplunk_LocalCore {
 
     if ($instanceNames.Count -eq 0) {
         _sqmSplunkWriteLog $logFile 'Keine Instanzen in der Registry eingetragen.'
-        return
+        return $true
     }
 
     _sqmSplunkWriteLog $logFile "Instanzen gefunden: $($instanceNames.Count) ($($instanceNames -join ', '))"
@@ -115,7 +153,7 @@ function _sqmSplunk_LocalCore {
         $existing = [Environment]::GetEnvironmentVariable($varName, [EnvironmentVariableTarget]::Machine)
         $stale    = ($null -ne $existing) -and (-not (Test-Path -LiteralPath $existing))
 
-        if ($TestMode) {
+        if ($Mode -eq 'Test') {
             if ($null -eq $existing) {
                 _sqmSplunkWriteLog $logFile "TEST: '$varName' nicht gesetzt."
             } elseif ($stale) {
@@ -162,7 +200,7 @@ function _sqmSplunk_LocalCore {
     }
 
     foreach ($varName in $orphaned) {
-        if ($TestMode) {
+        if ($Mode -eq 'Test') {
             _sqmSplunkWriteLog $logFile "TEST: '$varName' ist verwaist (keine passende Instanz mehr) - wuerde entfernt."
         } else {
             [Environment]::SetEnvironmentVariable($varName, $null, [EnvironmentVariableTarget]::Machine)
@@ -175,7 +213,7 @@ function _sqmSplunk_LocalCore {
 
     if (-not $svc) {
         _sqmSplunkWriteLog $logFile "WARN: Dienst '$svcName' nicht vorhanden."
-    } elseif ($TestMode) {
+    } elseif ($Mode -eq 'Test') {
         _sqmSplunkWriteLog $logFile "TEST: Dienst '$svcName' Status = $($svc.Status)"
         if ($svc.Status -ne 'Running') {
             try {
@@ -218,6 +256,7 @@ function _sqmSplunk_LocalCore {
     }
 
     _sqmSplunkWriteLog $logFile '=== Invoke-sqmSplunkConfiguration Ende ==='
+    return $true
 }
 
 # Remote-Engine: fuehrt _sqmSplunk_LocalCore auf mehreren Rechnern aus
@@ -241,22 +280,21 @@ function _sqmSplunk_OnComputers {
     # Beide Funktionen serialisieren - _sqmSplunk_LocalCore benoetigt _sqmSplunkWriteLog remote
     $coreStr    = ${function:_sqmSplunk_LocalCore}.ToString()
     $writeStr   = ${function:_sqmSplunkWriteLog}.ToString()
-    $testMode   = ($Mode -eq 'Test')
     $combined   = "function _sqmSplunkWriteLog {$writeStr} ; function _sqmSplunk_LocalCore {$coreStr}"
 
     # Jeder Zielrechner schreibt sein eigenes lokales Log unter $LogPath (auf sich selbst) -
     # unabhaengig vom Controller-Log ($LogFile), das die Orchestrierung hier dokumentiert.
     $remoteBlock = {
-        param([string]$LogPath, [bool]$TestMode, [string]$Combined)
+        param([string]$LogPath, [string]$Mode, [string]$Combined)
         . ([ScriptBlock]::Create($Combined))
         if (-not (Test-Path $LogPath)) { $null = New-Item -ItemType Directory -Path $LogPath -Force }
         $rLogFile = Join-Path $LogPath ("SplunkConfig_{0}.log" -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
-        _sqmSplunk_LocalCore -LogFile $rLogFile -TestMode $TestMode
+        _sqmSplunk_LocalCore -LogFile $rLogFile -Mode $Mode
     }
 
     $splat = @{
         ScriptBlock  = $remoteBlock
-        ArgumentList = @($LogPath, $testMode, $combined)
+        ArgumentList = @($LogPath, $Mode, $combined)
         ErrorAction  = 'Continue'
     }
     if ($Credential) { $splat['Credential'] = $Credential }
@@ -278,9 +316,20 @@ function _sqmSplunk_OnComputers {
         }
 
         try {
-            Invoke-Command -ComputerName $name @splat
-            $entry.Status = 'Erfolgreich'
-            _sqmSplunkGuiLog "  $name - OK" $LogCallback $LogFile
+            # In eine Variable fangen statt frei durchlaufen zu lassen - sonst wuerde der
+            # Rueckgabewert von _sqmSplunk_LocalCore (seit Remove-Modus $true/$false) unterhalb
+            # in $results einsickern und die Zusammenfassung verfaelschen.
+            $coreResult = Invoke-Command -ComputerName $name @splat
+            if ($coreResult -eq $false) {
+                # LocalCore ist frueh abgebrochen (z.B. fehlende Administratorrechte auf dem
+                # Zielrechner) - ohne diese Pruefung wuerde das hier faelschlich als Erfolg gelten,
+                # obwohl auf dem Zielrechner nichts geaendert wurde.
+                Write-Warning "$name - LocalCore vorzeitig abgebrochen (siehe lokales Log auf dem Zielrechner)."
+                $entry.Status = 'Fehler (siehe Zielrechner-Log)'
+            } else {
+                $entry.Status = 'Erfolgreich'
+                _sqmSplunkGuiLog "  $name - OK" $LogCallback $LogFile
+            }
         } catch {
             Write-Warning "Fehler bei $name : $_"
             $entry.Status = 'Fehler'
@@ -391,9 +440,13 @@ function Invoke-sqmSplunkConfiguration {
         longer exists (e.g. after installing a new SQL Server version) are corrected automatically,
         and variables left over from an instance that no longer exists are removed - both would
         otherwise leave Splunk monitoring a stale path and raising false alerts.
+        Mode Remove tears the configuration back down: all MSSQLn_Log environment variables are
+        removed and SplunkForwarder is stopped, regardless of which SQL instances are currently
+        installed.
     .PARAMETER Mode
-        Set  - Set environment variables and start/restart SplunkForwarder (default).
-        Test - Check only, no changes.
+        Set    - Set environment variables and start/restart SplunkForwarder (default).
+        Test   - Check only, no changes.
+        Remove - Remove all MSSQLn_Log environment variables and stop SplunkForwarder.
     .PARAMETER Remote
         Remote execution via AD OU search. Combine with -SearchOU.
     .PARAMETER SearchOU
@@ -416,8 +469,10 @@ function Invoke-sqmSplunkConfiguration {
         Invoke-sqmSplunkConfiguration -ComputerList "SRV-SQL01","SRV-SQL02"
     .EXAMPLE
         Invoke-sqmSplunkConfiguration -ComputerList "C:\Listen\db-server.txt" -Mode Test
+    .EXAMPLE
+        Invoke-sqmSplunkConfiguration -Mode Remove
     .NOTES
-        Set mode requires local administrator rights.
+        Set and Remove modes require local administrator rights.
         Remote: WinRM must be active on target servers.
         AD OU mode: ActiveDirectory module is automatically installed if needed.
         A log file is always written under -LogPath - this is standard behavior, not opt-in.
@@ -426,7 +481,7 @@ function Invoke-sqmSplunkConfiguration {
     #>
     [CmdletBinding()]
     param(
-        [ValidateSet('Set', 'Test')]
+        [ValidateSet('Set', 'Test', 'Remove')]
         [string]$Mode = 'Set',
 
         [switch]$Remote,
@@ -477,17 +532,33 @@ function Invoke-sqmSplunkConfiguration {
         else
         {
             # Local execution - must return PSCustomObject
-            _sqmSplunk_LocalCore -LogFile $LogFile -TestMode ($Mode -eq 'Test')
+            $coreOk = _sqmSplunk_LocalCore -LogFile $LogFile -Mode $Mode
+
+            if ($coreOk -eq $false)
+            {
+                # LocalCore ist vorzeitig abgebrochen (z.B. fehlende Administratorrechte) - ohne
+                # diese Pruefung wuerde unten anhand des unveraenderten Ist-Zustands faelschlich
+                # 'Success'/'NotConfigured' gemeldet, obwohl gar nichts ausgefuehrt wurde.
+                $result.Status  = 'Error'
+                $result.Message = 'Administratorrechte erforderlich. PowerShell als Administrator starten und erneut ausfuehren.'
+                return $result
+            }
 
             # Check actual configuration
             $envVars = [Environment]::GetEnvironmentVariables([System.EnvironmentVariableTarget]::Machine)
             $splunkVars = @($envVars.Keys | Where-Object { $_ -like 'MSSQL*_Log' })
             $result.IsConfigured = $splunkVars.Count -gt 0
 
-            if ($result.IsConfigured)
+            $svc = Get-Service -Name 'SplunkForwarder' -ErrorAction SilentlyContinue
+            $result.ServiceStatus = if ($svc) { $svc.Status.ToString() } else { 'NotFound' }
+
+            if ($Mode -eq 'Remove')
             {
-                $svc = Get-Service -Name 'SplunkForwarder' -ErrorAction SilentlyContinue
-                $result.ServiceStatus = if ($svc) { $svc.Status.ToString() } else { 'NotFound' }
+                $result.Status = if (-not $result.IsConfigured) { 'Success' } else { 'PartialFailure' }
+                $result.Message = "Removed Splunk environment variables, Service: $($result.ServiceStatus)"
+            }
+            elseif ($result.IsConfigured)
+            {
                 $result.Status = 'Success'
                 $result.Message = "Configured with $($splunkVars.Count) environment variable(s), Service: $($result.ServiceStatus)"
             }

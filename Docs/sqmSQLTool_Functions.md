@@ -3513,7 +3513,7 @@ Detects all SQL Server instances, sets machine-wide environment variables
 
 **Parameters:**
 
-- **-Mode** - Set  - Set environment variables and start/restart SplunkForwarder (default). Test - Check only, no changes.
+- **-Mode** - Set - Set environment variables and start/restart SplunkForwarder (default). Test - Check only, no changes. Remove - Remove all MSSQLn_Log environment variables and stop SplunkForwarder.
 - **-Remote** - Remote execution via AD OU search. Combine with -SearchOU.
 - **-SearchOU** - Distinguished Name or simple OU name. Default: OUServDatabase.
 - **-ComputerList** - Explicit server list: string array or path to a text file (# = comment).
@@ -3521,7 +3521,7 @@ Detects all SQL Server instances, sets machine-wide environment variables
 - **-LogPath** - Directory for log files. Default: sqmSQLTool LogPath configuration.
 - **-LogCallback** - Optional ScriptBlock for GUI logging.
 
-**Examples (5):**
+**Examples (6):**
 
 ```powershell
 Invoke-sqmSplunkConfiguration
@@ -3537,6 +3537,9 @@ Invoke-sqmSplunkConfiguration -ComputerList "SRV-SQL01","SRV-SQL02"
 
 ```powershell
 Invoke-sqmSplunkConfiguration -ComputerList "C:\Listen\db-server.txt" -Mode Test
+
+```powershell
+Invoke-sqmSplunkConfiguration -Mode Remove
 
 ### Invoke-sqmTsmConfiguration
 
