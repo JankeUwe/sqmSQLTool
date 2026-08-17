@@ -1,5 +1,15 @@
 # sqmSQLTool — Changelog
 
+## [1.9.91.0] — 2026-08-17
+
+### Fix: Stop-sqmSqlProcess - Benachrichtigungstext nannte nur die Session, nicht die Konsequenz
+
+Der `-NotifyOwner`-Nachrichtentext benannte SPID/Datenbank/Instanz und dass die Session "beendet"
+wurde, sagte dem Empfaenger aber nicht, was das konkret fuer ihn bedeutet: Verbindung geschlossen,
+laufende Transaktion automatisch zurueckgerollt, ggf. erneut anmelden. Aus einem Livetest gegen
+DEV01 als zu wenig aussagekraeftig zurueckgemeldet. Text erweitert, damit die Konsequenz explizit
+benannt wird statt nur der beendete Zustand.
+
 ## [1.9.90.0] — 2026-08-17
 
 ### Neu: `Stop-sqmSqlProcess` - SQL-Session beenden mit optionaler Besitzerbenachrichtigung

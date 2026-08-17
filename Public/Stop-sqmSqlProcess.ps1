@@ -204,7 +204,7 @@ WHERE session_id IN ($spidList)
 					}
 					else
 					{
-						$messageText = "Ihre SQL-Sitzung (SPID $targetSpid, Datenbank '$($row.DatabaseName)') auf '$SqlInstance' wurde durch den DBA beendet."
+						$messageText = "Ihre Verbindung zu '$SqlInstance' (SPID $targetSpid, Datenbank '$($row.DatabaseName)') wurde soeben durch den DBA beendet. Die Verbindung ist geschlossen, eine laufende Transaktion wurde automatisch zurueckgerollt. Bitte melden Sie sich bei Bedarf erneut an."
 						if ($Reason) { $messageText += " Grund: $Reason" }
 
 						$wtsResult = Send-sqmWtsMessage -ComputerName $row.HostName -Title 'sqmSQLTool' -Message $messageText -TimeoutSeconds $NotifyTimeoutSeconds
