@@ -1,5 +1,29 @@
 # sqmSQLTool — Changelog
 
+## [1.9.100.0] — 2026-08-18
+
+### Bugfix: `Sync-sqmBackupExcludeTable` — AG-Propagierung konnte die Primary ueberschreiben
+
+Gemeldet: sind Aenderungen an `sqm_BackupExclude` zuverlaessig auf allen AG-Secondaries? Antwort
+bis zu diesem Fix: nein, nicht ganz. Die Propagierung nutzte `sys.availability_replicas WHERE
+replica_server_name <> @@SERVERNAME` - das listet nur "alle anderen Knoten", ohne Rollenbezug.
+Der 30-Minuten-Sync-Job laeuft auf **allen** AG-Knoten, auch Secondaries. Feuert eine Secondary's
+Zyklus zufaellig vor dem naechsten Zyklus der Primary, pusht die Secondary ihren eigenen, noch
+veralteten Stand per MERGE auf die Primary - und macht damit eine gerade erst per
+`Show-sqmBackupExcludeForm` gemachte Aenderung rueckgaengig, ohne dass es auffaellt. Passt zum
+beobachteten Muster mehrfach hin- und her-getoggelter `IsActive`-Werte auf BLBNBGFATDBA3.
+
+Fix: vor jeder Propagierung wird jetzt geprueft, ob die aktuelle Instanz tatsaechlich die
+AG-Primary ist (`sys.dm_hadr_availability_group_states.primary_replica = @@SERVERNAME`) - exakt
+dieselbe Technik wie der Primary-Fix in `Sync-sqmLoginsToAlwaysOn` (v1.8.3.0). Ist die Instanz
+nicht Primary, wird die Propagierung fuer diesen Lauf komplett uebersprungen (keine Secondary
+pusht mehr ungefragt ihren eigenen Stand nach aussen).
+
+Gegen DEV01 verifiziert: neue Pruefquery laeuft fehlerfrei (liefert korrekt `IsPrimary=0` auf
+dieser Nicht-AG-Instanz), `Sync-sqmBackupExcludeTable` laeuft weiterhin fehlerfrei end-to-end.
+Das eigentliche Verhindern-Szenario (Secondary ueberschreibt Primary) konnte im Lab nicht in
+einer echten Mehrknoten-AG nachgestellt werden - DEV01 hat kein AlwaysOn.
+
 ## [1.9.99.0] — 2026-08-18
 
 ### Architekturänderung: `New-sqmOlaUsrDbBackupJob -UseExcludeTable` — Cursor statt einer langen Ausschlussliste

@@ -19,6 +19,12 @@ In addition, a history table master.dbo.sqm_BackupExclude_History and an audit t
 dbo.trg_sqm_BackupExclude_Audit are created automatically if they do not yet exist.
 The trigger records every INSERT and every change to IsActive or IsOrphaned.
 
+If the target instance is part of an Availability Group, the current IsActive/Reason values
+are also pushed to every other replica - but only when the target instance is actually the
+current AG primary (checked via sys.dm_hadr_availability_group_states.primary_replica). A
+secondary that happens to run its own scheduled sync before receiving the primary's latest
+change no longer pushes its own stale values back onto the primary.
+
 If SqlInstance is not specified, the current computer name ($env:COMPUTERNAME) is used.
 
 .PARAMETER SqlInstance
@@ -412,6 +418,30 @@ FROM   sys.availability_replicas r
 WHERE  r.replica_server_name <> @@SERVERNAME
 "@
 				$secondaries = Invoke-DbaQuery @connParams -Database master -Query $replicaQuery -ErrorAction SilentlyContinue
+
+				if ($secondaries)
+				{
+					# Nur die tatsaechliche AG-Primary darf ihren lokalen Stand auf die anderen
+					# Knoten pushen. sys.availability_replicas listet nur "andere Knoten" ohne
+					# Rollenbezug - ohne diese Pruefung wuerde bei nicht synchronisierten
+					# 30-Minuten-Sync-Zyklen gelegentlich eine Secondary ihren eigenen, noch
+					# veralteten Stand auf die Primary pushen und eine gerade erst gemachte
+					# Admin-Aenderung rueckgaengig machen. Gleiche Technik wie der
+					# Primary-Fix in Sync-sqmLoginsToAlwaysOn (v1.8.3.0):
+					# sys.dm_hadr_availability_group_states.primary_replica statt einer
+					# rollenblinden Replica-Liste.
+					$primaryCheck = Invoke-DbaQuery @connParams -Database master -Query @"
+SELECT CASE WHEN EXISTS (
+    SELECT 1 FROM sys.dm_hadr_availability_group_states ags WHERE ags.primary_replica = @@SERVERNAME
+) THEN 1 ELSE 0 END AS IsPrimary
+"@ -ErrorAction SilentlyContinue
+
+					if (-not $primaryCheck -or -not [bool]$primaryCheck.IsPrimary)
+					{
+						Invoke-sqmLogging -Message "AlwaysOn: '$SqlInstance' ist aktuell nicht die Primary - keine Propagierung von hier aus (verhindert Ueberschreiben der Primary durch veraltete Secondary-Daten)." -FunctionName $functionName -Level "INFO"
+						$secondaries = @()
+					}
+				}
 
 				# Aktueller, endgueltiger Stand der PRIMARY nach allen obigen Aenderungen - wird unten
 				# per MERGE an jede Secondary GEPUSHT (nicht nur strukturell abgeglichen). Der
