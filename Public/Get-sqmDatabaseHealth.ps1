@@ -7,6 +7,10 @@
     - Recovery model
     - Last DBCC CHECKDB execution and whether it was error-free
     - Last backup times (Full / Diff / Log)
+    - Whether the database is marked excluded (IsActive=0) in master.dbo.sqm_BackupExclude
+      (the exclusion table New-sqmOlaUsrDbBackupJob / Invoke-sqmUserDatabaseBackup honour with
+      -UseExcludeTable) - so a missing/old backup for an intentionally excluded database is not
+      mistaken for a problem
     - AutoGrowth events in the last -HistoryDays days (via default trace)
     - VLF count (excessively fragmented transaction log files)
     - Database size (data + log)
@@ -62,6 +66,11 @@
     Prerequisites: dbatools, Invoke-sqmLogging
     Default output path: C:\System\WinSrvLog\MSSQL
     VLF query requires SQL Server 2016+ (sys.dm_db_log_info). On older versions VLF status is shown as 'Unknown'.
+    Backup-exclusion flag reads master.dbo.sqm_BackupExclude directly (IsActive = 0 AND
+    IsOrphaned = 0 - IsActive=1 means "back this database up", the default for newly discovered
+    databases; same condition New-sqmOlaUsrDbBackupJob / Invoke-sqmUserDatabaseBackup apply with
+    -UseExcludeTable) - it reports what that table currently says, not whether any backup job
+    actually honours it. Missing table = no exclusions, same fallback as those functions.
 #>
 function Get-sqmDatabaseHealth
 {
@@ -179,7 +188,31 @@ GROUP BY database_name, type;
 				$backupRows = Invoke-DbaQuery @connParams -Query $backupQuery -EnableException:$EnableException
 				$backupLookup = @{ }
 				foreach ($r in $backupRows) { $backupLookup["$($r.database_name)|$($r.type)"] = $r.LastBackup }
-				
+
+				# 3b. Backup-Ausschlussliste (master.dbo.sqm_BackupExclude) - dieselbe Bedingung
+				# (IsActive = 0 AND IsOrphaned = 0 - IsActive=1 heisst "wird gesichert", Default
+				# fuer neu erkannte DBs), die New-sqmOlaUsrDbBackupJob / Invoke-sqmUserDatabaseBackup
+				# mit -UseExcludeTable zum Ueberspringen einer Datenbank verwenden. Fehlt die
+				# Tabelle, gibt es keine Ausschluesse (gleicher Fallback wie im Backup-Skript selbst).
+				$excludeLookup = @{ }
+				try
+				{
+					$excludeTableCheck = Invoke-DbaQuery @connParams `
+						-Query "SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'master.dbo.sqm_BackupExclude') AND type = 'U'" `
+						-EnableException:$false -ErrorAction SilentlyContinue
+					if ($excludeTableCheck)
+					{
+						$excludeRows = Invoke-DbaQuery @connParams `
+							-Query "SELECT DatabaseName, Reason FROM master.dbo.sqm_BackupExclude WHERE IsActive = 0 AND IsOrphaned = 0" `
+							-EnableException:$false -ErrorAction SilentlyContinue
+						foreach ($r in $excludeRows) { $excludeLookup[$r.DatabaseName] = $r.Reason }
+					}
+				}
+				catch
+				{
+					Invoke-sqmLogging -Message "[$instance] sqm_BackupExclude-Abfrage fehlgeschlagen (Tabelle evtl. nicht vorhanden)." -FunctionName $functionName -Level "VERBOSE"
+				}
+
 				# 4. VLF-Anzahl pro DB (sys.dm_db_log_info ab SQL 2016)
 				$vlfLookup = @{ }
 				try
@@ -245,7 +278,11 @@ END
 					# Backups
 					$lastFull = $backupLookup["$dbName|D"]
 					$lastLog = $backupLookup["$dbName|L"]
-					
+
+					# Backup-Ausschluss (sqm_BackupExclude)
+					$excludedFromBackup = $excludeLookup.ContainsKey($dbName)
+					$excludeReason = if ($excludedFromBackup) { $excludeLookup[$dbName] } else { $null }
+
 					# VLF
 					$vlfCount = $vlfLookup[$dbName]
 					$vlfStatus = if (-not $vlfCount) { 'Unknown' }
@@ -276,6 +313,8 @@ END
 							CheckDbStatus  = $checkDbStatus
 							LastFullBackup = if ($lastFull) { $lastFull.ToString('yyyy-MM-dd HH:mm') } else { '(keins)' }
 							LastLogBackup  = if ($lastLog) { $lastLog.ToString('yyyy-MM-dd HH:mm') } else { 'n/a' }
+							ExcludedFromBackup = $excludedFromBackup
+							ExcludeReason  = $excludeReason
 							VlfCount	   = $vlfCount
 							VlfStatus	   = $vlfStatus
 							AutoGrowthEvents = $agCount
@@ -313,6 +352,11 @@ END
 					$lines.Add("# Erstellt  : $timestamp")
 					$lines.Add("# CheckDB max: ${MaxCheckDbAgeDays} Tage | VLF max: $MaxVlfCount | AutoGrowth: letzte $HistoryDays Tage")
 					$lines.Add("# OK: $cntOk | Warning: $cntWarn | Critical: $cntCrit")
+					$excludedNames = @($detailRows | Where-Object ExcludedFromBackup | Select-Object -ExpandProperty Database)
+					if ($excludedNames.Count -gt 0)
+					{
+						$lines.Add("# Vom Backup ausgeschlossen (sqm_BackupExclude): $($excludedNames -join ', ')")
+					}
 					$lines.Add("# ================================================================")
 					$lines.Add("")
 					$lines.Add(("{0,-35} {1,-10} {2,-12} {3,-6} {4,-7} {5,-8} {6,-8} {7}" -f
@@ -336,10 +380,15 @@ END
 					$rowsHtml = foreach ($e in ($detailRows | Sort-Object OverallStatus, Database))
 					{
 						$sevClass = switch ($e.OverallStatus) { 'Critical' { 'crit' }; 'Warning' { 'warn' }; default { 'ok' } }
-						"<tr><td class='$sevClass'>$($e.OverallStatus)</td><td>$([System.Net.WebUtility]::HtmlEncode($e.Database))</td><td>$($e.RecoveryModel)</td><td>$($e.SizeMB)</td><td>$($e.CheckDbStatus) ($($e.CheckDbAgeDays)d)</td><td>$($e.VlfStatus) ($($e.VlfCount))</td><td>$($e.AutoGrowthEvents)</td><td>$($e.LastFullBackup)</td><td>$($e.LastLogBackup)</td></tr>"
+						$excludeCell = if ($e.ExcludedFromBackup)
+						{
+							'Ausgeschlossen' + $(if ($e.ExcludeReason) { " ($([System.Net.WebUtility]::HtmlEncode($e.ExcludeReason)))" } else { '' })
+						}
+						else { '' }
+						"<tr><td class='$sevClass'>$($e.OverallStatus)</td><td>$([System.Net.WebUtility]::HtmlEncode($e.Database))</td><td>$($e.RecoveryModel)</td><td>$($e.SizeMB)</td><td>$($e.CheckDbStatus) ($($e.CheckDbAgeDays)d)</td><td>$($e.VlfStatus) ($($e.VlfCount))</td><td>$($e.AutoGrowthEvents)</td><td>$($e.LastFullBackup)</td><td>$($e.LastLogBackup)</td><td>$excludeCell</td></tr>"
 					}
 					$bodyHtml = "<p>OK: $cntOk | Warning: $cntWarn | Critical: $cntCrit</p>" +
-						"<table><tr><th>Status</th><th>Datenbank</th><th>Recovery</th><th>SizeMB</th><th>CheckDB</th><th>VLF</th><th>AutoGrowth</th><th>Letztes Full</th><th>Letztes Log</th></tr>" +
+						"<table><tr><th>Status</th><th>Datenbank</th><th>Recovery</th><th>SizeMB</th><th>CheckDB</th><th>VLF</th><th>AutoGrowth</th><th>Letztes Full</th><th>Letztes Log</th><th>Backup-Ausschluss</th></tr>" +
 						($rowsHtml -join '') + "</table>"
 					$html = ConvertTo-sqmHtmlReport -Title "Database Health - $instance" -Subtitle "Erstellt: $timestamp" -BodyHtml $bodyHtml
 					$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force

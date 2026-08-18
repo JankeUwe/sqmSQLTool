@@ -1,5 +1,52 @@
 # sqmSQLTool — Changelog
 
+## [1.9.98.0] — 2026-08-18
+
+### Bugfix (kritisch): `Invoke-sqmUserDatabaseBackup -UseExcludeTable` hatte die IsActive-Polaritaet invertiert
+
+`master.dbo.sqm_BackupExclude` wird von zwei Funktionen gelesen: `New-sqmOlaUsrDbBackupJob`
+(produktiver Standard, Ola-Hallengren-basiert) interpretiert `IsActive=1` korrekt als "diese
+Datenbank wird gesichert" (Default fuer neu von `Sync-sqmBackupExcludeTable` erkannte
+Datenbanken; seit v1.8.13.0 so verifiziert) und schliesst nur bei `IsActive=0 AND
+IsOrphaned=0` aus. `Invoke-sqmUserDatabaseBackup -UseExcludeTable` filterte bislang jedoch auf
+`IsActive = 1 AND IsOrphaned = 0` - also genau umgekehrt.
+
+Praktische Folge: unter `Invoke-sqmUserDatabaseBackup -UseExcludeTable` wurde jede neu
+erkannte Datenbank ab dem ersten `Sync-sqmBackupExcludeTable`-Lauf automatisch vom Backup
+ausgeschlossen (Default-Wert `IsActive=1`), bis ein Admin die Checkbox in
+`Show-sqmBackupExcludeForm` manuell umschaltet - ein stiller Datenverlust-Risikofall bei
+gemischtem Einsatz beider Backup-Funktionen gegen dieselbe Tabelle.
+
+Fix: Query auf `WHERE IsActive = 0 AND IsOrphaned = 0` korrigiert, Log-Meldungen und
+Doku-Kommentare an die jetzt uebereinstimmende Semantik beider Funktionen angepasst. Das
+GUI-Label "Aktiv (Backup)" in `Show-sqmBackupExcludeForm` war bereits korrekt und wurde nicht
+veraendert.
+
+## [1.9.97.0] — 2026-08-18
+
+### Neu: `Get-sqmDatabaseHealth` zeigt Backup-Ausschluss (sqm_BackupExclude)
+
+Gemeldet: eine Datenbank ohne (aktuelles) Backup im Health-Report ist im Report nicht von einer
+Datenbank zu unterscheiden, die absichtlich ueber `master.dbo.sqm_BackupExclude` vom Backup
+ausgenommen ist (siehe `New-sqmOlaUsrDbBackupJob` / `Invoke-sqmUserDatabaseBackup
+-UseExcludeTable`). Neue Spalte "Backup-Ausschluss" im HTML-Bericht ("Ausgeschlossen (<Grund>)"
+wenn gesetzt), neue Properties `ExcludedFromBackup`/`ExcludeReason` je Datenbank im
+Rueckgabeobjekt/CSV, sowie eine Zusammenfassungszeile im TXT-Bericht.
+
+Semantik: `IsActive = 0 AND IsOrphaned = 0` = ausgeschlossen (`IsActive=1` heisst "wird
+gesichert", Default fuer neu erkannte Datenbanken) - deckungsgleich mit der Beschriftung "Aktiv
+(Backup)" in `Show-sqmBackupExcludeForm` sowie mit `New-sqmOlaUsrDbBackupJob`. Fehlt die
+Tabelle, werden keine Ausschluesse angenommen.
+
+*Korrektur 1.9.98.0: die urspruengliche Fassung dieser Funktion (und dieses Eintrags) hatte die
+Polaritaet fuer 1.9.97.0 fehlerhaft von `Invoke-sqmUserDatabaseBackup` uebernommen, dessen
+Query selbst invertiert war - siehe oben.*
+
+`OverallStatus` bleibt unveraendert - Backup-Aktualitaet fliesst schon bisher nicht in die
+Bewertung ein (separate, bereits bestehende Luecke, hier nicht mit angefasst). Mit gemockten
+dbatools-Daten via Pester verifiziert (3 neue Tests: Flag+Grund gesetzt, unbeteiligte DB bleibt
+unmarkiert, HTML enthaelt Spalte+Text).
+
 ## [1.9.96.0] — 2026-08-18
 
 ### Neu: `Get-sqmDatabaseSpaceReport` - Fuellstand der Datenbankdateien (Data + Log)

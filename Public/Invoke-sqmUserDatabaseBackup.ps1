@@ -10,9 +10,10 @@ If the SqlInstance parameter is not specified, the current computer name
 ($env:COMPUTERNAME) is used by default. This rule applies to all future versions.
 
 When -UseExcludeTable is set, the function reads the table master.dbo.sqm_BackupExclude
-(created by Sync-sqmBackupExcludeTable) and skips all databases where IsActive=1 AND
-IsOrphaned=0. If the table does not exist or contains no active, non-orphaned rows,
-all databases are backed up normally.
+(created by Sync-sqmBackupExcludeTable) and skips all databases where IsActive=0 AND
+IsOrphaned=0 (IsActive=1 means "back this database up", the default for newly discovered
+databases - same semantics as New-sqmOlaUsrDbBackupJob -UseExcludeTable). If the table does
+not exist or contains no matching rows, all databases are backed up normally.
 
 When -CheckPreferredReplica is set, the function checks whether this SQL Server instance
 is the preferred backup replica for any Availability Group databases before starting any
@@ -41,8 +42,9 @@ Optional direct backup path (overrides the value from server properties).
 The path must end with "Usr-db".
 
 .PARAMETER UseExcludeTable
-When set, reads master.dbo.sqm_BackupExclude and skips databases where IsActive=1
-and IsOrphaned=0.
+When set, reads master.dbo.sqm_BackupExclude and skips databases where IsActive=0
+and IsOrphaned=0 (IsActive=1, the default for newly discovered databases, means
+"back this database up").
 
 .PARAMETER CheckPreferredReplica
 When set, checks sys.fn_hadr_backup_is_preferred_replica() for all AG databases on
@@ -368,7 +370,7 @@ WHERE  rs.is_local = 1
 					if ($excludeCheck)
 					{
 						$excludeRows = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database master `
-							-Query "SELECT DatabaseName FROM master.dbo.sqm_BackupExclude WHERE IsActive = 1 AND IsOrphaned = 0" `
+							-Query "SELECT DatabaseName FROM master.dbo.sqm_BackupExclude WHERE IsActive = 0 AND IsOrphaned = 0" `
 							-ErrorAction Stop
 
 						if ($excludeRows)
@@ -376,14 +378,14 @@ WHERE  rs.is_local = 1
 							$excludeNames = @($excludeRows | Select-Object -ExpandProperty DatabaseName)
 							foreach ($excludeName in $excludeNames)
 							{
-								Invoke-sqmLogging -Message "Datenbank '$excludeName' ist in sqm_BackupExclude (IsActive=1, IsOrphaned=0) und wird uebersprungen." -FunctionName $functionName -Level "INFO"
+								Invoke-sqmLogging -Message "Datenbank '$excludeName' ist in sqm_BackupExclude (IsActive=0, IsOrphaned=0) und wird uebersprungen." -FunctionName $functionName -Level "INFO"
 							}
 							$databases = $databases | Where-Object { $_.Name -notin $excludeNames }
 							Invoke-sqmLogging -Message "Nach Exclude-Filter: $($databases.Count) Datenbank(en) verbleiben fuer das Backup." -FunctionName $functionName -Level "INFO"
 						}
 						else
 						{
-							Invoke-sqmLogging -Message "sqm_BackupExclude enthaelt keine aktiven Eintraege. Alle Datenbanken werden gesichert." -FunctionName $functionName -Level "INFO"
+							Invoke-sqmLogging -Message "sqm_BackupExclude enthaelt keine Ausschluesse (IsActive=0). Alle Datenbanken werden gesichert." -FunctionName $functionName -Level "INFO"
 						}
 					}
 					else

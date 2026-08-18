@@ -73,6 +73,47 @@ Describe 'Get-sqmDatabaseHealth' {
         }
     }
 
+    Context 'Backup-Ausschluss (sqm_BackupExclude)' {
+        BeforeAll {
+            Mock -ModuleName sqmSQLTool Connect-DbaInstance {
+                New-MockSqlInstance -Name 'TESTSERVER'
+            }
+            Mock -ModuleName sqmSQLTool Get-DbaDatabase {
+                @(
+                    New-MockDatabase -Name 'ExcludedDb' -Status 'Normal' -RecoveryModel 'Full'
+                    New-MockDatabase -Name 'NormalDb'   -Status 'Normal' -RecoveryModel 'Full'
+                )
+            }
+            Mock -ModuleName sqmSQLTool Invoke-DbaQuery -ParameterFilter {
+                $Query -like '*sys.objects*sqm_BackupExclude*'
+            } { @(1) }
+            Mock -ModuleName sqmSQLTool Invoke-DbaQuery -ParameterFilter {
+                $Query -like 'SELECT DatabaseName, Reason FROM master.dbo.sqm_BackupExclude*'
+            } { @([PSCustomObject]@{ DatabaseName = 'ExcludedDb'; Reason = 'Read-Replika, Backup laeuft auf Primary' }) }
+            Mock -ModuleName sqmSQLTool Invoke-DbaQuery { @() }
+            Mock -ModuleName sqmSQLTool Invoke-sqmLogging { }
+        }
+
+        It 'markiert die in sqm_BackupExclude gelistete Datenbank als ausgeschlossen' {
+            $r = Get-sqmDatabaseHealth -SqlInstance 'TESTSERVER' -OutputPath $script:TestDir -NoOpen
+            $rows = $r.DetailRows
+            ($rows | Where-Object Database -eq 'ExcludedDb').ExcludedFromBackup | Should -Be $true
+            ($rows | Where-Object Database -eq 'ExcludedDb').ExcludeReason | Should -Be 'Read-Replika, Backup laeuft auf Primary'
+        }
+
+        It 'laesst nicht gelistete Datenbanken unmarkiert' {
+            $r = Get-sqmDatabaseHealth -SqlInstance 'TESTSERVER' -OutputPath $script:TestDir -NoOpen
+            ($r.DetailRows | Where-Object Database -eq 'NormalDb').ExcludedFromBackup | Should -Be $false
+        }
+
+        It 'schreibt den Ausschluss-Hinweis und die Spalte in den HTML-Bericht' {
+            $r = Get-sqmDatabaseHealth -SqlInstance 'TESTSERVER' -OutputPath $script:TestDir -NoOpen
+            $html = Get-Content $r.HtmlFile -Raw
+            $html | Should -Match 'Backup-Ausschluss'
+            $html | Should -Match 'Ausgeschlossen'
+        }
+    }
+
     Context 'Fehlerbehandlung' {
         It 'Wirft Fehler bei nicht erreichbarer Instanz (kein Mock)' {
             { Get-sqmDatabaseHealth -SqlInstance 'NICHT_ERREICHBAR_99999' -OutputPath $script:TestDir -EnableException -ErrorAction Stop } |
