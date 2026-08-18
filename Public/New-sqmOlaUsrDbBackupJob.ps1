@@ -13,12 +13,15 @@
         OlaJobNameDiff  (Default: 'OlaHH-UserDatabases-DIFF')
         OlaJobNameLog   (Default: 'OlaHH-UserDatabases-LOG')
 
-    When -UseExcludeTable is set, the function reads master.dbo.sqm_BackupExclude
-    (created by Sync-sqmBackupExcludeTable) for entries where IsActive=0 (database should
-    NOT be backed up) AND IsOrphaned=0 AND the database actually exists on this instance
-    (sys.databases). If entries are found, they are prepended with '-' (Ola's exclude prefix)
-    and appended to the @Databases parameter in the generated job step command. If the table
-    does not exist or contains no matching rows, the -Databases parameter is used unchanged.
+    When -UseExcludeTable is set, the generated procedure no longer builds a single
+    '-DatabaseName' exclusion list for Ola's @Databases parameter (that list grows with every
+    excluded database and becomes impractically long on instances with many exclusions -
+    real-world incident on an instance with ~90 exclusion rows). Instead it cursors through
+    every candidate database individually (resolved from -Databases: 'USER_DATABASES',
+    'ALL_DATABASES', or an explicit comma-separated list) and, for each one, checks
+    master.dbo.sqm_BackupExclude on its own: if IsActive=0 AND IsOrphaned=0, the database is
+    skipped; otherwise Ola's DatabaseBackup is called for just that one database. If the table
+    does not exist, every candidate database is backed up.
     Note: IsActive=1 means "back this database up" (the default for newly discovered
     databases); IsActive=0 means "exclude this database".
 
@@ -113,11 +116,13 @@
     Continue with remaining jobs if one job fails.
 
 .PARAMETER UseExcludeTable
-    When set, reads master.dbo.sqm_BackupExclude for non-orphaned entries with IsActive=0
-    (databases explicitly marked as "do not back up") that exist on this instance, and adds
-    them as '-DatabaseName' exclusions to the @Databases parameter of Ola's DatabaseBackup.
-    IsActive=1 (the default for newly discovered databases) means "back this database up".
-    If the table does not exist or no rows match, the Databases parameter is used unchanged.
+    When set, the generated procedure backs up each candidate database individually via a
+    cursor, checking master.dbo.sqm_BackupExclude per database (IsActive=0 AND IsOrphaned=0 =
+    skip this database) instead of building one long '-DatabaseName,...' exclusion list for
+    Ola's @Databases parameter - avoids the exclusion list becoming impractically long on
+    instances with many excluded databases. IsActive=1 (the default for newly discovered
+    databases) means "back this database up". If the table does not exist, every candidate
+    database is backed up.
 
 .PARAMETER CreateSyncJob
     When -UseExcludeTable is set, automatically creates a SQL Agent job that runs
@@ -562,35 +567,64 @@ function New-sqmOlaUsrDbBackupJob
 
 					if ($UseExcludeTable)
 					{
+						# Cursor statt einer einzigen langen '-DatabaseName,...'-Ausschlussliste:
+						# die Liste waechst mit jedem Ausschluss und wird auf Instanzen mit vielen
+						# Eintraegen (Praxisfall: ~90 Zeilen) unpraktikabel lang. Stattdessen wird
+						# jede Kandidaten-Datenbank einzeln gegen sqm_BackupExclude geprueft und nur
+						# bei Bedarf einzeln gesichert.
 						$procBody = @"
 CREATE PROCEDURE [$procName]
 AS
 BEGIN
     SET NOCOUNT ON;
+
     DECLARE @Databases NVARCHAR(MAX) = N'$Databases';
-    IF OBJECT_ID(N'master.dbo.sqm_BackupExclude', N'U') IS NOT NULL
+    DECLARE @dbName sysname;
+    DECLARE @HasExcludeTable BIT = CASE WHEN OBJECT_ID(N'master.dbo.sqm_BackupExclude', N'U') IS NOT NULL THEN 1 ELSE 0 END;
+
+    DECLARE @DbList TABLE (DatabaseName sysname PRIMARY KEY);
+
+    IF @Databases = N'ALL_DATABASES'
+        INSERT INTO @DbList (DatabaseName)
+        SELECT name FROM sys.databases WHERE state = 0;
+    ELSE IF @Databases = N'USER_DATABASES'
+        INSERT INTO @DbList (DatabaseName)
+        SELECT name FROM sys.databases WHERE state = 0 AND database_id > 4 AND source_database_id IS NULL;
+    ELSE
+        INSERT INTO @DbList (DatabaseName)
+        SELECT d.name
+        FROM   STRING_SPLIT(@Databases, ',') s
+        JOIN   sys.databases d ON d.name = LTRIM(RTRIM(s.value)) AND d.state = 0;
+
+    DECLARE dbCursor CURSOR LOCAL FAST_FORWARD FOR
+        SELECT DatabaseName FROM @DbList ORDER BY DatabaseName;
+
+    OPEN dbCursor;
+    FETCH NEXT FROM dbCursor INTO @dbName;
+
+    WHILE @@FETCH_STATUS = 0
     BEGIN
-        DECLARE @Exclusions NVARCHAR(MAX);
-        SELECT @Exclusions = STUFF((
-            SELECT ',-' + e.DatabaseName
-            FROM   master.dbo.sqm_BackupExclude e
-            WHERE  e.IsActive   = 0
-              AND  e.IsOrphaned = 0
-              AND  EXISTS (SELECT 1 FROM sys.databases d WHERE d.name = e.DatabaseName)
-            FOR XML PATH(''), TYPE
-        ).value('.', 'NVARCHAR(MAX)'), 1, 1, '');
-        IF @Exclusions IS NOT NULL AND @Exclusions <> ''
-            SET @Databases = @Databases + ',' + @Exclusions;
+        IF @HasExcludeTable = 0 OR NOT EXISTS (
+            SELECT 1 FROM master.dbo.sqm_BackupExclude e
+            WHERE e.DatabaseName = @dbName AND e.IsActive = 0 AND e.IsOrphaned = 0
+        )
+        BEGIN
+            EXECUTE master.dbo.DatabaseBackup
+                @Databases  = @dbName,
+                @Directory  = N'$usrBackupDir',
+                @BackupType = '$($jobDef.BackupType)',
+                @Verify     = '$Verify',
+                $cleanupParam
+                @Compress   = '$Compress',
+                @CheckSum   = '$CheckSum',
+                @LogToTable = '$LogToTable';
+        END
+
+        FETCH NEXT FROM dbCursor INTO @dbName;
     END
-    EXECUTE master.dbo.DatabaseBackup
-        @Databases  = @Databases,
-        @Directory  = N'$usrBackupDir',
-        @BackupType = '$($jobDef.BackupType)',
-        @Verify     = '$Verify',
-        $cleanupParam
-        @Compress   = '$Compress',
-        @CheckSum   = '$CheckSum',
-        @LogToTable = '$LogToTable';
+
+    CLOSE dbCursor;
+    DEALLOCATE dbCursor;
 END
 "@
 					}

@@ -1,5 +1,32 @@
 # sqmSQLTool — Changelog
 
+## [1.9.99.0] — 2026-08-18
+
+### Architekturänderung: `New-sqmOlaUsrDbBackupJob -UseExcludeTable` — Cursor statt einer langen Ausschlussliste
+
+Gemeldet: die bisherige Umsetzung baut eine einzige `'-DatabaseName,-DatabaseName,...'`-Liste
+und haengt sie an Olas `@Databases`-Parameter an. Auf Instanzen mit vielen Ausschluessen
+(Praxisfall: ~90 Zeilen in `sqm_BackupExclude`) wird diese Liste unpraktikabel lang.
+
+Die generierte Prozedur (`sqm_Run_<Jobname>`) cursort jetzt einzeln durch jede
+Kandidaten-Datenbank (aufgeloest aus `-Databases`: `USER_DATABASES`, `ALL_DATABASES` oder eine
+explizite kommagetrennte Liste via `STRING_SPLIT`) und prueft pro Datenbank direkt gegen
+`master.dbo.sqm_BackupExclude` (`IsActive = 0 AND IsOrphaned = 0` = uebersprungen). Nur
+nicht-ausgeschlossene Datenbanken werden einzeln per `EXECUTE master.dbo.DatabaseBackup
+@Databases = @dbName, ...` gesichert - es wird nie eine lange Liste zusammengebaut. Fehlt die
+Tabelle (`OBJECT_ID(...) IS NULL`), wird jede Kandidaten-Datenbank gesichert.
+
+`Show-sqmBackupExcludeForm`: die Warnzeile zur Laenge der Exclusion-Liste (Schwellwerte 1500/1900
+Zeichen, RAISERROR-2047-Warnung) ist damit hinfaellig und wurde entfernt (`Update-
+ExclusionLengthIndicator`, `$pWarn`-Panel).
+
+Live gegen DEV01 verifiziert: generierte Prozedur (FULL + LOG) kompiliert und wird korrekt als
+SQL-Agent-Job angelegt; isolierter Logik-Test (Stub statt echtem `DatabaseBackup`) mit einer
+temporaer auf `IsActive=0` gesetzten Testdatenbank (`AdventureWorks`) bestaetigt: von 18
+Kandidaten-Datenbanken wurden korrekt 17 "gesichert", die ausgeschlossene fehlt im Ergebnis.
+Alle Testartefakte (Jobs, Prozeduren, Stub, Testtabelle) nach dem Test entfernt, Ausgangszustand
+wiederhergestellt.
+
 ## [1.9.98.0] — 2026-08-18
 
 ### Bugfix (kritisch): `Invoke-sqmUserDatabaseBackup -UseExcludeTable` hatte die IsActive-Polaritaet invertiert
