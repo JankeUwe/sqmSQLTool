@@ -1,5 +1,44 @@
 # sqmSQLTool — Changelog
 
+## [1.9.101.0] — 2026-08-18
+
+### Neu: `Get-sqmBlockingHistory` + `Register-sqmBlockedProcessMonitor` - vergangene Blocking-Vorfaelle
+
+Gemeldet: `Get-sqmBlockingReport` zeigt nur Blocking im Moment des Aufrufs, keine
+zurueckliegenden Waits. Neue Funktion `Get-sqmBlockingHistory` liest dafuer
+`blocked_process_report`-Events aus Extended-Events-Ring-Buffern (SPID, Login, Host,
+Programm, Lock-Modus, Wait-Resource, Wartezeit, Statement-Ausschnitt je Vorfall).
+
+**Zwei Design-Annahmen live widerlegt, bevor der finale Stand stand:**
+
+1. Die eingebaute `system_health`-Session enthaelt `blocked_process_report` **nicht**
+   zuverlaessig - auf einer Standardinstallation (DEV01) fehlt das Event komplett in der
+   Session-Definition (`sys.server_event_session_events` gepruef). Ohne lauschendes Ziel
+   verpuffen die Events, selbst bei aktiviertem `blocked process threshold (s)`. Neue
+   Funktion `Register-sqmBlockedProcessMonitor` legt daher bei Bedarf eine eigene,
+   dauerhafte Session `sqm_BlockedProcessMonitor` an (`blocked_process_report` +
+   `xml_deadlock_report`, `ring_buffer`-Target, optional `-IncludeFileTarget` fuer
+   laengere Aufbewahrung via `event_file`). `Get-sqmBlockingHistory` ruft das automatisch
+   auf (`-SkipMonitorSetup` zum Abschalten) und liest zusaetzlich weiterhin
+   `system_health` mit, falls das dort ausnahmsweise doch vorhanden ist.
+2. Der Konfigurationsname ist tatsaechlich `'blocked process threshold (s)'` (mit
+   Einheiten-Suffix) - `sp_configure`/`sys.configurations` kennen kein
+   `'blocked process threshold'` ohne Suffix. Mit einem echten, live via zwei
+   Hintergrund-Connections erzeugten Blocking-Vorfall verifiziert.
+3. **Der eigentliche Auslieferungsbug:** `.value()` auf ein zuvor per `.query()`
+   materialisiertes XML-Zwischenergebnis lieferte fuer jede Spalte `DBNull` - trotz
+   nachweislich vollstaendiger Roh-XML. Live an einem echten, ~12 Sekunden gehaltenen
+   Blocking-Vorfall auf DEV01 gefunden (`BlockedWaitMs`-Division warf
+   `System.DBNull does not contain a method named 'op_Division'`). Fix: der komplette
+   XPath laeuft jetzt in einem Zug direkt gegen die Ereignisspalte statt ueber eine
+   Zwischenspalte - danach lieferten alle drei erzeugten Testereignisse exakt die
+   erwarteten Werte (SPIDs, Wartezeiten 3.5/9.6/12.6s, Statements, Lock-Modus).
+   Zusaetzlich gehaertet: `Invoke-DbaQuery` liefert SQL NULL als `[DBNull]`, nicht als
+   PowerShell `$null` - reine Truthy-Pruefungen erkennen das nicht.
+
+Alle Testartefakte (Testdatenbank, temporaere Monitor-Session, Threshold/Advanced-Options)
+nach jedem Testlauf von DEV01 entfernt, Ausgangszustand wiederhergestellt.
+
 ## [1.9.100.0] — 2026-08-18
 
 ### Bugfix: `Sync-sqmBackupExcludeTable` — AG-Propagierung konnte die Primary ueberschreiben
