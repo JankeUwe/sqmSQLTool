@@ -26,7 +26,8 @@
     Instead of a time range: number of last executions per job (e.g. -LastX 5).
 
 .PARAMETER OutputPath
-    Export as CSV (optional). If specified, a CSV file is created.
+    Full path of the CSV file to write. Default: an auto-named file under
+    <OutputPath config>\AgentJobHistory.
 
 .PARAMETER EnableException
     Throw exceptions immediately.
@@ -58,7 +59,7 @@ function Get-sqmAgentJobHistory {
         [Parameter(Mandatory = $false)]
         [int]$LastX,
         [Parameter(Mandatory = $false)]
-        [string]$OutputPath,
+        [string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) "AgentJobHistory\AgentJobHistory_$(Get-Date -Format 'yyyyMMdd_HHmmss').csv"),
         [Parameter(Mandatory = $false)]
         [switch]$EnableException
     )
@@ -140,6 +141,8 @@ function Get-sqmAgentJobHistory {
             }
 
             if ($OutputPath) {
+                $parentDir = Split-Path -Path $OutputPath -Parent
+                if ($parentDir -and -not (Test-Path $parentDir)) { New-Item -ItemType Directory -Path $parentDir -Force | Out-Null }
                 $allResults | Export-Csv -Path $OutputPath -NoTypeInformation -Encoding UTF8 -Force
                 Invoke-sqmLogging -Message "CSV exportiert nach $OutputPath" -FunctionName $functionName -Level "INFO"
             }

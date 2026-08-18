@@ -34,6 +34,7 @@ $categoryMap = @{
     'Get-sqmConfig'                       = 'Configuration Management'
     'Get-sqmConnectionStats'              = 'Monitoring & Health Checks'
     'Get-sqmDatabaseHealth'               = 'Monitoring & Health Checks'
+    'Get-sqmDatabaseSpaceReport'          = 'Storage & Disk Management'
     'Get-sqmDeadlockReport'               = 'Extended Events & Diagnostics'
     'Get-sqmDiskBlockSize'                = 'Storage & Disk Management'
     'Get-sqmDiskInfoByDriveLetter'        = 'Storage & Disk Management'

@@ -16,7 +16,7 @@
     PSCredential for the connection.
 
 .PARAMETER OutputPath
-    If specified, a CSV report is saved.
+    Directory for the CSV report. Default: <OutputPath config>\PatchAnalysis.
 
 .PARAMETER EnableException
     Throw exceptions immediately.
@@ -45,7 +45,7 @@ function Invoke-sqmPatchAnalysis
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath,
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'PatchAnalysis'),
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)

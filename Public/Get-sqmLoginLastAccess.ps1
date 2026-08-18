@@ -43,7 +43,7 @@
     Which sources to query: 'All' (default), 'Live', 'ErrorLog'.
 
 .PARAMETER OutputPath
-    If specified, CSV and HTML reports are written. Default: no export.
+    Directory for CSV and HTML reports. Default: <OutputPath config>\LoginLastAccess.
 
 .PARAMETER ContinueOnError
     Continue on error for an instance.
@@ -94,7 +94,7 @@ function Get-sqmLoginLastAccess
 		[string]$Source = 'All',
 
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath,
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'LoginLastAccess'),
 
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,

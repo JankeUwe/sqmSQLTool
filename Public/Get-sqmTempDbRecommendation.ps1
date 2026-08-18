@@ -14,7 +14,8 @@
     PSCredential for the connection.
 
 .PARAMETER OutputPath
-    Optional directory for reports (CSV + HTML). File names are generated.
+    Directory for reports (CSV + HTML). File names are generated.
+    Default: <OutputPath config>\TempDbRecommendation.
 
 .PARAMETER NoOpen
     Do not open the HTML report after creation.
@@ -39,13 +40,13 @@ function Get-sqmTempDbRecommendation
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath,
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'TempDbRecommendation'),
 		[Parameter(Mandatory = $false)]
 		[switch]$NoOpen,
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
-	
+
 	begin
 	{
 		$functionName = $MyInvocation.MyCommand.Name

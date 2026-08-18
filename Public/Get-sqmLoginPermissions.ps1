@@ -42,7 +42,7 @@
     Skip the server-level roles and permissions, report database scope only.
 
 .PARAMETER OutputPath
-    If specified, CSV and HTML reports are written. Default: no export.
+    Directory for CSV and HTML reports. Default: <OutputPath config>\LoginPermissions.
 
 .PARAMETER ContinueOnError
     Continue on error for an instance.
@@ -100,7 +100,7 @@ function Get-sqmLoginPermissions
 		[switch]$ExcludeServerScope,
 
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath,
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'LoginPermissions'),
 
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,

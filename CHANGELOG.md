@@ -1,5 +1,70 @@
 # sqmSQLTool — Changelog
 
+## [1.9.96.0] — 2026-08-18
+
+### Neu: `Get-sqmDatabaseSpaceReport` - Fuellstand der Datenbankdateien (Data + Log)
+
+Bisher gab es keinen Report fuer den tatsaechlichen Fuellstand einer Datenbank (belegte Datenseiten
+vs. allokierte Dateigroesse) - nur benachbarte, aber andere Kennzahlen: `Get-sqmDiskSpaceReport`
+(freier Platz auf dem Windows-Laufwerk) und `Get-sqmAutoGrowthReport` (allokierte Dateigroesse +
+Autogrowth-Konfiguration). Neue Funktion liest pro Datenbank Data- und Log-Dateien getrennt aus,
+aggregiert je Datenbank zu einem Fuellstand in % und markiert `Warning`/`Critical` ab konfigurierbaren
+Schwellwerten (`-WarnThresholdPct` 80 / `-CriticalThresholdPct` 90, Default). CSV (Datei-Detail) +
+HTML (Datenbank-Zusammenfassung, farbcodiert) im etablierten Report-Format, Default-`-OutputPath`
+nach demselben Muster wie die uebrigen Reports (`Get-sqmDefaultOutputPath` + `DatabaseSpaceReport`).
+
+Aufbauend auf dbatools' `Get-DbaDbSpace`. Fallstrick beim Bau entdeckt: `Get-DbaDbSpace`s eigener
+`-IncludeSystemDBs`-Switch ist in der hier installierten dbatools-Version (2.8.4) deprecated und
+bricht mit `Stop-Function` ab, ohne etwas zurueckzugeben - `-IncludeSystemDatabases` steuert die
+System-DB-Aufnahme deshalb ueber `-ExcludeDatabase` (master/model/msdb/tempdb), nicht ueber den
+kaputten Switch. Mit gemockten dbatools-Daten via Pester verifiziert (8 Tests: Schwellwert-Logik,
+Critical-/OK-Einstufung, CSV/HTML-Erzeugung inkl. Default-Pfad).
+
+## [1.9.95.0] — 2026-08-18
+
+### Fix: sechs weitere Funktionen ohne Default-Wert fuer `-OutputPath`
+
+Vollstaendige Durchsicht aller oeffentlichen Funktionen mit `-OutputPath`-Parameter nach den
+Einzelfixes fuer `Get-sqmBlockingReport` (v1.9.93.0) und `Get-sqmDeadlockReport` (v1.9.94.0): 23
+Funktionen hatten einen unbedingten `[string]$OutputPath,`-Parameter ohne Default. 17 davon waren
+bereits korrekt (Default schon im `begin`-Block gesetzt, z. B. `Invoke-sqmPerfBaseline`,
+`Get-sqmCertificateReport`, `Invoke-sqmRestoreTest`) oder haben `-OutputPath` bewusst anders belegt
+(`Export-sqmDatabaseSettings`/`Export-sqmDatabaseLogins`: Mandatory, da Kennwort-Hashes/Settings
+ohne explizites Ziel nicht exportiert werden sollen; `Set-sqmConfig`: setzt den Konfigurationswert
+selbst, kein Report-Pfad). Sechs Funktionen fehlte der Default tatsaechlich - Fix nach dem
+etablierten Muster `(Join-Path (Get-sqmDefaultOutputPath) '<Unterordner>')`:
+- `Get-sqmLoginLastAccess` → `...\LoginLastAccess`
+- `Get-sqmLoginPermissions` → `...\LoginPermissions`
+- `Get-sqmTempDbRecommendation` → `...\TempDbRecommendation`
+- `Get-sqmIndexFragmentation` → `...\IndexFragmentation`
+- `Invoke-sqmPatchAnalysis` → `...\PatchAnalysis`
+- `Get-sqmAgentJobHistory` → Sonderfall: `-OutputPath` ist dort ein kompletter Dateipfad (nicht
+  Verzeichnis), Default ist deshalb ein vollstaendiger, zeitgestempelter Dateiname unter
+  `...\AgentJobHistory`; Schreiblogik legt das uebergeordnete Verzeichnis jetzt bei Bedarf an.
+
+Alle sechs mit gemockten dbatools-Daten via Pester verifiziert: CSV/HTML landen jetzt ohne
+explizites `-OutputPath` im Default-Ordner.
+
+## [1.9.94.0] — 2026-08-18
+
+### Fix: `Get-sqmDeadlockReport` hatte keinen Default-Wert fuer `-OutputPath`
+
+Gleicher Fehler wie eben bei `Get-sqmBlockingReport` (siehe dort): ohne explizites `-OutputPath`
+wurden nie XDL-Graphen oder ein HTML-Summary geschrieben. Fix nach demselben Muster
+`(Join-Path (Get-sqmDefaultOutputPath) 'DeadlockReport')`. Anmerkung: mindestens 23 weitere
+oeffentliche Funktionen haben denselben unbedingten `[string]$OutputPath,`-Parameter ohne
+Default - noch nicht angefasst, da nicht angefragt.
+
+## [1.9.93.0] — 2026-08-18
+
+### Fix: `Get-sqmBlockingReport` hatte keinen Default-Wert fuer `-OutputPath`
+
+Wie schon bei den fuenf Batch-B3-Funktionen in v1.9.80.0 (siehe dort) fehlte `-OutputPath` ein
+Standardwert - ohne explizite Angabe wurde nie ein CSV/HTML-Report geschrieben. Fix nach dem
+etablierten Muster `(Join-Path (Get-sqmDefaultOutputPath) 'BlockingReport')`. Die bestehende
+Bedingung `-and $blockedSessions.Count -gt 0` bleibt unveraendert (analog `Get-sqmMissingIndexes`:
+bewusst kein leerer Report, wenn keine Blockierung vorliegt).
+
 ## [1.9.92.0] — 2026-08-17
 
 ### Neu: `Invoke-sqmSplunkConfiguration` - Modus `Remove` zum Rueckbau der Splunk-Konfiguration

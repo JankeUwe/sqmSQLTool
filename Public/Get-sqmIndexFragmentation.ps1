@@ -27,7 +27,8 @@
     Show only indexes with at least this page count. Default: 0 (all indexes).
 
 .PARAMETER OutputPath
-    Optional directory for reports (CSV + HTML). File names are generated.
+    Directory for reports (CSV + HTML). File names are generated.
+    Default: <OutputPath config>\IndexFragmentation.
 
 .PARAMETER NoOpen
     Do not open the HTML report after creation.
@@ -66,7 +67,7 @@ function Get-sqmIndexFragmentation {
         [Parameter(Mandatory = $false)]
         [int]$PageCountMin = 0,
         [Parameter(Mandatory = $false)]
-        [string]$OutputPath,
+        [string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'IndexFragmentation'),
         [Parameter(Mandatory = $false)]
         [switch]$NoOpen,
         [Parameter(Mandatory = $false)]

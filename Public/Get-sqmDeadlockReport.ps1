@@ -35,8 +35,8 @@
     Maximum number of deadlocks returned (newest first). Default: 100.
 
 .PARAMETER OutputPath
-    If specified, deadlock graphs are saved as .xdl files in this directory
-    (format: Deadlock_<Instance>_<Timestamp>.xdl).
+    Directory for the XDL graphs and the HTML summary report
+    (format: Deadlock_<Instance>_<Timestamp>.xdl). Default: <OutputPath config>\DeadlockReport.
 
 .PARAMETER EnableException
     Throw exceptions immediately instead of returning as errors.
@@ -82,7 +82,7 @@ function Get-sqmDeadlockReport
 		[Parameter(Mandatory = $false)]
 		[int]$MaxDeadlocks = 100,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath,
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'DeadlockReport'),
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException,
 		[Parameter(Mandatory = $false)]

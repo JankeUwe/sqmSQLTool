@@ -29,7 +29,7 @@
     Only report blocking that has been waiting longer than this value (in seconds). Default: 0.
 
 .PARAMETER OutputPath
-    If specified, a CSV snapshot is written to this directory.
+    Directory for the CSV/HTML report. Default: <OutputPath config>\BlockingReport.
 
 .PARAMETER EnableException
     Throw exceptions immediately instead of returning as errors.
@@ -65,7 +65,7 @@ function Get-sqmBlockingReport
 		[Parameter(Mandatory = $false)]
 		[int]$MinWaitSeconds = 0,
 		[Parameter(Mandatory = $false)]
-		[string]$OutputPath,
+		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'BlockingReport'),
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException,
 		[Parameter(Mandatory = $false)]
