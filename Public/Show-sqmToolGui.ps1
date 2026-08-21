@@ -408,7 +408,17 @@
 	$output.ForeColor = $cText
 	$output.BorderStyle = 'FixedSingle'
 	$output.Font = New-Object System.Drawing.Font('Consolas', 9)
+	$btnCopyOutput = New-Object System.Windows.Forms.Button
+	$btnCopyOutput.Text = 'Copy output'
+	$btnCopyOutput.Dock = 'Top'
+	$btnCopyOutput.Height = 24
+	& $styleButton $btnCopyOutput
+	$btnCopyOutput.Add_Click({
+			if ($output.Text) { [System.Windows.Forms.Clipboard]::SetText($output.Text) }
+		})
+	# Fill control added first, Top control added second - see MSDN docking order remark.
 	$grpOut.Controls.Add($output)
+	$grpOut.Controls.Add($btnCopyOutput)
 	$right.Controls.Add($grpOut, 0, 3)
 
 	# --- State of the currently selected function ----------------------------------
@@ -470,6 +480,41 @@
 	}
 
 	$updatePreview = { $preview.Text = (& $buildCommand) }
+
+	# Evaluate a parameter's PowerShell-source default value expression (e.g. the
+	# "(Join-Path (Get-sqmDefaultOutputPath) 'WaitStatistics')" behind -OutputPath) so the GUI can
+	# pre-fill the textbox with the same directory the function would use anyway. CommandParameterInfo
+	# has no DefaultValue property for advanced functions, so this walks the function's own AST to
+	# find the parameter's default expression and evaluates it. Get-sqmDefaultOutputPath is a private
+	# (non-exported) helper, invisible to a plain InvokeScript() in this runspace's global scope, so
+	# the extracted expression is bound to the OWNING MODULE's session state via NewBoundScriptBlock -
+	# safe here because the expression always comes from this trusted module's own source, never
+	# from user input.
+	$getParamDefaultText = {
+		param ($cmd, $pname)
+		try
+		{
+			$paramAst = $cmd.ScriptBlock.Ast.FindAll({
+					param ($n) $n -is [System.Management.Automation.Language.ParameterAst] -and $n.Name.VariablePath.UserPath -eq $pname
+				}, $true) | Select-Object -First 1
+			if (-not $paramAst -or -not $paramAst.DefaultValue) { return $null }
+			$val = $null
+			try { $val = $paramAst.DefaultValue.SafeGetValue() }
+			catch
+			{
+				try
+				{
+					$sb = [scriptblock]::Create($paramAst.DefaultValue.Extent.Text)
+					if ($cmd.Module) { $sb = $cmd.Module.NewBoundScriptBlock($sb) }
+					$val = & $sb | Select-Object -First 1
+				}
+				catch { $val = $null }
+			}
+			if ([string]::IsNullOrWhiteSpace([string]$val)) { return $null }
+			return [string]$val
+		}
+		catch { return $null }
+	}
 
 	# Build the parameter fields for a function -------------------------------------
 	$loadFunction = {
@@ -559,6 +604,7 @@
 
 			$pt = $p.ParameterType
 			$isCred = $false
+			$extraCtrl = $null
 			if ($pt -eq [switch] -or $pt -eq [bool])
 			{
 				$ctrl = New-Object System.Windows.Forms.CheckBox
@@ -624,11 +670,79 @@
 				$ctrl.BorderStyle = 'FixedSingle'
 				# Pre-fill instance parameters with the current machine name
 				if ($p.Name -in @('SqlInstance', 'Instance')) { $ctrl.Text = $env:COMPUTERNAME }
+
+				if ($p.Name -match 'Files?$')
+				{
+					# File-path parameter (e.g. BackupFile/BackupFiles on Invoke-sqmRestoreDatabase) -
+					# offer an OpenFileDialog instead of forcing the user to type/paste a path.
+					# Array-typed parameters allow picking several files at once; the picked names are
+					# joined the same comma-separated way the textbox already expects (see $buildCommand).
+					$pName = $p.Name
+					$isArrayParam = $pt.IsArray
+					$btnBrowse = New-Object System.Windows.Forms.Button
+					$btnBrowse.Text = 'Browse...'
+					$btnBrowse.Width = 100
+					& $styleButton $btnBrowse
+					$btnBrowse.Add_Click({
+							$dlg = New-Object System.Windows.Forms.OpenFileDialog
+							$dlg.Title = "Select file$(if ($isArrayParam) { '(s)' }) for -$pName"
+							$dlg.Multiselect = $isArrayParam
+							$dlg.CheckFileExists = $true
+							if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK)
+							{
+								$ctrl.Text = ($dlg.FileNames -join ', ')
+								& $updatePreview
+							}
+						}.GetNewClosure())
+					$extraCtrl = $btnBrowse
+				}
+				elseif ($p.Name -eq 'OutputPath')
+				{
+					# Functions that write an HTML/CSV report default -OutputPath to a directory built
+					# from Get-sqmDefaultOutputPath in their own source; show that same default in the
+					# textbox instead of leaving it blank, and offer a folder/file picker seeded with it.
+					$defaultText = & $getParamDefaultText $cmd $p.Name
+					if ($defaultText) { $ctrl.Text = $defaultText }
+					$btnBrowse = New-Object System.Windows.Forms.Button
+					$btnBrowse.Text = 'Browse...'
+					$btnBrowse.Width = 100
+					& $styleButton $btnBrowse
+					$btnBrowse.Add_Click({
+							$current = $ctrl.Text
+							if ($current -and [System.IO.Path]::HasExtension($current))
+							{
+								# Default resolves to a full report file (e.g. Get-sqmAgentJobHistory's
+								# "...\AgentJobHistory_<timestamp>.csv") rather than a directory.
+								$dlg = New-Object System.Windows.Forms.SaveFileDialog
+								$dlg.Title = 'Select output file'
+								$dlg.Filter = 'HTML/CSV (*.html;*.csv)|*.html;*.csv|All files (*.*)|*.*'
+								$dlg.OverwritePrompt = $false
+								$dlg.FileName = $current
+								if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK)
+								{
+									$ctrl.Text = $dlg.FileName
+									& $updatePreview
+								}
+							}
+							else
+							{
+								$dlg = New-Object System.Windows.Forms.FolderBrowserDialog
+								$dlg.Description = 'Select output folder'
+								if ($current -and (Test-Path $current)) { $dlg.SelectedPath = $current }
+								if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK)
+								{
+									$ctrl.Text = $dlg.SelectedPath
+									& $updatePreview
+								}
+							}
+						}.GetNewClosure())
+					$extraCtrl = $btnBrowse
+				}
 				$ctrl.Add_TextChanged($updatePreview)
 			}
 			# Ein Zeilen-Panel pro Parameter: Label links, Eingabe rechts, auf einer Linie.
 			$rowP = New-Object System.Windows.Forms.Panel
-			$rowP.Width = 540
+			$rowP.Width = if ($extraCtrl) { 660 } else { 540 }
 			$rowP.Height = 30
 			$rowP.Margin = '0,0,0,2'
 			$rowP.BackColor = $cPanel
@@ -637,6 +751,11 @@
 			$ctrl.Location = New-Object System.Drawing.Point(195, [Math]::Max(2, [int]((30 - $ctrlHeight) / 2)))
 			$rowP.Controls.Add($lbl)
 			$rowP.Controls.Add($ctrl)
+			if ($extraCtrl)
+			{
+				$extraCtrl.Location = New-Object System.Drawing.Point(535, [Math]::Max(2, [int]((30 - $extraCtrl.Height) / 2)))
+				$rowP.Controls.Add($extraCtrl)
+			}
 			$paramPanel.Controls.Add($rowP)
 			if (-not $isCred) { $script:guiState.Controls[$p.Name] = $ctrl }
 			$row++

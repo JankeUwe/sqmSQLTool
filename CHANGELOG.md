@@ -1,5 +1,40 @@
 # sqmSQLTool — Changelog
 
+## [1.9.102.0] — 2026-08-21
+
+### GUI: Datei-/Ordnerauswahl und Ergebnis-Kopie in `Show-sqmToolGui`
+
+Drei Verbesserungen an der Parameter-Erfassung der GUI:
+
+1. Parameter, deren Name auf `File`/`Files` endet (z. B. `-BackupFile`/`-BackupFiles`
+   bei `Invoke-sqmRestoreDatabase`), bekommen jetzt einen "Browse..."-Button, der einen
+   `OpenFileDialog` oeffnet statt den Pfad von Hand eintippen zu muessen. Bei
+   Array-Parametern ist Mehrfachauswahl aktiv; die gewaehlten Dateien werden genauso
+   Komma-separiert in die Textbox geschrieben, wie sie das bestehende Splitting in
+   `$buildCommand`/Run bereits erwartet.
+2. `-OutputPath` wird jetzt mit demselben Standardverzeichnis vorbelegt, das die
+   jeweilige Funktion sonst intern verwenden wuerde (`Get-sqmDefaultOutputPath`
+   dahinter). Da dieser Default in praktisch allen betroffenen Funktionen ein Aufruf
+   eines *privaten*, nicht exportierten Modul-Helfers ist, reicht ein einfaches
+   `InvokeScript()` im GUI-Runspace nicht - der aus dem Funktions-AST extrahierte
+   Default-Ausdruck wird deshalb per `$cmd.Module.NewBoundScriptBlock()` im
+   Session-State des Moduls selbst ausgewertet (live an vier realen Varianten
+   verifiziert: `Get-sqmWaitStatistics`, `Get-sqmAgentJobHistory`,
+   `Enable-sqmMonitoringAccess`, `Install-sqmSsrsReportServer`). Der zugehoerige
+   "Browse..."-Button oeffnet einen `FolderBrowserDialog` fuer Verzeichnis-Defaults,
+   bzw. einen `SaveFileDialog`, wenn der Default (wie bei `Get-sqmAgentJobHistory`)
+   bereits ein vollstaendiger Dateiname mit Endung ist.
+3. Ueber dem Output-Feld sitzt jetzt ein "Copy output"-Button, der das Ergebnis der
+   zuletzt ausgefuehrten Funktion in die Zwischenablage kopiert - bisher liess sich nur
+   der Befehl selbst kopieren, nicht das Resultat.
+
+Die neue AST-/Default-Auswertungslogik wurde gegen das echte, importierte Modul
+getestet (vier Funktionen, alle vier `OutputPath`-Varianten liefern den korrekten
+Pfad). Das WinForms-Layout selbst (Button-Platzierung, Zeilenbreite) liess sich in
+dieser Umgebung nicht interaktiv per Klick verifizieren, da `ShowDialog()` blockiert
+und kein Desktop-Screenshot-Werkzeug zur Verfuegung steht - rein per Code-Review gegen
+das bestehende Layout-Muster abgesichert.
+
 ## [1.9.101.0] — 2026-08-18
 
 ### Neu: `Get-sqmBlockingHistory` + `Register-sqmBlockedProcessMonitor` - vergangene Blocking-Vorfaelle
