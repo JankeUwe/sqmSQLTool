@@ -238,12 +238,22 @@ function Invoke-sqmLogShrink
 						continue
 					}
 					
-					$logFiles = Get-DbaDbFile @connParams -Database $dbName -ErrorAction Stop |
-					Where-Object { $_.TypeDescription -eq 'LOG' }
-					
+					$allFiles = Get-DbaDbFile @connParams -Database $dbName -ErrorAction Stop
+					$logFiles = $allFiles | Where-Object { $_.TypeDescription -eq 'LOG' }
+
 					if (-not $logFiles)
 					{
-						$msg = "Keine Log-Datei fuer Datenbank '$dbName' gefunden."
+						if (-not $allFiles)
+						{
+							# Get-DbaDbFile liefert fuer diese DB ueberhaupt keine Zeilen (auch keine ROWS-Dateien).
+							# Get-DbaDatabase hat die DB zuvor gefunden, d.h. sie existiert - typischerweise fehlende
+							# Berechtigung (CONNECT/db_datareader) des verwendeten Logins auf genau dieser Datenbank.
+							$msg = "Get-DbaDbFile lieferte keine Daten fuer Datenbank '$dbName' - moeglicherweise fehlt dem verwendeten Login der Zugriff auf diese Datenbank. Log-Datei konnte nicht ermittelt werden."
+						}
+						else
+						{
+							$msg = "Keine Log-Datei fuer Datenbank '$dbName' gefunden."
+						}
 						Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "WARNING"
 						$results.Add([PSCustomObject]@{
 								SqlInstance   = $effectiveInstance

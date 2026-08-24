@@ -3,6 +3,8 @@
 Grants the SQL Server service accounts NTFS permissions on the instance's data, log, TempDB
 and backup directories (with an ACL backup beforehand).
 
+Also available under the alias Set-sqmSqlDirectoryPermissions.
+
 .DESCRIPTION
 Reproduces the manual "set NTFS permissions after install" step in an auditable way:
 
@@ -41,6 +43,13 @@ Directory for the ACL backup file. Default: the configured OutputPath (Get-sqmCo
 
 .PARAMETER SkipBackup
 Skip writing the ACL backup file. Not recommended.
+
+.PARAMETER FailOnIncompleteCoverage
+When auto-discovering directories (-Directory not supplied), abort with Status 'IncompleteCoverage'
+if the connection account cannot see files for one or more databases via sys.master_files (typically
+a missing CONNECT/db_datareader permission on that database). Without this switch, the gap is only
+logged as a WARNING and listed in the returned object's InaccessibleDatabases property, and the run
+proceeds with whatever directories it did find.
 
 .PARAMETER EnableException
 Propagate exceptions immediately instead of logging them as warnings and returning a status object.
@@ -83,6 +92,8 @@ function Invoke-sqmNtfsSetup
 		[Parameter(Mandatory = $false)]
 		[switch]$SkipBackup,
 		[Parameter(Mandatory = $false)]
+		[switch]$FailOnIncompleteCoverage,
+		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
 
@@ -124,6 +135,7 @@ function Invoke-sqmNtfsSetup
 			Permission  = $Permission
 			BackupFile  = $null
 			Granted     = @()
+			InaccessibleDatabases = @()
 			Status      = 'Unknown'
 			Message     = $null
 		}
@@ -177,8 +189,30 @@ function Invoke-sqmNtfsSetup
 				catch { Write-Verbose "Get-DbaDefaultPath fehlgeschlagen: $($_.Exception.Message)" }
 
 				$files = Invoke-DbaQuery @connParams -Database master `
-					-Query "SELECT DISTINCT physical_name FROM sys.master_files" -ErrorAction Stop
+					-Query "SELECT DISTINCT database_id, physical_name FROM sys.master_files" -ErrorAction Stop
 				$dirs += @($files | ForEach-Object { Split-Path $_.physical_name -Parent })
+
+				# Vollstaendigkeits-Check: sys.master_files zeigt einem nicht-sysadmin Login nur
+				# Datenbanken, auf die es Zugriff hat. Fehlt eine DB hier (obwohl Get-DbaDatabase
+				# sie kennt), wurde ihr Verzeichnis stillschweigend NICHT erkannt - genau das Muster,
+				# das den ZVEB-Vorfall (fehlende Berechtigung -> Get-DbaDbFile leer) ausgeloest hat.
+				$visibleDbIds = @($files | Select-Object -ExpandProperty database_id -Unique)
+				$allDbs = Get-DbaDatabase @connParams -ErrorAction SilentlyContinue
+				$missingDbs = @($allDbs | Where-Object { $_.ID -notin $visibleDbIds })
+				if ($missingDbs)
+				{
+					$missingNames = ($missingDbs | Select-Object -ExpandProperty Name) -join ', '
+					$warnMsg = "sys.master_files lieferte keine Dateien fuer: $missingNames (fehlende Berechtigung des verwendeten Logins auf diese Datenbank(en)?). Deren Verzeichnisse wurden NICHT automatisch erkannt."
+					Invoke-sqmLogging -Message $warnMsg -FunctionName $functionName -Level "WARNING"
+					$result.InaccessibleDatabases = @($missingDbs | Select-Object -ExpandProperty Name)
+
+					if ($FailOnIncompleteCoverage)
+					{
+						$result.Status = 'IncompleteCoverage'; $result.Message = $warnMsg
+						if ($EnableException) { throw $warnMsg }
+						return $result
+					}
+				}
 			}
 			# normalisieren, deduplizieren, nur existierende Verzeichnisse
 			$dirs = @($dirs | Where-Object { $_ } | ForEach-Object { $_.TrimEnd('\') } |
@@ -293,3 +327,8 @@ function Invoke-sqmNtfsSetup
 		Invoke-sqmLogging -Message "$functionName abgeschlossen." -FunctionName $functionName -Level "INFO"
 	}
 }
+
+# Discoverability-Alias: der Funktionsname "Invoke-sqmNtfsSetup" verrät nicht, dass die
+# Funktion SQL-Engine-/Agent-Dienstkonten-Berechtigungen auf den SQL-Verzeichnissen setzt.
+# Muss zusaetzlich in AliasesToExport (sqmSQLTool.psd1) stehen, sonst wird sie nicht exportiert.
+Set-Alias -Name Set-sqmSqlDirectoryPermissions -Value Invoke-sqmNtfsSetup
