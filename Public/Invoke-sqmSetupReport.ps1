@@ -469,6 +469,34 @@ FROM sys.dm_os_sys_info si
                 $serverFacts += "Serverfakten nicht ermittelbar: $($_.Exception.Message)"
             }
 
+            # SQL Server Installationsdatum (Naeherung): kein SERVERPROPERTY liefert das direkt.
+            # 'sa'.create_date taugt NICHT dafuer - der ist bei jeder Installation derselbe fixe
+            # Wert (2003-04-08) aus der master-Vorlage. Der tatsaechliche Dienstkonto-Login (aus
+            # sys.dm_server_services, nicht angenommen als 'NT SERVICE\<Instanzname>' - das
+            # deckt auch Domain-/gMSA-Dienstkonten ab) wird dagegen erst bei der Installation
+            # dieser konkreten Instanz in sys.server_principals angelegt.
+            try
+            {
+                $installDateRow = Invoke-DbaQuery -SqlInstance $server -Database master -As PSObject -EnableException -Query @"
+DECLARE @acct sysname = (SELECT TOP 1 service_account FROM sys.dm_server_services WHERE servicename LIKE N'SQL Server (%');
+SELECT sp.create_date AS InstallDate
+FROM sys.server_principals sp
+WHERE sp.name = @acct;
+"@
+                if ($installDateRow -and $installDateRow.InstallDate)
+                {
+                    $serverFacts += "SQL Server Installationsdatum (naeherungsweise, aus Anlage des Dienstkonto-Logins): $($installDateRow.InstallDate.ToString('yyyy-MM-dd HH:mm:ss'))"
+                }
+                else
+                {
+                    $serverFacts += 'SQL Server Installationsdatum: nicht ermittelbar (Dienstkonto-Login nicht in sys.server_principals gefunden)'
+                }
+            }
+            catch
+            {
+                $serverFacts += "SQL Server Installationsdatum: nicht ermittelbar: $($_.Exception.Message)"
+            }
+
             # ---- Installierte Komponenten ----
             $featureList = @()
 
