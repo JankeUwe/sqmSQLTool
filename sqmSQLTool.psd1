@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.9.102.0'
+	ModuleVersion		   = '1.9.105.0'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
@@ -247,6 +247,7 @@
 		'Uninstall-sqmDb2Driver',
 		'Uninstall-sqmJdbcDriver',
 		'Uninstall-sqmOdbcDriver',
+		'Unlock-sqmSqlLogin',
 		'Write-sqmSetupEvent'
 	)
 	
@@ -257,7 +258,10 @@
 	VariablesToExport	   = @()
 
 	# KORREKTUR #9: Keine Aliases - explizit leer statt '*'
-	AliasesToExport	       = @()
+	# Ausnahme: Set-sqmSqlDirectoryPermissions -> Invoke-sqmNtfsSetup (Alias fuer bessere
+	# Auffindbarkeit unter Get-Command -Noun *DirectoryPermissions* / *Permission*; siehe
+	# Set-Alias am Ende von Public\Invoke-sqmNtfsSetup.ps1)
+	AliasesToExport	       = @('Set-sqmSqlDirectoryPermissions')
 	
 	# List of all modules packaged with this module
 	ModuleList			   = @()

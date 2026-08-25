@@ -160,6 +160,7 @@ $categoryMap = @{
     'Uninstall-sqmDb2Driver'              = 'SQL Drivers & Tools Installation'
     'Uninstall-sqmJdbcDriver'             = 'SQL Drivers & Tools Installation'
     'Uninstall-sqmOdbcDriver'             = 'SQL Drivers & Tools Installation'
+    'Unlock-sqmSqlLogin'                  = 'Login & User Security'
     'Write-sqmSetupEvent'                 = 'Reporting & Analysis'
 }
 

@@ -1,5 +1,73 @@
 # sqmSQLTool — Changelog
 
+## [1.9.105.0] — 2026-08-25
+
+### New: `Unlock-sqmSqlLogin` — unlock a CHECK_POLICY-locked SQL login
+
+Covers the two standard cases for a SQL-auth login locked out by repeated bad-password
+attempts under `CHECK_POLICY = ON`: unlock without knowing/touching the current password
+(known or unknown password, caller just wants back in), or a real password reset when the
+password is genuinely lost. T-SQL has no standalone `ALTER LOGIN ... UNLOCK` - `UNLOCK`
+only works combined with `PASSWORD =`. Without `-NewPassword` the function instead uses
+the documented `CHECK_POLICY = OFF` / `= ON` toggle, which clears the Windows-managed
+lockout flag without touching the password hash at all. Neither path restates
+`CHECK_POLICY`/`CHECK_EXPIRATION` in the `ALTER LOGIN` statement, so SQL Server leaves
+both exactly as they were; the function verifies that via `sys.sql_logins` afterward
+instead of trusting "no exception = nothing changed". `-NewPassword` (SecureString) does
+a real `PASSWORD = @newpwd UNLOCK` reset, passed as a query parameter and never logged;
+`-MustChange` requires `CHECK_EXPIRATION = ON` on the login and fails fast with a clear
+message otherwise instead of surfacing SQL Server's raw error. Already-unlocked logins are
+a no-op (`Status = 'AlreadyUnlocked'`).
+
+## [1.9.104.0] — 2026-08-24
+
+### Discoverability: `Set-sqmSqlDirectoryPermissions` alias for `Invoke-sqmNtfsSetup`
+
+A request to "add a function that sets permissions for SQL Server and SQL Agent on the
+directories used by SQL Server" turned out to already exist as `Invoke-sqmNtfsSetup`
+(auto-discovers the Engine/Agent service accounts via `Get-DbaService` and the Data/Log/
+Backup/TempDB directories via `Get-DbaDefaultPath` + `sys.master_files`, backs up the ACLs
+first, then grants FullControl/Modify). It just wasn't found because the `Invoke-*` verb and
+"NtfsSetup" name give no hint that it's a permissions function. Added `Set-sqmSqlDirectoryPermissions`
+as an alias (`Set-Alias` at the end of `Public\Invoke-sqmNtfsSetup.ps1`, registered in
+`AliasesToExport`) so it surfaces under `Get-Command -Noun *Permission*` without touching the
+existing function name, exports, docs, or any Agent job/script that already calls it by its
+original name.
+
+## [1.9.103.0] — 2026-08-23
+
+### Fix: `Get-sqmWaitStatistics` silently swallowed SQL login/connection failures in the GUI
+
+Bug report: `Show-sqmToolGui` crashed with "Cannot index into a null array" while testing
+`Get-sqmWaitStatistics` against a SQL-authenticated login (`gui-launch.log`, three occurrences
+within one session). Reproduced the SQL-login path headlessly (`$form.Show()` + `$btnRun.PerformClick()`
+instead of `ShowDialog()`, so the Run button's real Click handler runs without blocking on a
+modal dialog) with both a valid and an invalid DEV01 credential. The invalid-credential case
+never threw a null-array error, but it did surface a real, separate, and reproducible bug:
+`Invoke-DbaQuery @connParams -Database master -Query $waitSql -ErrorAction Stop` does not
+actually throw on a failed login - dbatools just `Write-Warning`s and returns `$null` unless
+`-EnableException` is passed - so the failed-login case fell through to the "instance returned
+zero waits" path and the GUI showed "(No result / no output)" with no indication the login had
+failed at all. Fixed by adding `-EnableException:$true` to that call, matching the pattern
+already used for the connectivity-check query in `Get-sqmAlwaysOnHealthReport` /
+`Get-sqmDistributedAgHealth`. Also extended `Show-sqmToolGui`'s connection-error detection
+regex to recognize German SQL Server error text (e.g. "Fehler bei der Anmeldung") - the
+existing patterns were English-only, so a German-locale instance's login failure fell through
+to the generic `ERROR: ...` line instead of the clearer "SQL CONNECTION FAILED" message.
+
+Could not reproduce the literal null-array crash itself despite testing successful login,
+failed login (wrong password), and the default local-instance prefill combined with a
+mismatched credential - none of those hit it. Hardened the two array-index sites in the
+Run button's own mandatory-parameter validation (`$missing[0]` / `$paramSets[$i]`, the only
+places in that handler that index by integer rather than by hashtable key) against a `$null`
+array defensively, since a crash there would bypass the handler's own try/catch entirely (it
+only wraps the actual command invocation, not the validation step before it) and reach the
+top-level unhandled-exception handler with no script context. Also enhanced that top-level
+handler in `Start-sqmToolGui.ps1` to log `$e.Exception.ErrorRecord.InvocationInfo.PositionMessage`
+in addition to the bare `.StackTrace` - the interpreter-frame stack trace alone carries no file
+or line number, which is why the original crash log couldn't be traced back to a cause. If this
+recurs, `gui-launch.log` will now show the exact line.
+
 ## [1.9.102.0] — 2026-08-21
 
 ### GUI: Datei-/Ordnerauswahl und Ergebnis-Kopie in `Show-sqmToolGui`
