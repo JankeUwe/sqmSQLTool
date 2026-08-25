@@ -215,7 +215,13 @@ FROM sys.dm_os_wait_stats
 WHERE waiting_tasks_count > 0
 ORDER BY wait_time_ms DESC
 "@
-			$rawWaits = Invoke-DbaQuery @connParams -Database master -Query $waitSql -ErrorAction Stop
+			# -EnableException:$true forces a real login/connection failure to throw here and land
+			# in the catch below (same pattern as the connectivity-check query in Get-sqmAlwaysOnHealthReport
+			# / Get-sqmDistributedAgHealth). Without it, dbatools just Write-Warning's on a failed
+			# login and returns $null, which the code below then misreports as "instance has zero
+			# waits" instead of "could not connect" - the GUI then shows "(No result / no output)"
+			# with no indication the login ever failed.
+			$rawWaits = Invoke-DbaQuery @connParams -Database master -Query $waitSql -EnableException:$true -ErrorAction Stop
 
 			if (-not $rawWaits)
 			{

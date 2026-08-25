@@ -863,13 +863,26 @@
 			{
 				# Multiple parameter sets: show each still-incomplete combination as its own
 				# alternative so the user knows filling in EITHER is enough, not all of them.
-				$lines = if ($paramSets.Count -gt 1)
+				# $missing/$paramSets are guarded against $null/empty here defensively - indexing
+				# a genuinely $null array (as opposed to merely empty) throws a RuntimeException
+				# in Windows PowerShell that bypasses this handler's own try/catch entirely (it
+				# only wraps the actual command invocation below), so a crash here previously
+				# reached the GUI's top-level unhandled-exception handler with no useful detail.
+				$lines = if ($paramSets -and $paramSets.Count -gt 1)
 				{
-					for ($i = 0; $i -lt $paramSets.Count; $i++) { "  [$($paramSets[$i].Name)] $($missing[$i] -join ', ')" }
+					for ($i = 0; $i -lt $paramSets.Count; $i++)
+					{
+						$m = if ($missing -and $i -lt $missing.Count) { $missing[$i] } else { @() }
+						"  [$($paramSets[$i].Name)] $($m -join ', ')"
+					}
+				}
+				elseif ($missing -and $missing.Count -gt 0)
+				{
+					$missing[0] | ForEach-Object { "  - $_" }
 				}
 				else
 				{
-					$missing[0] | ForEach-Object { "  - $_" }
+					@('  - (unable to determine which parameters are missing)')
 				}
 				[System.Windows.Forms.MessageBox]::Show("Required parameters missing:`n$($lines -join "`n")", 'Incomplete input', 'OK', 'Warning') | Out-Null
 				return
@@ -910,8 +923,12 @@
 			$output.Text = ">> $(& $buildCommand)`r`n`r`n"
 			$form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
 			$btnRun.Enabled = $false
-			# Detect connection/network errors and report them clearly
-			$connHint = '(?i)network-related|server was not found|login failed|certificate chain|untrusted|timeout|connect to|connection.*(fail|refused|reset)|sql server.*not (found|accessible)|named pipes|tcp provider'
+			# Detect connection/network errors and report them clearly. SQL Server returns
+			# localized error text (e.g. German "Fehler bei der Anmeldung fuer den Benutzer"
+			# instead of "Login failed for user") when the instance's server locale isn't
+			# English, so the English-only patterns below silently missed those - the GUI fell
+			# through to the generic "ERROR: ..." line instead of the clearer connection message.
+			$connHint = '(?i)network-related|server was not found|login failed|certificate chain|untrusted|timeout|connect to|connection.*(fail|refused|reset)|sql server.*not (found|accessible)|named pipes|tcp provider|fehler bei der anmeldung|netzwerkbezogen|zertifikatkette|zeit.?ueberschreitung|keine verbindung'
 			try
 			{
 				$records = & $fn @params 2>&1

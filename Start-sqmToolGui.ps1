@@ -44,7 +44,16 @@ try
     [System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::CatchException)
     [System.Windows.Forms.Application]::add_ThreadException({
             param ($senderObj, $e)
-            Show-sqmGuiError "Unbehandelte GUI-Ausnahme: $($e.Exception.GetType().FullName): $($e.Exception.Message)`r`n$($e.Exception.StackTrace)"
+            # ErrorRecord.InvocationInfo.PositionMessage pinpoints the exact script/line/column
+            # that threw (e.g. for a PowerShell RuntimeException raised inside an event handler
+            # scriptblock) - .StackTrace alone is just interpreter frames with no line numbers,
+            # which made a previous GUI crash ("Cannot index into a null array") impossible to
+            # trace back to its source from the log alone.
+            $posMsg = try { $e.Exception.ErrorRecord.InvocationInfo.PositionMessage } catch { $null }
+            $detail = "Unbehandelte GUI-Ausnahme: $($e.Exception.GetType().FullName): $($e.Exception.Message)"
+            if ($posMsg) { $detail += "`r`n$posMsg" }
+            $detail += "`r`n$($e.Exception.StackTrace)"
+            Show-sqmGuiError $detail
         })
 
     Write-sqmGuiLog "Starte sqmSQLTool GUI (PID $PID, PS $($PSVersionTable.PSVersion))..."
