@@ -9,6 +9,10 @@
     Supports NESTED GROUPS: Recursively resolves all members, including members of nested groups.
     Example: If GroupA contains GroupB (which contains User2), both GroupB and User2 are returned.
 
+    For user accounts the real AD 'displayName' attribute is resolved (via Get-ADUser or LDAP),
+    so the DisplayName column shows the person's name instead of just the login/CN.
+    Fallback chain: displayName -> CN/Name -> sAMAccountName.
+
     Methods:
     1. Get-ADGroupMember -Recursive (if ActiveDirectory module available) — Resolves nested groups
     2. LDAP direct query (fallback, no module required) — Direct members only
@@ -111,9 +115,22 @@ function Get-sqmADGroupMembers
                         $adMembers = Get-ADGroupMember -Identity $cleanGroup -Recursive -ErrorAction Stop
                         foreach ($member in $adMembers)
                         {
+                            # Get-ADGroupMember liefert nur CN/Name (oft = Login), NICHT das
+                            # AD-Attribut displayName. Fuer User den echten Anzeigenamen nachladen.
+                            $disp = $member.Name
+                            if ($member.objectClass -eq 'user')
+                            {
+                                try
+                                {
+                                    $adUser = Get-ADUser -Identity $member.SID -Properties DisplayName -ErrorAction Stop
+                                    if ($adUser.DisplayName) { $disp = $adUser.DisplayName }
+                                }
+                                catch { }
+                            }
+
                             $members.Add([PSCustomObject]@{
                                     SamAccountName = $member.SamAccountName
-                                    DisplayName    = $member.Name
+                                    DisplayName    = $disp
                                     ObjectClass    = $member.objectClass
                                 })
                         }
@@ -166,16 +183,20 @@ function Get-sqmADGroupMembers
                                         $samAccount = $Matches[1]
                                         $displayName = $samAccount
 
-                                        # Try to get actual sAMAccountName and displayName
-                                        try
-                                        {
-                                            $memberEntry = [ADSI]"LDAP://$memberDN"
-                                            $sam = $memberEntry.psbase.InvokeGet("sAMAccountName")
-                                            $disp = $memberEntry.psbase.InvokeGet("displayName")
-                                            if ($sam) { $samAccount = $sam }
-                                            if ($disp) { $displayName = $disp }
-                                        }
-                                        catch { }
+                                        # Try to get actual sAMAccountName and displayName.
+                                        # Jedes Attribut einzeln tolerant lesen: fehlt z.B. displayName,
+                                        # wirft InvokeGet eine Exception, die sonst auch das bereits
+                                        # gelesene sAMAccountName verwerfen wuerde.
+                                        # Fallback-Kette: displayName -> cn -> sAMAccountName.
+                                        $memberEntry = [ADSI]"LDAP://$memberDN"
+                                        $sam = $null
+                                        try { $sam = $memberEntry.psbase.InvokeGet("sAMAccountName") } catch { }
+                                        if ($sam) { $samAccount = $sam }
+
+                                        $disp = $null
+                                        try { $disp = $memberEntry.psbase.InvokeGet("displayName") } catch { }
+                                        if (-not $disp) { try { $disp = $memberEntry.psbase.InvokeGet("cn") } catch { } }
+                                        if ($disp) { $displayName = $disp }
 
                                         # Determine object class
                                         $objectClass = "Unknown"

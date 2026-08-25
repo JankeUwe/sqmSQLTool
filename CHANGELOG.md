@@ -1,5 +1,19 @@
 # sqmSQLTool — Changelog
 
+## [1.9.106.0] — 2026-08-25
+
+### Fix: `Get-sqmADGroupMembers` did not resolve real AD display names
+
+Brought the non-recursive `Get-sqmADGroupMembers` in line with `Get-sqmADGroupMembersRecursive`,
+which already resolved this correctly. Method 1 (`Get-ADGroupMember`) only returns the CN/Name
+(often just the login), not the `displayName` attribute - user members now get their real
+`displayName` loaded via `Get-ADUser -Properties DisplayName`. Method 2 (LDAP fallback) had a
+latent bug: `sAMAccountName` and `displayName` were read via `InvokeGet` inside the same `try`,
+so a group member whose AD object simply has no `displayName` attribute threw before the already-read
+`sAMAccountName` was ever applied, silently falling back to the CN for both fields. Each attribute
+is now read individually and tolerantly, with the same `displayName -> cn -> sAMAccountName`
+fallback chain used elsewhere in the module.
+
 ## [1.9.105.0] — 2026-08-25
 
 ### New: `Unlock-sqmSqlLogin` — unlock a CHECK_POLICY-locked SQL login
