@@ -969,12 +969,20 @@
 			$connHint = '(?i)network-related|server was not found|login failed|certificate chain|untrusted|timeout|connect to|connection.*(fail|refused|reset)|sql server.*not (found|accessible)|named pipes|tcp provider|fehler bei der anmeldung|netzwerkbezogen|zertifikatkette|zeit.?ueberschreitung|keine verbindung'
 			try
 			{
-				$records = & $fn @params 2>&1
+				# Merge Warning/Verbose/Information into the captured stream alongside Error - a
+				# console-hosted GUI runs in the window BEHIND the form, so anything left on those
+				# streams (e.g. dbatools' non-terminating Write-Warning on a failed restore, which
+				# never throws without -EnableException) would silently print to that hidden console
+				# instead of the GUI's own Output panel.
+				$records = & $fn @params 3>&1 4>&1 6>&1 2>&1
 				$errRecords = $records | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] }
-				$normal = $records | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] }
+				$warnRecords = $records | Where-Object { $_ -is [System.Management.Automation.WarningRecord] }
+				$normal = $records | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] -and $_ -isnot [System.Management.Automation.WarningRecord] }
 
 				$txt = ($normal | Out-String)
 				if ($txt.Trim()) { $output.AppendText($txt) }
+
+				foreach ($wr in $warnRecords) { $output.AppendText("WARNING: $($wr.Message)`r`n") }
 
 				foreach ($er in $errRecords)
 				{
@@ -988,7 +996,7 @@
 						$output.AppendText("`r`nERROR: $($er.Exception.Message)`r`n")
 					}
 				}
-				if (-not $txt.Trim() -and -not $errRecords) { $output.AppendText("(No result / no output)`r`n") }
+				if (-not $txt.Trim() -and -not $errRecords -and -not $warnRecords) { $output.AppendText("(No result / no output)`r`n") }
 			}
 			catch
 			{
