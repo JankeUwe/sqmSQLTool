@@ -439,7 +439,14 @@
 			$ctrl = $script:guiState.Controls[$pname]
 			if ($ctrl -is [System.Windows.Forms.CheckBox])
 			{
-				if ($ctrl.Checked) { $parts.Add("-$pname") }
+				# [switch] parameters default to $false, so presence alone (no value) means $true -
+				# omitting when unchecked reproduces that default. A [bool] parameter can default to
+				# $true (e.g. Invoke-sqmSplunkConfiguration's -KeepService) - there, omitting on
+				# uncheck would silently fall back to the same $true default and the checkbox could
+				# never actually express $false. [bool] params must always pass their explicit value.
+				$pType = $script:guiState.Command.Parameters[$pname].ParameterType
+				if ($pType -eq [bool]) { $parts.Add("-$pname `$$($ctrl.Checked.ToString().ToLower())") }
+				elseif ($ctrl.Checked) { $parts.Add("-$pname") }
 			}
 			elseif ($ctrl -is [System.Windows.Forms.ComboBox])
 			{
@@ -610,6 +617,15 @@
 				$ctrl = New-Object System.Windows.Forms.CheckBox
 				$ctrl.AutoSize = $true
 				$ctrl.ForeColor = $cText
+				if ($pt -eq [bool])
+				{
+					# Unlike [switch] (always defaults to $false), a [bool] parameter can default to
+					# $true (e.g. -KeepService) - since the checkbox now always passes its explicit
+					# value (see $buildCommand), it must start out reflecting that real default,
+					# otherwise leaving it untouched would silently send $false instead.
+					$defaultText = & $getParamDefaultText $cmd $p.Name
+					if ($defaultText -eq 'True') { $ctrl.Checked = $true }
+				}
 				$ctrl.Add_CheckedChanged($updatePreview)
 			}
 			elseif ($validValues -or $pt.IsEnum)
@@ -780,6 +796,20 @@
 				}.GetNewClosure())
 		}
 
+		# Spezialfall Mode/KeepService: Invoke-sqmSplunkConfiguration's -KeepService only has any
+		# effect in -Mode Remove (see the function's own Remove branch) - greyed out otherwise so the
+		# GUI doesn't suggest it does something in Set/Test mode.
+		if ($script:guiState.Controls.ContainsKey('Mode') -and $script:guiState.Controls.ContainsKey('KeepService'))
+		{
+			$modeCtrl = $script:guiState.Controls['Mode']
+			$keepSvcCtrl = $script:guiState.Controls['KeepService']
+			$updateKeepServiceEnabled = {
+				$keepSvcCtrl.Enabled = ([string]$modeCtrl.SelectedItem -eq 'Remove')
+			}.GetNewClosure()
+			$modeCtrl.Add_SelectedIndexChanged($updateKeepServiceEnabled)
+			& $updateKeepServiceEnabled
+		}
+
 		if ($row -eq 0)
 		{
 			$none = New-Object System.Windows.Forms.Label
@@ -893,7 +923,15 @@
 			foreach ($pname in $script:guiState.Controls.Keys)
 			{
 				$ctrl = $script:guiState.Controls[$pname]
-				if ($ctrl -is [System.Windows.Forms.CheckBox]) { if ($ctrl.Checked) { $params[$pname] = $true } }
+				if ($ctrl -is [System.Windows.Forms.CheckBox])
+				{
+					# See matching comment in $buildCommand: a [bool] param's default can be $true, so
+					# it must always be passed explicitly - omitting it on uncheck would silently keep
+					# that $true default instead of expressing $false.
+					$pType = $script:guiState.Command.Parameters[$pname].ParameterType
+					if ($pType -eq [bool]) { $params[$pname] = $ctrl.Checked }
+					elseif ($ctrl.Checked) { $params[$pname] = $true }
+				}
 				elseif ($ctrl -is [System.Windows.Forms.ComboBox]) { if ($ctrl.SelectedItem) { $params[$pname] = [string]$ctrl.SelectedItem } }
 				else
 				{
