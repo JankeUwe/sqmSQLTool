@@ -26,7 +26,7 @@ function _sqmSplunkGuiLog {
 # Darf KEINE externen Abhaengigkeiten haben.
 # Verwendet _sqmSplunkWriteLog - wird zusammen mit dieser Funktion serialisiert.
 function _sqmSplunk_LocalCore {
-    param([string]$LogFile, [string]$Mode)
+    param([string]$LogFile, [string]$Mode, [bool]$KeepService = $true)
 
     $ErrorActionPreference = 'Continue'
 
@@ -70,7 +70,9 @@ function _sqmSplunk_LocalCore {
 
         $svcName = 'SplunkForwarder'
         $svc     = Get-Service -Name $svcName -ErrorAction SilentlyContinue
-        if (-not $svc) {
+        if ($KeepService) {
+            _sqmSplunkWriteLog $logFile "Dienst '$svcName' bleibt unangetastet (KeepService)."
+        } elseif (-not $svc) {
             _sqmSplunkWriteLog $logFile "WARN: Dienst '$svcName' nicht vorhanden."
         } elseif ($svc.Status -eq 'Stopped') {
             _sqmSplunkWriteLog $logFile "Dienst '$svcName' war bereits gestoppt."
@@ -264,6 +266,7 @@ function _sqmSplunk_OnComputers {
     param(
         [string[]]$ComputerNames,
         [string]$Mode,
+        [bool]$KeepService,
         [string]$LogPath,
         [string]$LogFile,
         [System.Management.Automation.PSCredential]$Credential,
@@ -285,16 +288,16 @@ function _sqmSplunk_OnComputers {
     # Jeder Zielrechner schreibt sein eigenes lokales Log unter $LogPath (auf sich selbst) -
     # unabhaengig vom Controller-Log ($LogFile), das die Orchestrierung hier dokumentiert.
     $remoteBlock = {
-        param([string]$LogPath, [string]$Mode, [string]$Combined)
+        param([string]$LogPath, [string]$Mode, [bool]$KeepService, [string]$Combined)
         . ([ScriptBlock]::Create($Combined))
         if (-not (Test-Path $LogPath)) { $null = New-Item -ItemType Directory -Path $LogPath -Force }
         $rLogFile = Join-Path $LogPath ("SplunkConfig_{0}.log" -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
-        _sqmSplunk_LocalCore -LogFile $rLogFile -Mode $Mode
+        _sqmSplunk_LocalCore -LogFile $rLogFile -Mode $Mode -KeepService $KeepService
     }
 
     $splat = @{
         ScriptBlock  = $remoteBlock
-        ArgumentList = @($LogPath, $Mode, $combined)
+        ArgumentList = @($LogPath, $Mode, $KeepService, $combined)
         ErrorAction  = 'Continue'
     }
     if ($Credential) { $splat['Credential'] = $Credential }
@@ -351,6 +354,7 @@ function _sqmSplunk_ForOU {
     param(
         [string]$SearchOU,
         [string]$Mode,
+        [bool]$KeepService,
         [string]$LogPath,
         [string]$LogFile,
         [System.Management.Automation.PSCredential]$Credential,
@@ -377,7 +381,7 @@ function _sqmSplunk_ForOU {
     $names = $computers | Select-Object -ExpandProperty Name
     _sqmSplunkGuiLog "$($names.Count) Server in der OU gefunden." $LogCallback $LogFile
 
-    _sqmSplunk_OnComputers -ComputerNames $names -Mode $Mode -LogPath $LogPath -LogFile $LogFile `
+    _sqmSplunk_OnComputers -ComputerNames $names -Mode $Mode -KeepService $KeepService -LogPath $LogPath -LogFile $LogFile `
                            -Credential $Credential -LogCallback $LogCallback
 }
 
@@ -386,6 +390,7 @@ function _sqmSplunk_ForList {
     param(
         [string[]]$ComputerList,
         [string]$Mode,
+        [bool]$KeepService,
         [string]$LogPath,
         [string]$LogFile,
         [System.Management.Automation.PSCredential]$Credential,
@@ -419,7 +424,7 @@ function _sqmSplunk_ForList {
     $unique = $resolved | Select-Object -Unique
     _sqmSplunkGuiLog "$($unique.Count) eindeutige Computer." $LogCallback $LogFile
 
-    _sqmSplunk_OnComputers -ComputerNames $unique -Mode $Mode -LogPath $LogPath -LogFile $LogFile `
+    _sqmSplunk_OnComputers -ComputerNames $unique -Mode $Mode -KeepService $KeepService -LogPath $LogPath -LogFile $LogFile `
                            -Credential $Credential -LogCallback $LogCallback
 }
 
@@ -441,12 +446,17 @@ function Invoke-sqmSplunkConfiguration {
         and variables left over from an instance that no longer exists are removed - both would
         otherwise leave Splunk monitoring a stale path and raising false alerts.
         Mode Remove tears the configuration back down: all MSSQLn_Log environment variables are
-        removed and SplunkForwarder is stopped, regardless of which SQL instances are currently
-        installed.
+        removed, regardless of which SQL instances are currently installed. By default
+        SplunkForwarder keeps running (-KeepService $true); pass -KeepService:$false to also
+        stop the service.
     .PARAMETER Mode
         Set    - Set environment variables and start/restart SplunkForwarder (default).
         Test   - Check only, no changes.
-        Remove - Remove all MSSQLn_Log environment variables and stop SplunkForwarder.
+        Remove - Remove all MSSQLn_Log environment variables. SplunkForwarder is stopped only if
+                 -KeepService:$false is passed (default: service keeps running).
+    .PARAMETER KeepService
+        Only relevant for -Mode Remove. Default $true: environment variables are removed but
+        SplunkForwarder keeps running. Pass -KeepService:$false to also stop the service.
     .PARAMETER Remote
         Remote execution via AD OU search. Combine with -SearchOU.
     .PARAMETER SearchOU
@@ -471,6 +481,8 @@ function Invoke-sqmSplunkConfiguration {
         Invoke-sqmSplunkConfiguration -ComputerList "C:\Listen\db-server.txt" -Mode Test
     .EXAMPLE
         Invoke-sqmSplunkConfiguration -Mode Remove
+    .EXAMPLE
+        Invoke-sqmSplunkConfiguration -Mode Remove -KeepService:$false
     .NOTES
         Set and Remove modes require local administrator rights.
         Remote: WinRM must be active on target servers.
@@ -483,6 +495,8 @@ function Invoke-sqmSplunkConfiguration {
     param(
         [ValidateSet('Set', 'Test', 'Remove')]
         [string]$Mode = 'Set',
+
+        [bool]$KeepService = $true,
 
         [switch]$Remote,
 
@@ -522,17 +536,17 @@ function Invoke-sqmSplunkConfiguration {
     try
     {
         if ($Remote) {
-            return (_sqmSplunk_ForOU -SearchOU $SearchOU -Mode $Mode -LogPath $LogPath -LogFile $LogFile `
+            return (_sqmSplunk_ForOU -SearchOU $SearchOU -Mode $Mode -KeepService $KeepService -LogPath $LogPath -LogFile $LogFile `
                                      -Credential $Credential -LogCallback $LogCallback)
         }
         elseif ($ComputerList) {
-            return (_sqmSplunk_ForList -ComputerList $ComputerList -Mode $Mode -LogPath $LogPath -LogFile $LogFile `
+            return (_sqmSplunk_ForList -ComputerList $ComputerList -Mode $Mode -KeepService $KeepService -LogPath $LogPath -LogFile $LogFile `
                                        -Credential $Credential -LogCallback $LogCallback)
         }
         else
         {
             # Local execution - must return PSCustomObject
-            $coreOk = _sqmSplunk_LocalCore -LogFile $LogFile -Mode $Mode
+            $coreOk = _sqmSplunk_LocalCore -LogFile $LogFile -Mode $Mode -KeepService $KeepService
 
             if ($coreOk -eq $false)
             {
