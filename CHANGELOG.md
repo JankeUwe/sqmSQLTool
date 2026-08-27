@@ -1,5 +1,21 @@
 # sqmSQLTool — Changelog
 
+## [1.9.107.0] — 2026-08-27
+
+### New: `Get-sqmAlwaysOnQueueStatus` — pollable redo/send queue status, no report files
+
+`Get-sqmAlwaysOnHealthReport` already reads redo queue / send queue per replica and database via
+`sys.dm_hadr_database_replica_states`, but it always writes TXT/CSV/HTML report files on every
+call - wrong shape for something called every few minutes by a poller (SQLLiveDiagnose central
+poller in particular). The DMV query and threshold/status scoring (redo/send MB conversion,
+`OverallStatus` OK/Warning/Critical) moved into a new private helper,
+`Get-sqmAlwaysOnQueueSnapshot`, shared by both functions - `Get-sqmAlwaysOnHealthReport`'s own
+behavior (AutoSeed tracking, TXT/CSV/HTML writing, thresholds) is unchanged, it just sources its
+per-row data from the helper now instead of an inline query. `Get-sqmAlwaysOnQueueStatus` is the
+new lightweight sibling: same `-SqlInstance/-SqlCredential/-MaxRedoQueueMB/-MaxSendQueueMB`
+parameters, returns the row objects directly, no file I/O. An instance without any availability
+groups returns an empty array, not an error.
+
 ## [1.9.106.0] — 2026-08-25
 
 ### Fix: `Get-sqmADGroupMembers` did not resolve real AD display names

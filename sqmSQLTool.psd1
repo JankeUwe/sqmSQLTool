@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.9.106.0'
+	ModuleVersion		   = '1.9.107.0'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
@@ -103,6 +103,7 @@
 		'Get-sqmAgentJobScheduleReport',
 		'Get-sqmAlwaysOnFailoverHistory',
 		'Get-sqmAlwaysOnHealthReport',
+		'Get-sqmAlwaysOnQueueStatus',
 		'Get-sqmAutoGrowthReport',
 		'Get-sqmBlockingHistory',
 		'Get-sqmBlockingReport',

@@ -123,31 +123,10 @@ function Get-sqmAlwaysOnHealthReport
 				}
 				catch { $sqlMajorVersion = 0 }
 				
-				# DMV-Abfrage: Replikat- und Datenbankstatus mit Queues
-				$dmvQuery = @"
-SELECT
-    ag.name                           AS AgName,
-    ar.replica_server_name            AS ReplicaName,
-    ar.availability_mode_desc         AS AvailabilityMode,
-    ar.failover_mode_desc             AS FailoverMode,
-    ars.role_desc                     AS Role,
-    ars.connected_state_desc          AS ConnectionState,
-    ars.synchronization_health_desc   AS SyncHealth,
-    DB_NAME(adbrs.database_id)         AS DatabaseName,
-    adbrs.synchronization_state_desc  AS DbSyncState,
-    adbrs.synchronization_health_desc AS DbSyncHealth,
-    adbrs.redo_queue_size             AS RedoQueueKB,
-    adbrs.log_send_queue_size         AS SendQueueKB,
-    adbrs.redo_rate                   AS RedoRateKBs,
-    adbrs.log_send_rate               AS SendRateKBs,
-    adbrs.is_suspended                AS IsSuspended
-FROM sys.availability_groups              ag
-JOIN sys.availability_replicas            ar    ON ar.group_id    = ag.group_id
-JOIN sys.dm_hadr_availability_replica_states ars ON ars.replica_id = ar.replica_id
-LEFT JOIN sys.dm_hadr_database_replica_states adbrs ON adbrs.replica_id = ar.replica_id
-ORDER BY ag.name, ars.role_desc DESC, ar.replica_server_name, DB_NAME(adbrs.database_id);
-"@
-				$dmvRows = Invoke-DbaQuery @connParams -Query $dmvQuery -EnableException:$EnableException
+				# Replikat- und Datenbankstatus mit Queues (Redo/Send) - geteilte Abfrage +
+				# Schwellwert-Bewertung, auch von Get-sqmAlwaysOnQueueStatus genutzt.
+				$queueRows = Get-sqmAlwaysOnQueueSnapshot -SqlInstance $instance -SqlCredential $SqlCredential `
+					-MaxRedoQueueMB $MaxRedoQueueMB -MaxSendQueueMB $MaxSendQueueMB -EnableException:$EnableException
 				
 				# Laufende AutoSeed-Vorgaenge (ab SQL Server 2016) - versionsspezifisch
 				# SQL 2019+ (v15): group_database_id, transferred/total_size_bytes, estimate_time_complete
@@ -222,46 +201,10 @@ ORDER BY has.start_time;
 				}
 				}  # end if ($seedQuery)
 				
-				# Ergebniszeilen sammeln (pro Datenbank/Replikat)
+				# Ergebniszeilen sammeln (pro Datenbank/Replikat) - Redo/Send-Queue-Bewertung
+				# kommt bereits fertig aus Get-sqmAlwaysOnQueueSnapshot.
 				$healthRows = [System.Collections.Generic.List[PSCustomObject]]::new()
-				foreach ($row in $dmvRows)
-				{
-					if (-not $row.DatabaseName) { continue } # Replikat ohne Datenbankzeile ueberspringen
-					
-					# NULL-sicher: bei disconnected Secondary liefert SQL NULL fuer Queue-Groessen
-					$redoMB = [math]::Round([double]($row.RedoQueueKB -as [long]) / 1024, 1)
-					$sendMB = [math]::Round([double]($row.SendQueueKB -as [long]) / 1024, 1)
-					
-					$queueStatus = if ($row.Role -ne 'PRIMARY' -and $redoMB -gt $MaxRedoQueueMB) { 'Warning' }
-					elseif ($sendMB -gt $MaxSendQueueMB) { 'Warning' }
-					else { 'OK' }
-					
-					$syncOk = ($row.DbSyncState -in @('SYNCHRONIZED', 'SYNCHRONIZING')) -and
-					$row.ConnectionState -eq 'CONNECTED' -and
-					-not $row.IsSuspended
-					
-					$overallStatus = if (-not $syncOk) { 'Critical' }
-					elseif ($queueStatus -eq 'Warning') { 'Warning' }
-					else { 'OK' }
-					
-					$healthRows.Add([PSCustomObject]@{
-							SqlInstance = $instance
-							AgName	    = $row.AgName
-							ReplicaName = $row.ReplicaName
-							Role	    = $row.Role
-							AvailabilityMode = $row.AvailabilityMode
-							ConnectionState = $row.ConnectionState
-							SyncHealth  = $row.SyncHealth
-							DatabaseName = $row.DatabaseName
-							DbSyncState = $row.DbSyncState
-							IsSuspended = $row.IsSuspended
-							RedoQueueMB = $redoMB
-							SendQueueMB = $sendMB
-							RedoRateKBs = $row.RedoRateKBs
-							SendRateKBs = $row.SendRateKBs
-							OverallStatus = $overallStatus
-						})
-				}
+				foreach ($row in $queueRows) { $healthRows.Add($row) }
 				
 				# AutoSeed-Eintraege hinzufuegen (falls vorhanden)
 				if ($seedRows)
