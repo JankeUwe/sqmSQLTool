@@ -1,5 +1,26 @@
 # sqmSQLTool — Changelog
 
+## [1.9.109.0] — 2026-08-28
+
+### Change: every per-database report now shows TRUSTWORTHY and isolation level
+
+New shared private helper `Get-sqmDatabaseTrustIsolationMap` (`Private\Invoke-sqmHelpers.ps1`) reads
+`is_trustworthy_on`, `is_read_committed_snapshot_on`, and `snapshot_isolation_state_desc` from
+`sys.databases` for an entire instance in one query, and derives a single readable `IsolationLevel`
+string (`READ_COMMITTED_SNAPSHOT`, `READ_COMMITTED (SNAPSHOT allowed)`, `READ_COMMITTED (default)`,
+or both combined). Built as a dedicated raw-SQL query rather than trusting dbatools' `Get-DbaDatabase`
+SMO object: `.Trustworthy` is reliably populated, but `.ReadCommittedSnapshot` comes back `$null` on a
+standard `Get-DbaDatabase` call (SMO does not eager-load it) - confirmed live on DEV01, where a naive
+`$db.ReadCommittedSnapshot` read would have silently reported every database as RCSI-off regardless of
+the real setting.
+
+Wired into every function that reports one row per database: `Get-sqmDbOwnerRisk` (new `IsolationLevel`
+column, `TrustworthyOn` already existed), `Get-sqmDatabaseHealth`, `Export-sqmDatabaseDocumentation`,
+`Invoke-sqmInstanceInventory`, `Invoke-sqmSetupReport`, `Export-sqmServerConfiguration` (new
+`IsolationLevel`, `Trustworthy` already existed), and `Compare-sqmServerConfiguration -CompareDatabases`
+(now also flags Trustworthy drift as `Critical` and isolation-level drift as `Warning` between source
+and target). Live-verified end to end against DEV01's 22 databases for all seven functions.
+
 ## [1.9.108.0] — 2026-08-28
 
 ### New: `Get-sqmDbOwnerRisk` / `Repair-sqmDbOwnerRisk` — db_owner privilege-escalation audit and fix

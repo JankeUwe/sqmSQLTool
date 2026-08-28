@@ -346,7 +346,18 @@ GROUP BY s.database_id;
 				{
 					Invoke-sqmLogging -Message "[$instance] VLF-Abfrage nicht unterstuetzt (< SQL 2016?)." -FunctionName $functionName -Level "VERBOSE"
 				}
-				
+
+				# ?? TRUSTWORTHY + Isolation Level zentral laden ??????????????????
+				$trustIsoLookup = @{ }
+				try
+				{
+					$trustIsoLookup = Get-sqmDatabaseTrustIsolationMap -SqlInstance $instance -SqlCredential $SqlCredential
+				}
+				catch
+				{
+					Invoke-sqmLogging -Message "[$instance] TRUSTWORTHY/Isolation-Abfrage fehlgeschlagen: $($_.Exception.Message)" -FunctionName $functionName -Level "VERBOSE"
+				}
+
 				# ?? HTML-Aufbau ??????????????????????????????????????????????????
 				$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 				$datestamp = Get-Date -Format 'yyyyMMdd_HHmm'
@@ -397,7 +408,12 @@ GROUP BY s.database_id;
 						
 						# VLF
 						$vlfCount = $vlfLookup[$dbName]
-						
+
+						# TRUSTWORTHY + Isolation Level
+						$trustIso = $trustIsoLookup[$dbName]
+						$trustworthyOn = if ($trustIso) { $trustIso.TrustworthyOn } else { $null }
+						$isolationLevel = if ($trustIso) { $trustIso.IsolationLevel } else { $null }
+
 						# Groessen
 						$dataSizeMB = [math]::Round(($db.FileGroups | ForEach-Object { $_.Files } | Measure-Object -Property Size -Sum).Sum / 1024, 1)
 						$logSizeMB = [math]::Round(($db.LogFiles | Measure-Object -Property Size -Sum).Sum / 1024, 1)
@@ -446,6 +462,8 @@ GROUP BY s.database_id;
 							'ReadOnly'	      = $db.ReadOnly
 							'AutoClose'	      = $db.AutoClose
 							'AutoShrink'	  = $db.AutoShrink
+							'Trustworthy'	  = $trustworthyOn
+							'IsolationLevel'  = $isolationLevel
 						}
 						foreach ($kv in $props.GetEnumerator())
 						{
@@ -589,6 +607,8 @@ ORDER BY dp.name;
 								Status	    = $db.Status
 								RecoveryModel = $db.RecoveryModel
 								Kompatibilitaet = $db.CompatibilityLevel
+								Trustworthy = $trustworthyOn
+								IsolationLevel = $isolationLevel
 								Collation   = $db.Collation
 								Owner	    = $db.Owner
 								ErstelltAm  = if ($db.CreateDate) { $db.CreateDate.ToString('yyyy-MM-dd') } else { '' }

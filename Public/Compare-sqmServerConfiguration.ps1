@@ -14,7 +14,7 @@
       welche db_*-Rollen dort - Standard-Migrationscheck gegen orphaned/fehlende Berechtigungen)
     - Migrationsrelevante Objekte (-IncludeMigrationObjects): Linked Servers, Credentials,
       SQL-Agent-Jobs, Endpoints, Database-Mail-Profile
-    - Datenbanken (-CompareDatabases): Name, Owner, RecoveryModel, Collation
+    - Datenbanken (-CompareDatabases): Name, Owner, RecoveryModel, Collation, Trustworthy, IsolationLevel
 
     Jede Abweichung erhaelt einen Status (OK/Warning/Critical). Ausgabe als Rueckgabeobjekt
     sowie TXT- und HTML-Report (Report wird nach Erstellung automatisch geoeffnet, ausser -NoOpen).
@@ -178,13 +178,24 @@ function Compare-sqmServerConfiguration
 		function Get-DatabaseSimple($inst)
 		{
 			$dbs = Get-DbaDatabase -SqlInstance $inst -SqlCredential $SqlCredential -ErrorAction Stop
+
+			$trustIsoLookup = @{ }
+			try
+			{
+				$trustIsoLookup = Get-sqmDatabaseTrustIsolationMap -SqlInstance $inst -SqlCredential $SqlCredential
+			}
+			catch { }
+
 			$dbs | ForEach-Object {
+				$trustIso = $trustIsoLookup[$_.Name]
 				[PSCustomObject]@{
 					Name           = $_.Name
 					Owner          = $_.Owner
 					RecoveryModel  = $_.RecoveryModel
 					Collation      = $_.Collation
 					IsSystemObject = $_.IsSystemObject
+					TrustworthyOn  = if ($trustIso) { $trustIso.TrustworthyOn } else { $null }
+					IsolationLevel = if ($trustIso) { $trustIso.IsolationLevel } else { $null }
 				}
 			}
 		}
@@ -503,6 +514,9 @@ WHERE sp.type IN ('S','U','G')
 					if ($s.Owner -ne $t.Owner) { _AddResult 'Database' "$dbName Owner" $s.Owner $t.Owner 'Warning' }
 					if ($s.RecoveryModel -ne $t.RecoveryModel) { _AddResult 'Database' "$dbName RecoveryModel" $s.RecoveryModel $t.RecoveryModel 'Warning' }
 					if ($s.Collation -ne $t.Collation) { _AddResult 'Database' "$dbName Collation" $s.Collation $t.Collation 'Warning' }
+					# Trustworthy-Drift ist sicherheitsrelevant (siehe Get-sqmDbOwnerRisk) - Critical statt Warning.
+					if ($s.TrustworthyOn -ne $t.TrustworthyOn) { _AddResult 'Database' "$dbName Trustworthy" $s.TrustworthyOn $t.TrustworthyOn 'Critical' }
+					if ($s.IsolationLevel -ne $t.IsolationLevel) { _AddResult 'Database' "$dbName IsolationLevel" $s.IsolationLevel $t.IsolationLevel 'Warning' }
 				}
 			}
 

@@ -817,6 +817,14 @@ JOIN sys.availability_groups ag ON ag.group_id = l.group_id
             try
             {
                 $allDbs = Get-DbaDatabase -SqlInstance $server -ExcludeSystem
+
+                $trustIsoLookup = @{ }
+                try
+                {
+                    $trustIsoLookup = Get-sqmDatabaseTrustIsolationMap -SqlInstance $SqlInstance -SqlCredential $SqlCredential
+                }
+                catch { }
+
                 foreach ($db in $allDbs)
                 {
                     $dbo = $db.Owner
@@ -845,10 +853,14 @@ JOIN sys.availability_groups ag ON ag.group_id = l.group_id
                         $compatText += ", niedriger als die Instanz: $(_ConvertTo-SqlVersionName $instanceCompat)"
                     }
 
+                    $trustIso = $trustIsoLookup[$db.Name]
+
                     $databases += [PSCustomObject]@{
                         Name           = $db.Name
                         Recovery       = $db.RecoveryModel
                         Compatibility  = $compatText
+                        Trustworthy    = if ($trustIso) { $trustIso.TrustworthyOn } else { $null }
+                        IsolationLevel = if ($trustIso) { $trustIso.IsolationLevel } else { $null }
                         DBO            = $dbo
                         LastFullBackup = $backupStatus
                     }
@@ -992,10 +1004,10 @@ function _Build-ModernReportHtml
 
     $dbRows = if ($Databases) {
         $Databases | ForEach-Object {
-            "<tr><td>$(_HtmlEncode $_.Name)</td><td>$($_.Recovery)</td><td>$(_HtmlEncode $_.Compatibility)</td><td>$(_HtmlEncode $_.DBO)</td><td>$($_.LastFullBackup)</td></tr>"
+            "<tr><td>$(_HtmlEncode $_.Name)</td><td>$($_.Recovery)</td><td>$(_HtmlEncode $_.Compatibility)</td><td>$($_.Trustworthy)</td><td>$(_HtmlEncode $_.IsolationLevel)</td><td>$(_HtmlEncode $_.DBO)</td><td>$($_.LastFullBackup)</td></tr>"
         } | Out-String
     } else {
-        '<tr><td colspan="5">No databases</td></tr>'
+        '<tr><td colspan="7">No databases</td></tr>'
     }
 
     return @"
@@ -1147,6 +1159,8 @@ function _Build-ModernReportHtml
         <th>Database</th>
         <th>Recovery Model</th>
         <th>Datenbank-Modus</th>
+        <th>Trustworthy</th>
+        <th>Isolation Level</th>
         <th>DBO Owner</th>
         <th>Last Full Backup</th>
       </tr>

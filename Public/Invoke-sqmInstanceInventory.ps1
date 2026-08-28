@@ -118,7 +118,18 @@ GROUP BY database_name, type;
 				$backupRows = Invoke-DbaQuery @connParams -Query $backupQuery -EnableException:$EnableException -ErrorAction SilentlyContinue
 				$backupLookup = @{ }
 				foreach ($r in $backupRows) { $backupLookup["$($r.database_name)|$($r.type)"] = $r.LastBackup }
-				
+
+				# TRUSTWORTHY + Isolation Level pro Datenbank
+				$trustIsoLookup = @{ }
+				try
+				{
+					$trustIsoLookup = Get-sqmDatabaseTrustIsolationMap -SqlInstance $instance -SqlCredential $SqlCredential
+				}
+				catch
+				{
+					Invoke-sqmLogging -Message "[$instance] TRUSTWORTHY/Isolation-Abfrage fehlgeschlagen: $($_.Exception.Message)" -FunctionName $functionName -Level "VERBOSE"
+				}
+
 				# Logins
 				$logins = Get-DbaLogin @connParams -ErrorAction SilentlyContinue
 				
@@ -186,23 +197,27 @@ ORDER BY name;
 				
 				# --- Datenbanken ---
 				$lines.Add(""); $lines.Add("# ?? DATENBANKEN ($(@($databases).Count)) ????????????????????????????????????")
-				$lines.Add(("{0,-35} {1,-10} {2,-12} {3,-8} {4,-10} {5,-20} {6}" -f
-						'Name', 'Status', 'Recovery', 'SizeMB', 'CompatLvl', 'Letztes Full', 'Owner'))
-				$lines.Add(("-" * 120))
-				
+				$lines.Add(("{0,-35} {1,-10} {2,-12} {3,-8} {4,-10} {5,-6} {6,-28} {7,-20} {8}" -f
+						'Name', 'Status', 'Recovery', 'SizeMB', 'CompatLvl', 'Trust', 'IsolationLevel', 'Letztes Full', 'Owner'))
+				$lines.Add(("-" * 150))
+
 				$dbCsvList = [System.Collections.Generic.List[PSCustomObject]]::new()
 				foreach ($db in ($databases | Sort-Object IsSystemObject, Name))
 				{
 					$lastFull = $backupLookup["$($db.Name)|D"]
 					$fullStr = if ($lastFull) { $lastFull.ToString('yyyy-MM-dd HH:mm') }
 					else { '(keins)' }
-					
-					$lines.Add(("{0,-35} {1,-10} {2,-12} {3,-8} {4,-10} {5,-20} {6}" -f
+
+					$trustIso = $trustIsoLookup[$db.Name]
+					$trustworthyOn = if ($trustIso) { $trustIso.TrustworthyOn } else { $null }
+					$isolationLevel = if ($trustIso) { $trustIso.IsolationLevel } else { $null }
+
+					$lines.Add(("{0,-35} {1,-10} {2,-12} {3,-8} {4,-10} {5,-6} {6,-28} {7,-20} {8}" -f
 							$db.Name.Substring(0, [Math]::Min(35, $db.Name.Length)),
 							$db.Status, $db.RecoveryModel,
 							[math]::Round($db.Size, 0),
-							$db.CompatibilityLevel, $fullStr, $db.Owner))
-					
+							$db.CompatibilityLevel, $trustworthyOn, $isolationLevel, $fullStr, $db.Owner))
+
 					$dbCsvList.Add([PSCustomObject]@{
 							SqlInstance  = $instance
 							DatabaseName = $db.Name
@@ -210,6 +225,8 @@ ORDER BY name;
 							RecoveryModel = $db.RecoveryModel
 							SizeMB	     = [math]::Round($db.Size, 0)
 							CompatibilityLevel = $db.CompatibilityLevel
+							TrustworthyOn = $trustworthyOn
+							IsolationLevel = $isolationLevel
 							Owner	     = $db.Owner
 							Collation    = $db.Collation
 							IsSystemObject = $db.IsSystemObject
@@ -336,12 +353,15 @@ ORDER BY name;
 					{
 						$lastFull = $backupLookup["$($db.Name)|D"]
 						$fullStr = if ($lastFull) { $lastFull.ToString('yyyy-MM-dd HH:mm') } else { '(keins)' }
+						$trustIso = $trustIsoLookup[$db.Name]
+						$trustworthyOn = if ($trustIso) { $trustIso.TrustworthyOn } else { $null }
+						$isolationLevel = if ($trustIso) { $trustIso.IsolationLevel } else { $null }
 						$sevClass = if ($db.Status -ne 'Normal') { ' class="crit"' } elseif (-not $lastFull) { ' class="warn"' } else { '' }
 						"<tr><td$sevClass>$(_Enc $db.Name)</td><td>$($db.Status)</td><td>$($db.RecoveryModel)</td>" +
-							"<td>$([math]::Round($db.Size, 0))</td><td>$($db.CompatibilityLevel)</td><td>$fullStr</td><td>$(_Enc $db.Owner)</td></tr>"
+							"<td>$([math]::Round($db.Size, 0))</td><td>$($db.CompatibilityLevel)</td><td>$trustworthyOn</td><td>$(_Enc $isolationLevel)</td><td>$fullStr</td><td>$(_Enc $db.Owner)</td></tr>"
 					}
 					$bodySections.Add("<h3>Datenbanken ($(@($databases).Count))</h3><table>" +
-							"<tr><th>Name</th><th>Status</th><th>Recovery</th><th>SizeMB</th><th>CompatLvl</th><th>Letztes Full</th><th>Owner</th></tr>" +
+							"<tr><th>Name</th><th>Status</th><th>Recovery</th><th>SizeMB</th><th>CompatLvl</th><th>Trustworthy</th><th>IsolationLevel</th><th>Letztes Full</th><th>Owner</th></tr>" +
 							($dbRowsHtml -join '') + "</table>")
 
 					$loginRowsHtml = foreach ($l in ($logins | Sort-Object LoginType, Name))

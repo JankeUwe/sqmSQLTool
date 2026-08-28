@@ -453,10 +453,19 @@ function Export-sqmServerConfiguration
 					$databases = Get-DbaDatabase -SqlInstance $server -ErrorAction SilentlyContinue
 					$dbList = @()
 
+					$trustIsoLookup = @{ }
+					try
+					{
+						$trustIsoLookup = Get-sqmDatabaseTrustIsolationMap -SqlInstance $SqlInstance -SqlCredential $SqlCredential
+					}
+					catch { }
+
 					if ($databases)
 					{
 						foreach ($db in $databases)
 						{
+							$trustIso = $trustIsoLookup[$db.Name]
+
 							$dbList += [PSCustomObject]@{
 								Name                = $db.Name
 								Owner               = $db.Owner
@@ -468,6 +477,7 @@ function Export-sqmServerConfiguration
 								AutoClose           = $db.AutoClose
 								AutoShrink          = $db.AutoShrink
 								Trustworthy         = $db.Trustworthy
+								IsolationLevel      = if ($trustIso) { $trustIso.IsolationLevel } else { $null }
 							}
 						}
 					}

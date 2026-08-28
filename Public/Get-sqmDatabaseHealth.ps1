@@ -15,6 +15,8 @@
     - VLF count (excessively fragmented transaction log files)
     - Database size (data + log)
     - Database status (Online, Suspect, Restoring, ...)
+    - TRUSTWORTHY setting and effective isolation level (READ_COMMITTED_SNAPSHOT /
+      SNAPSHOT allowed / default), via Get-sqmDatabaseTrustIsolationMap
 
     Results are saved as HTML, TXT and CSV files in the specified directory.
     The function also returns an object with the detail data and file paths.
@@ -259,7 +261,18 @@ END
 				{
 					Invoke-sqmLogging -Message "[$instance] AutoGrowth-Abfrage fehlgeschlagen (Trace evtl. deaktiviert)." -FunctionName $functionName -Level "VERBOSE"
 				}
-				
+
+				# 5b. TRUSTWORTHY + Isolation Level pro Datenbank (ein Call fuer die ganze Instanz)
+				$trustIsoLookup = @{ }
+				try
+				{
+					$trustIsoLookup = Get-sqmDatabaseTrustIsolationMap -SqlInstance $instance -SqlCredential $SqlCredential
+				}
+				catch
+				{
+					Invoke-sqmLogging -Message "[$instance] TRUSTWORTHY/Isolation-Abfrage fehlgeschlagen: $($_.Exception.Message)" -FunctionName $functionName -Level "VERBOSE"
+				}
+
 				$now = Get-Date
 				
 				# 6. Detailzeilen fuer jede Datenbank
@@ -296,17 +309,24 @@ END
 					$agTotalKB = if ($agData) { $agData.TotalGrowthKB }
 					else { 0 }
 					
+					# TRUSTWORTHY + Isolation Level
+					$trustIso = $trustIsoLookup[$dbName]
+					$trustworthyOn = if ($trustIso) { $trustIso.TrustworthyOn } else { $null }
+					$isolationLevel = if ($trustIso) { $trustIso.IsolationLevel } else { $null }
+
 					# Gesamtstatus
 					$overallStatus = if ($db.Status -ne 'Normal') { 'Critical' }
 					elseif ($checkDbStatus -eq 'Warning' -or
 						$vlfStatus -eq 'Warning') { 'Warning' }
 					else { 'OK' }
-					
+
 					$detailRows.Add([PSCustomObject]@{
 							SqlInstance    = $instance
 							Database	   = $dbName
 							DatabaseStatus = $db.Status
 							RecoveryModel  = $db.RecoveryModel
+							TrustworthyOn  = $trustworthyOn
+							IsolationLevel = $isolationLevel
 							SizeMB		   = [math]::Round($db.Size, 1)
 							LastCheckDb    = if ($lastCheckDb) { $lastCheckDb.ToString('yyyy-MM-dd') } else { '(unbekannt)' }
 							CheckDbAgeDays = if ($checkDbAgeD) { [math]::Round($checkDbAgeD, 0) } else { $null }
@@ -359,16 +379,16 @@ END
 					}
 					$lines.Add("# ================================================================")
 					$lines.Add("")
-					$lines.Add(("{0,-35} {1,-10} {2,-12} {3,-6} {4,-7} {5,-8} {6,-8} {7}" -f
-							'Datenbank', 'Status', 'Recovery', 'SizeMB', 'CheckDB', 'VLF', 'AGEvts', 'Letztes Full'))
-					$lines.Add(("-" * 110))
-					
+					$lines.Add(("{0,-35} {1,-10} {2,-12} {3,-6} {4,-6} {5,-28} {6,-7} {7,-8} {8,-8} {9}" -f
+							'Datenbank', 'Status', 'Recovery', 'SizeMB', 'Trust', 'IsolationLevel', 'CheckDB', 'VLF', 'AGEvts', 'Letztes Full'))
+					$lines.Add(("-" * 140))
+
 					foreach ($e in ($detailRows | Sort-Object OverallStatus, Database))
 					{
 						$dbNameShort = if ($e.Database.Length -gt 35) { $e.Database.Substring(0, 32) + '...' }
 						else { $e.Database }
-						$lines.Add(("{0,-35} {1,-10} {2,-12} {3,-6} {4,-7} {5,-8} {6,-8} {7}" -f
-								$dbNameShort, $e.OverallStatus, $e.RecoveryModel, $e.SizeMB,
+						$lines.Add(("{0,-35} {1,-10} {2,-12} {3,-6} {4,-6} {5,-28} {6,-7} {7,-8} {8,-8} {9}" -f
+								$dbNameShort, $e.OverallStatus, $e.RecoveryModel, $e.SizeMB, $e.TrustworthyOn, $e.IsolationLevel,
 								$e.CheckDbAgeDays, $e.VlfCount, $e.AutoGrowthEvents, $e.LastFullBackup))
 					}
 					$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force
@@ -385,10 +405,10 @@ END
 							'Ausgeschlossen' + $(if ($e.ExcludeReason) { " ($([System.Net.WebUtility]::HtmlEncode($e.ExcludeReason)))" } else { '' })
 						}
 						else { '' }
-						"<tr><td class='$sevClass'>$($e.OverallStatus)</td><td>$([System.Net.WebUtility]::HtmlEncode($e.Database))</td><td>$($e.RecoveryModel)</td><td>$($e.SizeMB)</td><td>$($e.CheckDbStatus) ($($e.CheckDbAgeDays)d)</td><td>$($e.VlfStatus) ($($e.VlfCount))</td><td>$($e.AutoGrowthEvents)</td><td>$($e.LastFullBackup)</td><td>$($e.LastLogBackup)</td><td>$excludeCell</td></tr>"
+						"<tr><td class='$sevClass'>$($e.OverallStatus)</td><td>$([System.Net.WebUtility]::HtmlEncode($e.Database))</td><td>$($e.RecoveryModel)</td><td>$($e.TrustworthyOn)</td><td>$([System.Net.WebUtility]::HtmlEncode($e.IsolationLevel))</td><td>$($e.SizeMB)</td><td>$($e.CheckDbStatus) ($($e.CheckDbAgeDays)d)</td><td>$($e.VlfStatus) ($($e.VlfCount))</td><td>$($e.AutoGrowthEvents)</td><td>$($e.LastFullBackup)</td><td>$($e.LastLogBackup)</td><td>$excludeCell</td></tr>"
 					}
 					$bodyHtml = "<p>OK: $cntOk | Warning: $cntWarn | Critical: $cntCrit</p>" +
-						"<table><tr><th>Status</th><th>Datenbank</th><th>Recovery</th><th>SizeMB</th><th>CheckDB</th><th>VLF</th><th>AutoGrowth</th><th>Letztes Full</th><th>Letztes Log</th><th>Backup-Ausschluss</th></tr>" +
+						"<table><tr><th>Status</th><th>Datenbank</th><th>Recovery</th><th>Trustworthy</th><th>IsolationLevel</th><th>SizeMB</th><th>CheckDB</th><th>VLF</th><th>AutoGrowth</th><th>Letztes Full</th><th>Letztes Log</th><th>Backup-Ausschluss</th></tr>" +
 						($rowsHtml -join '') + "</table>"
 					$html = ConvertTo-sqmHtmlReport -Title "Database Health - $instance" -Subtitle "Erstellt: $timestamp" -BodyHtml $bodyHtml
 					$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force

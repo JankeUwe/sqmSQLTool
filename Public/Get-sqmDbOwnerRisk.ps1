@@ -177,6 +177,8 @@ ORDER BY dp.name
 				$metaByDb = @{}
 				foreach ($m in $metaRows) { $metaByDb[$m.DatabaseName] = $m }
 
+				$isoByDb = Get-sqmDatabaseTrustIsolationMap -SqlInstance $instance -SqlCredential $SqlCredential
+
 				$dbList = Get-DbaDatabase @connParams -ErrorAction Stop | Where-Object { $_.Name -ne 'tempdb' }
 				if (-not $IncludeSystemDatabases) { $dbList = $dbList | Where-Object { -not $_.IsSystemObject } }
 
@@ -219,6 +221,7 @@ ORDER BY dp.name
 					$isTrustworthy = if ($meta) { [bool]$meta.IsTrustworthyOn } else { $false }
 					$ownerIsSysAdmin = if ($meta) { [bool]$meta.OwnerIsSysAdmin } else { $false }
 					$dbOwnerLogin = if ($meta) { $meta.DbOwnerLogin } else { $null }
+					$isolationLevel = if ($isoByDb.ContainsKey($dbName)) { $isoByDb[$dbName].IsolationLevel } else { $null }
 
 					$escalationPossible = ($members.Count -gt 0) -and $isTrustworthy -and $ownerIsSysAdmin
 
@@ -249,6 +252,7 @@ ORDER BY dp.name
 						MemberCount         = $members.Count
 						DbOwnerLogin        = $dbOwnerLogin
 						IsTrustworthyOn     = $isTrustworthy
+						IsolationLevel      = $isolationLevel
 						OwnerIsSysAdmin     = $ownerIsSysAdmin
 						EscalationPossible  = $escalationPossible
 						Message             = $message
@@ -322,7 +326,7 @@ ORDER BY dp.name
 							foreach ($e in ($entries | Sort-Object SqlInstance, DatabaseName))
 							{
 								$lines.Add(("  {0,-20} {1,-25} Members: {2}" -f $e.SqlInstance, $e.DatabaseName, ($e.DbOwnerMembers -join ', ')))
-								$lines.Add(("    Owner: {0,-25} Trustworthy: {1,-6} OwnerIsSysAdmin: {2}" -f $e.DbOwnerLogin, $e.IsTrustworthyOn, $e.OwnerIsSysAdmin))
+								$lines.Add(("    Owner: {0,-25} Trustworthy: {1,-6} OwnerIsSysAdmin: {2,-6} IsolationLevel: {3}" -f $e.DbOwnerLogin, $e.IsTrustworthyOn, $e.OwnerIsSysAdmin, $e.IsolationLevel))
 							}
 						}
 						else { $lines.Add("  (keine)") }
@@ -340,12 +344,12 @@ ORDER BY dp.name
 							"<td>$([System.Net.WebUtility]::HtmlEncode($e.DatabaseName))</td>" +
 							"<td>$([System.Net.WebUtility]::HtmlEncode(($e.DbOwnerMembers -join ', ')))</td>" +
 							"<td>$([System.Net.WebUtility]::HtmlEncode($e.DbOwnerLogin))</td>" +
-							"<td>$($e.IsTrustworthyOn)</td><td>$($e.OwnerIsSysAdmin)</td>" +
+							"<td>$($e.IsTrustworthyOn)</td><td>$([System.Net.WebUtility]::HtmlEncode($e.IsolationLevel))</td><td>$($e.OwnerIsSysAdmin)</td>" +
 							"<td>$([System.Net.WebUtility]::HtmlEncode($e.Message))</td></tr>"
 					}
 					$bodyHtml = "<p>Gesamt: $($allResults.Count) | Critical: $cntCritical | Warning: $cntWarning | OK: $cntOk</p>" +
 						"<table><tr><th>Status</th><th>Instanz</th><th>Datenbank</th><th>db_owner-Mitglieder</th>" +
-						"<th>DB-Owner-Login</th><th>Trustworthy</th><th>OwnerIsSysAdmin</th><th>Meldung</th></tr>" +
+						"<th>DB-Owner-Login</th><th>Trustworthy</th><th>IsolationLevel</th><th>OwnerIsSysAdmin</th><th>Meldung</th></tr>" +
 						($rowsHtml -join '') + "</table>"
 					$html = ConvertTo-sqmHtmlReport -Title "db_owner Risiko-Bericht" -Subtitle "Instanz(en): $instanceList | Erstellt: $timestamp" -BodyHtml $bodyHtml
 					$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force

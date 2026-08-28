@@ -14,6 +14,7 @@
       Invoke-sqmOpenReport      - Oeffnet Report (HTML vor TXT, nie CSV, -NoOpen)
       ConvertTo-sqmHtmlReport   - HTML-Geruest im sqmSQLTool-Theme
       Get-sqmDirectCpuMemory    - Momentaufnahme CPU% + Memory MB (ein DMV-Call)
+      Get-sqmDatabaseTrustIsolationMap - TRUSTWORTHY + Isolation Level pro Datenbank (ein Call)
     ===========================================================================
 #>
 
@@ -349,4 +350,63 @@ OUTER APPLY
 		AvailableMemoryMB     = [math]::Round([int64]$row.AvailableMemoryBytes / 1MB, 2)
 		ServerTotalMemoryMB   = [math]::Round([int64]$row.ServerTotalMemoryBytes / 1MB, 2)
 	}
+}
+
+# Liefert TRUSTWORTHY + Isolation-Level-Info fuer ALLE Datenbanken einer Instanz in EINEM
+# Call, als Hashtable keyed by Datenbankname fuer O(1)-Lookup in einer foreach-Datenbankschleife.
+#
+# Bewusst eine eigene sys.databases-Abfrage statt der dbatools-SMO-Objekte (Get-DbaDatabase):
+# .Trustworthy ist zuverlaessig befuellt, ABER .ReadCommittedSnapshot ist auf einem Standard-
+# Get-DbaDatabase-Objekt $null (SMO laedt diese Property nicht eager) - live auf DEV01 verifiziert.
+# Ein naiver $db.ReadCommittedSnapshot-Zugriff wuerde also auf JEDER Datenbank falsch "aus"
+# anzeigen, unabhaengig vom echten Wert. Deshalb hier eine einzige verlaessliche Quelle fuer
+# beide Felder statt halb SMO / halb Raw-SQL je nach Aufrufer.
+#
+# IsolationLevel ist ein aus ReadCommittedSnapshot + SnapshotIsolationState abgeleiteter,
+# lesbarer Text - ein Feld statt zwei rohe Booleans/Enums, damit Report-Tabellen nicht mit
+# Spalten zumuellen, aber die Rohwerte bleiben als eigene Properties fuer Skripting erhalten.
+function Get-sqmDatabaseTrustIsolationMap
+{
+	[CmdletBinding()]
+	[OutputType([hashtable])]
+	param (
+		[Parameter(Mandatory = $true)]
+		[string]$SqlInstance,
+		[Parameter(Mandatory = $false)]
+		[System.Management.Automation.PSCredential]$SqlCredential
+	)
+
+	$connParams = @{ SqlInstance = $SqlInstance }
+	if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
+
+	$sql = @"
+SELECT
+    name AS DatabaseName,
+    is_trustworthy_on AS TrustworthyOn,
+    is_read_committed_snapshot_on AS ReadCommittedSnapshot,
+    snapshot_isolation_state_desc AS SnapshotIsolationState
+FROM sys.databases
+"@
+	$rows = Invoke-DbaQuery @connParams -Database 'master' -Query $sql -ErrorAction Stop
+
+	$map = @{}
+	foreach ($r in $rows)
+	{
+		$rcsi = [bool]$r.ReadCommittedSnapshot
+		$sis  = [string]$r.SnapshotIsolationState
+
+		$isolationLevel =
+			if ($rcsi -and $sis -eq 'ON') { 'READ_COMMITTED_SNAPSHOT + SNAPSHOT' }
+			elseif ($rcsi) { 'READ_COMMITTED_SNAPSHOT' }
+			elseif ($sis -eq 'ON') { 'READ_COMMITTED (SNAPSHOT allowed)' }
+			else { 'READ_COMMITTED (default)' }
+
+		$map[$r.DatabaseName] = [PSCustomObject]@{
+			TrustworthyOn          = [bool]$r.TrustworthyOn
+			ReadCommittedSnapshot  = $rcsi
+			SnapshotIsolationState = $sis
+			IsolationLevel         = $isolationLevel
+		}
+	}
+	return $map
 }
