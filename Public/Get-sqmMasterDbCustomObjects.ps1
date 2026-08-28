@@ -15,8 +15,8 @@
     and anything matched by the MasterDbObjectWhitelist module configuration (wildcards
     allowed) - see Get-sqmConfig -Key 'MasterDbObjectWhitelist' / Set-sqmConfig
     -MasterDbObjectWhitelist. The default whitelist covers the standard maintenance-script
-    family: sp_Blitz*, sp_WhoIsActive, Ola Hallengren's CommandExecute/DatabaseBackup/
-    DatabaseIntegrityCheck/IndexOptimize, and sp_BackRestRemain.
+    family: sp_Blitz*, sp_WhoIsActive, Ola Hallengren's CommandExecute/CommandLog/
+    DatabaseBackup/DatabaseIntegrityCheck/IndexOptimize, and sp_BackRestRemain.
 
     Output as PowerShell objects (one row per found object, plus one OK row per instance with
     nothing found), plus TXT/CSV/HTML report files. This function only reports - use

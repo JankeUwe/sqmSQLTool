@@ -39,10 +39,12 @@ $script:sqmModuleConfig = @{
 	# Namen von Objekten (Tabellen/Views/Prozeduren/Functions), die in master erwartet werden
 	# und von Get-/Remove-sqmMasterDbCustomObjects NIE als "versehentlich angelegt" gemeldet
 	# oder entfernt werden - Standard-Wartungsskripte (Ola Hallengren, Brent Ozar sp_Blitz*,
-	# sp_WhoIsActive) sowie sp_BackRestRemain. Wildcards ('sp_Blitz*') sind erlaubt.
+	# sp_WhoIsActive) sowie sp_BackRestRemain. CommandLog ist Ola Hallengrens Log-Tabelle
+	# (landet standardmaessig in master, siehe Test-sqmOlaInstallation), keine Prozedur -
+	# gehoert trotzdem auf die Whitelist. Wildcards ('sp_Blitz*') sind erlaubt.
 	MasterDbObjectWhitelist = @(
 		'sp_Blitz', 'sp_BlitzBackups', 'sp_BlitzCache', 'sp_BlitzFirst', 'sp_BlitzIndex',
-		'sp_BlitzLock', 'sp_BlitzWho', 'CommandExecute', 'DatabaseBackup',
+		'sp_BlitzLock', 'sp_BlitzWho', 'CommandExecute', 'CommandLog', 'DatabaseBackup',
 		'DatabaseIntegrityCheck', 'IndexOptimize', 'sp_WhoIsActive', 'sp_BackRestRemain'
 	)
 	SsrsInstallerPath     = $null

@@ -69,10 +69,11 @@
     Array of object names (tables/views/procedures/functions) that are expected in master and
     must never be reported or removed by Get-/Remove-sqmMasterDbCustomObjects, in addition to
     genuine Microsoft-shipped objects (which are always excluded via is_ms_shipped). Wildcards
-    allowed. Default: the standard maintenance-script family (Ola Hallengren, Brent Ozar sp_Blitz*,
-    sp_WhoIsActive) plus sp_BackRestRemain.
+    allowed. Default: the standard maintenance-script family (Ola Hallengren's
+    CommandExecute/CommandLog/DatabaseBackup/DatabaseIntegrityCheck/IndexOptimize, Brent Ozar's
+    sp_Blitz*, sp_WhoIsActive) plus sp_BackRestRemain.
     Example:
-        Set-sqmConfig -MasterDbObjectWhitelist @('sp_Blitz*', 'sp_WhoIsActive', 'CommandLog')
+        Set-sqmConfig -MasterDbObjectWhitelist @('sp_Blitz*', 'sp_WhoIsActive', 'usp_MyAdminTool')
 
 .PARAMETER SsrsInstallerPath
     Full UNC or local path to the SSRS installer file
@@ -148,7 +149,7 @@
     Set-sqmConfig -DbatoolsSharePath 'W:\75084-Datenbanken\MSSQL\SQLSources\Modules'
 
 .EXAMPLE
-    Set-sqmConfig -MasterDbObjectWhitelist @('sp_Blitz*', 'sp_WhoIsActive', 'CommandExecute', 'CommandLog')
+    Set-sqmConfig -MasterDbObjectWhitelist @('sp_Blitz*', 'sp_WhoIsActive', 'CommandExecute', 'CommandLog', 'usp_MyAdminTool')
 #>
 function Set-sqmConfig
 {

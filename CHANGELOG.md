@@ -1,5 +1,13 @@
 # sqmSQLTool — Changelog
 
+## [1.9.111.0] — 2026-08-28
+
+### Fix: `MasterDbObjectWhitelist` default was missing `CommandLog`
+
+Ola Hallengren's maintenance solution creates a `CommandLog` table in master by default (not just
+the four stored procedures) - left off the default whitelist added in 1.9.110.0. Added, so a
+standard Ola install doesn't get its own logging table flagged/dropped out of the box.
+
 ## [1.9.110.0] — 2026-08-28
 
 ### New: `Get-sqmMasterDbCustomObjects` / `Remove-sqmMasterDbCustomObjects` — clean up objects accidentally created in master
