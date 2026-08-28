@@ -65,6 +65,15 @@
             [PSCustomObject]@{ DomainPattern = '*';                     GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' }
         )
 
+.PARAMETER MasterDbObjectWhitelist
+    Array of object names (tables/views/procedures/functions) that are expected in master and
+    must never be reported or removed by Get-/Remove-sqmMasterDbCustomObjects, in addition to
+    genuine Microsoft-shipped objects (which are always excluded via is_ms_shipped). Wildcards
+    allowed. Default: the standard maintenance-script family (Ola Hallengren, Brent Ozar sp_Blitz*,
+    sp_WhoIsActive) plus sp_BackRestRemain.
+    Example:
+        Set-sqmConfig -MasterDbObjectWhitelist @('sp_Blitz*', 'sp_WhoIsActive', 'CommandLog')
+
 .PARAMETER SsrsInstallerPath
     Full UNC or local path to the SSRS installer file
     (SQLServerReportingServices.exe or .msi).
@@ -137,6 +146,9 @@
 
 .EXAMPLE
     Set-sqmConfig -DbatoolsSharePath 'W:\75084-Datenbanken\MSSQL\SQLSources\Modules'
+
+.EXAMPLE
+    Set-sqmConfig -MasterDbObjectWhitelist @('sp_Blitz*', 'sp_WhoIsActive', 'CommandExecute', 'CommandLog')
 #>
 function Set-sqmConfig
 {
@@ -183,6 +195,8 @@ function Set-sqmConfig
 		[string]$DefaultPolicy,
 		[Parameter(Mandatory = $false)]
 		[PSCustomObject[]]$HpuDomainGroupMap,
+		[Parameter(Mandatory = $false)]
+		[string[]]$MasterDbObjectWhitelist,
 		[Parameter(Mandatory = $false)]
 		[string]$SsrsInstallerPath,
 		[Parameter(Mandatory = $false)]
@@ -460,6 +474,21 @@ function Set-sqmConfig
 		}
 	}
 	
+	# Whitelist erwarteter Objekte in master (Get-/Remove-sqmMasterDbCustomObjects)
+	if ($PSBoundParameters.ContainsKey('MasterDbObjectWhitelist'))
+	{
+		if ($MasterDbObjectWhitelist -and $MasterDbObjectWhitelist.Count -gt 0)
+		{
+			$globalConfig['MasterDbObjectWhitelist'] = $MasterDbObjectWhitelist
+			$updated = $true
+		}
+		else
+		{
+			Write-Error "MasterDbObjectWhitelist darf nicht leer sein."
+			return
+		}
+	}
+
 	# SSRS-Installer-Pfad
 	if ($PSBoundParameters.ContainsKey('SsrsInstallerPath'))
 	{

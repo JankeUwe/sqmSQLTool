@@ -1,5 +1,35 @@
 # sqmSQLTool — Changelog
 
+## [1.9.110.0] — 2026-08-28
+
+### New: `Get-sqmMasterDbCustomObjects` / `Remove-sqmMasterDbCustomObjects` — clean up objects accidentally created in master
+
+Users occasionally create tables, views, procedures, or functions directly in `master` by
+accident (wrong database selected in SSMS, a script run without `USE`). Unlike a user database,
+`master` has no natural owner for "this shouldn't be here."
+
+`Get-sqmMasterDbCustomObjects` reads `sys.objects` in master for tables/views/procedures/functions
+(`U`/`V`/`P`/`PC`/`FN`/`IF`/`TF`/`FS`/`FT`), excludes genuine Microsoft-shipped objects
+(`is_ms_shipped`) and anything matching the new `MasterDbObjectWhitelist` module configuration
+(wildcards allowed), and reports the rest as a TXT/CSV/HTML report.
+
+`Remove-sqmMasterDbCustomObjects` drops what it finds - re-detects live per instance (not from a
+possibly stale pipeline object), issues the correct `DROP TABLE`/`DROP VIEW`/`DROP PROCEDURE`/
+`DROP FUNCTION` per object type, each wrapped in its own try/catch. Full `-WhatIf`/`-Confirm`
+support (`ConfirmImpact = 'High'`), CSV changelog. There is no per-call bypass of the whitelist -
+edit the configuration first if an object should be exempt.
+
+New config key `MasterDbObjectWhitelist` (`Get-sqmConfig -Key 'MasterDbObjectWhitelist'` /
+`Set-sqmConfig -MasterDbObjectWhitelist @(...)`), defaulting to the standard maintenance-script
+family: `sp_Blitz`, `sp_BlitzBackups`, `sp_BlitzCache`, `sp_BlitzFirst`, `sp_BlitzIndex`,
+`sp_BlitzLock`, `sp_BlitzWho`, `CommandExecute`, `DatabaseBackup`, `DatabaseIntegrityCheck`,
+`IndexOptimize`, `sp_WhoIsActive`, `sp_BackRestRemain`.
+
+Live-verified end to end against DEV01: created a table/view/procedure/function directly in
+master, confirmed all four were detected and correctly typed, confirmed `-WhatIf` changed
+nothing, confirmed targeted removal by `-ObjectName` and bulk removal both worked, confirmed a
+final scan came back clean, and confirmed whitelisted names are never flagged.
+
 ## [1.9.109.0] — 2026-08-28
 
 ### Change: every per-database report now shows TRUSTWORTHY and isolation level

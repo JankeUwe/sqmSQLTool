@@ -36,6 +36,15 @@ $script:sqmModuleConfig = @{
 	# aufbewahren (nie aufraeumen).
 	RestoreTestRetentionMonths = 12
 	HpuDomainGroupMap     = @()
+	# Namen von Objekten (Tabellen/Views/Prozeduren/Functions), die in master erwartet werden
+	# und von Get-/Remove-sqmMasterDbCustomObjects NIE als "versehentlich angelegt" gemeldet
+	# oder entfernt werden - Standard-Wartungsskripte (Ola Hallengren, Brent Ozar sp_Blitz*,
+	# sp_WhoIsActive) sowie sp_BackRestRemain. Wildcards ('sp_Blitz*') sind erlaubt.
+	MasterDbObjectWhitelist = @(
+		'sp_Blitz', 'sp_BlitzBackups', 'sp_BlitzCache', 'sp_BlitzFirst', 'sp_BlitzIndex',
+		'sp_BlitzLock', 'sp_BlitzWho', 'CommandExecute', 'DatabaseBackup',
+		'DatabaseIntegrityCheck', 'IndexOptimize', 'sp_WhoIsActive', 'sp_BackRestRemain'
+	)
 	SsrsInstallerPath     = $null
 	# Freigabelaufwerk mit einer vorab gepackten dbatools + dbatools.library-Baseline, fuer
 	# Umgebungen ohne PSGallery-Zugriff (siehe Install.ps1 Schritt 5b). $null = PSGallery nutzen.
