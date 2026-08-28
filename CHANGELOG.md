@@ -1,5 +1,29 @@
 # sqmSQLTool — Changelog
 
+## [1.9.108.0] — 2026-08-28
+
+### New: `Get-sqmDbOwnerRisk` / `Repair-sqmDbOwnerRisk` — db_owner privilege-escalation audit and fix
+
+db_owner is functionally equivalent to CONTROL on the database: members can create triggers and
+procedures with `EXECUTE AS OWNER`, which run as the database owner (`dbo`), not the caller. If a
+database has `TRUSTWORTHY = ON` and its owner maps to a sysadmin-privileged login (common, since
+databases are usually created by an admin/setup account), any db_owner member can escalate to full
+instance control via a single `CREATE PROCEDURE ... WITH EXECUTE AS OWNER`.
+
+`Get-sqmDbOwnerRisk` finds, per database, any non-dbo db_owner members and whether that escalation
+path is actually open (`TRUSTWORTHY` + sysadmin owner), and writes a TXT/CSV/HTML report - green
+rows for databases with no unexpected db_owner members, red rows for the rest (Warning if just the
+membership is wrong, Critical if the full escalation path is open).
+
+`Repair-sqmDbOwnerRisk` fixes what it finds: removes the offending db_owner membership, adds
+`db_datareader` + `db_datawriter`, creates a custom `db_execute` role (`CREATE ROLE ... AUTHORIZATION
+dbo`) if it doesn't exist yet, grants that role `EXECUTE` on every user stored procedure in the
+database (skipped if there are none), and adds the login to it. Accepts `Get-sqmDbOwnerRisk`'s
+pipeline output directly. Full `-WhatIf`/`-Confirm` support (`ConfirmImpact = 'High'`), per-member
+error isolation so one failing login doesn't stop the rest, and a CSV changelog per instance.
+
+Background: [db_owner Risks: Trigger Creation, Ownership Chaining, and the Path to sysadmin](https://www.powershelldba.de/blog/articles/db-owner-privilege-escalation-risks.html)
+
 ## [1.9.107.0] — 2026-08-27
 
 ### New: `Get-sqmAlwaysOnQueueStatus` — pollable redo/send queue status, no report files
