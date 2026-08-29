@@ -1,5 +1,18 @@
 # sqmSQLTool — Changelog
 
+## [1.9.112.0] — 2026-08-29
+
+### Fix: GUI crashed picking a folder/file for `-OutputPath` or a `Files` parameter
+
+`Show-sqmToolGui`'s Browse... buttons (OpenFileDialog/SaveFileDialog/FolderBrowserDialog) set the
+textbox's `.Text` and then explicitly called `& $updatePreview` right after. `.Text` already fires
+`Add_TextChanged($updatePreview)`, so `$updatePreview` was invoked twice within the same
+click-handler call stack; that reentrant re-invocation of the same scriptblock (captured as a raw
+.NET event handler) corrupted it, and the next `& $updatePreview` failed with "The expression after
+'&' in a pipeline element produced an object that was not valid. It must result in a command name,
+a script block, or a CommandInfo object." Removed the redundant explicit calls - the TextChanged
+handler already covers it.
+
 ## [1.9.111.0] — 2026-08-28
 
 ### Fix: `MasterDbObjectWhitelist` default was missing `CommandLog`

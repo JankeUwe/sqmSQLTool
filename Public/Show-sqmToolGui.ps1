@@ -706,8 +706,13 @@
 							$dlg.CheckFileExists = $true
 							if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK)
 							{
+								# Setting .Text fires Add_TextChanged($updatePreview) below already - an
+								# extra explicit "& $updatePreview" call here re-invoked that SAME captured
+								# scriptblock a second time within the same event-handler call stack, which
+								# corrupted it (PowerShell/.NET event-delegate reentrancy) and crashed the
+								# GUI with "The expression after '&' ... produced an object that was not
+								# valid" the next time it ran. Do not add it back.
 								$ctrl.Text = ($dlg.FileNames -join ', ')
-								& $updatePreview
 							}
 						}.GetNewClosure())
 					$extraCtrl = $btnBrowse
@@ -736,8 +741,9 @@
 								$dlg.FileName = $current
 								if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK)
 								{
+									# See the OpenFileDialog handler above: .Text already triggers
+									# Add_TextChanged($updatePreview) - do not also call it explicitly here.
 									$ctrl.Text = $dlg.FileName
-									& $updatePreview
 								}
 							}
 							else
@@ -748,7 +754,6 @@
 								if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK)
 								{
 									$ctrl.Text = $dlg.SelectedPath
-									& $updatePreview
 								}
 							}
 						}.GetNewClosure())
