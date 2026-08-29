@@ -121,8 +121,8 @@ function Get-sqmDeadlockReport
 			# -----------------------------------------------------------------------
 			$ringBufferQuery = @"
 SELECT
-    xdr.value('@timestamp', 'datetime2')         AS EventTime,
-    xdr.query('.')                               AS DeadlockGraph
+    xdr.value('@timestamp', 'datetime2')             AS EventTime,
+    xdr.query('(data/value/deadlock)[1]')            AS DeadlockGraph
 FROM (
     SELECT CAST(target_data AS XML) AS target_data
     FROM sys.dm_xe_session_targets t
@@ -150,10 +150,16 @@ ORDER BY EventTime DESC
 				
 				try
 				{
-					# Deadlock-Graph XML parsen
+					# Deadlock-Graph XML parsen. Die SQL-Query liefert bereits den <deadlock>-Knoten
+					# direkt (xdr.query('(data/value/deadlock)[1]'), wie im bewaehrten DeadlockCollector-
+					# Projekt - NICHT den ganzen <event>-Knoten. Ein frueherer Versuch, stattdessen den
+					# ganzen <event>-Knoten zu holen (xdr.query('.')) und in PowerShell ueber
+					# $dlXml.event.'data'.value.'deadlock' zum <deadlock>-Knoten zu navigieren, scheiterte
+					# lautlos (0 Treffer statt Fehler), sobald <event> mehr als ein <data>-Kind hat -
+					# $dlXml.event.'data' wird dann ein Array statt eines einzelnen Elements.
 					[xml]$dlXml = $dl.DeadlockGraph.ToString()
-					$deadlockNode = $dlXml.event.'data'.value.'deadlock'
-					
+					$deadlockNode = $dlXml.deadlock
+
 					if (-not $deadlockNode) { continue }
 					
 					# Opfer ermitteln

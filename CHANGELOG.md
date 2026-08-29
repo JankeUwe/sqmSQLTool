@@ -1,5 +1,21 @@
 # sqmSQLTool — Changelog
 
+## [1.9.113.0] — 2026-08-29
+
+### Fix: `Get-sqmDeadlockReport` silently found 0 deadlocks even when they existed
+
+Confirmed on a machine where the (independently proven) `DeadlockCollector` T-SQL solution listed
+deadlocks from `system_health` but `Get-sqmDeadlockReport` reported none. The ring-buffer query
+pulled back the whole `<event>` element (`xdr.query('.')`) and PowerShell then tried to navigate to
+the deadlock node via `$dlXml.event.'data'.value.'deadlock'` - if `<event>` has more than one
+`<data>` child (as `xml_deadlock_report` can), `$dlXml.event.'data'` becomes an array instead of a
+single element and the property chase silently returns nothing (no error, no exception - just 0
+results). `DeadlockCollector` never had this problem because it extracts the `<deadlock>` node
+*inside T-SQL* via a relative XQuery (`xdr.query('(data/value/deadlock)[1]')`) instead of leaving
+the navigation to PowerShell's XML object model. `Get-sqmDeadlockReport` now does the same -
+queries for `(data/value/deadlock)[1]` directly, so `$dl.DeadlockGraph` is already the `<deadlock>`
+node and no further PowerShell-side navigation is needed.
+
 ## [1.9.112.0] — 2026-08-29
 
 ### Fix: GUI crashed picking a folder/file for `-OutputPath` or a `Files` parameter
