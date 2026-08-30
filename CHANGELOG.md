@@ -1,5 +1,42 @@
 # sqmSQLTool — Changelog
 
+## [1.9.115.0] — 2026-08-30
+
+### New: `Register-sqmAuditSession` — Extended Events session for the login/database/metadata audit gap
+
+Creates (if missing) and starts a dedicated Extended Events session covering the categories
+a previous blog post on SQL Server auditing methods flagged as a gap: `-FailedLogins`,
+`-SuccessfulLogins`, `-DatabaseCreated`, `-DatabaseDropped`, `-MetadataChanges` (schema-level
+DDL), each independently selectable, plus `-All`. No new reader was written - every event
+collects the same standard actions (`database_name`, `username`, `sql_text`, etc.)
+`Invoke-sqmExtendedEvents -Read` already knows how to surface.
+
+Every predicate was verified live against DEV01 rather than assumed, and two assumptions
+turned out to be wrong:
+
+- `sys.dm_xe_objects` actually has dedicated `database_created`/`database_dropped` events
+  (the auditing blog post claimed no such clean event exists for CREATE/DROP DATABASE - that
+  claim was incorrect and needs fixing in the article).
+- `object_created`/`object_altered`/`object_deleted` fire twice per statement (start and
+  commit/rollback) - filtered to `ddl_phase = 1` (commit) so nothing is double-counted.
+- Live-verified that scoping `-DatabaseCreated`/`-DatabaseDropped` to a specific database name
+  via a WHERE predicate does **not** work - neither the collected `database_name` action (it
+  reflects the connecting session's existing context, not the database being created/dropped)
+  nor a direct reference to the event's own field produces a working filter; both were tried
+  and both silently matched nothing. These two categories are always instance-wide by design,
+  not by omission, and the function warns if `-TargetDatabase` is supplied without
+  `-MetadataChanges` (the one category scoping actually works for, confirmed live: an
+  unrelated database's DDL was not captured when scoped).
+- `-MetadataChanges` excludes temp objects (`#...`) and SQL Server's own auto-generated
+  statistics objects (`_WA_Sys_...`) by default (`-IncludeSystemGeneratedObjects` to capture
+  them anyway) - both showed up as pure noise in live testing, including from dbatools' own
+  connection-housekeeping temp tables.
+
+Live-verified end to end against DEV01: idempotency (`-All` twice reports `Created` then
+`Unchanged`, no session recreation), a failed login, a successful login, `CREATE DATABASE`,
+scoped `CREATE`/`ALTER`/`DROP TABLE`, an out-of-scope table correctly excluded, and
+`DROP DATABASE`, all correctly captured and read back via `Invoke-sqmExtendedEvents -Read`.
+
 ## [1.9.114.0] — 2026-08-30
 
 ### New: `Get-sqmErrorLog` — read and categorize the SQL Server error log with ready-made filters

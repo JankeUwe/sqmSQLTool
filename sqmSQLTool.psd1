@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.9.114.0'
+	ModuleVersion		   = '1.9.115.0'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
@@ -212,6 +212,7 @@
 		'Remove-sqmAdOrphanLogin',
 		'Remove-sqmDatabaseFromAG',
 		'Remove-sqmMasterDbCustomObjects',
+		'Register-sqmAuditSession',
 		'Register-sqmBackupExcludeTrigger',
 		'Register-sqmBlockedProcessMonitor',
 		'Repair-sqmAlwaysOnDatabases',
