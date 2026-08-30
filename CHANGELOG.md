@@ -1,5 +1,27 @@
 # sqmSQLTool — Changelog
 
+## [1.9.114.0] — 2026-08-30
+
+### New: `Get-sqmErrorLog` — read and categorize the SQL Server error log with ready-made filters
+
+Wraps dbatools' `Get-DbaErrorLog` and adds what it does not provide on its own: switches for the
+event types that come up in almost every troubleshooting session instead of everyone re-inventing
+the same `-match` pattern - `-FailedLogins`, `-SuccessfulLogins`, `-Logins` (both), `-Backups`,
+`-Restores`, `-Errors` (internal `Error: n, Severity: n, State: n.` entries), `-Shutdowns`,
+`-Startups`, `-CorruptionEvents`, `-IOErrors`, `-MemoryPressure`, `-ServiceBrokerEvents`, plus
+`-Database`, `-Since`/`-Before`, `-LogNumber` (current log and/or archives), `-Top`, and a
+freeform `-Pattern` that combines with any other filter or works standalone.
+
+Login detection (`-FailedLogins`/`-SuccessfulLogins`) is language-neutral: the message templates
+for 18456/18453/18454 are read from `sys.messages` on the target instance and turned into regular
+expressions, the same approach `Get-sqmLoginLastAccess` already uses, so a non-English instance is
+matched correctly instead of only ever finding the English wording. The remaining categories match
+well-known English message text; the module does not guess localized strings it can't verify, and
+`-Pattern` is the documented escape hatch for anything else or for a localized instance.
+
+Every matched entry is returned with a `Category` label even with no filter applied, and exports
+to CSV/HTML like the other reporting functions (`-OutputPath`, `-NoOpen`, `Copy-sqmToCentralPath`).
+
 ## [1.9.113.0] — 2026-08-29
 
 ### Fix: `Get-sqmDeadlockReport` silently found 0 deadlocks even when they existed
