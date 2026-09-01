@@ -759,6 +759,115 @@
 						}.GetNewClosure())
 					$extraCtrl = $btnBrowse
 				}
+				elseif ($cmd.Name -eq 'Invoke-sqmCollationChange' -and $p.Name -eq 'NewCollation')
+				{
+					# Valid collations are instance/version-specific (sys.fn_helpcollations()) - a
+					# static dropdown would go stale or offer collations the target doesn't actually
+					# support. Query them live from the -SqlInstance/-SqlCredential the user already
+					# entered above instead, via a small filterable picker (see Get-sqmSupportedCollations).
+					$btnList = New-Object System.Windows.Forms.Button
+					$btnList.Text = 'List...'
+					$btnList.Width = 100
+					& $styleButton $btnList
+					$btnList.Add_Click({
+							$instCtrl = $script:guiState.Controls['SqlInstance']
+							$inst = if ($instCtrl -and -not [string]::IsNullOrWhiteSpace($instCtrl.Text)) { $instCtrl.Text }
+							else { $env:COMPUTERNAME }
+							$credObj = if ($script:guiState.Creds.ContainsKey('SqlCredential')) { $script:guiState.Creds['SqlCredential'].Cred }
+							else { $null }
+
+							try
+							{
+								$collParams = @{ SqlInstance = $inst; EnableException = $true }
+								if ($credObj) { $collParams['SqlCredential'] = $credObj }
+								$names = @(Get-sqmSupportedCollations @collParams | Select-Object -ExpandProperty Name)
+							}
+							catch
+							{
+								[System.Windows.Forms.MessageBox]::Show(
+									"Collations could not be retrieved from '$inst':`n$($_.Exception.Message)",
+									'sqmSQLTool', 'OK', 'Warning') | Out-Null
+								return
+							}
+							if (-not $names) { return }
+
+							$pick = New-Object System.Windows.Forms.Form
+							$pick.Text = "Collations on $inst"
+							$pick.Size = New-Object System.Drawing.Size(480, 520)
+							$pick.StartPosition = 'CenterParent'
+							$pick.BackColor = $cPanel
+							$pick.ForeColor = $cText
+							$pick.FormBorderStyle = 'FixedDialog'
+							$pick.MaximizeBox = $false
+							$pick.MinimizeBox = $false
+
+							$txtFilter = New-Object System.Windows.Forms.TextBox
+							$txtFilter.Location = New-Object System.Drawing.Point(10, 10)
+							$txtFilter.Width = 440
+							$txtFilter.BackColor = $cWindow
+							$txtFilter.ForeColor = $cText
+							$txtFilter.BorderStyle = 'FixedSingle'
+							$pick.Controls.Add($txtFilter)
+
+							$lst = New-Object System.Windows.Forms.ListBox
+							$lst.Location = New-Object System.Drawing.Point(10, 38)
+							$lst.Size = New-Object System.Drawing.Size(440, 372)
+							$lst.BackColor = $cWindow
+							$lst.ForeColor = $cText
+							$lst.BorderStyle = 'FixedSingle'
+							foreach ($n in $names) { [void]$lst.Items.Add($n) }
+							if ($ctrl.Text -and $lst.Items.Contains($ctrl.Text)) { $lst.SelectedItem = $ctrl.Text }
+							$pick.Controls.Add($lst)
+
+							$lblCount = New-Object System.Windows.Forms.Label
+							$lblCount.Location = New-Object System.Drawing.Point(10, 416)
+							$lblCount.Width = 350
+							$lblCount.ForeColor = $cDim
+							$lblCount.Text = "$($names.Count) collations on $inst"
+							$pick.Controls.Add($lblCount)
+
+							$txtFilter.Add_TextChanged({
+									$f = $txtFilter.Text
+									$lst.BeginUpdate()
+									$lst.Items.Clear()
+									$hits = if ([string]::IsNullOrWhiteSpace($f)) { $names }
+									else { $names | Where-Object { $_ -like "*$f*" } }
+									foreach ($n in $hits) { [void]$lst.Items.Add($n) }
+									$lst.EndUpdate()
+									$lblCount.Text = "$($hits.Count) of $($names.Count) collations on $inst"
+								}.GetNewClosure())
+
+							$btnOk = New-Object System.Windows.Forms.Button
+							$btnOk.Text = 'OK'
+							$btnOk.Location = New-Object System.Drawing.Point(290, 448)
+							$btnOk.Width = 75
+							& $styleButton $btnOk
+							$btnOk.DialogResult = [System.Windows.Forms.DialogResult]::OK
+							$pick.Controls.Add($btnOk)
+
+							$btnCancel = New-Object System.Windows.Forms.Button
+							$btnCancel.Text = 'Cancel'
+							$btnCancel.Location = New-Object System.Drawing.Point(375, 448)
+							$btnCancel.Width = 75
+							& $styleButton $btnCancel
+							$btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+							$pick.Controls.Add($btnCancel)
+
+							$lst.Add_DoubleClick({
+									$pick.DialogResult = [System.Windows.Forms.DialogResult]::OK; $pick.Close()
+								}.GetNewClosure())
+
+							$pick.AcceptButton = $btnOk
+							$pick.CancelButton = $btnCancel
+
+							if ($pick.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK -and $lst.SelectedItem)
+							{
+								# Setting .Text fires Add_TextChanged($updatePreview) already registered below.
+								$ctrl.Text = [string]$lst.SelectedItem
+							}
+						}.GetNewClosure())
+					$extraCtrl = $btnList
+				}
 				$ctrl.Add_TextChanged($updatePreview)
 			}
 			# Ein Zeilen-Panel pro Parameter: Label links, Eingabe rechts, auf einer Linie.
