@@ -269,8 +269,32 @@ WHERE sp.type IN ('S','U','G')
 			# -------------------------------------------------------------------
 			# 1. Instance-Einstellungen
 			# -------------------------------------------------------------------
-			$sourceProps = Get-ServerProps $SourceInstance
-			$targetProps = Get-ServerProps $TargetInstance
+			# Verbindungsfehler (z.B. Firewall blockiert den Port) wurden bisher nur vom
+			# allgemeinen catch() ganz unten aufgefangen: das loggte lediglich in die Logdatei und
+			# gab $null zurueck - ohne Konsolenausgabe, ohne Report, ohne erkennbaren Grund fuer den
+			# Aufrufer. Hier gezielt abfangen, WELCHE Instanz nicht erreichbar war, das sichtbar
+			# melden (Write-Error, nicht nur ins Log) und trotzdem ein Ergebnis- + Report-Objekt
+			# zurueckgeben statt $null.
+			try { $sourceProps = Get-ServerProps $SourceInstance }
+			catch
+			{
+				$msg = "Verbindung zu Source-Instanz '$SourceInstance' fehlgeschlagen: $($_.Exception.Message)"
+				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "ERROR"
+				if ($EnableException) { throw }
+				Write-Error $msg
+				_AddResult 'Connection' "Source '$SourceInstance' nicht erreichbar" $_.Exception.Message '<nicht geprueft>' 'Critical'
+				return $results
+			}
+			try { $targetProps = Get-ServerProps $TargetInstance }
+			catch
+			{
+				$msg = "Verbindung zu Target-Instanz '$TargetInstance' fehlgeschlagen: $($_.Exception.Message)"
+				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "ERROR"
+				if ($EnableException) { throw }
+				Write-Error $msg
+				_AddResult 'Connection' "Target '$TargetInstance' nicht erreichbar" '<nicht geprueft>' $_.Exception.Message 'Critical'
+				return $results
+			}
 			foreach ($key in $sourceProps.Keys)
 			{
 				if ($key -eq 'Collation') { continue }
@@ -597,9 +621,14 @@ $rowsHtml
 		}
 		catch
 		{
+			# Wie beim Verbindungsaufbau oben: nicht nur ins Log schreiben und $null zurueckgeben -
+			# das liess einen Aufrufer ohne jede sichtbare Fehlermeldung und ohne Ergebnisobjekt da
+			# stehen. Sichtbar melden und ein Ergebnis mit der Fehlerursache zurueckgeben.
 			Invoke-sqmLogging -Message $_.Exception.Message -FunctionName $functionName -Level "ERROR"
 			if ($EnableException) { throw }
-			return $null
+			Write-Error $_.Exception.Message
+			_AddResult 'Connection' 'Vergleich abgebrochen' $SourceInstance $TargetInstance 'Critical'
+			return $results
 		}
 	}
 }
