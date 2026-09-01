@@ -336,8 +336,25 @@ function Invoke-sqmCollationChange
 			$startInfo.UseShellExecute = $false
 			$startInfo.RedirectStandardOutput = $true
 			$startInfo.RedirectStandardError = $true
-			$sqlProc = [System.Diagnostics.Process]::Start($startInfo)
-			
+			$sqlProc = New-Object System.Diagnostics.Process
+			$sqlProc.StartInfo = $startInfo
+			# RedirectStandardOutput/Error only opens the pipes - nothing was ever reading them. The
+			# .NET pipe buffer is a few KB; sqlservr.exe starting with -T4022 -T3659 easily produces
+			# more console output than that during the collation rebuild, so the child process blocks
+			# on its next console write once the buffer fills and just HANGS for the rest of
+			# -StartupTimeoutSeconds, never finishing the rebuild - which Kill() then aborts, leaving
+			# the OLD collation in place even though nothing "crashed" or timed out visibly. Draining
+			# both streams asynchronously via events (instead of a later ReadToEnd(), which would
+			# itself deadlock waiting on a child that's blocked writing) avoids that and also gives
+			# real diagnostics for the next failure.
+			$sqlProcOutput = [System.Collections.Generic.List[string]]::new()
+			$outHandler = { if ($null -ne $EventArgs.Data) { $Event.MessageData.Add($EventArgs.Data) } }
+			Register-ObjectEvent -InputObject $sqlProc -EventName OutputDataReceived -Action $outHandler -MessageData $sqlProcOutput | Out-Null
+			Register-ObjectEvent -InputObject $sqlProc -EventName ErrorDataReceived -Action $outHandler -MessageData $sqlProcOutput | Out-Null
+			[void]$sqlProc.Start()
+			$sqlProc.BeginOutputReadLine()
+			$sqlProc.BeginErrorReadLine()
+
 			# Warten auf Bereitschaft (Errorlog pruefen)
 			# errorlogPath wird bei JEDEM Schleifendurchlauf neu ermittelt statt einmalig direkt nach
 			# dem Start: die Instanz nimmt unmittelbar nach Process.Start() noch keine Verbindungen an,
@@ -378,6 +395,9 @@ function Invoke-sqmCollationChange
 			}
 			$exitedOnItsOwn = $sqlProc.HasExited
 			if (-not $exitedOnItsOwn) { $sqlProc.Kill(); $null = $sqlProc.WaitForExit(10000) }
+			Get-EventSubscriber | Where-Object { $_.SourceObject -eq $sqlProc } | Unregister-Event
+			$sqlProcOutputText = $sqlProcOutput -join "`r`n"
+			Invoke-sqmLogging -Message "sqlservr.exe-Ausgabe:`n$sqlProcOutputText" -FunctionName $functionName -Level "INFO"
 			if (-not $exitedOnItsOwn -and -not $isReady)
 			{
 				# Weder von selbst beendet noch ein Bereitschafts-Token gefunden - der Rebuild wurde
@@ -385,6 +405,7 @@ function Invoke-sqmCollationChange
 				# ist damit hoechstwahrscheinlich NICHT wirksam geworden; Schritt 9 (Verifikation) wird
 				# das bestaetigen, aber schon hier explizit warnen statt einen gruenen Haken zu zeigen.
 				Write-Warning "  sqlservr.exe wurde nach Ablauf von $StartupTimeoutSeconds Sekunden ohne Bereitschaftsbestaetigung beendet - Collation-Rebuild moeglicherweise unvollstaendig. -StartupTimeoutSeconds erhoehen und erneut versuchen."
+				if ($sqlProcOutputText) { Write-Warning "  Letzte sqlservr.exe-Ausgabe:`n$($sqlProcOutput | Select-Object -Last 15 | Out-String)" }
 			}
 			Write-Host "  ? sqlservr.exe-Phase abgeschlossen." -ForegroundColor Green
 			
