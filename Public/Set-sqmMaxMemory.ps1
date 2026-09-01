@@ -18,13 +18,21 @@
     Percentage of physical RAM to assign when -MaxMemoryMB is not given. Default: 90.
 
 .PARAMETER MaxMemoryMB
-    Explicit value in MB. Overrides -RecommendedPct.
+    Explicit value in MB. Overrides -RecommendedPct and -InstanceCount (an explicit value is
+    assumed to already account for any other instances on the host).
+
+.PARAMETER InstanceCount
+    Number of SQL Server Engine instances sharing this host's RAM, used to split the
+    -RecommendedPct budget between them. Auto-detected by default (see
+    Get-sqmHostEngineInstanceCount); pass this to override when auto-detection isn't reliable
+    (e.g. remote host with WinRM blocked) or a future instance isn't installed yet.
 
 .PARAMETER EnableException
     Throw on error instead of logging a warning and returning a failed result.
 
 .OUTPUTS
-    [PSCustomObject] with SqlInstance, PreviousMaxMemMB, NewMaxMemMB, TotalRamMB, Status, Message.
+    [PSCustomObject] with SqlInstance, PreviousMaxMemMB, NewMaxMemMB, TotalRamMB, InstanceCount,
+    Status, Message.
 
 .EXAMPLE
     Set-sqmMaxMemory -SqlInstance SQL01
@@ -61,6 +69,10 @@ function Set-sqmMaxMemory
 		[int]$MaxMemoryMB,
 
 		[Parameter(Mandatory = $false)]
+		[ValidateRange(1, 64)]
+		[int]$InstanceCount,
+
+		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
 
@@ -71,6 +83,7 @@ function Set-sqmMaxMemory
 		PreviousMaxMemMB = $null
 		NewMaxMemMB      = $null
 		TotalRamMB       = $null
+		InstanceCount    = $null
 		Status           = 'Error'
 		Message          = $null
 	}
@@ -108,7 +121,20 @@ function Set-sqmMaxMemory
 				$totalRamMB = [math]::Round((Get-WmiObject -Class Win32_ComputerSystem -ErrorAction Stop).TotalPhysicalMemory / 1MB)
 				$result.TotalRamMB = $totalRamMB
 			}
-			$targetMB = [math]::Round($totalRamMB * ($RecommendedPct / 100))
+
+			# RecommendedPct of TOTAL RAM is only correct for a single instance - on a host
+			# running several Engine instances side by side, applying that same percentage to
+			# EACH one massively over-commits RAM (e.g. two instances both at 90% = 180% total).
+			# Split the RAM budget across however many Engine instances actually share this host,
+			# unless the caller already knows the number (-InstanceCount).
+			$instCount = if ($PSBoundParameters.ContainsKey('InstanceCount')) { $InstanceCount }
+			else { Get-sqmHostEngineInstanceCount -SqlInstance $SqlInstance }
+			$result.InstanceCount = $instCount
+			$targetMB = [math]::Round(($totalRamMB * ($RecommendedPct / 100)) / $instCount)
+			if ($instCount -gt 1)
+			{
+				_Log "Host hat $instCount Engine-Instanzen - RAM-Budget wird geteilt ($targetMB MB je Instanz)."
+			}
 		}
 		$result.NewMaxMemMB = $targetMB
 
