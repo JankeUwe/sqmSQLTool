@@ -770,10 +770,16 @@
 					$btnList.Width = 100
 					& $styleButton $btnList
 					$btnList.Add_Click({
-							$instCtrl = $script:guiState.Controls['SqlInstance']
+							# $script:guiState is torn down/rebuilt (Add_AfterSelect AND Add_NodeMouseClick
+							# both fire $loadFunction on the same tree click, see below) between this
+							# button being created and being clicked - guard against .Controls/.Creds not
+							# being the populated hashtable yet instead of throwing "Cannot index into a
+							# null array" on a null-scoped access.
+							$instCtrl = if ($script:guiState -and $script:guiState.Controls) { $script:guiState.Controls['SqlInstance'] }
+							else { $null }
 							$inst = if ($instCtrl -and -not [string]::IsNullOrWhiteSpace($instCtrl.Text)) { $instCtrl.Text }
 							else { $env:COMPUTERNAME }
-							$credObj = if ($script:guiState.Creds.ContainsKey('SqlCredential')) { $script:guiState.Creds['SqlCredential'].Cred }
+							$credObj = if ($script:guiState -and $script:guiState.Creds -and $script:guiState.Creds.ContainsKey('SqlCredential')) { $script:guiState.Creds['SqlCredential'].Cred }
 							else { $null }
 
 							try
