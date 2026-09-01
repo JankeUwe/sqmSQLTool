@@ -287,7 +287,7 @@ WHERE dp.type IN ('G','U') AND dp.sid IS NOT NULL
 
 						try
 						{
-							$dbRows = Invoke-DbaQuery @connParams -Database $dbName -Query $dbQuery -EnableException -ErrorAction Stop
+							$dbRows = Invoke-DbaQuery @connParams -Database $dbName -Query $dbQuery -EnableException
 						}
 						catch
 						{
