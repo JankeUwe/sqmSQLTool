@@ -244,7 +244,14 @@ function Invoke-sqmCollationChange
 			$rollbackLines.Add("# Invoke-sqmCollationChange -SqlInstance '$SqlInstance' -NewCollation '$oldCollation'")
 			$rollbackLines.Add("")
 			# User-DB-Collations dokumentieren
-			$userDbs = Get-DbaDatabase @connParams | Where-Object { -not $_.IsSystemObject -and $_.Status -eq 'Normal' } | Where-Object { -not ($ExcludeDatabase | Where-Object { $_.Name -like $_ }) }
+			# -ExcludeDatabase war wirkungslos: im inneren Where-Object ueberschreibt die Pipeline von
+			# $ExcludeDatabase (Strings) das $_ der aeusseren Datenbank - "$_.Name" griff dann auf den
+			# Exclude-Pattern-String statt auf die DB zu, war also immer $null und "-like" schlug immer
+			# fehl. $dbName merkt sich den Namen VOR dem inneren Pipe, damit der Vergleich stimmt.
+			$userDbs = Get-DbaDatabase @connParams | Where-Object { -not $_.IsSystemObject -and $_.Status -eq 'Normal' } | Where-Object {
+				$dbName = $_.Name
+				-not ($ExcludeDatabase | Where-Object { $dbName -like $_ })
+			}
 			if ($userDbs)
 			{
 				$rollbackLines.Add("# --- ROLLBACK: User-DB-Collations (ALTER DATABASE) ---")
@@ -332,20 +339,30 @@ function Invoke-sqmCollationChange
 			$sqlProc = [System.Diagnostics.Process]::Start($startInfo)
 			
 			# Warten auf Bereitschaft (Errorlog pruefen)
-			$errorlogPath = $null
-			try
-			{
-				$errorlogPath = Invoke-DbaQuery @connParams -Query "EXEC xp_readerrorlog 0, 1, N'Logging SQL Server messages in file'" -ErrorAction SilentlyContinue |
-				Select-Object -Last 1 -ExpandProperty Text -ErrorAction SilentlyContinue
-				if ($errorlogPath -match "'(.+ERRORLOG)'") { $errorlogPath = $Matches[1] }
-			}
-			catch { }
+			# errorlogPath wird bei JEDEM Schleifendurchlauf neu ermittelt statt einmalig direkt nach
+			# dem Start: die Instanz nimmt unmittelbar nach Process.Start() noch keine Verbindungen an,
+			# der erste (einzige) Versuch schlug daher praktisch immer fehl und $errorlogPath blieb
+			# dauerhaft $null - die Bereitschaftserkennung ueber die Errorlog-Tokens lief dadurch nie an,
+			# sodass sich die Funktion allein auf "sqlservr.exe beendet sich selbst" oder den blinden
+			# Timeout+Kill() verliess. Ein zu frueher Kill() kann den Collation-Rebuild abbrechen, bevor
+			# er committet ist - die Instanz startet danach normal, aber ohne geaenderte Collation.
 			$deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
 			$isReady = $false
+			$errorlogPath = $null
 			$readyTokens = @('Recovery is complete', 'SQL Server is now ready', 'Collation change successful', 'Server is listening on')
 			while ((Get-Date) -lt $deadline -and -not $sqlProc.HasExited)
 			{
 				Start-Sleep -Milliseconds 500
+				if (-not $errorlogPath)
+				{
+					try
+					{
+						$candidate = Invoke-DbaQuery @connParams -Query "EXEC xp_readerrorlog 0, 1, N'Logging SQL Server messages in file'" -ErrorAction SilentlyContinue |
+						Select-Object -Last 1 -ExpandProperty Text -ErrorAction SilentlyContinue
+						if ($candidate -match "'(.+ERRORLOG)'") { $errorlogPath = $Matches[1] }
+					}
+					catch { }
+				}
 				if ($errorlogPath -and (Test-Path $errorlogPath))
 				{
 					$tail = Get-Content -Path $errorlogPath -Tail 20 -ErrorAction SilentlyContinue
@@ -359,7 +376,16 @@ function Invoke-sqmCollationChange
 				}
 				if ($isReady) { break }
 			}
-			if (-not $sqlProc.HasExited) { $sqlProc.Kill(); $null = $sqlProc.WaitForExit(10000) }
+			$exitedOnItsOwn = $sqlProc.HasExited
+			if (-not $exitedOnItsOwn) { $sqlProc.Kill(); $null = $sqlProc.WaitForExit(10000) }
+			if (-not $exitedOnItsOwn -and -not $isReady)
+			{
+				# Weder von selbst beendet noch ein Bereitschafts-Token gefunden - der Rebuild wurde
+				# durch den Timeout erzwungen abgebrochen, statt regulaer abzuschliessen. Die Aenderung
+				# ist damit hoechstwahrscheinlich NICHT wirksam geworden; Schritt 9 (Verifikation) wird
+				# das bestaetigen, aber schon hier explizit warnen statt einen gruenen Haken zu zeigen.
+				Write-Warning "  sqlservr.exe wurde nach Ablauf von $StartupTimeoutSeconds Sekunden ohne Bereitschaftsbestaetigung beendet - Collation-Rebuild moeglicherweise unvollstaendig. -StartupTimeoutSeconds erhoehen und erneut versuchen."
+			}
 			Write-Host "  ? sqlservr.exe-Phase abgeschlossen." -ForegroundColor Green
 			
 			# -----------------------------------------------------------------
