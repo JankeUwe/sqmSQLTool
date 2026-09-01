@@ -332,7 +332,12 @@ function Invoke-sqmCollationChange
 			Write-Host "  Starte sqlservr.exe im Minimal-Modus mit neuer Collation..." -ForegroundColor Gray
 			$startInfo = [System.Diagnostics.ProcessStartInfo]::new()
 			$startInfo.FileName = $sqlBinPath
-			$startInfo.Arguments = "-m -T4022 -T3659 -q `"$NewCollation`""
+			# sqlservr.exe's own argument parser (not getopt-style) requires flags that take a value -
+			# -d, -e, -l, and -q the same way - to have NO SPACE before the value. "-q "Collation""
+			# (with a space) is very likely parsed as a bare/malformed -q plus a stray unrecognized
+			# argument: sqlservr.exe then just starts normally in single-user mode and performs NO
+			# collation rebuild at all - a silent, deterministic no-op, not a timing/readiness issue.
+			$startInfo.Arguments = "-m -T4022 -T3659 -q`"$NewCollation`""
 			$startInfo.UseShellExecute = $false
 			$startInfo.RedirectStandardOutput = $true
 			$startInfo.RedirectStandardError = $true
