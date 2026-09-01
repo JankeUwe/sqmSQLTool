@@ -150,6 +150,7 @@ $categoryMap = @{
     'Test-sqmCostThreshold'               = 'Performance Analysis & Optimization'
     'Test-sqmDistributedAgReadiness'      = 'Always On & Availability Groups'
     'Test-sqmDriverInstalled'             = 'SQL Drivers & Tools Installation'
+    'Test-sqmLoginGroupAccess'            = 'Login & User Security'
     'Test-sqmMaxDop'                      = 'Performance Analysis & Optimization'
     'Test-sqmMaxMemory'                   = 'Performance Analysis & Optimization'
     'Test-sqmOlaInstallation'             = 'Database Maintenance'
