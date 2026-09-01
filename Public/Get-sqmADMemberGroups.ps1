@@ -6,6 +6,11 @@
     Inverse operation to Get-sqmADGroupMembers.
     Lists all groups (direct and nested) that contain the specified member.
 
+    The real AD 'displayName' attribute of the queried Identity itself is also resolved (via
+    Get-ADObject or LDAP), so the report shows the person's actual name next to the
+    SamAccountName/UPN that was passed in. Fallback chain: displayName -> CN/Name -> the
+    identity as given.
+
 .PARAMETER Identity
     Identity of the user, group, or computer.
     Can be: SamAccountName, UPN, or DistinguishedName
@@ -22,7 +27,7 @@
     Default: C:\System\WinSrvLog\MSSQL
 
 .OUTPUTS
-    PSCustomObject with Identity, GroupName, GroupCount, Groups[], Depth, TxtFile, CsvFile, Status
+    PSCustomObject with Identity, DisplayName, GroupCount, Groups[], Depth, TxtFile, CsvFile, Status
 
 .EXAMPLE
     Get-sqmADMemberGroups -Identity "john.doe" -Depth 2
@@ -99,6 +104,56 @@ function Get-sqmADMemberGroups
 
                 $cleanIdentity = $member -replace '^[^\\]*\\', ''
                 Invoke-sqmLogging -Message "[$cleanIdentity] Domain: $targetDomain, Depth: $Depth" -FunctionName $functionName -Level "VERBOSE"
+
+                # Resolve the real (display) name of the QUERIED account itself. Find-ParentGroups
+                # below already resolves DisplayName for the GROUPS it finds, but never for the
+                # identity being looked up - the report only ever showed the raw SamAccountName.
+                # Identity can be a user, group or computer (see .PARAMETER), so this uses a
+                # class-agnostic LDAPFilter/InvokeGet lookup rather than Get-ADUser, which would
+                # throw for a group or computer identity.
+                $identityDisplayName = $cleanIdentity
+                try
+                {
+                    if (Get-Module -ListAvailable -Name ActiveDirectory -ErrorAction SilentlyContinue)
+                    {
+                        $null = Import-Module ActiveDirectory -ErrorAction Stop
+                        $adSelf = Get-ADObject -LDAPFilter "(|(sAMAccountName=$cleanIdentity)(userPrincipalName=$cleanIdentity))" -Properties DisplayName, Name -ErrorAction Stop |
+                        Select-Object -First 1
+                        if ($adSelf)
+                        {
+                            if ($adSelf.DisplayName) { $identityDisplayName = $adSelf.DisplayName }
+                            elseif ($adSelf.Name) { $identityDisplayName = $adSelf.Name }
+                        }
+                    }
+                }
+                catch
+                {
+                    Invoke-sqmLogging -Message "[$cleanIdentity] AD-Modul-Namensaufloesung fehlgeschlagen: $_" -FunctionName $functionName -Level "VERBOSE"
+                }
+                if ($identityDisplayName -eq $cleanIdentity)
+                {
+                    # LDAP fallback - module missing or the lookup above didn't resolve a name.
+                    try
+                    {
+                        $selfRoot = [ADSI]"LDAP://$targetDomain/RootDSE"
+                        $selfSearcher = [System.DirectoryServices.DirectorySearcher]::new()
+                        $selfSearcher.SearchRoot = [ADSI]("LDAP://" + $selfRoot.defaultNamingContext[0])
+                        $selfSearcher.Filter = "(&(|(sAMAccountName=$cleanIdentity)(userPrincipalName=$cleanIdentity)))"
+                        $selfResult = $selfSearcher.FindOne()
+                        if ($selfResult)
+                        {
+                            $selfEntry = $selfResult.GetDirectoryEntry()
+                            $selfDisp = $null
+                            try { $selfDisp = $selfEntry.psbase.InvokeGet("displayName") } catch { }
+                            if (-not $selfDisp) { try { $selfDisp = $selfEntry.psbase.InvokeGet("cn") } catch { } }
+                            if ($selfDisp) { $identityDisplayName = $selfDisp }
+                        }
+                    }
+                    catch
+                    {
+                        Invoke-sqmLogging -Message "[$cleanIdentity] LDAP-Namensaufloesung fehlgeschlagen: $_" -FunctionName $functionName -Level "VERBOSE"
+                    }
+                }
 
                 # Helper function for recursive group lookup
                 function Find-ParentGroups
@@ -274,6 +329,7 @@ function Get-sqmADMemberGroups
                         "# ================================================================"
                         "# AD Member Groups Report"
                         "# Member    : $cleanIdentity"
+                        "# Real Name : $identityDisplayName"
                         "# Domain    : $targetDomain"
                         "# Depth     : $Depth"
                         "# Created   : $timestamp"
@@ -297,7 +353,7 @@ function Get-sqmADMemberGroups
                     {
                         "<tr><td>$([System.Net.WebUtility]::HtmlEncode($g.SamAccountName))</td><td>$([System.Net.WebUtility]::HtmlEncode($g.DisplayName))</td><td>$($g.GroupScope)</td><td>$($g.Depth)</td></tr>"
                     }
-                    $bodyHtml = "<p>Mitglied: $([System.Net.WebUtility]::HtmlEncode($cleanIdentity)) | Domain: $([System.Net.WebUtility]::HtmlEncode($targetDomain)) | Depth: $Depth | Gruppen: $($parentGroups.Count)</p>" +
+                    $bodyHtml = "<p>Mitglied: $([System.Net.WebUtility]::HtmlEncode($cleanIdentity)) ($([System.Net.WebUtility]::HtmlEncode($identityDisplayName))) | Domain: $([System.Net.WebUtility]::HtmlEncode($targetDomain)) | Depth: $Depth | Gruppen: $($parentGroups.Count)</p>" +
                         "<table><tr><th>GroupName</th><th>DisplayName</th><th>Scope</th><th>Level</th></tr>" +
                         ($rowsHtml -join '') + "</table>"
                     $html = ConvertTo-sqmHtmlReport -Title "AD Member Groups - $cleanIdentity" -Subtitle "Erstellt: $timestamp | Depth: $Depth" -BodyHtml $bodyHtml
@@ -310,6 +366,7 @@ function Get-sqmADMemberGroups
 
                 $allResults.Add([PSCustomObject]@{
                         Identity    = $cleanIdentity
+                        DisplayName = $identityDisplayName
                         Domain      = $targetDomain
                         Depth       = $Depth
                         GroupCount  = $parentGroups.Count
@@ -329,6 +386,7 @@ function Get-sqmADMemberGroups
                 Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
                 $allResults.Add([PSCustomObject]@{
                         Identity    = $member
+                        DisplayName = $null
                         Domain      = $Domain
                         Depth       = $Depth
                         GroupCount  = 0
