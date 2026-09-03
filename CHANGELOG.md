@@ -1,5 +1,24 @@
 # sqmSQLTool — Changelog
 
+## [1.9.126.0] — 2026-09-03
+
+### New: `Repair-sqmSsasSerializeError` — fixes the known SSAS "ASDatabase::Serialize" internal error
+
+Addresses a documented SSAS bug (Microsoft Q&A 1350375): deploying an XMLA `<Create>`/`<Alter>`
+script fails with `Internal error: An unexpected error occurred (file 'pcserialize.cpp', line
+1535, function 'ASDatabase::Serialize')`, most commonly reported on instances that are part of
+an Always On Availability Group. The confirmed fix is removing the undocumented
+`<Gen2ServerKey>` element from `msmdsrv.ini` and restarting the SSAS service.
+
+Uses the same instance/config-file discovery as `Get-`/`Set-sqmSsasDeploymentMode` (Windows
+service command line `-s` switch, XML load with whitespace preserved to keep the diff minimal).
+Idempotent - a second run reports `NotPresent` instead of re-touching the file. Backs up
+`msmdsrv.ini` before writing, supports `-WhatIf`/`-Confirm`, and takes `-RestartService` to
+apply the fix immediately instead of leaving it for the next manual restart.
+
+Not live-tested against DEV01 - the lab has no SSAS instance installed. Verified only by
+reading the XML structure `Set-sqmSsasDeploymentMode` already parses successfully in production.
+
 ## [1.9.115.0] — 2026-08-30
 
 ### New: `Register-sqmAuditSession` — Extended Events session for the login/database/metadata audit gap
