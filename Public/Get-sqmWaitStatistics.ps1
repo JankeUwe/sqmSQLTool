@@ -190,6 +190,48 @@ function Get-sqmWaitStatistics
 			'ASYNC_NETWORK_IO'   = @{ Category = 'Network';     MinAvgWaitMs = 10;      Recommendation = (_s 'WaitRec_ASYNC_NETWORK_IO') }
 		}
 
+		# Glossar: was der Wait-Type ueberhaupt bedeutet - unabhaengig von Kategorie/Schwellwert
+		# oben. Wird als Tooltip (title-Attribut) auf den WaitType im HTML-Report angezeigt.
+		# Bewusst eine eigene Tabelle statt in $waitCategories, weil sie auch Typen abdeckt, die
+		# dort keinen Eintrag haben (z. B. Backup-Waits) und weil Definition sich nie aendert,
+		# waehrend Category/Recommendation von Schwellwerten abhaengen.
+		$waitDefinitions = @{
+			'PAGEIOLATCH_SH'      = (_s 'WaitDef_PAGEIOLATCH_SH')
+			'PAGEIOLATCH_EX'      = (_s 'WaitDef_PAGEIOLATCH_EX')
+			'PAGEIOLATCH_UP'      = (_s 'WaitDef_PAGEIOLATCH_UP')
+			'WRITELOG'		      = (_s 'WaitDef_WRITELOG')
+			'IO_COMPLETION'	      = (_s 'WaitDef_IO_COMPLETION')
+			'ASYNC_IO_COMPLETION' = (_s 'WaitDef_ASYNC_IO_COMPLETION')
+			'LCK_M_X'		      = (_s 'WaitDef_LCK_M_X')
+			'LCK_M_S'		      = (_s 'WaitDef_LCK_M_S')
+			'LCK_M_U'		      = (_s 'WaitDef_LCK_M_U')
+			'LCK_M_IX'		      = (_s 'WaitDef_LCK_M_IX')
+			'LCK_M_IS'		      = (_s 'WaitDef_LCK_M_IS')
+			'CXPACKET'		      = (_s 'WaitDef_CXPACKET')
+			'CXCONSUMER'	      = (_s 'WaitDef_CXCONSUMER')
+			'CXSYNC_PORT'	      = (_s 'WaitDef_CXSYNC_PORT')
+			'RESOURCE_SEMAPHORE'  = (_s 'WaitDef_RESOURCE_SEMAPHORE')
+			'RESOURCE_SEMAPHORE_QUERY_COMPILE' = (_s 'WaitDef_RES_SEM_COMPILE')
+			'CMEMTHREAD'	      = (_s 'WaitDef_CMEMTHREAD')
+			'SOS_SCHEDULER_YIELD' = (_s 'WaitDef_SOS_SCHEDULER_YIELD')
+			'THREADPOOL'	      = (_s 'WaitDef_THREADPOOL')
+			'PAGELATCH_EX'	      = (_s 'WaitDef_PAGELATCH_EX')
+			'PAGELATCH_SH'	      = (_s 'WaitDef_PAGELATCH_SH')
+			'PAGELATCH_UP'	      = (_s 'WaitDef_PAGELATCH_UP')
+			'LATCH_EX'		      = (_s 'WaitDef_LATCH_EX')
+			'LATCH_SH'		      = (_s 'WaitDef_LATCH_SH')
+			'DBMIRROR_EVENTS_QUEUE' = (_s 'WaitDef_DBMIRROR_EVENTS_QUEUE')
+			'DBMIRRORING_CMD'     = (_s 'WaitDef_DBMIRRORING_CMD')
+			'ASYNC_NETWORK_IO'    = (_s 'WaitDef_ASYNC_NETWORK_IO')
+			'OLEDB'			      = (_s 'WaitDef_OLEDB')
+			'BACKUPBUFFER'	      = (_s 'WaitDef_BACKUPBUFFER')
+			'BACKUPIO'		      = (_s 'WaitDef_BACKUPIO')
+			'BACKUPTHREAD'	      = (_s 'WaitDef_BACKUPTHREAD')
+			'MSQL_XP'		      = (_s 'WaitDef_MSQL_XP')
+			'BUFFERPOOL_SCAN'     = (_s 'WaitDef_BUFFERPOOL_SCAN')
+			'WAIT_ON_SYNC_STATISTICS_REFRESH' = (_s 'WaitDef_WAIT_ON_SYNC_STATISTICS_REFRESH')
+		}
+
 		Invoke-sqmLogging -Message (_s 'WaitStats_Starting' $functionName, $SqlInstance, $TopN, $IncludeIdle) -FunctionName $functionName -Level "INFO"
 	}
 
@@ -303,6 +345,8 @@ ORDER BY wait_time_ms DESC
 						else { $meta.Recommendation }
 					}
 
+					$def = if ($waitDefinitions.ContainsKey($_.wait_type)) { $waitDefinitions[$_.wait_type] } else { _s 'WaitDef_Generic' }
+
 					[PSCustomObject]@{
 						WaitType             = $_.wait_type
 						Category             = $cat
@@ -316,6 +360,7 @@ ORDER BY wait_time_ms DESC
 						ResourceWaitMs       = $_.resource_wait_time_ms
 						IsDelta              = [bool]$SnapshotBefore
 						Recommendation       = $rec
+						Definition		     = $def
 					}
 				}
 
@@ -329,8 +374,22 @@ ORDER BY wait_time_ms DESC
 				Invoke-sqmLogging -Message (_s 'WaitStats_Saved' $csvFile) -FunctionName $functionName -Level "INFO"
 
 				$htmlFile = Join-Path $OutputPath "WaitStats_${safeInst}_${ts}.html"
-				$bodyHtml = ($results | ConvertTo-Html -Fragment -As Table | Out-String)
-				$html = ConvertTo-sqmHtmlReport -Title "Wait Statistics - $SqlInstance" -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -BodyHtml $bodyHtml
+
+				# Eigener Tabellenaufbau statt ConvertTo-Html -Fragment: nur so laesst sich ein
+				# title-Attribut (Tooltip) auf die WaitType-Zelle setzen, das die Bedeutung des
+				# Wait-Types erklaert (Definition), unabhaengig von der Recommendation-Spalte.
+				$rowsHtml = foreach ($r in $results)
+				{
+					$waitTypeEnc = [System.Net.WebUtility]::HtmlEncode($r.WaitType)
+					$defEnc      = [System.Net.WebUtility]::HtmlEncode($r.Definition)
+					$recEnc      = [System.Net.WebUtility]::HtmlEncode([string]$r.Recommendation)
+					"<tr><td><span class='wt-tip' title='$defEnc'>$waitTypeEnc</span></td><td>$($r.Category)</td><td>$($r.WaitTimeSec)</td><td>$($r.WaitTimePct)</td><td>$($r.WaitingTasksCount)</td><td>$($r.AvgWaitMs)</td><td>$($r.MaxWaitMs)</td><td>$($r.SignalWaitMs)</td><td>$($r.SignalWaitPct)</td><td>$($r.ResourceWaitMs)</td><td>$($r.IsDelta)</td><td>$recEnc</td></tr>"
+				}
+				$tipCss = "<style>.wt-tip{cursor:help;border-bottom:1px dotted #5dade2;}</style>"
+				$bodyHtml = $tipCss +
+					"<table><tr><th>WaitType</th><th>Category</th><th>WaitTimeSec</th><th>WaitTimePct</th><th>WaitingTasksCount</th><th>AvgWaitMs</th><th>MaxWaitMs</th><th>SignalWaitMs</th><th>SignalWaitPct</th><th>ResourceWaitMs</th><th>IsDelta</th><th>Recommendation</th></tr>" +
+					($rowsHtml -join '') + "</table>"
+				$html = ConvertTo-sqmHtmlReport -Title "Wait Statistics - $SqlInstance" -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Zeigerposition auf WaitType fuer Erklaerung" -BodyHtml $bodyHtml
 				$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
 				Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
 			}

@@ -1,5 +1,26 @@
 # sqmSQLTool — Changelog
 
+## [1.9.128.0] — 2026-09-04
+
+### `Get-sqmWaitStatistics` — tooltips explaining what each wait type means
+
+The HTML report's WaitType column now carries a hover tooltip explaining what the wait
+type actually is - independent of the existing threshold-based `Recommendation` column,
+which only judges whether the current value is a problem. Backed by a new `WaitDef_*`
+glossary in both language resource files, covering all 25 categorized wait types plus
+7 common ones that had no category/recommendation entry (`OLEDB`, `BACKUPBUFFER`,
+`BACKUPIO`, `BACKUPTHREAD`, `MSQL_XP`, `BUFFERPOOL_SCAN`,
+`WAIT_ON_SYNC_STATISTICS_REFRESH`); any other wait type falls back to a generic
+"see Microsoft/SQLskills docs" tooltip instead of showing nothing. The definition is
+also returned as a new `Definition` property on the result objects (and therefore in
+the CSV export). Switched the HTML body from `ConvertTo-Html -Fragment` to a hand-built
+table, since a tooltip needs a `title` attribute `ConvertTo-Html` has no way to add.
+
+Live-verified against DEV01: categorized types (`CXSYNC_PORT`, `WRITELOG`, ...) show
+their specific explanation, uncategorized ones (`PREEMPTIVE_OS_QUERYREGISTRY`,
+`LOGBUFFER`, ...) fall back cleanly, and the generated HTML properly encodes
+apostrophes inside the `title` attribute.
+
 ## [1.9.127.0] — 2026-09-04
 
 ### New: `Get-sqmWhoIsActive` — sp_whoisactive-style live session monitor, repeatable
