@@ -1,5 +1,23 @@
 # sqmSQLTool — Changelog
 
+## [1.9.127.0] — 2026-09-04
+
+### New: `Get-sqmWhoIsActive` — sp_whoisactive-style live session monitor, repeatable
+
+Shows currently active/blocked sessions (SPID, login/host/program, database, status,
+blocking SPID, wait info, elapsed time, CPU/reads/writes, tempdb allocation, running
+SQL statement) similar to Adam Machanic's `sp_whoisactive`, built entirely from DMVs
+(`sys.dm_exec_sessions`/`dm_exec_requests`/`dm_exec_sql_text`/`dm_db_session_space_usage`)
+so no stored procedure needs to be installed on the target instance.
+
+`-ShowSleepingSpids` mirrors `sp_whoisactive`'s `@show_sleeping_spids` (0 = active only,
+1 = active + open transactions [default], 2 = all user sessions). New relative to
+`sp_whoisactive` itself: `-RepeatIntervalSeconds`/`-RepeatCount`/`-DurationMinutes` turn
+it into a refreshing live monitor (client-side loop, since the stored proc has no
+built-in repeat), printing a table per snapshot and collecting every snapshot into one
+CSV plus an HTML report of the last snapshot at the end - including when a long-running
+loop is cancelled with Ctrl+C.
+
 ## [1.9.126.0] — 2026-09-03
 
 ### New: `Repair-sqmSsasSerializeError` — fixes the known SSAS "ASDatabase::Serialize" internal error
