@@ -1,5 +1,28 @@
 # sqmSQLTool — Changelog
 
+## [1.9.129.0] — 2026-09-05
+
+### New: `Show-sqmWhoIsActiveMonitor` — live grid view for `Get-sqmWhoIsActive`
+
+`Get-sqmWhoIsActive`'s own repeat loop only prints a console table and writes
+CSV/HTML at the end - not useful while actually watching a server live in the GUI.
+`Show-sqmWhoIsActiveMonitor` is a WinForms dialog that shows the current snapshot in
+a `DataGridView` and refreshes it automatically every N seconds ("Start"/"Stop", with
+an adjustable interval and the same `ShowSleepingSpids` filter). Blocked sessions are
+highlighted in red, sessions running/idle 30s+ in yellow - same severity classes as
+the HTML report.
+
+"Stop" (or closing the window mid-run) writes a report for that run exactly like
+`Get-sqmWhoIsActive` does: the CSV contains every iteration, the HTML report only the
+last snapshot - a long-running live session must not turn into a multi-thousand-row
+HTML dump.
+
+Refactored the query and report-writing logic that used to live inline in
+`Get-sqmWhoIsActive` into two private helpers (`Get-sqmWhoIsActiveSnapshot`,
+`Export-sqmWhoIsActiveReport`) so both the CLI/Agent-job function and this new GUI
+monitor use the identical DMV query and HTML/CSV format - `Get-sqmWhoIsActive`'s own
+behavior/output is unchanged.
+
 ## [1.9.128.0] — 2026-09-04
 
 ### `Get-sqmWaitStatistics` — tooltips explaining what each wait type means

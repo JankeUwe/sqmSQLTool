@@ -36,4 +36,7 @@ $sqmNlpSynonyms = @{
 	'inventar'          = @('Invoke-sqmInstanceInventory')
 	'wer ist drin'      = @('Get-sqmSysadminAccounts', 'Get-sqmLoginSettings')
 	'gesundheit'        = @('Get-sqmDatabaseHealth', 'Get-sqmSQLInstanceCheck')
+	'wer ist aktiv'     = @('Get-sqmWhoIsActive', 'Show-sqmWhoIsActiveMonitor')
+	'aktive sessions'   = @('Get-sqmWhoIsActive', 'Show-sqmWhoIsActiveMonitor')
+	'whoisactive'       = @('Get-sqmWhoIsActive', 'Show-sqmWhoIsActiveMonitor')
 }
