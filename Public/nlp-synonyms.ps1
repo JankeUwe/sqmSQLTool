@@ -39,4 +39,9 @@ $sqmNlpSynonyms = @{
 	'wer ist aktiv'     = @('Get-sqmWhoIsActive', 'Show-sqmWhoIsActiveMonitor')
 	'aktive sessions'   = @('Get-sqmWhoIsActive', 'Show-sqmWhoIsActiveMonitor')
 	'whoisactive'       = @('Get-sqmWhoIsActive', 'Show-sqmWhoIsActiveMonitor')
+	'zurueckschwenken'  = @('Invoke-sqmPreferredPrimaryCheck', 'New-sqmPreferredPrimaryJob')
+	'zurückschwenken'   = @('Invoke-sqmPreferredPrimaryCheck', 'New-sqmPreferredPrimaryJob')
+	'bevorzugter knoten' = @('Invoke-sqmPreferredPrimaryCheck', 'New-sqmPreferredPrimaryJob')
+	'falscher knoten'   = @('Invoke-sqmPreferredPrimaryCheck', 'Get-sqmAlwaysOnHealthReport')
+	'patchwochenende'   = @('Invoke-sqmPreferredPrimaryCheck', 'Get-sqmAlwaysOnFailoverHistory')
 }

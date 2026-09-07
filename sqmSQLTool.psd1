@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.9.129.0'
+	ModuleVersion		   = '1.9.130.0'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
@@ -179,6 +179,7 @@
 		'Invoke-sqmNtfsSetup',
 		'Invoke-sqmPatchAnalysis',
 		'Invoke-sqmPerfBaseline',
+		'Invoke-sqmPreferredPrimaryCheck',
 		'Invoke-sqmQueryStore',
 		'Invoke-sqmRestoreDatabase',
 		'Invoke-sqmRestoreTest',
@@ -206,6 +207,7 @@
 		'New-sqmOlaSysDbBackupJob',
 		'New-sqmOlaUsrDbBackupJob',
 		'New-sqmAutoLoginSyncJob',
+		'New-sqmPreferredPrimaryJob',
 		'New-sqmRandomSaPassword',
 		'New-sqmRestoreDatabaseJob',
 		'New-sqmRestoreTestJob',

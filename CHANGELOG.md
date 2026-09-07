@@ -1,5 +1,41 @@
 # sqmSQLTool — Changelog
 
+## [1.9.130.0] — 2026-09-07
+
+### New: `Invoke-sqmPreferredPrimaryCheck` + `New-sqmPreferredPrimaryJob` - AG kehrt selbst auf den gewuenschten Primary-Knoten zurueck
+
+Nach einem Patchwochenende liegt die AG auf dem Knoten, der zufaellig zuletzt rebootet
+wurde. Wo ein bestimmter Knoten Primary sein muss, war das bisher Handarbeit:
+`Get-sqmAlwaysOnHealthReport` schauen, dann `Invoke-sqmFailover` von Hand.
+
+`Invoke-sqmPreferredPrimaryCheck` vergleicht das aktuelle Primaerreplikat mit dem
+vorgegebenen und schwenkt zurueck, wenn das gefahrlos moeglich ist. Es schwenkt NUR, wenn
+jede Bedingung erfuellt ist: Ziel ist SECONDARY im SYNCHRONOUS_COMMIT-Modus, alle
+AG-Datenbanken sind dort gejoint (Abgleich gegen `sys.availability_databases_cluster` -
+faengt die nach dem Patchen nicht wieder gejointe Datenbank ab), SYNCHRONIZED, ONLINE und
+nicht suspendiert, Redo-Queue unterhalb der Grenze, SQL Server auf dem Ziel laeuft lange
+genug (ein Knoten kurz nach dem Reboot patcht evtl. noch weiter) und das aktuelle
+Primaerreplikat haelt seine Rolle lange genug (Flatterschutz gegen das Hineinschwenken in
+eine laufende Patchsequenz). Optional zusaetzlich ein Zeitfenster ueber `-AllowedDay` und
+`-AllowedTimeStart`/`-AllowedTimeEnd`, z. B. "nur Mo-Fr 06:00-20:00" - damit bleibt das
+Patchwochenende selbst unberuehrt.
+
+Greift eine Bedingung nicht, passiert nichts; das Ergebnisobjekt fuehrt jede Pruefung
+einzeln mit Begruendung auf. Der Schwenk selbst laeuft ueber `Invoke-sqmFailover`, es gibt
+also weiterhin nur eine Stelle mit `ALTER AVAILABILITY GROUP ... FAILOVER` und dieselben
+Pre-/Post-Checks wie beim Schwenken von Hand. Ein FORCED Failover wird nie automatisiert:
+ist das Primaerreplikat nicht erreichbar, passiert nichts.
+
+`New-sqmPreferredPrimaryJob` legt den passenden Agent-Job an - technisch
+`New-sqmAgentCommandJob` (generischer CmdExec-Wrapper mit typisierten Clixml-Parametern)
+plus den Minutenzeitplan, den dieser nicht anbietet (Daily + SubdayType Minutes). Fuer die
+Einfuehrung `-CheckOnly`: der Job meldet dann nur, was er tun wuerde. `-FailOnBlocked` laesst
+den Jobstep rot werden, wenn ein noetiger Schwenk blockiert wurde; ohne den Schalter bleibt
+es bei WARNING im Log, damit ein Patchwochenende nicht jeden Lauf rot faerbt.
+
+Beide Funktionen sind in `category-map.ps1` und `nlp-synonyms.ps1` registriert; 57 neue
+Unit-Tests decken die Entscheidungslogik mit gemockten DMV-Antworten ab.
+
 ## [1.9.129.0] — 2026-09-05
 
 ### New: `Show-sqmWhoIsActiveMonitor` — live grid view for `Get-sqmWhoIsActive`

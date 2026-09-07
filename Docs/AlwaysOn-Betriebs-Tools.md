@@ -60,6 +60,7 @@ und dient damit als Installer **und** Updater.
 | `Move-sqmAlwaysOnListener` | Migriert einen AG-Listener von einer Availability Group zu einer anderen. |
 | `Invoke-sqmListenerMigrationPrep` | Entfernt den Listener aus der AG, hält die Datenbanken dabei ONLINE (Migrationsvorbereitung). |
 | `Complete-sqmListenerMigration` | Schließt die Listener-Migration nach der Vorbereitung ab. |
+| `Invoke-sqmPreferredPrimaryCheck` | Prüft, ob ein festgelegtes Replikat Primary ist, und schwenkt bei Bedarf kontrolliert zurück (Sicherheitsprüfungen, Zeitfenster, Flatterschutz). |
 
 ## Datenbanken in der AG
 
@@ -167,6 +168,7 @@ AD-Prüfung: das RSAT-ActiveDirectory-Modul und AD-Leserechte des ausführenden 
 | `New-sqmAutoLoginSyncJob` | Erstellt einen Agent-Job, der Logins regelmäßig automatisch synchronisiert. |
 | `New-sqmAutoLoginCompareJob` | Erstellt einen Agent-Job, der Logins regelmäßig vergleicht und bei Drift auf Fail geht. |
 | `New-sqmAlwaysOnRepairJob` | Erstellt einen Agent-Job, der `Repair-sqmAlwaysOnDatabases` regelmäßig ausführt (Auto-Repair). |
+| `New-sqmPreferredPrimaryJob` | Erstellt einen Agent-Job, der `Invoke-sqmPreferredPrimaryCheck` alle paar Minuten ausführt, damit die AG nach dem Patchwochenende von selbst auf den gewünschten Knoten zurückkehrt. |
 
 ### Praxisbeispiele: Login-Sync-Job
 
