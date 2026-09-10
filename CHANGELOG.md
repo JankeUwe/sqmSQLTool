@@ -1,5 +1,60 @@
 # sqmSQLTool — Changelog
 
+## [1.9.132.0] - 2026-09-10
+
+### Neu: `Invoke-sqmSsisCatalogMigration` - SSIS-Katalog auf einen neuen Server umziehen und anheben
+
+Einen SSIS-Katalog umzuziehen ist kein Datenbankumzug. Die SSISDB traegt einen
+Datenbank-Hauptschluessel, und jeder empfindliche Wert darin - Kennwoerter in
+Verbindungsmanagern, als sensibel markierte Umgebungsvariablen, Projektparameter - haengt an
+diesem Schluessel. Ein blosses Backup/Restore setzt eine Datenbank auf den neuen Server, deren
+Hauptschluessel der neue Server nicht oeffnen kann; das faellt nicht beim Restore auf, sondern
+erst beim Ausfuehren der Pakete. Dazu kommt: der Restore schaltet TRUSTWORTHY ab, macht den
+wiederherstellenden Login zum Eigentuemer und laesst den Katalog auf der Schemaversion des ALTEN
+Servers stehen.
+
+Die Funktion faehrt die vollstaendige Abfolge in einem Lauf und protokolliert jeden Schritt:
+Bewertung von Quelle und Ziel (Inventar, Schemaversion, Schluesselzustand, TRUSTWORTHY,
+Eigentuemer, CLR, Wartungsjob, `sp_ssis_startup`), Sicherung von Hauptschluessel und Datenbank,
+Anlegen des Katalogs auf dem Ziel, Restore, Nacharbeit (TRUSTWORTHY, Eigentuemer, Umschluesseln
+auf den Service Master Key des Ziels, `catalog.startup`, verwaiste Benutzer) und schliesslich der
+Schemavergleich. Die Quelle wird dabei nie veraendert; sie bleibt online, es laufen nur Lesezugriffe
+und zwei Sicherungen.
+
+Drei Entscheidungen, die den Unterschied zu einem Skript machen:
+
+- **`-AssessOnly` als eigener Einstieg.** Erst planen, dann umziehen. Der Bewertungslauf meldet
+  jeden Blocker (keine SSISDB, aelteres Ziel, vorhandene SSISDB ohne `-Force`, unlesbare
+  Katalogsichten) und aendert nichts.
+- **Das Master-Key-Kennwort wird VOR dem ersten Schreibzugriff gegen die Quelle geprueft**, indem
+  der Schluessel geoeffnet und wieder geschlossen wird. Sonst laeuft die Migration bis zum
+  Zielserver durch und scheitert erst beim Umschluesseln. Geprueft wird ueber den Erfolg des
+  Oeffnens, nicht ueber den Fehlertext - der ist je nach Sprachversion des Servers anders.
+- **Kein fest verdrahtetes Versionsschema.** Massstab fuer "Upgrade noetig?" ist die Schemaversion
+  des Katalogs, den der Zielserver selbst kurz zuvor angelegt hat. Die wird vor dem Restore
+  gemerkt und danach mit der wiederhergestellten verglichen. `-UpgradeCatalog` stoesst
+  `ISDBUpgradeWizard.exe` an und prueft anschliessend die Schemaversion nach: ein wirkungsloser
+  Lauf wird als Fehler gemeldet, nicht als Erfolg.
+
+Der Restore selbst geht an `Invoke-sqmRestoreDatabase` - damit gilt auch hier die erprobte
+Behandlung von Exclusive Access (SINGLE_USER, Fremdsessions beenden, Wiederholung), und es gibt
+weiterhin nur eine Stelle im Modul, die `RESTORE DATABASE` ausfuehrt. Der Scan nach Agent-Jobs, die
+nach dem Umzug umgehaengt werden muessen, nutzt `Find-sqmAgentJobReference`.
+
+Geprueft: 53 Unit-Tests plus Laeufe gegen einen echten SQL Server 2022 unter PowerShell 5.1. Die
+Anweisungsfolge zum Umschluesseln (`BACKUP MASTER KEY`, `OPEN` + `ALTER MASTER KEY ADD ENCRYPTION
+BY SERVICE MASTER KEY`, `RESTORE MASTER KEY`) wurde dort einzeln nachgestellt; dabei kam heraus,
+dass `RESTORE MASTER KEY` allein NICHT genuegt (`is_master_key_encrypted_by_server` bleibt danach
+0) und ueber einen vorhandenen Schluessel nur mit FORCE laeuft - beides steckt jetzt in der
+Funktion. Ein zweiter Befund kam aus dem Livelauf: die Pruefung des Hauptschluessels hing an
+derselben Abfrage wie die Katalogsichten, sodass bei beschaedigtem Katalog ausgerechnet die
+Kennwortpruefung stillschweigend uebersprungen wurde. Beide Abfragen sind jetzt getrennt, mit
+Regressionstest.
+
+Nicht im Labor pruefbar und entsprechend gekennzeichnet: das Anlegen des Katalogs, der Restore
+einer echten SSISDB und der Aufruf des Upgrade-Assistenten - auf keinem Rechner dieser Umgebung
+ist Integration Services installiert.
+
 ## [1.9.131.0] - 2026-09-10
 
 ### Neu: `Find-sqmAgentJobReference` - welcher Agent-Job ruft diese Prozedur auf?

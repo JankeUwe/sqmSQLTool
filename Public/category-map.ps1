@@ -105,6 +105,7 @@ $categoryMap = @{
     'Invoke-sqmSignModule'                = 'Script Execution & Deployment'
     'Invoke-sqmSplunkConfiguration'       = 'External Systems Integration'
     'Invoke-sqmSqlAlwaysOnAutoseeding'    = 'Always On & Availability Groups'
+    'Invoke-sqmSsisCatalogMigration'      = 'SSIS Configuration'
     'Invoke-sqmSsisConfiguration'         = 'SSIS Configuration'
     'Invoke-sqmTsmConfiguration'          = 'External Systems Integration'
     'Invoke-sqmUpdateStatistics'          = 'Database Maintenance'

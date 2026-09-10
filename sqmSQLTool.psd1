@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.9.131.0'
+	ModuleVersion		   = '1.9.132.0'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
@@ -192,6 +192,7 @@
 		'Invoke-sqmSignModule',
 		'Invoke-sqmSplunkConfiguration',
 		'Invoke-sqmSqlAlwaysOnAutoseeding',
+		'Invoke-sqmSsisCatalogMigration',
 		'Invoke-sqmSsisConfiguration',
 		'Invoke-sqmTsmConfiguration',
 		'Invoke-sqmUpdateStatistics',

@@ -52,4 +52,12 @@ $sqmNlpSynonyms = @{
 	'prozedur löschen'  = @('Find-sqmAgentJobReference')
 	'datenbank abschalten' = @('Find-sqmAgentJobReference', 'Get-sqmLinkedServerUsage')
 	'wer leert die tabelle' = @('Find-sqmAgentJobReference')
+	'ssis umziehen'     = @('Invoke-sqmSsisCatalogMigration')
+	'ssisdb umziehen'   = @('Invoke-sqmSsisCatalogMigration')
+	'katalog umziehen'  = @('Invoke-sqmSsisCatalogMigration')
+	'ssis auf neuen server' = @('Invoke-sqmSsisCatalogMigration')
+	'ssis upgrade'      = @('Invoke-sqmSsisCatalogMigration', 'Test-sqmSSISPackageCompatibility')
+	'pakete laufen nicht mehr' = @('Invoke-sqmSsisCatalogMigration', 'Find-sqmAgentJobReference')
+	'hauptschlüssel'    = @('Invoke-sqmSsisCatalogMigration')
+	'master key'        = @('Invoke-sqmSsisCatalogMigration')
 }
