@@ -44,4 +44,12 @@ $sqmNlpSynonyms = @{
 	'bevorzugter knoten' = @('Invoke-sqmPreferredPrimaryCheck', 'New-sqmPreferredPrimaryJob')
 	'falscher knoten'   = @('Invoke-sqmPreferredPrimaryCheck', 'Get-sqmAlwaysOnHealthReport')
 	'patchwochenende'   = @('Invoke-sqmPreferredPrimaryCheck', 'Get-sqmAlwaysOnFailoverHistory')
+	'wer ruft auf'      = @('Find-sqmAgentJobReference', 'Find-sqmDatabaseObject')
+	'ruft prozedur auf' = @('Find-sqmAgentJobReference')
+	'welcher job'       = @('Find-sqmAgentJobReference', 'Get-sqmAgentJobScheduleReport')
+	'wird das benutzt'  = @('Find-sqmAgentJobReference', 'Find-sqmDatabaseObject')
+	'prozedur loeschen' = @('Find-sqmAgentJobReference')
+	'prozedur löschen'  = @('Find-sqmAgentJobReference')
+	'datenbank abschalten' = @('Find-sqmAgentJobReference', 'Get-sqmLinkedServerUsage')
+	'wer leert die tabelle' = @('Find-sqmAgentJobReference')
 }

@@ -1,5 +1,46 @@
 # sqmSQLTool — Changelog
 
+## [1.9.131.0] - 2026-09-10
+
+### Neu: `Find-sqmAgentJobReference` - welcher Agent-Job ruft diese Prozedur auf?
+
+Die Frage kommt vor jedem Aufraeumen: Eine Prozedur soll geloescht oder umbenannt werden, eine
+Datenbank soll weg, oder eine Tabelle wird nachts leer und keine Anwendung will es gewesen sein.
+Bisher hiess die Antwort SSMS oeffnen und die Jobs durchklicken.
+
+`Find-sqmAgentJobReference` liest alle Jobsteps aus `msdb.dbo.sysjobsteps` und meldet je
+gefundenen Step eine Zeile: Job, Step, Subsystem, Zeitplan, letzter Lauf, Fundzeile mit
+Zeilennummer. Gesucht wird nach Objektname (`-ObjectName`, mit Wildcards und optional schema-
+oder datenbankqualifiziert), nach freiem Text (`-SearchText`, auf Wunsch als regulaerer
+Ausdruck) und/oder nach Datenbank (`-Database`) - `-Database` allein beantwortet die Frage vor
+dem Abschalten einer Datenbank.
+
+Bewusst KEINE serverseitige `command LIKE '%name%'`-Suche: LIKE behandelt `_` als Platzhalter,
+und Prozedurnamen mit Unterstrich sind der Normalfall - `usp_LoadSales` wuerde auch
+`uspXLoadYSales` finden. LIKE kennt ausserdem keine Wortgrenze und wuerde `usp_LoadSalesArchive`
+mitliefern. Der Abgleich laeuft daher in PowerShell ueber Identifier-Grenzen, die auch die
+Klammerschreibweise `[dbo].[usp_LoadSales]` erfassen.
+
+Ein Textfund allein ist kein Beweis fuer einen Aufruf, deshalb wird jeder Fund eingeordnet:
+`CallType` 'Execute' (der Name steht hinter EXEC/EXECUTE), 'Reference' (nur erwaehnt, etwa in
+dynamischem SQL oder als Tabellenname) oder 'Text' (Treffer aus `-SearchText`), dazu
+`InComment`, wenn die Fundstelle in einem Kommentar steht. Die Datenbank des Treffers wird aus
+`database_name` des Steps, aus `USE <db>`, aus dem Datenbankteil dreiteiliger Namen sowie aus
+`sqlcmd -d` und `-Database` von CmdExec-/PowerShell-Steps aufgeloest. `-VerifyObject` prueft
+zusaetzlich in `sys.objects`, ob das aufgerufene Objekt dort ueberhaupt (noch) existiert - damit
+wird aus "der Job nennt diesen Namen" ein "der Job ruft eine Prozedur auf, die es nicht mehr
+gibt".
+
+Live gegen einen echten SQL Server geprueft. Dabei ist ein Fehler aufgefallen und behoben
+worden: msdb speichert einen nie gelaufenen Jobstep mit `last_run_outcome = 0` und
+`last_run_date = 0`, und 0 ist zugleich der Code fuer 'Failed' - acht Ola-Jobs ohne Historie
+wurden dadurch zunaechst als fehlgeschlagen gemeldet. Massgeblich ist jetzt der Zeitstempel;
+ohne Lauf steht 'NeverRun' im Ergebnis.
+
+50 Unit-Tests decken Wortgrenze, Unterstrich-Falle, Klammerschreibweise, Kommentar- und
+Erwaehnungserkennung, Datenbankaufloesung, Filter und die Objektpruefung ab. In
+`category-map.ps1` und `nlp-synonyms.ps1` registriert.
+
 ## [1.9.130.0] — 2026-09-07
 
 ### New: `Invoke-sqmPreferredPrimaryCheck` + `New-sqmPreferredPrimaryJob` - AG kehrt selbst auf den gewuenschten Primary-Knoten zurueck

@@ -18,6 +18,7 @@ $categoryMap = @{
     'Export-sqmAlwaysOnConfiguration'     = 'Always On & Availability Groups'
     'Export-sqmDatabaseDocumentation'     = 'Reporting & Analysis'
     'Export-sqmServerConfiguration'       = 'Configuration Management'
+    'Find-sqmAgentJobReference'           = 'SQL Agent & Proxy Jobs'
     'Find-sqmDatabaseObject'              = 'Database Maintenance'
     'Get-sqmADAccountStatus'              = 'Login & User Security'
     'Get-sqmADGroupMembers'               = 'Login & User Security'
