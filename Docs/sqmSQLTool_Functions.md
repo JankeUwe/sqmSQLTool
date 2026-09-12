@@ -3820,9 +3820,17 @@ Adds one or more databases to an Always On availability group (AutoSeed).
 
 - Checks whether the database is already in an AG.
 - Sets recovery mode to Full (if necessary).
+- Recognizes TDE-encrypted databases and checks their preconditions BEFORE any change.
+- Optionally distributes the TDE certificate to every secondary replica (-SyncTdeCertificate).
 - Drops existing databases on all secondary replicas.
 - Adds the database to the AG using Automatic Seeding.
 - With -All, databases are added sequentially to avoid load spikes.
+
+TDE handling: Automatic Seeding of an encrypted database requires SQL Server 2019 (major
+version 15) or higher on EVERY replica, and the certificate protecting the database encryption
+key must already exist on each secondary. Both are verified before the database is touched.
+Below SQL 2019 the database is skipped with status "TdeUnsupportedVersion" - there the only
+route is backup/restore, not seeding.
 
 **Parameters:**
 
@@ -3831,17 +3839,28 @@ Adds one or more databases to an Always On availability group (AutoSeed).
 - **-AvailabilityGroup** - Name of the target availability group (mandatory).
 - **-Database** - Name or array of databases. Ignored when -All is set.
 - **-All** - Add all user databases that are not yet in an AG.
+- **-SyncTdeCertificate** - For TDE-encrypted databases: export the encryptor certificate from the primary and create it on every secondary that does not have it yet (matched by thumbprint, not by name). Without this switch such a database is skipped with status "TdeCertificateMissing". Requires -TdeCertificateBackupPath and -TdeCertificatePassword.
+- **-TdeCertificateBackupPath** - Directory for the temporary certificate export (.cer + .pvk). BACKUP CERTIFICATE writes it under the primary's SQL service account and CREATE CERTIFICATE reads it under the secondary's service account, so this must be a share both accounts can reach.
+- **-TdeCertificatePassword** - Password protecting the exported private key (.pvk). The same password is used to decrypt it on the secondaries.
+- **-TdeMasterKeyPassword** - Password used to create the database master key in master on a secondary that has none yet. Defaults to -TdeCertificatePassword when omitted.
+- **-KeepTdeCertificateBackup** - Keep the exported .cer/.pvk files. Default: they are deleted after distribution, because the .pvk carries the private key of the TDE certificate.
 - **-EnableException** - Allow exceptions to pass through.
 - **-Confirm** - Request confirmation.
 - **-WhatIf** - Test only (no changes).
 
-**Examples (2):**
+**Examples (4):**
 
 ```powershell
 Add-sqmDatabaseToAG -AvailabilityGroup "AG1" -Database "SalesDB"
 
 ```powershell
 Add-sqmDatabaseToAG -AvailabilityGroup "AG1" -All
+
+```powershell
+Add-sqmDatabaseToAG -AvailabilityGroup "AG1" -Database "PayrollDB" -SyncTdeCertificate -TdeCertificateBackupPath "\\fileserver\sqlcerts$" -TdeCertificatePassword (Read-Host -AsSecureString)
+
+```powershell
+Add-sqmDatabaseToAG -AvailabilityGroup "AG1" -All -WhatIf
 
 ### Add-sqmDatabaseToDistributedAg
 

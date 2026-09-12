@@ -1,5 +1,63 @@
 # sqmSQLTool — Changelog
 
+## [1.9.133.0] - 2026-09-12
+
+### `Add-sqmDatabaseToAG` nimmt jetzt auch TDE-verschluesselte Datenbanken
+
+Eine verschluesselte Datenbank ueber Automatic Seeding in eine Availability Group zu bringen
+scheiterte bisher an zwei Voraussetzungen, die die Funktion nicht kannte: Seeding
+verschluesselter Datenbanken gibt es erst ab SQL Server 2019, und das Zertifikat, an dem der
+Datenbank-Verschluesselungsschluessel haengt, muss auf jedem Secondary bereits liegen. Fehlt
+eines von beidem, bricht `Add-DbaAgDatabase` ab, nachdem die Funktion die Datenbank auf den
+Secondaries schon geloescht hat.
+
+Beides wird jetzt vorab geprueft, und zwar bevor irgendetwas veraendert wird. Der TDE-Zustand
+aller Benutzerdatenbanken wird einmal aus `sys.dm_database_encryption_keys` gelesen; nur fuer
+eine verschluesselte Datenbank laufen die weiteren Pruefungen. Ist ein Replikat aelter als SQL
+2019, wird die Datenbank mit Status `TdeUnsupportedVersion` und Nennung des Knotens
+uebersprungen, statt es zu versuchen. Fuer alles Unverschluesselte bleibt der Ablauf
+unveraendert, inklusive der Zertifikatsabfragen, die dann gar nicht erst stattfinden.
+
+Neu ist `-SyncTdeCertificate`: das Zertifikat wird vom Primary exportiert
+(`BACKUP CERTIFICATE ... WITH PRIVATE KEY`) und auf jedem Secondary erzeugt, dem es fehlt.
+Ohne den Schalter meldet die Funktion `TdeCertificateMissing` und nennt die betroffenen Knoten.
+Dazu kommen `-TdeCertificateBackupPath`, `-TdeCertificatePassword`, `-TdeMasterKeyPassword`
+und `-KeepTdeCertificateBackup`.
+
+Vier Entscheidungen, die den Unterschied zu einem Skript machen:
+
+- **Verglichen wird der Thumbprint, nicht der Name.** SQL Server ordnet den
+  Verschluesselungsschluessel ueber den Thumbprint zu; ein Zertifikat, das auf dem Secondary
+  anders heisst, ist trotzdem das richtige. Umgekehrt wird ein gleichnamiges Zertifikat mit
+  abweichendem Thumbprint nicht ueberschrieben, sondern als `TdeCertificateNameConflict`
+  gemeldet.
+- **Der Datenbank-Hauptschluessel wird auf dem Secondary mitgeprueft.**
+  `CREATE CERTIFICATE ... WITH PRIVATE KEY` verlangt ihn in master. Fehlt er, wird er angelegt,
+  sonst scheitert der Import mit einer Meldung, die nach einem Kennwortfehler aussieht.
+- **Haengt der Schluessel an einem asymmetrischen Schluessel (EKM, Key Vault),** wird das als
+  `TdeEncryptorNotCertificate` gemeldet und nicht als fehlendes Zertifikat. Der Schluessel
+  laesst sich nicht als Datei verteilen, dafuer ist der Provider zustaendig.
+- **Aufgeraeumt wird nur, was diese Sitzung auch sieht.** Geschrieben hat die Exportdateien das
+  Dienstkonto des Primary. Zeigt der Ablagepfad von dort woanders hin als vom aufrufenden
+  Rechner, traefe ein Loeschen eine gleichnamige fremde Datei; dann bleiben die Dateien liegen,
+  mit Warnung. Sonst werden `.cer` und `.pvk` nach der Verteilung entfernt, weil die `.pvk` den
+  privaten Schluessel traegt.
+
+Geprueft: 26 Unit-Tests mit gemockter AG sowie ein Lauf gegen einen echten SQL Server 2022 unter
+PowerShell 5.1. Dort wurde die Anweisungsfolge einzeln nachgestellt, an einer TDE-Datenbank mit
+einem Zertifikat, dessen Name eine eckige Klammer und dessen Kennwort ein Dollarzeichen und ein
+Hochkomma enthaelt: Erkennungsabfrage, Export, Import in eine Datenbank ohne Hauptschluessel
+(scheitert erwartungsgemaess), Anlegen des Hauptschluessels, erneuter Import, Abgleich der
+Thumbprints. Der Livelauf brachte zwei Befunde, die jetzt im Code stehen: SQL Server lehnt ein
+Zertifikat ab, dessen Thumbprint in der Datenbank schon existiert, auch unter anderem Namen -
+deshalb wird nur dort erzeugt, wo der Thumbprint wirklich fehlt. Und `NULL` aus dem LEFT JOIN
+kommt als `[DBNull]` an, nicht als `$null`, was die Pruefung auf den EKM-Fall stillschweigend
+umgangen haette.
+
+Nicht im Labor pruefbar und entsprechend gekennzeichnet: der Seeding-Vorgang selbst. In dieser
+Umgebung gibt es keine Availability Group; die AG-Pfade sind ueber Unit-Tests mit gemockten
+dbatools-Aufrufen abgedeckt.
+
 ## [1.9.132.0] - 2026-09-10
 
 ### Neu: `Invoke-sqmSsisCatalogMigration` - SSIS-Katalog auf einen neuen Server umziehen und anheben

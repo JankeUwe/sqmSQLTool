@@ -66,7 +66,7 @@ und dient damit als Installer **und** Updater.
 
 | Funktion | Zweck |
 |---|---|
-| `Add-sqmDatabaseToAG` | Fügt eine oder mehrere Datenbanken per Automatic Seeding zur AG hinzu. |
+| `Add-sqmDatabaseToAG` | Fügt eine oder mehrere Datenbanken per Automatic Seeding zur AG hinzu; erkennt TDE-verschlüsselte Datenbanken und verteilt auf Wunsch das Zertifikat. |
 | `Remove-sqmDatabaseFromAG` | Entfernt eine oder mehrere Datenbanken aus ihrer AG. |
 | `Invoke-sqmRestoreDatabase` | Kontrollierter Restore (Full / Full+Diff+Logs); erkennt AG-Mitgliedschaft automatisch und behandelt die Secondaries selbstständig. |
 | `Repair-sqmAlwaysOnDatabases` | Prüft alle AG-Datenbanken auf Probleme und repariert sie (Remove → Cleanup → Add). |
@@ -84,6 +84,22 @@ Logins oder Datenbanken auf einem Read-Only-Secondary).
   ziehen kann. Anschließend überträgt Automatic Seeding die Datenbank vom Primary auf alle
   Secondaries; eine manuelle Restore-Kette auf dem Secondary entfällt. Voraussetzung: Recovery
   Model FULL und Automatic Seeding auf allen Replicas aktiv.
+
+- **Add-sqmDatabaseToAG bei TDE** — Eine verschlüsselte Datenbank wird erkannt und vorab
+  geprüft, **bevor** auf den Secondaries etwas gelöscht wird. Zwei Bedingungen müssen
+  erfüllt sein: Automatic Seeding verschlüsselter Datenbanken gibt es erst **ab SQL Server
+  2019** auf allen Replicas, und das Zertifikat des Datenbank-Verschlüsselungsschlüssels muss
+  auf jedem Secondary liegen. Ist ein Replikat älter, wird die Datenbank mit Status
+  `TdeUnsupportedVersion` übersprungen; dort bleibt nur Backup/Restore. Fehlt nur das
+  Zertifikat, verteilt es `-SyncTdeCertificate` selbständig: Export vom Primary
+  (`BACKUP CERTIFICATE ... WITH PRIVATE KEY`), auf jedem Secondary ohne dieses Zertifikat ein
+  `CREATE CERTIFICATE ... FROM FILE`, bei Bedarf vorher der Datenbank-Hauptschlüssel in master.
+  Ohne den Schalter wird mit `TdeCertificateMissing` abgebrochen und der betroffene Knoten
+  genannt. Verglichen wird der **Thumbprint**, nicht der Name; ein gleichnamiges Zertifikat mit
+  anderem Thumbprint wird nie überschrieben. Der Ablagepfad muss für die SQL-Dienstkonten
+  **aller** Replicas erreichbar sein (Freigabe), denn geschrieben wird vom Primary und gelesen
+  vom Secondary. Die `.pvk` mit dem privaten Schlüssel wird nach der Verteilung gelöscht,
+  sofern nicht `-KeepTdeCertificateBackup` gesetzt ist.
 
 - **Remove-sqmDatabaseFromAG** — Die Datenbank wird zuerst aus der AG herausgelöst und danach
   **auf allen Secondary-Replicas gelöscht**. Auf dem Primary bleibt sie als normale, eigenständige
