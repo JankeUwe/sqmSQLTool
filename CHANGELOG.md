@@ -1,5 +1,61 @@
 # sqmSQLTool — Changelog
 
+## [1.9.135.0] - 2026-09-15
+
+### Neu: Test-sqmDiscoveryAccess — wiederkehrende Pruefung fuer Inventarisierungs-Konten
+
+Werkzeuge wie ServiceNow Discovery, SCOM oder ein authentifizierter Schwachstellenscanner
+verbinden sich mit einem eigenen Dienstkonto. Fehlt dieses Konto auf einer Instanz, scheitert
+die Erfassung aus Sicht des DBA lautlos. Bei ServiceNow ist der Schaden dauerhaft: ein CI, das
+einmal als "absent" markiert wurde, kehrt nicht von selbst in den aktiven Status zurueck, auch
+wenn der naechste Scan wieder laeuft. Bisher fiel so etwas erst auf, wenn jemand die CMDB
+anzweifelte.
+
+`Test-sqmDiscoveryAccess` prueft das ueber eine ganze Serverliste hinweg, rein lesend und ohne
+jede Aenderung an den geprueften Instanzen. Pro Instanz wird gemeldet, ob das Login existiert,
+aktiviert ist und nicht per DENY von CONNECT SQL ausgesperrt wurde, ob es Mitglied der
+erwarteten Serverrolle ist, und welche effektiven Serverberechtigungen es tatsaechlich besitzt.
+
+Die effektive Berechtigung wird nicht geraten, sondern aus drei Quellen zusammengesetzt:
+direkte GRANTs, jede Serverrolle in der das Login steckt (rekursiv aufgeloest, Rollen koennen
+verschachtelt sein) und die Rolle `public`. DENY schlaegt dabei GRANT, deshalb wird DENY
+separat geprueft statt nur die Existenz eines GRANT.
+
+Daraus leitet die Funktion eine `DiscoveryLevel`-Stufe ab, also das, was das sammelnde Werkzeug
+wirklich sieht: `None`, `ServerOnly`, `Databases`, `DatabaseDetails` oder `Full`. Ueber
+`-RequiredLevel` wird die Sollstufe vorgegeben, alles darunter gilt als Fehler.
+
+Zwei Faelle, die in der Praxis besonders schwer zu finden sind, werden ausdruecklich erkannt:
+
+- `VIEW ANY DATABASE` ist im SQL Server standardmaessig an `public` vergeben. Genau deshalb
+  reicht ein blosses Login, um alle Datenbanken aufzulisten. Wurde das Recht im Rahmen einer
+  Haertung von `public` entzogen oder dem Login per DENY gesperrt, sieht das Konto nur noch
+  master und tempdb, und zwar ohne jede Fehlermeldung. Die Funktion unterscheidet beide
+  Ursachen.
+- Ohne `VIEW ANY DEFINITION` liefert `sys.master_files` null Zeilen statt eines Fehlers.
+  Datenbankgroessen und Dateipfade bleiben leer, die Erfassung meldet trotzdem Erfolg.
+
+Ebenfalls gemeldet wird der umgekehrte Fall: ein Discovery-Konto mit `sysadmin` ist
+ueberberechtigt, fuer keine der Sammelabfragen erforderlich und gehoert reduziert.
+
+Ab SQL Server 2022 meldet der Server fehlende DMV-Rechte als `VIEW SERVER PERFORMANCE STATE`
+statt `VIEW SERVER STATE`. Beide Schreibweisen werden ausgewertet, und der Hinweistext nennt
+die Variante passend zur Version der geprueften Instanz.
+
+Ausgabe als TXT- und HTML-Bericht unter `<Get-sqmDefaultOutputPath>\DiscoveryAccess`, zusaetzlich
+als Objekte fuer die Weiterverarbeitung. `-SqlInstance` ist pipelinefaehig, eine Serverliste aus
+einer Datei laesst sich also direkt durchreichen.
+
+Abgrenzung: Bezieht ein Konto seinen Zugriff ueber ein AD-*Gruppen*-Login statt ueber ein eigenes
+Login, meldet diese Funktion es als fehlend. Die Aufloesung verschachtelter AD-Gruppen ist
+Aufgabe von `Test-sqmLoginGroupAccess` und setzt einen erreichbaren Domaenencontroller voraus.
+
+Live gegen DEV01 geprueft, mit sieben Szenarien: fehlendes Login, nur Login, fehlendes
+VIEW ANY DEFINITION, vollstaendige Rolle, falsche Rollenmitgliedschaft, sysadmin-Ueberberechtigung
+und DENY VIEW ANY DATABASE. Zusaetzlich der Mehrinstanzlauf ueber die Pipeline mit einer nicht
+erreichbaren Instanz.
+
+
 ## [1.9.134.0] - 2026-09-15
 
 ### Laufzeitfehler "The term 'if' is not recognized" in zwei Funktionen behoben
