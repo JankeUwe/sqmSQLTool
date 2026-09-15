@@ -379,9 +379,9 @@ WHERE dp.type IN ('G','U') AND dp.sid IS NOT NULL
 					{
 						$lines.Add(("{0,-8} {1,-25} {2,-30} {3,-10} {4,-8} {5,-8} {6}" -f `
 								$e.GroupDepth, $e.GroupSamAccountName, $(if ($e.LoginName) { $e.LoginName } else { '-' }), `
-								(if ($null -eq $e.LoginEnabled) { '-' } elseif ($e.LoginEnabled) { 'Ja' } else { 'Nein' }), `
-								(if ($null -eq $e.DenyConnectSql) { '-' } elseif ($e.DenyConnectSql) { 'Ja' } else { 'Nein' }), `
-								(if ($e.HasServerLogin) { 'Ja' } else { 'Nein' }), `
+								$(if ($null -eq $e.LoginEnabled) { '-' } elseif ($e.LoginEnabled) { 'Ja' } else { 'Nein' }), `
+								$(if ($null -eq $e.DenyConnectSql) { '-' } elseif ($e.DenyConnectSql) { 'Ja' } else { 'Nein' }), `
+								$(if ($e.HasServerLogin) { 'Ja' } else { 'Nein' }), `
 								$(if ($e.DatabaseAccessSummary) { $e.DatabaseAccessSummary } else { $e.Assessment })))
 					}
 					$lines | Out-File -FilePath $txtFile -Encoding UTF8 -Force

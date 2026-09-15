@@ -1,5 +1,26 @@
 # sqmSQLTool — Changelog
 
+## [1.9.134.0] - 2026-09-15
+
+### Laufzeitfehler "The term 'if' is not recognized" in zwei Funktionen behoben
+
+`Test-sqmLoginGroupAccess` brach am Ende jedes Laufs mit einer `CommandNotFoundException`
+fuer `if` ab, und zwar erst beim Schreiben des TXT-Berichts, also nachdem die gesamte
+AD- und SQL-Pruefung bereits gelaufen war. Ursache: in der `-f`-Formatzeile standen drei
+Bedingungen als `(if ... )` statt `$(if ... )`. Runde Klammern eroeffnen in PowerShell einen
+Pipeline-Kontext, in dem `if` kein Schluesselwort mehr ist, sondern als Kommandoname
+interpretiert wird. Das faellt beim Parsen nicht auf, sondern erst, wenn die Zeile ausgefuehrt
+wird.
+
+Dasselbe Muster steckte in `Get-sqmCertificateReport` als `return if (...) { } else { }`:
+auch `return` nimmt eine Pipeline entgegen, also galt dort dieselbe Falle. Getroffen haette
+es jeden Lauf, bei dem ein Endpoint-Zertifikat klassifiziert werden musste. Ersetzt durch
+`if (...) { return ... }` plus abschliessendem `return`.
+
+Zur Absicherung wurden alle Dateien unter `Public\` und `Private\` per AST daraufhin
+durchsucht, ob irgendwo ein Schluesselwort (`if`, `else`, `while`, `switch`, `try`, ...) in
+Kommandoposition steht. Nach den beiden Korrekturen: keine weiteren Treffer.
+
 ## [1.9.133.0] - 2026-09-12
 
 ### `Add-sqmDatabaseToAG` nimmt jetzt auch TDE-verschluesselte Datenbanken

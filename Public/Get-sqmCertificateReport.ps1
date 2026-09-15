@@ -383,8 +383,8 @@ function Get-sqmCertPurpose
 	if ($EndpointCerts.ContainsKey($CertName))
 	{
 		$epType = $EndpointCerts[$CertName]
-		return if ($epType -like '*MIRROR*' -or $epType -like '*DATABASE_MIRRORING*') { 'AlwaysOn' }
-		else { 'ServiceBroker' }
+		if ($epType -like '*MIRROR*' -or $epType -like '*DATABASE_MIRRORING*') { return 'AlwaysOn' }
+		return 'ServiceBroker'
 	}
 	if ($TdeCerts.ContainsKey($CertName)) { return 'TDE' }
 	if ($CertName -like '*backup*') { return 'Backup' }
