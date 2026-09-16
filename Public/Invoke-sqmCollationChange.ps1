@@ -198,7 +198,34 @@ function Invoke-sqmCollationChange
 			{
 				throw "sqlservr.exe konnte nicht gefunden werden. Bitte -ServiceName angeben."
 			}
-			
+
+			# ERRORLOG-Pfad JETZT ermitteln (Instanz laeuft noch normal, keine Verbindungskonkurrenz).
+			# Wuerde dies erst waehrend der Bereitschaftserkennung per Invoke-DbaQuery/xp_readerrorlog
+			# gegen die im -m-Modus gestartete Instanz abgefragt, konkurriert dieser Verbindungsversuch
+			# mit jedem anderen Client, der sich just in diesem Moment verbindet (Single-User-Modus
+			# laesst nur EINE Verbindung zu - z.B. NLB-PROD\izeyl24 o.ae.). Gewinnt der fremde Client das
+			# Rennen, schlaegt die eigene Abfrage fehl, $errorlogPath bleibt $null, die
+			# Bereitschaftserkennung laeuft nie an und die Funktion wartet bis zum Timeout, obwohl der
+			# Collation-Rebuild selbst laengst durchgelaufen sein kann.
+			$errorlogPath = $null
+			if ($regInstKey)
+			{
+				$paramsKey = Get-Item "$regBase\$regInstKey\MSSQLServer\Parameters" -ErrorAction SilentlyContinue
+				if ($paramsKey)
+				{
+					$eArg = $paramsKey.GetValueNames() | ForEach-Object { $paramsKey.GetValue($_) } | Where-Object { $_ -match '^-e(.+)$' } | Select-Object -First 1
+					if ($eArg -match '^-e(.+)$') { $errorlogPath = $Matches[1] }
+				}
+			}
+			if (-not $errorlogPath)
+			{
+				# Fallback ueber dbatools - nur hier, waehrend die Instanz noch normal erreichbar ist.
+				$logCfg = Get-DbaErrorLogConfig @connParams -ErrorAction SilentlyContinue
+				if ($logCfg -and $logCfg.LogPath) { $errorlogPath = Join-Path $logCfg.LogPath 'ERRORLOG' }
+			}
+			if ($errorlogPath) { Invoke-sqmLogging -Message "ERRORLOG-Pfad: $errorlogPath" -FunctionName $functionName -Level "INFO" }
+			else { Invoke-sqmLogging -Message "ERRORLOG-Pfad konnte nicht ermittelt werden - Bereitschaftserkennung faellt auf Prozessende/Timeout zurueck." -FunctionName $functionName -Level "WARNING" }
+
 			# Windows-Dienstname
 			if (-not $ServiceName)
 			{
@@ -361,30 +388,19 @@ function Invoke-sqmCollationChange
 			$sqlProc.BeginErrorReadLine()
 
 			# Warten auf Bereitschaft (Errorlog pruefen)
-			# errorlogPath wird bei JEDEM Schleifendurchlauf neu ermittelt statt einmalig direkt nach
-			# dem Start: die Instanz nimmt unmittelbar nach Process.Start() noch keine Verbindungen an,
-			# der erste (einzige) Versuch schlug daher praktisch immer fehl und $errorlogPath blieb
-			# dauerhaft $null - die Bereitschaftserkennung ueber die Errorlog-Tokens lief dadurch nie an,
-			# sodass sich die Funktion allein auf "sqlservr.exe beendet sich selbst" oder den blinden
-			# Timeout+Kill() verliess. Ein zu frueher Kill() kann den Collation-Rebuild abbrechen, bevor
-			# er committet ist - die Instanz startet danach normal, aber ohne geaenderte Collation.
+			# $errorlogPath wurde bereits VOR dem Stoppen des Dienstes ueber die Registry (bzw.
+			# dbatools-Fallback) ermittelt - siehe Pre-Flight-Check. Waehrend dieser Schleife wird dafuer
+			# KEINE SQL-Verbindung mehr aufgebaut: die im -m-Modus laufende Instanz laesst nur eine
+			# einzige Verbindung zu, und jede eigene Abfrage hier wuerde mit einem fremden Client
+			# konkurrieren, der sich zufaellig genau jetzt verbindet (z.B. NLB-PROD\izeyl24) - gewinnt
+			# der fremde Client, schlaegt die eigene Abfrage fehl und die Bereitschaftserkennung haengt
+			# bis zum Timeout, obwohl der Collation-Rebuild laengst durchgelaufen sein kann.
 			$deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
 			$isReady = $false
-			$errorlogPath = $null
 			$readyTokens = @('Recovery is complete', 'SQL Server is now ready', 'Collation change successful', 'Server is listening on')
 			while ((Get-Date) -lt $deadline -and -not $sqlProc.HasExited)
 			{
 				Start-Sleep -Milliseconds 500
-				if (-not $errorlogPath)
-				{
-					try
-					{
-						$candidate = Invoke-DbaQuery @connParams -Query "EXEC xp_readerrorlog 0, 1, N'Logging SQL Server messages in file'" -ErrorAction SilentlyContinue |
-						Select-Object -Last 1 -ExpandProperty Text -ErrorAction SilentlyContinue
-						if ($candidate -match "'(.+ERRORLOG)'") { $errorlogPath = $Matches[1] }
-					}
-					catch { }
-				}
 				if ($errorlogPath -and (Test-Path $errorlogPath))
 				{
 					$tail = Get-Content -Path $errorlogPath -Tail 20 -ErrorAction SilentlyContinue

@@ -1,5 +1,23 @@
 # sqmSQLTool — Changelog
 
+## [1.9.136.0] - 2026-09-16
+
+### Fix: Invoke-sqmCollationChange — Bereitschaftserkennung durch fremde Verbindung blockiert
+
+Waehrend `sqlservr.exe -m ...` im Single-User-Modus lief, ermittelte die Bereitschaftserkennung
+den ERRORLOG-Pfad ueber eine eigene SQL-Verbindung (`Invoke-DbaQuery`/`xp_readerrorlog`). Diese
+Verbindung konkurrierte mit jedem anderen Client, der sich zufaellig genau in diesem Moment mit
+der Instanz verbinden wollte - Single-User-Modus laesst nur eine einzige Verbindung zu. Gewann
+der fremde Client (im Feld beobachtet: `NLB-PROD\izeyl24`, abgewiesen mit "Server is in
+single-user mode"), blieb `$errorlogPath` dauerhaft `$null`, die Bereitschaftserkennung lief nie
+an und die Funktion wartete bis zum `-StartupTimeoutSeconds`-Timeout und killte den Prozess -
+obwohl der Collation-Rebuild selbst laengst durchgelaufen sein konnte.
+
+Der ERRORLOG-Pfad wird jetzt bereits im Pre-Flight-Check ermittelt, waehrend die Instanz noch
+normal laeuft (Registry-Startparameter `-e`, mit `Get-DbaErrorLogConfig` als Fallback). Die
+Warteschleife braucht danach keine SQL-Verbindung mehr und ist damit gegen fremde
+Verbindungsversuche waehrend des Single-User-Fensters immun.
+
 ## [1.9.135.0] - 2026-09-15
 
 ### Neu: Test-sqmDiscoveryAccess — wiederkehrende Pruefung fuer Inventarisierungs-Konten
