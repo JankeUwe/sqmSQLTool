@@ -1,5 +1,33 @@
 # sqmSQLTool — Changelog
 
+## [1.9.143.0] - 2026-09-17
+
+### Aenderung: New-sqmBackupMaintenanceJob — Logik als Prozeduren in master, Job-Steps sind Einzeiler
+
+Die 1.9.142.0-Umstellung auf T-SQL hat die komplette Logik als langen Skripttext in die
+Job-Steps geschrieben (Step 1 ~1.800, Step 2 ~4.000 Zeichen). Beides liegt jetzt als Prozedur
+in master, die Job-Steps rufen sie nur noch auf - gleiche Konvention wie in
+New-sqmOlaUsrDbBackupJob:
+
+- **Step 1**: `EXEC master.dbo.[sqm_SyncBackupExcludeTable] @IncludeSystemDatabases = 0;` (73 Zeichen).
+  Eine gemeinsame Prozedur fuer alle Backup-Typen statt einer Kopie je Job, der System-DB-Filter
+  ist ein Parameter.
+- **Step 2**: `EXEC master.dbo.[sqm_Run_<JobName>];` (~53 Zeichen). Enthaelt den Cursor, der pro
+  Datenbank Olas DatabaseBackup aufruft, je Datenbank in TRY/CATCH.
+
+Beide Prozeduren werden bei jedem Aufruf der Funktion neu angelegt (DROP + CREATE), ein
+`-Update`-Lauf aktualisiert also auch die Backup-Logik selbst und nicht nur den Job.
+
+Nebeneffekt der Prozedur-Form: innerhalb einer Prozedur greift Deferred Name Resolution, der
+Verweis auf master.dbo.sqm_BackupExclude darf also direkt stehen. Der sp_executesql-Umweg aus
+1.9.141.0/1.9.142.0 (noetig, weil ein Ad-hoc-Batch alle Tabellennamen schon beim Parsen bindet)
+entfaellt damit in beiden Prozeduren.
+
+Auf DEV01 als echter Agent-Job geprueft, jeweils mit vorher geloeschter sqm_BackupExclude, um
+das Anlegen der Prozedur ohne existierende Tabelle mitzutesten: FULL-Job 11 s, alle 19
+Benutzerdatenbanken gesichert; LOG-Job 6 s, 15 Log-Sicherungen - also 19 minus 3 Datenbanken im
+Recovery Model SIMPLE minus die eine per sqm_BackupExclude ausgeschlossene.
+
 ## [1.9.142.0] - 2026-09-17
 
 ### Fix: New-sqmBackupMaintenanceJob — beide Steps jetzt reines T-SQL (Ola-Cursor statt PowerShell)
