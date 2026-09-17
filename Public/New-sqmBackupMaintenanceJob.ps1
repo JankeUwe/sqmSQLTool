@@ -12,7 +12,7 @@
 
 	Step 2 — Backup-UserDatabases-<BackupType>
 	    Calls Invoke-sqmUserDatabaseBackup with -All and all configured options (UseExcludeTable,
-	    CheckPreferredReplica, MailTo, MailProfile, MailOnSuccess, BackupPath).
+	    CheckPreferredReplica, MailTo, MailProfile, MailOnSuccess, BackupPath, CleanupTime).
 
 	Both steps use the PowerShell subsystem so that the sqmSQLTool module is imported fresh at
 	each execution. This means the job is fully self-contained and does not depend on the SQL
@@ -23,6 +23,11 @@
 	    FULL — every day (@('EveryDay')) at 20:15, once
 	    DIFF — Monday-Saturday (@('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')) at 20:00, once
 	    LOG  — every day (@('EveryDay')), starting 00:00, every 15 minutes
+
+	Default cleanup retention per backup type (applied via -CleanupTime unless overridden, skipped
+	entirely with -NoCleanup): FULL 4 weeks ('4w'), DIFF 2 weeks ('2w'), LOG 48 hours ('48h'). Old
+	backup files are removed by Invoke-sqmUserDatabaseBackup (Remove-DbaBackup) after each run,
+	matching only that BackupType's own file extension (.bak for FULL/DIFF, .trn for LOG).
 
 .PARAMETER SqlInstance
 	SQL Server instance. Default: current computer name ($env:COMPUTERNAME).
@@ -79,6 +84,16 @@
 	When set, passes -MailOnSuccess to Invoke-sqmUserDatabaseBackup in Step 2 so that a report
 	mail is also sent on full success.
 
+.PARAMETER CleanupTime
+	Retention period for old backup files of this BackupType in BackupPath, passed as
+	-CleanupTime to Invoke-sqmUserDatabaseBackup in Step 2, e.g. '48h', '7d', '4w', '1m'. When
+	not specified, defaults depend on BackupType (see description). Use -NoCleanup to disable
+	cleanup entirely instead.
+
+.PARAMETER NoCleanup
+	When set, no -CleanupTime is passed to Invoke-sqmUserDatabaseBackup in Step 2, so old backup
+	files are never removed by this job. Ignored if -CleanupTime is also specified explicitly.
+
 .PARAMETER OperatorName
 	SQL Agent operator name for failure email notification on the job level.
 
@@ -106,8 +121,14 @@
 	    -UseExcludeTable -ScheduleTime "22:00"
 
 .EXAMPLE
-	# LOG backup, default schedule: every day, every 15 minutes starting 00:00
+	# LOG backup, default schedule: every day, every 15 minutes starting 00:00,
+	# default cleanup: .trn files older than 48h are removed after each run
 	New-sqmBackupMaintenanceJob -SqlInstance "SQL01" -BackupType LOG -UseExcludeTable
+
+.EXAMPLE
+	# LOG backup with custom retention and no automatic cleanup
+	New-sqmBackupMaintenanceJob -SqlInstance "SQL01" -BackupType LOG -CleanupTime "24h"
+	New-sqmBackupMaintenanceJob -SqlInstance "SQL01" -BackupType LOG -NoCleanup
 
 .EXAMPLE
 	# Replace existing job
@@ -156,6 +177,11 @@ function New-sqmBackupMaintenanceJob
 		[string]$MailProfile = 'Default',
 		[Parameter(Mandatory = $false)]
 		[switch]$MailOnSuccess,
+		[Parameter(Mandatory = $false)]
+		[ValidatePattern('^\d+[hdwm]$')]
+		[string]$CleanupTime,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoCleanup,
 		[Parameter(Mandatory = $false)]
 		[string]$OperatorName,
 		[Parameter(Mandatory = $false)]
@@ -212,6 +238,18 @@ function New-sqmBackupMaintenanceJob
 			}
 		}
 
+		# Default-CleanupTime je BackupType setzen wenn nicht explizit angegeben (ausser -NoCleanup)
+		if (-not $NoCleanup -and -not $PSBoundParameters.ContainsKey('CleanupTime'))
+		{
+			switch ($BackupType)
+			{
+				'FULL' { $CleanupTime = '4w' }
+				'DIFF' { $CleanupTime = '2w' }
+				'LOG'  { $CleanupTime = '48h' }
+			}
+		}
+		if ($NoCleanup) { $CleanupTime = $null }
+
 		# JobName ohne explizite Angabe aus der Konfiguration lesen, abhaengig von -BackupType -
 		# analog zu New-sqmOlaUsrDbBackupJob (OlaJobNameFull/Diff/Log). Vorher war der Default fest
 		# auf 'sqm-BackupMaintenance-FULL' verdrahtet, unabhaengig vom gewaehlten BackupType - ein
@@ -244,6 +282,7 @@ function New-sqmBackupMaintenanceJob
 			ScheduleName   = $null
 			ScheduleDays   = ($ScheduleDays -join ', ')
 			ScheduleTime   = $ScheduleTime
+			CleanupTime    = $CleanupTime
 			Status         = 'Unknown'
 			Message        = $null
 		}
@@ -333,6 +372,10 @@ function New-sqmBackupMaintenanceJob
 			if ($MailOnSuccess)
 			{
 				$step2Lines.Add("`$params['MailOnSuccess'] = `$true")
+			}
+			if ($CleanupTime)
+			{
+				$step2Lines.Add("`$params['CleanupTime'] = '$CleanupTime'")
 			}
 			$step2Lines.Add("Invoke-sqmUserDatabaseBackup @params")
 			$step2Command = $step2Lines -join "`r`n"
@@ -452,8 +495,9 @@ function New-sqmBackupMaintenanceJob
 			}
 
 			$intervalInfo    = if ($ScheduleIntervalMinutes -gt 0) { ", alle $ScheduleIntervalMinutes Min." } else { '' }
+			$cleanupInfo     = if ($CleanupTime) { ", Cleanup: $CleanupTime" } else { '' }
 			$result.Status   = 'Created'
-			$result.Message  = "Job '$JobName' ($BackupType) erstellt. Schedule: $($expandedDays -join '/') $ScheduleTime$intervalInfo"
+			$result.Message  = "Job '$JobName' ($BackupType) erstellt. Schedule: $($expandedDays -join '/') $ScheduleTime$intervalInfo$cleanupInfo"
 			Invoke-sqmLogging -Message $result.Message -FunctionName $functionName -Level "INFO"
 		}
 		catch
@@ -498,6 +542,8 @@ function New-sqmBackupMaintenanceJob
 						if ($MailTo)                 { $secParams['MailTo']                 = $MailTo }
 						if ($MailOnSuccess)          { $secParams['MailOnSuccess']          = $true }
 						if ($OperatorName)           { $secParams['OperatorName']           = $OperatorName }
+						if ($CleanupTime)            { $secParams['CleanupTime']            = $CleanupTime }
+						else                         { $secParams['NoCleanup']              = $true }
 						$secParams['MailProfile'] = $MailProfile
 
 						$secResult = New-sqmBackupMaintenanceJob @secParams

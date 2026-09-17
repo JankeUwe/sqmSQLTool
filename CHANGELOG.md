@@ -1,5 +1,27 @@
 # sqmSQLTool — Changelog
 
+## [1.9.139.0] - 2026-09-17
+
+### Neu: -CleanupTime — automatisches Aufraeumen alter Backup-Dateien
+
+Weder `Invoke-sqmUserDatabaseBackup` noch `New-sqmBackupMaintenanceJob` hatten bisher eine
+Retention-/Aufraeum-Funktion. Besonders fuer LOG-Jobs (jetzt standardmaessig alle 15 Minuten,
+siehe 1.9.138.0) fuellt sich das Backup-Verzeichnis ohne Aufraeumung entsprechend schnell.
+
+`Invoke-sqmUserDatabaseBackup` bekommt einen neuen `-CleanupTime`-Parameter (Format wie bei
+dbatools `Remove-DbaBackup`: '48h', '7d', '4w', '1m'). Wenn gesetzt, werden nach dem Backup
+alle Dateien MIT DERSELBEN Endung dieses Laufs (.bak fuer FULL/DIFF, .trn fuer LOG) im
+BackupPath entfernt, die aelter als die angegebene Periode sind - ueber `Remove-DbaBackup`.
+Ohne `-CleanupTime` bleibt das Verhalten wie bisher (keine Aufraeumung).
+
+`New-sqmBackupMaintenanceJob` reicht `-CleanupTime` an Step 2 durch und setzt bei fehlender
+Angabe automatisch einen typabhaengigen Default: FULL 4 Wochen, DIFF 2 Wochen, LOG 48 Stunden.
+`-NoCleanup` deaktiviert die Aufraeumung fuer den erzeugten Job vollstaendig.
+
+Live gegen DEV01 verifiziert: eine 10 Tage alte .trn-Datei wurde bei `-CleanupTime "48h"`
+entfernt, eine gleich alte .bak-Datei im selben Verzeichnis blieb unangetastet (nur die
+Endung des jeweiligen BackupType wird angefasst).
+
 ## [1.9.138.0] - 2026-09-17
 
 ### Aenderung: New-sqmBackupMaintenanceJob — neue Default-Zeitplaene je BackupType

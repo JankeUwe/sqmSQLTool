@@ -72,6 +72,15 @@ Default: 'Default'.
 When set together with -MailTo, a report mail is also sent when all backups succeeded
 (not only on errors or abort).
 
+.PARAMETER CleanupTime
+Optional retention period for old backup files of the SAME BackupType in BackupPath, e.g.
+'48h', '7d', '4w', '1m' (hours/days/weeks/months). When specified, Remove-DbaBackup deletes
+files with this run's extension (.bak for FULL/DIFF, .trn for LOG) older than this period
+after the backup completes. Not specified (default): no cleanup is performed. Note: FULL and
+DIFF share the ".bak" extension in the same BackupPath, so a single retention period applied
+via this parameter affects both - run them with separate -BackupPath values if they need
+different retention.
+
 .PARAMETER EnableException
 Switch to propagate exceptions immediately (by default errors are logged as warnings).
 
@@ -90,6 +99,10 @@ Invoke-sqmUserDatabaseBackup -All -BackupPath "D:\Backup\Usr-db"
 .EXAMPLE
 # Transaction log backup of all user databases
 Invoke-sqmUserDatabaseBackup -All -BackupType LOG
+
+.EXAMPLE
+# Transaction log backup with cleanup of .trn files older than 48 hours
+Invoke-sqmUserDatabaseBackup -All -BackupType LOG -CleanupTime "48h"
 
 .EXAMPLE
 # Back up all user databases, skipping databases listed in sqm_BackupExclude
@@ -150,6 +163,9 @@ function Invoke-sqmUserDatabaseBackup
 		[string]$MailProfile = 'Default',
 		[Parameter(Mandatory = $false)]
 		[switch]$MailOnSuccess,
+		[Parameter(Mandatory = $false)]
+		[ValidatePattern('^\d+[hdwm]$')]
+		[string]$CleanupTime,
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
@@ -504,6 +520,31 @@ WHERE  rs.is_local = 1
 	{
 		Invoke-sqmLogging -Message "$functionName abgeschlossen. $($results.Count) Objekte zurueckgegeben." -FunctionName $functionName -Level "INFO"
 
+		# Alte Backups aufraeumen wenn -CleanupTime angegeben. Nur die Dateiendung dieses
+		# Laufs (.bak fuer FULL/DIFF, .trn fuer LOG) wird angefasst, damit z.B. ein LOG-Lauf
+		# nicht versehentlich FULL/DIFF-Dateien im selben Verzeichnis loescht.
+		$cleanupRemovedCount = $null
+		if ($CleanupTime)
+		{
+			$cleanupAction = "Entferne .$backupFileExtension-Dateien aelter als $CleanupTime"
+			if ($PSCmdlet.ShouldProcess($BackupPath, $cleanupAction))
+			{
+				try
+				{
+					Invoke-sqmLogging -Message "$cleanupAction in '$BackupPath'." -FunctionName $functionName -Level "INFO"
+					$cleanupResult = Remove-DbaBackup -Path $BackupPath -BackupFileExtension $backupFileExtension `
+						-RetentionPeriod $CleanupTime -EnableException:$EnableException
+					$cleanupRemovedCount = @($cleanupResult).Count
+					Invoke-sqmLogging -Message "Cleanup abgeschlossen: $cleanupRemovedCount Datei(en) entfernt." -FunctionName $functionName -Level "INFO"
+				}
+				catch
+				{
+					Invoke-sqmLogging -Message "Cleanup fehlgeschlagen: $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
+					if ($EnableException) { throw }
+				}
+			}
+		}
+
 		# Mail-Benachrichtigung
 		if ($MailTo)
 		{
@@ -527,9 +568,12 @@ WHERE  rs.is_local = 1
 					"Erfolgreich : $successCount"
 					"Fehlgeschlagen: $failedCount"
 					"Uebersprungen: $skippedCount"
-					""
-					"Details:"
 				)
+				if ($null -ne $cleanupRemovedCount) {
+					$bodyLines += "Cleanup ($CleanupTime): $cleanupRemovedCount Datei(en) entfernt"
+				}
+				$bodyLines += ""
+				$bodyLines += "Details:"
 				foreach ($r in $results) {
 					$bodyLines += "  [$($r.Status)] $($r.DatabaseName) - $($r.Message)"
 				}
