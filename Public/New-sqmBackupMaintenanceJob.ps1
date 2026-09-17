@@ -16,7 +16,12 @@
 
 	Both steps use the PowerShell subsystem so that the sqmSQLTool module is imported fresh at
 	each execution. This means the job is fully self-contained and does not depend on the SQL
-	Server Agent service account's PowerShell profile.
+	Server Agent service account's PowerShell profile. Both steps also pass -Confirm:$false and
+	end with an explicit "exit 0": without it, the PowerShell-subsystem process can hang after
+	the script itself has already finished successfully (e.g. via SMO connection pooling from
+	Connect-DbaInstance), leaving the job step stuck "Executing" indefinitely even though nothing
+	is actually still running - a copy of the same command run interactively in a normal
+	PowerShell console exits fine because the console process itself terminates on demand.
 
 	Default schedule per backup type (applied to -ScheduleDays/-ScheduleTime/-ScheduleIntervalMinutes
 	whenever the respective parameter is not explicitly specified):
@@ -337,12 +342,18 @@ function New-sqmBackupMaintenanceJob
 			# 4. Step 1 Command aufbauen: Sync-sqmBackupExcludeTable
 			$step1Lines = [System.Collections.Generic.List[string]]::new()
 			$step1Lines.Add("Import-Module sqmSQLTool -Force")
-			$step1Lines.Add("`$params = @{ SqlInstance = '$SqlInstance' }")
+			$step1Lines.Add("`$params = @{ SqlInstance = '$SqlInstance'; Confirm = `$false }")
 			if ($IncludeSystemDatabases)
 			{
 				$step1Lines.Add("`$params['IncludeSystemDatabases'] = `$true")
 			}
 			$step1Lines.Add("Sync-sqmBackupExcludeTable @params")
+			# Ohne explizites exit bleibt der PowerShell-Subsystem-Prozess des SQL Agent Job Steps
+			# manchmal haengen, obwohl das Skript selbst fertig ist (z.B. durch SMO-Connection-Pooling
+			# von Connect-DbaInstance) - der Job zeigt dann dauerhaft "Wird ausgefuehrt" an, obwohl
+			# Sync-sqmBackupExcludeTable laengst durchgelaufen ist. Gleiches Muster wie in
+			# New-sqmAgentCommandJob (generic-invoke.ps1).
+			$step1Lines.Add("exit 0")
 			$step1Command = $step1Lines -join "`r`n"
 			$result.Step1Command = $step1Command
 
@@ -351,7 +362,7 @@ function New-sqmBackupMaintenanceJob
 			# 5. Step 2 Command aufbauen: Invoke-sqmUserDatabaseBackup
 			$step2Lines = [System.Collections.Generic.List[string]]::new()
 			$step2Lines.Add("Import-Module sqmSQLTool -Force")
-			$step2Lines.Add("`$params = @{ SqlInstance = '$SqlInstance'; All = `$true; BackupType = '$BackupType' }")
+			$step2Lines.Add("`$params = @{ SqlInstance = '$SqlInstance'; All = `$true; BackupType = '$BackupType'; Confirm = `$false }")
 			if ($UseExcludeTable)
 			{
 				$step2Lines.Add("`$params['UseExcludeTable'] = `$true")
@@ -378,6 +389,9 @@ function New-sqmBackupMaintenanceJob
 				$step2Lines.Add("`$params['CleanupTime'] = '$CleanupTime'")
 			}
 			$step2Lines.Add("Invoke-sqmUserDatabaseBackup @params")
+			# Siehe Kommentar bei Step 1: ohne exit bleibt der Job-Prozess nach einem erfolgreichen
+			# Lauf manchmal haengen und der Job wird nie als abgeschlossen gemeldet.
+			$step2Lines.Add("exit 0")
 			$step2Command = $step2Lines -join "`r`n"
 			$result.Step2Command = $step2Command
 

@@ -1,5 +1,23 @@
 # sqmSQLTool — Changelog
 
+## [1.9.140.0] - 2026-09-17
+
+### Fix: New-sqmBackupMaintenanceJob — Job blieb nach erfolgreichem Lauf haengen
+
+Beide Job-Steps liefen als reiner Befehlstext im PowerShell-Subsystem des SQL Agent, ohne
+abschliessendes `exit`. Sobald Step 2 dank der 1.9.137.0-Korrektur tatsaechlich erfolgreich
+durchlief (vorher schlug er sofort mit dem ParameterBindingException-Fehler fehl und der
+Prozess beendete sich dadurch schnell von selbst), blieb der Job-Prozess danach manchmal
+haengen, obwohl das eigentliche Skript laengst fertig war - vermutlich durch SMO-
+Connection-Pooling aus `Connect-DbaInstance`, das den Prozess am Leben haelt. Der Job zeigte
+dauerhaft "Wird ausgefuehrt" in der Job-History, ohne je abzuschliessen. Manuelles Ausfuehren
+desselben Befehlstexts in einer normalen PowerShell-Konsole zeigte den Effekt nicht, weil sich
+dort der Konsolen-Prozess selbst regulaer beendet.
+
+Beide generierten Step-Kommandos enden jetzt explizit mit `exit 0` und setzen `-Confirm $false`
+fuer die aufgerufene Funktion - genau das Muster, das `New-sqmAgentCommandJob` (generic-invoke.ps1)
+fuer denselben PowerShell-Subsystem-Effekt bereits verwendet.
+
 ## [1.9.139.0] - 2026-09-17
 
 ### Neu: -CleanupTime — automatisches Aufraeumen alter Backup-Dateien
