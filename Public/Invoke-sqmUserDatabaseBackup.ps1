@@ -3,7 +3,9 @@
 Backs up user databases on a SQL Server instance.
 
 .DESCRIPTION
-Backs up all or selected user databases (no system databases) in full backup mode.
+Backs up all or selected user databases (no system databases) as FULL, DIFF (differential)
+or LOG (transaction log) backups, selected via -BackupType. FULL and DIFF backups are written
+with a ".bak" extension, LOG backups with ".trn".
 The target path is read from the server properties (BackupDirectory) and must end with "Usr-db".
 
 If the SqlInstance parameter is not specified, the current computer name
@@ -40,6 +42,12 @@ When set, all user databases on the instance are backed up.
 .PARAMETER BackupPath
 Optional direct backup path (overrides the value from server properties).
 The path must end with "Usr-db".
+
+.PARAMETER BackupType
+Backup type: 'FULL', 'DIFF' (differential), or 'LOG' (transaction log). Default: 'FULL'.
+Maps to Backup-DbaDatabase -Type Full/Differential/Log. LOG backups require the full or
+bulk-logged recovery model and a prior full backup; databases that don't qualify fail with
+the underlying SQL Server error for that database only, the rest of the run continues.
 
 .PARAMETER UseExcludeTable
 When set, reads master.dbo.sqm_BackupExclude and skips databases where IsActive=0
@@ -78,6 +86,10 @@ Invoke-sqmUserDatabaseBackup -SqlInstance "SQL01" -Database "SalesDB", "Inventor
 .EXAMPLE
 # With an alternative path
 Invoke-sqmUserDatabaseBackup -All -BackupPath "D:\Backup\Usr-db"
+
+.EXAMPLE
+# Transaction log backup of all user databases
+Invoke-sqmUserDatabaseBackup -All -BackupType LOG
 
 .EXAMPLE
 # Back up all user databases, skipping databases listed in sqm_BackupExclude
@@ -125,6 +137,9 @@ function Invoke-sqmUserDatabaseBackup
 		[switch]$All,
 		[Parameter(Mandatory = $false)]
 		[string]$BackupPath,
+		[Parameter(Mandatory = $false)]
+		[ValidateSet('FULL', 'DIFF', 'LOG')]
+		[string]$BackupType = 'FULL',
 		[Parameter(Mandatory = $false)]
 		[switch]$UseExcludeTable,
 		[Parameter(Mandatory = $false)]
@@ -242,6 +257,15 @@ function Invoke-sqmUserDatabaseBackup
 				throw $errMsg
 			}
 		}
+
+		# BackupType auf Backup-DbaDatabase -Type und Dateiendung abbilden
+		$dbaBackupType = switch ($BackupType)
+		{
+			'FULL' { 'Full' }
+			'DIFF' { 'Differential' }
+			'LOG'  { 'Log' }
+		}
+		$backupFileExtension = if ($BackupType -eq 'LOG') { 'trn' } else { 'bak' }
 
 		# Ergebnisliste
 		$results = @()
@@ -403,20 +427,20 @@ WHERE  rs.is_local = 1
 			foreach ($db in $databases)
 			{
 				$dbName = $db.Name
-				$backupFile = Join-Path -Path $BackupPath -ChildPath "${dbName}_$(Get-Date -Format 'yyyyMMdd_HHmmss').bak"
+				$backupFile = Join-Path -Path $BackupPath -ChildPath "${dbName}_$(Get-Date -Format 'yyyyMMdd_HHmmss').$backupFileExtension"
 
 				$backupParams = @{
 					SqlInstance    = $SqlInstance
 					SqlCredential  = $SqlCredential
 					Database	   = $dbName
 					Path		   = $backupFile
-					Type		   = 'Full'
+					Type		   = $dbaBackupType
 					BackupFileName = $backupFile
 					ErrorAction    = 'Stop'
 				}
 				if ($EnableException) { $backupParams.EnableException = $true }
 
-				$actionMsg = "Sichere Datenbank '$dbName' nach '$backupFile'"
+				$actionMsg = "Sichere Datenbank '$dbName' ($BackupType) nach '$backupFile'"
 				if ($PSCmdlet.ShouldProcess($dbName, $actionMsg))
 				{
 					try
@@ -492,13 +516,13 @@ WHERE  rs.is_local = 1
 			if ($shouldSend)
 			{
 				$subject = if ($failedCount -gt 0 -or $aborted) {
-					"[$SqlInstance] Backup FEHLER - $failedCount fehlgeschlagen"
+					"[$SqlInstance] $BackupType Backup FEHLER - $failedCount fehlgeschlagen"
 				} else {
-					"[$SqlInstance] Backup erfolgreich - $successCount Datenbanken"
+					"[$SqlInstance] $BackupType Backup erfolgreich - $successCount Datenbanken"
 				}
 
 				$bodyLines = @(
-					"Backup-Report: $SqlInstance"
+					"Backup-Report: $SqlInstance ($BackupType)"
 					"Zeitpunkt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 					"Erfolgreich : $successCount"
 					"Fehlgeschlagen: $failedCount"

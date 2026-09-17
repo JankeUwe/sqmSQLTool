@@ -284,10 +284,9 @@ function New-sqmBackupMaintenanceJob
 			Invoke-sqmLogging -Message "Step 1 Command aufgebaut (Sync-sqmBackupExcludeTable)." -FunctionName $functionName -Level "INFO"
 
 			# 5. Step 2 Command aufbauen: Invoke-sqmUserDatabaseBackup
-			# DIFF und LOG Unterstuetzung geplant — aktuell wird Type = 'Full' verwendet
 			$step2Lines = [System.Collections.Generic.List[string]]::new()
 			$step2Lines.Add("Import-Module sqmSQLTool -Force")
-			$step2Lines.Add("`$params = @{ SqlInstance = '$SqlInstance'; All = `$true; BackupType = 'FULL' }")
+			$step2Lines.Add("`$params = @{ SqlInstance = '$SqlInstance'; All = `$true; BackupType = '$BackupType' }")
 			if ($UseExcludeTable)
 			{
 				$step2Lines.Add("`$params['UseExcludeTable'] = `$true")

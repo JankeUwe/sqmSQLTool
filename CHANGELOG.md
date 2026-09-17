@@ -1,5 +1,26 @@
 # sqmSQLTool — Changelog
 
+## [1.9.137.0] - 2026-09-17
+
+### Fix: New-sqmBackupMaintenanceJob — LOG-Job sicherte per FULL statt Transaktionsprotokoll
+
+`New-sqmBackupMaintenanceJob -BackupType LOG` legte einen Job-Step namens
+`Backup-UserDatabases-LOG` an, dessen tatsaechlicher Befehl aber immer eine FULL-Sicherung
+ausloeste: `Invoke-sqmUserDatabaseBackup` kannte gar keinen `-BackupType`-Parameter und
+sicherte intern hart verdrahtet mit `Type = 'Full'`. Ein mit `-ScheduleIntervalMinutes 15`
+eingerichteter "LOG"-Job haette also alle 15 Minuten eine volle Datenbanksicherung
+ausgefuehrt statt einer Transaktionsprotokollsicherung.
+
+`Invoke-sqmUserDatabaseBackup` hat jetzt einen echten `-BackupType`-Parameter
+(`FULL`/`DIFF`/`LOG`, Default `FULL`), der auf `Backup-DbaDatabase -Type`
+(`Full`/`Differential`/`Log`) abgebildet wird. LOG-Sicherungen werden mit der Endung
+`.trn` geschrieben (FULL/DIFF weiterhin `.bak`), passend zur ueberall sonst im Modul
+verwendeten Konvention. `New-sqmBackupMaintenanceJob` reicht den gewaehlten `-BackupType`
+jetzt tatsaechlich durch, statt ihn im Step-2-Kommando auf `'FULL'` zu ueberschreiben.
+
+Live gegen DEV01 verifiziert: `-BackupType FULL` erzeugt eine `.bak`-Datei (Backupset-Typ
+`D`), `-BackupType LOG` eine `.trn`-Datei (Backupset-Typ `L`).
+
 ## [1.9.136.0] - 2026-09-16
 
 ### Fix: Invoke-sqmCollationChange — Bereitschaftserkennung durch fremde Verbindung blockiert
