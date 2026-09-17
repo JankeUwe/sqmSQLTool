@@ -1,5 +1,36 @@
 # sqmSQLTool — Changelog
 
+## [1.9.144.0] - 2026-09-17
+
+### Aenderung: New-sqmBackupMaintenanceJob — eine generische Prozedur, alle Werte als Parameter im Job-Step
+
+In 1.9.143.0 steckten Verzeichnis, Backup-Typ und Aufbewahrung fest verdrahtet im Prozedur-Rumpf,
+und es gab zwei Prozeduren (eine Sync-Prozedur plus eine Run-Prozedur JE JOB). Beides ist weg:
+
+- **Eine einzige generische Prozedur** `master.dbo.sqm_BackupUserDatabases` fuer alle Jobs und
+  alle Backup-Typen. Die Sync-Logik der Exclude-Tabelle steckt jetzt in derselben Prozedur
+  (`@SyncExcludeTable`), eine zweite Prozedur je Job entfaellt ersatzlos.
+- **Keine fest verdrahteten Werte mehr im Prozedur-Rumpf.** Verzeichnis, Backup-Typ,
+  Aufbewahrung, Exclude-Tabelle, System-DBs, Verify/Compress/Checksum, AG-Preference und Mail
+  sind Parameter.
+- **Der Job-Step zeigt alle Werte im Klartext** und laesst sich direkt dort anpassen:
+
+      EXEC master.dbo.[sqm_BackupUserDatabases]
+           @BackupType               = N'FULL',
+           @Directory                = N'D:\Backup\Usr-db',
+           @CleanupTime              = 672,
+           @UseExcludeTable          = 1,
+           ...
+
+Da die Sync-Logik mit in die Prozedur gewandert ist, hat der Job jetzt nur noch EINEN Step
+statt zwei.
+
+Im SQL-2022-Container mit aktiviertem Agent als echter Agent-Job geprueft: genau eine Prozedur
+in master, ein Step je Job mit sichtbaren Parametern (@CleanupTime 672 fuer FULL, 48 fuer LOG),
+FULL-Job 3 s und LOG-Job 0 s jeweils erfolgreich, eine per sqm_BackupExclude ausgeschlossene
+Datenbank blieb korrekt unangetastet, und Olas CommandLog belegt die Einzelaufrufe je Datenbank
+mit dem uebergebenen Verzeichnis.
+
 ## [1.9.143.0] - 2026-09-17
 
 ### Aenderung: New-sqmBackupMaintenanceJob — Logik als Prozeduren in master, Job-Steps sind Einzeiler

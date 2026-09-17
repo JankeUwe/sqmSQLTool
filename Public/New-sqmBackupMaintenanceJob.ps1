@@ -1,32 +1,51 @@
 ﻿<#
 .SYNOPSIS
-	Creates a SQL Agent job with two steps that implement the full dynamic backup maintenance workflow.
+	Creates a SQL Agent job that backs up user databases one at a time via Ola Hallengren's
+	DatabaseBackup, driven by a single generic T-SQL procedure in master.
 
 .DESCRIPTION
-	Creates a single SQL Agent job containing two PowerShell steps:
+	Creates a SQL Agent job with ONE Transact-SQL step (subsystem TransactSql, no PowerShell
+	anywhere) that calls the generic procedure master.dbo.sqm_BackupUserDatabases.
 
-	Step 1 — Sync-BackupExcludeTable
-	    Pure T-SQL: creates master.dbo.sqm_BackupExclude if missing, inserts newly discovered
-	    databases (IsActive=1), flags databases that no longer exist as IsOrphaned=1, and clears
-	    that flag again for databases that came back. Keeps the exclude table current before the
-	    backup runs.
+	The procedure contains no hard-coded values. Everything that differs between backup types,
+	instances or jobs is a parameter, and the job step passes those values in plain text, so the
+	whole configuration is visible - and editable - directly in the job step:
 
-	Step 2 — Backup-UserDatabases-<BackupType>
-	    The backup logic lives in a stored procedure in master (master.dbo.sqm_Run_<JobName>);
-	    the job step itself is only "EXEC master.dbo.[sqm_Run_<JobName>];". The procedure cursors
-	    over the candidate databases and calls Ola Hallengren's master.dbo.DatabaseBackup once per
-	    database. Each call sits in its own TRY/CATCH, so a single failing database is logged and
-	    the loop continues; the step only fails at the end, after every database was attempted.
-	    With -UseExcludeTable, each database is checked against master.dbo.sqm_BackupExclude
-	    individually (IsActive=0 AND IsOrphaned=0 = skip). The procedure is dropped and recreated
-	    on every run of this function, so -Update also refreshes the backup logic itself.
+	    EXEC master.dbo.[sqm_BackupUserDatabases]
+	         @BackupType               = N'FULL',
+	         @Directory                = N'D:\Backup\Usr-db',
+	         @CleanupTime              = 672,
+	         @UseExcludeTable          = 1,
+	         @SyncExcludeTable         = 1,
+	         @IncludeSystemDatabases   = 0,
+	         @Verify                   = 'Y',
+	         @Compress                 = 'Y',
+	         @Checksum                 = 'Y',
+	         @OverrideBackupPreference = 'Y',
+	         @LogToTable               = 'Y',
+	         @MailTo                   = NULL,
+	         @MailProfile              = N'Default',
+	         @MailOnSuccess            = 0;
 
-	BOTH steps use the TransactSql subsystem - no PowerShell anywhere in the job. Earlier versions
-	ran both steps through the PowerShell subsystem, which reproducibly hung on real instances:
-	the job started, Step 1 never returned, so Step 2 (the actual backup) never ran at all -
-	"job starts, no backup, never comes back" - while the exact same command text pasted into an
-	interactive PowerShell console always completed fine. Because the steps are now plain T-SQL,
-	the job also no longer requires the sqmSQLTool module to be installed on the SQL Server itself.
+	Because it is fully parameterised, ONE procedure serves every backup type and every job on the
+	instance - FULL, DIFF and LOG jobs all call the same one. It is dropped and recreated whenever
+	this function runs, so -Update refreshes the backup logic itself and not just the job.
+
+	What the procedure does:
+	  - With @UseExcludeTable = 1 and @SyncExcludeTable = 1 it first creates master.dbo.
+	    sqm_BackupExclude if missing and reconciles it with sys.databases (new databases are added
+	    with IsActive=1, vanished ones flagged IsOrphaned=1, returning ones un-flagged).
+	  - It then cursors over the candidate databases and calls Ola Hallengren's
+	    master.dbo.DatabaseBackup once per database, skipping any database marked IsActive=0 AND
+	    IsOrphaned=0 in the exclude table.
+	  - Each call sits in its own TRY/CATCH, so one failing database is logged and the loop
+	    continues; the step fails only at the end, once at least one database actually failed.
+
+	Earlier versions ran this through the PowerShell subsystem, which reproducibly hung on real
+	instances: the job started, the first step never returned, so the backup step never ran at all
+	- "job starts, no backup, never comes back" - while the exact same command text pasted into an
+	interactive PowerShell console always completed fine. As plain T-SQL the job also no longer
+	requires the sqmSQLTool module to be installed on the SQL Server itself.
 
 	Requires Ola Hallengren's Maintenance Solution (master.dbo.DatabaseBackup) on the instance;
 	install it with Install-sqmOlaMaintenanceSolution if missing.
@@ -38,9 +57,9 @@
 	    LOG  — every day (@('EveryDay')), starting 00:00, every 15 minutes
 
 	Default cleanup retention per backup type (applied via -CleanupTime unless overridden, skipped
-	entirely with -NoCleanup): FULL 4 weeks ('4w'), DIFF 2 weeks ('2w'), LOG 48 hours ('48h'). Old
-	backup files are removed by Invoke-sqmUserDatabaseBackup (Remove-DbaBackup) after each run,
-	matching only that BackupType's own file extension (.bak for FULL/DIFF, .trn for LOG).
+	entirely with -NoCleanup): FULL 4 weeks ('4w'), DIFF 2 weeks ('2w'), LOG 48 hours ('48h'). The
+	value is converted to hours and passed to Ola's own @CleanupTime, which deletes old backup
+	files of the same type in the target directory after each run.
 
 .PARAMETER SqlInstance
 	SQL Server instance. Default: current computer name ($env:COMPUTERNAME).
@@ -57,8 +76,9 @@
 	Backup type: 'FULL', 'DIFF', or 'LOG'. Default: 'FULL'.
 
 .PARAMETER BackupPath
-	Optional backup path. When specified, overrides the server default and is passed as
-	-BackupPath to Invoke-sqmUserDatabaseBackup in Step 2.
+	Backup target directory, passed to the job step as @Directory. When not specified, the
+	instance's configured BackupDirectory plus '\Usr-db' is resolved at job-creation time and
+	baked into the step, where it stays visible and editable.
 
 .PARAMETER ScheduleTime
 	Start time of the schedule in format 'HH:mm'. When not specified, defaults depend on
@@ -77,35 +97,39 @@
 	SQL Agent job category. Default: 'Database Maintenance'.
 
 .PARAMETER UseExcludeTable
-	When set, passes -UseExcludeTable to Invoke-sqmUserDatabaseBackup in Step 2.
+	When set, the job step passes @UseExcludeTable = 1, so master.dbo.sqm_BackupExclude is
+	reconciled with sys.databases at the start of the run and every database marked IsActive=0
+	AND IsOrphaned=0 is skipped.
 
 .PARAMETER CheckPreferredReplica
-	When set, passes -CheckPreferredReplica to Invoke-sqmUserDatabaseBackup in Step 2.
+	When set, the job step passes @OverrideBackupPreference = 'N', so Ola honours the Availability
+	Group backup preference and only backs up where this replica is the preferred one. Without it,
+	'Y' is passed and databases are backed up regardless of the preference.
 
 .PARAMETER IncludeSystemDatabases
-	When set, passes -IncludeSystemDatabases to Sync-sqmBackupExcludeTable in Step 1.
-	Note: system databases are not backed up by Invoke-sqmUserDatabaseBackup (Step 2).
+	When set, the job step passes @IncludeSystemDatabases = 1, so master, model and msdb are
+	included in both the exclude-table sync and the backup run.
 
 .PARAMETER MailTo
-	Recipient email address. Passed as -MailTo to Invoke-sqmUserDatabaseBackup in Step 2.
+	Recipient email address, passed to the job step as @MailTo. The procedure sends a report via
+	msdb.dbo.sp_send_dbmail after the run (on failures, or always with -MailOnSuccess).
 
 .PARAMETER MailProfile
-	SQL Server Database Mail profile name. Passed as -MailProfile to Invoke-sqmUserDatabaseBackup.
+	SQL Server Database Mail profile name, passed to the job step as @MailProfile.
 	Default: 'Default'.
 
 .PARAMETER MailOnSuccess
-	When set, passes -MailOnSuccess to Invoke-sqmUserDatabaseBackup in Step 2 so that a report
-	mail is also sent on full success.
+	When set, the job step passes @MailOnSuccess = 1, so a report mail is also sent on full
+	success and not only on failures.
 
 .PARAMETER CleanupTime
-	Retention period for old backup files of this BackupType in BackupPath, passed as
-	-CleanupTime to Invoke-sqmUserDatabaseBackup in Step 2, e.g. '48h', '7d', '4w', '1m'. When
-	not specified, defaults depend on BackupType (see description). Use -NoCleanup to disable
-	cleanup entirely instead.
+	Retention period for old backup files, e.g. '48h', '7d', '4w', '1m'. Converted to hours and
+	passed to the job step as @CleanupTime for Ola's own cleanup. When not specified, defaults
+	depend on BackupType (see description). Use -NoCleanup to disable cleanup entirely.
 
 .PARAMETER NoCleanup
-	When set, no -CleanupTime is passed to Invoke-sqmUserDatabaseBackup in Step 2, so old backup
-	files are never removed by this job. Ignored if -CleanupTime is also specified explicitly.
+	When set, the job step passes @CleanupTime = NULL, so old backup files are never removed by
+	this job. Ignored if -CleanupTime is also specified explicitly.
 
 .PARAMETER OperatorName
 	SQL Agent operator name for failure email notification on the job level.
@@ -148,8 +172,9 @@
 	New-sqmBackupMaintenanceJob -SqlInstance "SQL01" -BackupType FULL -Update
 
 .NOTES
-	Prerequisites: dbatools, Invoke-sqmLogging
-	Both job steps use the PowerShell subsystem and import sqmSQLTool at runtime.
+	Prerequisites: dbatools, Invoke-sqmLogging, and Ola Hallengren's Maintenance Solution
+	(master.dbo.DatabaseBackup) on the target instance.
+	The job step is plain T-SQL, so the job itself does not need sqmSQLTool on the SQL Server.
 #>
 function New-sqmBackupMaintenanceJob
 {
@@ -290,8 +315,7 @@ function New-sqmBackupMaintenanceJob
 			SqlInstance    = $SqlInstance
 			JobName        = $JobName
 			BackupType     = $BackupType
-			Step1Command   = $null
-			Step2Command   = $null
+			StepCommand    = $null
 			ProcedureName  = $null
 			ScheduleName   = $null
 			ScheduleDays   = ($ScheduleDays -join ', ')
@@ -349,82 +373,22 @@ function New-sqmBackupMaintenanceJob
 				}
 			}
 
-			# 4. Step 1 Command aufbauen: sqm_BackupExclude in reinem T-SQL synchronisieren.
-			# Frueher war das ein PowerShell-Step (Import-Module sqmSQLTool; Sync-sqmBackupExcludeTable).
-			# Der PowerShell-Subsystem-Prozess des SQL Agent blieb dabei reproduzierbar haengen, ohne je
-			# zurueckzukehren - und weil Step 1 nie fertig wurde, lief Step 2 (das eigentliche Backup)
-			# ueberhaupt nicht an: Job startet, kein Backup, kommt nie zurueck. Derselbe Befehlstext von
-			# Hand in einer PowerShell-Konsole ausgefuehrt lief dagegen immer sauber durch.
-			# Beide Steps sind deshalb jetzt reines T-SQL (Subsystem TransactSql), ganz ohne PowerShell.
-			$sysDbFilter = if ($IncludeSystemDatabases)
-			{
-				"(database_id > 4 OR name IN (N'master', N'model', N'msdb'))"
-			}
-			else
-			{
-				"database_id > 4"
-			}
+			# 4. EINE generische Prozedur in master statt Skripttext im Job-Step und statt einer
+			# Prozedur je Job: alles was sich zwischen FULL/DIFF/LOG und zwischen Instanzen
+			# unterscheidet (Verzeichnis, Backup-Typ, Aufbewahrung, Exclude-Tabelle, Mail) ist ein
+			# Parameter. Der Job-Step zeigt diese Werte im Klartext und kann direkt dort angepasst
+			# werden. Die Prozedur selbst enthaelt keine fest verdrahteten Werte.
+			#
+			# Hintergrund: frueher waren beide Steps PowerShell-Steps. Der PowerShell-Subsystem-Prozess
+			# des SQL Agent blieb reproduzierbar haengen und kehrte nie zurueck - und weil schon Step 1
+			# nie fertig wurde, lief das eigentliche Backup ueberhaupt nicht an: Job startet, kein
+			# Backup, kommt nie zurueck. Derselbe Befehlstext von Hand in einer PowerShell-Konsole
+			# lief dagegen immer sauber durch. Deshalb jetzt reines T-SQL (Subsystem TransactSql).
+			$procName = 'sqm_BackupUserDatabases'
+			$result.ProcedureName = "master.dbo.$procName"
 
-			# Auch Step 1 laeuft ueber eine Prozedur in master statt als langes Skript im Job-Step.
-			# Die Sync-Logik ist fuer FULL/DIFF/LOG identisch, deshalb EINE gemeinsame Prozedur mit
-			# Parameter statt einer Kopie je Job. Innerhalb der Prozedur greift Deferred Name
-			# Resolution, die im selben Batch angelegte Tabelle darf also direkt referenziert werden.
-			$syncProcName = 'sqm_SyncBackupExcludeTable'
-			$syncProcBody = @"
-CREATE PROCEDURE dbo.[$syncProcName]
-    @IncludeSystemDatabases bit = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    IF OBJECT_ID(N'master.dbo.sqm_BackupExclude', N'U') IS NULL
-    BEGIN
-        CREATE TABLE master.dbo.sqm_BackupExclude (
-            DatabaseName  sysname       NOT NULL,
-            Reason        nvarchar(255) NULL,
-            ExcludedBy    sysname       NOT NULL CONSTRAINT DF_sqm_BackupExclude_ExcludedBy DEFAULT SUSER_SNAME(),
-            ExcludedAt    datetime2     NOT NULL CONSTRAINT DF_sqm_BackupExclude_ExcludedAt DEFAULT SYSDATETIME(),
-            IsActive      bit           NOT NULL CONSTRAINT DF_sqm_BackupExclude_IsActive   DEFAULT 1,
-            IsOrphaned    bit           NOT NULL CONSTRAINT DF_sqm_BackupExclude_IsOrphaned DEFAULT 0,
-            CONSTRAINT PK_sqm_BackupExclude PRIMARY KEY (DatabaseName)
-        );
-        PRINT 'Created master.dbo.sqm_BackupExclude.';
-    END
-
-    DECLARE @Current TABLE (DatabaseName sysname PRIMARY KEY);
-    INSERT INTO @Current (DatabaseName)
-    SELECT name FROM sys.databases
-    WHERE  state = 0 AND source_database_id IS NULL
-      AND  (database_id > 4 OR (@IncludeSystemDatabases = 1 AND name IN (N'master', N'model', N'msdb')));
-
-    INSERT INTO master.dbo.sqm_BackupExclude (DatabaseName, IsActive, IsOrphaned)
-    SELECT c.DatabaseName, 1, 0
-    FROM   @Current c
-    WHERE  NOT EXISTS (SELECT 1 FROM master.dbo.sqm_BackupExclude e WHERE e.DatabaseName = c.DatabaseName);
-    PRINT 'Added ' + CAST(@@ROWCOUNT AS varchar(10)) + ' new database(s).';
-
-    UPDATE e SET IsOrphaned = 1
-    FROM   master.dbo.sqm_BackupExclude e
-    WHERE  e.IsOrphaned = 0
-      AND  NOT EXISTS (SELECT 1 FROM @Current c WHERE c.DatabaseName = e.DatabaseName);
-    PRINT 'Flagged ' + CAST(@@ROWCOUNT AS varchar(10)) + ' orphaned database(s).';
-
-    UPDATE e SET IsOrphaned = 0
-    FROM   master.dbo.sqm_BackupExclude e
-    WHERE  e.IsOrphaned = 1
-      AND  EXISTS (SELECT 1 FROM @Current c WHERE c.DatabaseName = e.DatabaseName);
-    PRINT 'Un-flagged ' + CAST(@@ROWCOUNT AS varchar(10)) + ' returned database(s).';
-END
-"@
-			$syncArg = if ($IncludeSystemDatabases) { 1 } else { 0 }
-			$step1Command = "EXEC master.dbo.[$syncProcName] @IncludeSystemDatabases = $syncArg;"
-			$result.Step1Command = $step1Command
-
-			Invoke-sqmLogging -Message "Step 1: Prozedur master.dbo.[$syncProcName] vorbereitet, Job-Step ruft sie nur auf." -FunctionName $functionName -Level "INFO"
-
-			# 5. Step 2 Command aufbauen: T-SQL-Cursor, der pro Datenbank Olas DatabaseBackup aufruft.
-			# Backup-Verzeichnis zur Anlagezeit aufloesen - der T-SQL-Step kann es nicht selbst aus
-			# der Modul-Konfiguration lesen (analog zu New-sqmOlaUsrDbBackupJob).
+			# Backup-Verzeichnis zur Anlagezeit aufloesen und im Job-Step sichtbar hinterlegen -
+			# der T-SQL-Step kann es nicht selbst aus der Modul-Konfiguration lesen.
 			$effBackupDir = $BackupPath
 			if (-not $effBackupDir)
 			{
@@ -442,7 +406,6 @@ END
 				throw "Backup-Verzeichnis konnte nicht ermittelt werden. Bitte -BackupPath angeben."
 			}
 			$result.BackupPath = $effBackupDir
-			Invoke-sqmLogging -Message "Backup-Verzeichnis fuer Step 2: $effBackupDir" -FunctionName $functionName -Level "INFO"
 
 			# -CleanupTime ('48h'/'7d'/'4w'/'1m') in Olas @CleanupTime (Stunden, int) umrechnen
 			$cleanupHours = $null
@@ -458,73 +421,36 @@ END
 				}
 			}
 
-			# Ola respektiert die AG-Backup-Preference von sich aus. Ohne -CheckPreferredReplica
-			# soll unabhaengig davon gesichert werden, also Preference uebersteuern.
+			# Ola beachtet die AG-Backup-Preference von sich aus. Ohne -CheckPreferredReplica soll
+			# unabhaengig davon gesichert werden, also Preference uebersteuern.
 			$overridePreference = if ($CheckPreferredReplica) { 'N' } else { 'Y' }
 
-			$escDir      = $effBackupDir.Replace("'", "''")
-			$escMailTo   = $MailTo.Replace("'", "''")
-			$escMailProf = $MailProfile.Replace("'", "''")
-			$escJobName  = $JobName.Replace("'", "''")
-
-			$cleanupArg   = if ($null -ne $cleanupHours) { "        @CleanupTime = $cleanupHours,`r`n" } else { '' }
-			$excludeCheck = if ($UseExcludeTable) { '1' } else { '0' }
-
-			$mailBlock = ''
-			if ($MailTo)
-			{
-				$sendCondition = if ($MailOnSuccess) { '1 = 1' } else { '@ErrorCount > 0' }
-				$mailBlock = @"
-
-IF $sendCondition AND EXISTS (SELECT 1 FROM msdb.sys.objects WHERE name = 'sp_send_dbmail')
-BEGIN
-    DECLARE @subject nvarchar(255) =
-        CASE WHEN @ErrorCount > 0
-             THEN N'[' + @@SERVERNAME + N'] $BackupType Backup FEHLER - ' + CAST(@ErrorCount AS nvarchar(10)) + N' fehlgeschlagen'
-             ELSE N'[' + @@SERVERNAME + N'] $BackupType Backup erfolgreich - ' + CAST(@OkCount AS nvarchar(10)) + N' Datenbanken'
-        END;
-    DECLARE @body nvarchar(max) =
-        N'Job: $escJobName' + CHAR(13) + CHAR(10) +
-        N'Instanz: ' + @@SERVERNAME + CHAR(13) + CHAR(10) +
-        N'Typ: $BackupType' + CHAR(13) + CHAR(10) +
-        N'Zeitpunkt: ' + CONVERT(nvarchar(19), SYSDATETIME(), 120) + CHAR(13) + CHAR(10) +
-        N'Erfolgreich: ' + CAST(@OkCount AS nvarchar(10)) + CHAR(13) + CHAR(10) +
-        N'Uebersprungen: ' + CAST(@SkipCount AS nvarchar(10)) + CHAR(13) + CHAR(10) +
-        N'Fehlgeschlagen: ' + CAST(@ErrorCount AS nvarchar(10)) + CHAR(13) + CHAR(10) +
-        ISNULL(@FailedList, N'');
-    BEGIN TRY
-        EXEC msdb.dbo.sp_send_dbmail
-            @profile_name = N'$escMailProf',
-            @recipients   = N'$escMailTo',
-            @subject      = @subject,
-            @body         = @body;
-    END TRY
-    BEGIN CATCH
-        PRINT 'Mail konnte nicht gesendet werden: ' + ERROR_MESSAGE();
-    END CATCH
-END
-"@
-			}
-
-			# Der Backup-Code liegt als Prozedur in master, der Job-Step ruft sie nur auf. Damit
-			# bleibt der Step-Text eine Zeile statt eines langen Skripts, und die Logik laesst sich
-			# unabhaengig vom Job pruefen/aendern. Gleiche Konvention wie New-sqmOlaUsrDbBackupJob.
-			$procName = 'sqm_Run_' + (($JobName -replace '[\s\-]+', '_') -replace '[^a-zA-Z0-9_]', '')
-			$result.ProcedureName = "master.dbo.$procName"
-
-			# Innerhalb einer Prozedur greift Deferred Name Resolution: der direkte Verweis auf
-			# master.dbo.sqm_BackupExclude ist hier zulaessig, auch wenn die Tabelle beim Anlegen
-			# der Prozedur noch nicht existiert (im Ad-hoc-Batch waere genau das ein Parse-Fehler).
-			$procBody = @"
-CREATE PROCEDURE dbo.[$procName]
+			# Innerhalb einer Prozedur greift Deferred Name Resolution: master.dbo.sqm_BackupExclude
+			# darf direkt referenziert werden, auch wenn die Tabelle beim Anlegen der Prozedur noch
+			# nicht existiert (in einem Ad-hoc-Batch waere genau das ein Parse-Fehler).
+			$procBody = @'
+CREATE PROCEDURE dbo.[sqm_BackupUserDatabases]
+    @BackupType               nvarchar(10),           -- 'FULL', 'DIFF' oder 'LOG'
+    @Directory                nvarchar(4000),         -- Zielverzeichnis der Sicherungen
+    @CleanupTime              int           = NULL,   -- Aufbewahrung in Stunden, NULL = kein Cleanup
+    @UseExcludeTable          bit           = 0,      -- master.dbo.sqm_BackupExclude auswerten
+    @SyncExcludeTable         bit           = 1,      -- Tabelle vorher mit sys.databases abgleichen
+    @IncludeSystemDatabases   bit           = 0,
+    @Verify                   nvarchar(1)   = 'Y',
+    @Compress                 nvarchar(1)   = 'Y',
+    @Checksum                 nvarchar(1)   = 'Y',
+    @OverrideBackupPreference nvarchar(1)   = 'Y',    -- 'N' = AG-Backup-Preference beachten
+    @LogToTable               nvarchar(1)   = 'Y',
+    @MailTo                   nvarchar(500) = NULL,
+    @MailProfile              sysname       = N'Default',
+    @MailOnSuccess            bit           = 0
 AS
 BEGIN
     SET NOCOUNT ON;
 
     /* Sichert jede Datenbank EINZELN ueber Olas master.dbo.DatabaseBackup.
-       Reines T-SQL - kein PowerShell-Subsystem, damit der Job-Step nicht haengen bleiben kann.
        Jeder Einzelaufruf steckt in TRY/CATCH: eine fehlschlagende Datenbank stoppt den Lauf
-       nicht, der Step faellt erst am Ende aus, wenn mindestens eine Datenbank gescheitert ist. */
+       nicht, die Prozedur faellt erst am Ende aus, wenn mindestens eine gescheitert ist. */
 
     IF OBJECT_ID(N'master.dbo.DatabaseBackup', N'P') IS NULL
     BEGIN
@@ -532,23 +458,66 @@ BEGIN
         RETURN;
     END
 
-    DECLARE @dbName          sysname;
-    DECLARE @ErrorCount      int = 0;
-    DECLARE @OkCount         int = 0;
-    DECLARE @SkipCount       int = 0;
-    DECLARE @IsExcluded      bit;
-    DECLARE @FailedList      nvarchar(max) = N'';
-    DECLARE @ErrMsg          nvarchar(2000);
-    DECLARE @UseExcludeTable bit = $excludeCheck;
+    IF @BackupType NOT IN (N'FULL', N'DIFF', N'LOG')
+    BEGIN
+        RAISERROR('@BackupType muss FULL, DIFF oder LOG sein.', 16, 1);
+        RETURN;
+    END
+
+    DECLARE @dbName     sysname;
+    DECLARE @ErrorCount int = 0;
+    DECLARE @OkCount    int = 0;
+    DECLARE @SkipCount  int = 0;
+    DECLARE @IsExcluded bit;
+    DECLARE @FailedList nvarchar(max) = N'';
+    DECLARE @ErrMsg     nvarchar(2000);
+
+    DECLARE @Current TABLE (DatabaseName sysname PRIMARY KEY);
+    INSERT INTO @Current (DatabaseName)
+    SELECT name FROM sys.databases
+    WHERE  state = 0 AND source_database_id IS NULL
+      AND  (database_id > 4 OR (@IncludeSystemDatabases = 1 AND name IN (N'master', N'model', N'msdb')));
+
+    -- Exclude-Tabelle bei Bedarf anlegen und mit dem aktuellen Stand abgleichen
+    IF @UseExcludeTable = 1 AND @SyncExcludeTable = 1
+    BEGIN
+        IF OBJECT_ID(N'master.dbo.sqm_BackupExclude', N'U') IS NULL
+        BEGIN
+            CREATE TABLE master.dbo.sqm_BackupExclude (
+                DatabaseName  sysname       NOT NULL,
+                Reason        nvarchar(255) NULL,
+                ExcludedBy    sysname       NOT NULL CONSTRAINT DF_sqm_BackupExclude_ExcludedBy DEFAULT SUSER_SNAME(),
+                ExcludedAt    datetime2     NOT NULL CONSTRAINT DF_sqm_BackupExclude_ExcludedAt DEFAULT SYSDATETIME(),
+                IsActive      bit           NOT NULL CONSTRAINT DF_sqm_BackupExclude_IsActive   DEFAULT 1,
+                IsOrphaned    bit           NOT NULL CONSTRAINT DF_sqm_BackupExclude_IsOrphaned DEFAULT 0,
+                CONSTRAINT PK_sqm_BackupExclude PRIMARY KEY (DatabaseName)
+            );
+            PRINT 'Created master.dbo.sqm_BackupExclude.';
+        END
+
+        INSERT INTO master.dbo.sqm_BackupExclude (DatabaseName, IsActive, IsOrphaned)
+        SELECT c.DatabaseName, 1, 0
+        FROM   @Current c
+        WHERE  NOT EXISTS (SELECT 1 FROM master.dbo.sqm_BackupExclude e WHERE e.DatabaseName = c.DatabaseName);
+        PRINT 'Exclude table: added ' + CAST(@@ROWCOUNT AS varchar(10)) + ' new database(s).';
+
+        UPDATE e SET IsOrphaned = 1
+        FROM   master.dbo.sqm_BackupExclude e
+        WHERE  e.IsOrphaned = 0
+          AND  NOT EXISTS (SELECT 1 FROM @Current c WHERE c.DatabaseName = e.DatabaseName);
+        PRINT 'Exclude table: flagged ' + CAST(@@ROWCOUNT AS varchar(10)) + ' orphaned database(s).';
+
+        UPDATE e SET IsOrphaned = 0
+        FROM   master.dbo.sqm_BackupExclude e
+        WHERE  e.IsOrphaned = 1
+          AND  EXISTS (SELECT 1 FROM @Current c WHERE c.DatabaseName = e.DatabaseName);
+        PRINT 'Exclude table: un-flagged ' + CAST(@@ROWCOUNT AS varchar(10)) + ' returned database(s).';
+    END
+
     DECLARE @HasExcludeTable bit = CASE WHEN OBJECT_ID(N'master.dbo.sqm_BackupExclude', N'U') IS NOT NULL THEN 1 ELSE 0 END;
 
-    DECLARE @DbList TABLE (DatabaseName sysname PRIMARY KEY);
-    INSERT INTO @DbList (DatabaseName)
-    SELECT name FROM sys.databases
-    WHERE  state = 0 AND source_database_id IS NULL AND $sysDbFilter;
-
     DECLARE dbCursor CURSOR LOCAL FAST_FORWARD FOR
-        SELECT DatabaseName FROM @DbList ORDER BY DatabaseName;
+        SELECT DatabaseName FROM @Current ORDER BY DatabaseName;
 
     OPEN dbCursor;
     FETCH NEXT FROM dbCursor INTO @dbName;
@@ -569,16 +538,17 @@ BEGIN
         ELSE
         BEGIN
             BEGIN TRY
-                PRINT 'Backing up ' + @dbName + ' ($BackupType)...';
+                PRINT 'Backing up ' + @dbName + ' (' + @BackupType + ')...';
                 EXECUTE master.dbo.DatabaseBackup
-                    @Databases  = @dbName,
-                    @Directory  = N'$escDir',
-                    @BackupType = '$BackupType',
-                    @Verify     = 'Y',
-$cleanupArg                    @Compress   = 'Y',
-                    @CheckSum   = 'Y',
-                    @OverrideBackupPreference = '$overridePreference',
-                    @LogToTable = 'Y';
+                    @Databases                = @dbName,
+                    @Directory                = @Directory,
+                    @BackupType               = @BackupType,
+                    @Verify                   = @Verify,
+                    @CleanupTime              = @CleanupTime,
+                    @Compress                 = @Compress,
+                    @Checksum                 = @Checksum,
+                    @OverrideBackupPreference = @OverrideBackupPreference,
+                    @LogToTable               = @LogToTable;
                 SET @OkCount += 1;
             END TRY
             BEGIN CATCH
@@ -596,16 +566,67 @@ $cleanupArg                    @Compress   = 'Y',
     DEALLOCATE dbCursor;
 
     PRINT 'Done. OK: ' + CAST(@OkCount AS varchar(10)) + ', skipped: ' + CAST(@SkipCount AS varchar(10)) + ', failed: ' + CAST(@ErrorCount AS varchar(10)) + '.';
-$mailBlock
+
+    IF @MailTo IS NOT NULL AND (@ErrorCount > 0 OR @MailOnSuccess = 1)
+    BEGIN
+        DECLARE @subject nvarchar(255) =
+            CASE WHEN @ErrorCount > 0
+                 THEN N'[' + @@SERVERNAME + N'] ' + @BackupType + N' Backup FEHLER - ' + CAST(@ErrorCount AS nvarchar(10)) + N' fehlgeschlagen'
+                 ELSE N'[' + @@SERVERNAME + N'] ' + @BackupType + N' Backup erfolgreich - ' + CAST(@OkCount AS nvarchar(10)) + N' Datenbanken'
+            END;
+        DECLARE @body nvarchar(max) =
+            N'Instanz: ' + @@SERVERNAME + CHAR(13) + CHAR(10) +
+            N'Typ: ' + @BackupType + CHAR(13) + CHAR(10) +
+            N'Ziel: ' + @Directory + CHAR(13) + CHAR(10) +
+            N'Zeitpunkt: ' + CONVERT(nvarchar(19), SYSDATETIME(), 120) + CHAR(13) + CHAR(10) +
+            N'Erfolgreich: ' + CAST(@OkCount AS nvarchar(10)) + CHAR(13) + CHAR(10) +
+            N'Uebersprungen: ' + CAST(@SkipCount AS nvarchar(10)) + CHAR(13) + CHAR(10) +
+            N'Fehlgeschlagen: ' + CAST(@ErrorCount AS nvarchar(10)) + CHAR(13) + CHAR(10) +
+            ISNULL(@FailedList, N'');
+        BEGIN TRY
+            EXEC msdb.dbo.sp_send_dbmail
+                @profile_name = @MailProfile,
+                @recipients   = @MailTo,
+                @subject      = @subject,
+                @body         = @body;
+        END TRY
+        BEGIN CATCH
+            PRINT 'Mail konnte nicht gesendet werden: ' + ERROR_MESSAGE();
+        END CATCH
+    END
+
     IF @ErrorCount > 0
-        RAISERROR('${escJobName}: %d Datenbank(en) fehlgeschlagen. Details siehe Step-Ausgabe.', 16, 1, @ErrorCount);
+        RAISERROR('sqm_BackupUserDatabases: %d Datenbank(en) fehlgeschlagen. Details siehe Step-Ausgabe.', 16, 1, @ErrorCount);
 END
+'@
+
+			# 5. Job-Step: ruft die Prozedur mit allen Werten im Klartext auf
+			$sqlDir     = "N'" + $effBackupDir.Replace("'", "''") + "'"
+			$sqlCleanup = if ($null -ne $cleanupHours) { "$cleanupHours" } else { 'NULL' }
+			$sqlMailTo  = if ($MailTo) { "N'" + $MailTo.Replace("'", "''") + "'" } else { 'NULL' }
+			$sqlProfile = "N'" + $MailProfile.Replace("'", "''") + "'"
+
+			$stepCommand = @"
+EXEC master.dbo.[$procName]
+     @BackupType               = N'$BackupType',
+     @Directory                = $sqlDir,
+     @CleanupTime              = $sqlCleanup,
+     @UseExcludeTable          = $(if ($UseExcludeTable) { 1 } else { 0 }),
+     @SyncExcludeTable         = 1,
+     @IncludeSystemDatabases   = $(if ($IncludeSystemDatabases) { 1 } else { 0 }),
+     @Verify                   = 'Y',
+     @Compress                 = 'Y',
+     @Checksum                 = 'Y',
+     @OverrideBackupPreference = '$overridePreference',
+     @LogToTable               = 'Y',
+     @MailTo                   = $sqlMailTo,
+     @MailProfile              = $sqlProfile,
+     @MailOnSuccess            = $(if ($MailOnSuccess) { 1 } else { 0 });
 "@
+			$result.StepCommand = $stepCommand
 
-			$step2Command = "EXEC master.dbo.[$procName];"
-			$result.Step2Command = $step2Command
+			Invoke-sqmLogging -Message "Job-Step ruft master.dbo.[$procName] mit Parametern auf (Typ $BackupType, Ziel $effBackupDir)." -FunctionName $functionName -Level "INFO"
 
-			Invoke-sqmLogging -Message "Step 2: Prozedur master.dbo.[$procName] vorbereitet, Job-Step ruft sie nur auf." -FunctionName $functionName -Level "INFO"
 
 			# 6. WhatIf-Pruefung
 			if (-not $PSCmdlet.ShouldProcess($SqlInstance, "Erstelle Job '$JobName' [$BackupType]"))
@@ -615,50 +636,31 @@ END
 				return $result
 			}
 
-			# 6b. Beide Prozeduren in master anlegen/aktualisieren (CREATE PROCEDURE muss allein im
-			# Batch stehen, deshalb je zwei getrennte Aufrufe statt DROP und CREATE in einem Query).
-			foreach ($proc in @(
-					@{ Name = $syncProcName; Body = $syncProcBody },
-					@{ Name = $procName;     Body = $procBody }))
-			{
-				Invoke-DbaQuery @connParams -Database master `
-					-Query "IF OBJECT_ID(N'master.dbo.$($proc.Name)', N'P') IS NOT NULL DROP PROCEDURE dbo.[$($proc.Name)];" `
-					-EnableException -ErrorAction Stop
-				Invoke-DbaQuery @connParams -Database master -Query $proc.Body -EnableException -ErrorAction Stop
-				Invoke-sqmLogging -Message "Prozedur master.dbo.[$($proc.Name)] angelegt/aktualisiert." -FunctionName $functionName -Level "INFO"
-			}
+			# 6b. Prozedur in master anlegen/aktualisieren (CREATE PROCEDURE muss allein im Batch
+			# stehen, deshalb zwei getrennte Aufrufe statt DROP und CREATE in einem Query).
+			Invoke-DbaQuery @connParams -Database master `
+				-Query "IF OBJECT_ID(N'master.dbo.$procName', N'P') IS NOT NULL DROP PROCEDURE dbo.[$procName];" `
+				-EnableException -ErrorAction Stop
+			Invoke-DbaQuery @connParams -Database master -Query $procBody -EnableException -ErrorAction Stop
+			Invoke-sqmLogging -Message "Prozedur master.dbo.[$procName] angelegt/aktualisiert." -FunctionName $functionName -Level "INFO"
 
 			# 7. Job anlegen
 			New-DbaAgentJob @connParams `
 				-Job $JobName `
 				-Category $JobCategory `
-				-Description "sqm BackupMaintenance $BackupType (T-SQL) — Sync sqm_BackupExclude + Ola DatabaseBackup je Datenbank — $($ScheduleDays -join '/') $ScheduleTime — Ziel: $effBackupDir" `
+				-Description "sqm BackupMaintenance $BackupType (T-SQL) — Ola DatabaseBackup je Datenbank via master.dbo.$procName — $($ScheduleDays -join '/') $ScheduleTime — Ziel: $effBackupDir" `
 				-EnableException -ErrorAction Stop | Out-Null
 
 			Invoke-sqmLogging -Message "Job '$JobName' angelegt." -FunctionName $functionName -Level "INFO"
 
-			# 8. Step 1 anlegen: Sync-BackupExcludeTable (T-SQL)
+			# 8. Job-Step anlegen: Backup-UserDatabases-<BackupType>
 			New-DbaAgentJobStep @connParams `
 				-Job $JobName `
 				-StepId 1 `
-				-StepName 'Sync-BackupExcludeTable' `
-				-Subsystem TransactSql `
-				-Database master `
-				-Command $step1Command `
-				-OnSuccessAction GoToNextStep `
-				-OnFailAction QuitWithFailure `
-				-EnableException -ErrorAction Stop | Out-Null
-
-			Invoke-sqmLogging -Message "Step 1 'Sync-BackupExcludeTable' angelegt (TransactSql)." -FunctionName $functionName -Level "INFO"
-
-			# 9. Step 2 anlegen: Backup-UserDatabases-<BackupType> (T-SQL Cursor + Ola)
-			New-DbaAgentJobStep @connParams `
-				-Job $JobName `
-				-StepId 2 `
 				-StepName "Backup-UserDatabases-$BackupType" `
 				-Subsystem TransactSql `
 				-Database master `
-				-Command $step2Command `
+				-Command $stepCommand `
 				-OnSuccessAction QuitWithSuccess `
 				-OnFailAction QuitWithFailure `
 				-EnableException -ErrorAction Stop | Out-Null
