@@ -1,5 +1,32 @@
 # sqmSQLTool — Changelog
 
+## [1.9.145.0] - 2026-09-17
+
+### Aenderung: -CleanupTime ist jetzt ueberall eine Zahl in STUNDEN
+
+Bisher gab es zwei Einheiten fuer dieselbe Sache: auf PowerShell-Seite ein String mit Suffix
+('48h', '7d', '4w', '1m'), im Job-Step und in Olas `@CleanupTime` dagegen eine Zahl in Stunden.
+Die Funktion rechnete dazwischen um, was beim Lesen des Job-Steps unnoetig Fragen aufwirft
+(`@CleanupTime = 672` - was bedeutet 672?).
+
+`-CleanupTime` ist jetzt in beiden Funktionen ein `[int]` in Stunden, also dieselbe Einheit, die
+Ola selbst verwendet, und der Wert wird unveraendert durchgereicht:
+
+- `New-sqmBackupMaintenanceJob -CleanupTime 672` -> `@CleanupTime = 672` im Job-Step.
+  Typ-Defaults jetzt als Stunden: FULL 672 (4 Wochen), DIFF 336 (2 Wochen), LOG 48 (2 Tage).
+- `Invoke-sqmUserDatabaseBackup -CleanupTime 48` - intern wird daraus fuer
+  `Remove-DbaBackup -RetentionPeriod` wieder '48h' gebaut, weil dieses Cmdlet das Suffix-Format
+  verlangt. Nach aussen ist die Einheit aber einheitlich Stunden.
+- `0` bedeutet in beiden Funktionen "kein Cleanup", genau wie `-NoCleanup`.
+
+Die alte Schreibweise mit Suffix wird abgewiesen (`-CleanupTime '48h'` ist kein gueltiger int).
+
+Im Container als echter Agent-Job geprueft: Defaults 672/336/48 landen korrekt im Job-Step,
+`-CleanupTime 24` ebenso, `-NoCleanup` erzeugt `@CleanupTime = NULL` (und wirft dabei nicht mehr
+den MetadataError, den ein `ValidateRange(1, ...)` beim Setzen auf 0 ausgeloest hat - die Range
+beginnt jetzt bei 0), und die Umrechnung int -> '48h' fuer Remove-DbaBackup loescht eine 10 Tage
+alte .bak-Datei und laesst die frische stehen.
+
 ## [1.9.144.0] - 2026-09-17
 
 ### Aenderung: New-sqmBackupMaintenanceJob — eine generische Prozedur, alle Werte als Parameter im Job-Step

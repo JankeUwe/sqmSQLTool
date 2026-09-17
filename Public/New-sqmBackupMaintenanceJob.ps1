@@ -56,10 +56,10 @@
 	    DIFF — Monday-Saturday (@('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')) at 20:00, once
 	    LOG  — every day (@('EveryDay')), starting 00:00, every 15 minutes
 
-	Default cleanup retention per backup type (applied via -CleanupTime unless overridden, skipped
-	entirely with -NoCleanup): FULL 4 weeks ('4w'), DIFF 2 weeks ('2w'), LOG 48 hours ('48h'). The
-	value is converted to hours and passed to Ola's own @CleanupTime, which deletes old backup
-	files of the same type in the target directory after each run.
+	Default cleanup retention per backup type, in HOURS (applied via -CleanupTime unless
+	overridden, skipped entirely with -NoCleanup): FULL 672 (4 weeks), DIFF 336 (2 weeks),
+	LOG 48 (2 days). The value goes straight into Ola's own @CleanupTime, which is also in hours
+	and deletes old backup files of the same type in the target directory after each run.
 
 .PARAMETER SqlInstance
 	SQL Server instance. Default: current computer name ($env:COMPUTERNAME).
@@ -123,9 +123,10 @@
 	success and not only on failures.
 
 .PARAMETER CleanupTime
-	Retention period for old backup files, e.g. '48h', '7d', '4w', '1m'. Converted to hours and
-	passed to the job step as @CleanupTime for Ola's own cleanup. When not specified, defaults
-	depend on BackupType (see description). Use -NoCleanup to disable cleanup entirely.
+	Retention period for old backup files, in HOURS - the same unit Ola's own @CleanupTime uses,
+	so the value is passed straight through to the job step (e.g. 48 = 2 days, 336 = 2 weeks,
+	672 = 4 weeks). When not specified, defaults depend on BackupType (see description).
+	0 disables cleanup, same as -NoCleanup.
 
 .PARAMETER NoCleanup
 	When set, the job step passes @CleanupTime = NULL, so old backup files are never removed by
@@ -164,7 +165,7 @@
 
 .EXAMPLE
 	# LOG backup with custom retention and no automatic cleanup
-	New-sqmBackupMaintenanceJob -SqlInstance "SQL01" -BackupType LOG -CleanupTime "24h"
+	New-sqmBackupMaintenanceJob -SqlInstance "SQL01" -BackupType LOG -CleanupTime 24
 	New-sqmBackupMaintenanceJob -SqlInstance "SQL01" -BackupType LOG -NoCleanup
 
 .EXAMPLE
@@ -216,8 +217,8 @@ function New-sqmBackupMaintenanceJob
 		[Parameter(Mandatory = $false)]
 		[switch]$MailOnSuccess,
 		[Parameter(Mandatory = $false)]
-		[ValidatePattern('^\d+[hdwm]$')]
-		[string]$CleanupTime,
+		[ValidateRange(0, 87600)]
+		[int]$CleanupTime,
 		[Parameter(Mandatory = $false)]
 		[switch]$NoCleanup,
 		[Parameter(Mandatory = $false)]
@@ -281,12 +282,12 @@ function New-sqmBackupMaintenanceJob
 		{
 			switch ($BackupType)
 			{
-				'FULL' { $CleanupTime = '4w' }
-				'DIFF' { $CleanupTime = '2w' }
-				'LOG'  { $CleanupTime = '48h' }
+				'FULL' { $CleanupTime = 672 }   # 4 Wochen
+				'DIFF' { $CleanupTime = 336 }   # 2 Wochen
+				'LOG'  { $CleanupTime = 48 }    # 2 Tage
 			}
 		}
-		if ($NoCleanup) { $CleanupTime = $null }
+		if ($NoCleanup) { $CleanupTime = 0 }
 
 		# JobName ohne explizite Angabe aus der Konfiguration lesen, abhaengig von -BackupType -
 		# analog zu New-sqmOlaUsrDbBackupJob (OlaJobNameFull/Diff/Log). Vorher war der Default fest
@@ -406,20 +407,6 @@ function New-sqmBackupMaintenanceJob
 				throw "Backup-Verzeichnis konnte nicht ermittelt werden. Bitte -BackupPath angeben."
 			}
 			$result.BackupPath = $effBackupDir
-
-			# -CleanupTime ('48h'/'7d'/'4w'/'1m') in Olas @CleanupTime (Stunden, int) umrechnen
-			$cleanupHours = $null
-			if ($CleanupTime -and $CleanupTime -match '^(\d+)([hdwm])$')
-			{
-				$cleanupValue = [int]$Matches[1]
-				$cleanupHours = switch ($Matches[2])
-				{
-					'h' { $cleanupValue }
-					'd' { $cleanupValue * 24 }
-					'w' { $cleanupValue * 24 * 7 }
-					'm' { $cleanupValue * 24 * 30 }
-				}
-			}
 
 			# Ola beachtet die AG-Backup-Preference von sich aus. Ohne -CheckPreferredReplica soll
 			# unabhaengig davon gesichert werden, also Preference uebersteuern.
@@ -602,7 +589,7 @@ END
 
 			# 5. Job-Step: ruft die Prozedur mit allen Werten im Klartext auf
 			$sqlDir     = "N'" + $effBackupDir.Replace("'", "''") + "'"
-			$sqlCleanup = if ($null -ne $cleanupHours) { "$cleanupHours" } else { 'NULL' }
+			$sqlCleanup = if ($CleanupTime -gt 0) { "$CleanupTime" } else { 'NULL' }
 			$sqlMailTo  = if ($MailTo) { "N'" + $MailTo.Replace("'", "''") + "'" } else { 'NULL' }
 			$sqlProfile = "N'" + $MailProfile.Replace("'", "''") + "'"
 
@@ -736,7 +723,7 @@ EXEC master.dbo.[$procName]
 			}
 
 			$intervalInfo    = if ($ScheduleIntervalMinutes -gt 0) { ", alle $ScheduleIntervalMinutes Min." } else { '' }
-			$cleanupInfo     = if ($CleanupTime) { ", Cleanup: $CleanupTime" } else { '' }
+			$cleanupInfo     = if ($CleanupTime -gt 0) { ", Cleanup: ${CleanupTime}h" } else { '' }
 			$result.Status   = 'Created'
 			$result.Message  = "Job '$JobName' ($BackupType) erstellt. Schedule: $($expandedDays -join '/') $ScheduleTime$intervalInfo$cleanupInfo"
 			Invoke-sqmLogging -Message $result.Message -FunctionName $functionName -Level "INFO"
@@ -783,7 +770,7 @@ EXEC master.dbo.[$procName]
 						if ($MailTo)                 { $secParams['MailTo']                 = $MailTo }
 						if ($MailOnSuccess)          { $secParams['MailOnSuccess']          = $true }
 						if ($OperatorName)           { $secParams['OperatorName']           = $OperatorName }
-						if ($CleanupTime)            { $secParams['CleanupTime']            = $CleanupTime }
+						if ($CleanupTime -gt 0)      { $secParams['CleanupTime']            = $CleanupTime }
 						else                         { $secParams['NoCleanup']              = $true }
 						$secParams['MailProfile'] = $MailProfile
 
