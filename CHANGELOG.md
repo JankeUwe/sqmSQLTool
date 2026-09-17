@@ -1,5 +1,40 @@
 # sqmSQLTool — Changelog
 
+## [1.9.142.0] - 2026-09-17
+
+### Fix: New-sqmBackupMaintenanceJob — beide Steps jetzt reines T-SQL (Ola-Cursor statt PowerShell)
+
+Die eigentliche Ursache fuer "Job startet, kein Backup, kommt nie zurueck": **Step 1** war ein
+PowerShell-Step (`Import-Module sqmSQLTool; Sync-sqmBackupExcludeTable`). Der blieb im
+PowerShell-Subsystem des SQL Agent haengen und kehrte nie zurueck - und weil Step 1 nie fertig
+wurde, lief **Step 2 (das Backup) ueberhaupt nie an**. Genau das erklaert, warum gar kein Backup
+entstand und der Job trotzdem ewig "Wird ausgefuehrt" zeigte. Derselbe Befehlstext von Hand in
+einer PowerShell-Konsole ausgefuehrt lief immer sauber durch, weil sich dort der Konsolen-Prozess
+selbst beendet. Die Fixes in 1.9.140.0 (`exit 0`, `-Confirm $false`) haben daran nichts geaendert.
+
+Beide Steps laufen jetzt im Subsystem **TransactSql**, ganz ohne PowerShell:
+
+- **Step 1** legt `master.dbo.sqm_BackupExclude` bei Bedarf an, traegt neue Datenbanken ein
+  (IsActive=1), markiert verschwundene als IsOrphaned=1 und nimmt die Markierung wieder zurueck,
+  wenn eine Datenbank zurueckkehrt - alles als T-SQL.
+- **Step 2** cursort ueber die Datenbanken und ruft pro Datenbank einzeln Olas
+  `master.dbo.DatabaseBackup` auf. Jeder Aufruf steckt in TRY/CATCH: eine fehlschlagende
+  Datenbank stoppt den Lauf nicht, der Step faellt erst am Ende aus, wenn mindestens eine
+  Datenbank gescheitert ist. Mit `-UseExcludeTable` wird jede Datenbank einzeln gegen
+  sqm_BackupExclude geprueft.
+
+Nebeneffekt: der Job braucht das sqmSQLTool-Modul auf dem SQL Server gar nicht mehr, weil in den
+Steps nur noch T-SQL steht. Voraussetzung ist jetzt Olas Maintenance Solution auf der Instanz
+(`Install-sqmOlaMaintenanceSolution`). `-CleanupTime` ('48h'/'7d'/'4w') wird in Olas
+`@CleanupTime` (Stunden) umgerechnet, `-CheckPreferredReplica` auf Olas
+`@OverrideBackupPreference` abgebildet, und `-MailTo`/`-MailOnSuccess` per `sp_send_dbmail`
+direkt im T-SQL-Step umgesetzt.
+
+Diesmal am echten Fehlerpfad getestet, nicht nur per Query: in einem SQL-2022-Container mit
+aktiviertem SQL Agent als **echter Agent-Job** gestartet (FULL und LOG, inkl. korrekt
+uebersprungener ausgeschlossener Datenbank), und anschliessend auf DEV01 - Job durchgelaufen in
+11 Sekunden, beide Steps "Succeeded", alle 19 Benutzerdatenbanken gesichert.
+
 ## [1.9.141.0] - 2026-09-17
 
 ### Neu: jobs/OlaBackup-UserDatabases.sql — reines T-SQL statt PowerShell-Subsystem
