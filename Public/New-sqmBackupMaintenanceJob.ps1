@@ -18,10 +18,11 @@
 	each execution. This means the job is fully self-contained and does not depend on the SQL
 	Server Agent service account's PowerShell profile.
 
-	Default schedule days per backup type (when -ScheduleDays is not specified):
-	    FULL — @('Sunday')
-	    DIFF — @('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')
-	    LOG  — @('EveryDay')
+	Default schedule per backup type (applied to -ScheduleDays/-ScheduleTime/-ScheduleIntervalMinutes
+	whenever the respective parameter is not explicitly specified):
+	    FULL — every day (@('EveryDay')) at 20:15, once
+	    DIFF — Monday-Saturday (@('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')) at 20:00, once
+	    LOG  — every day (@('EveryDay')), starting 00:00, every 15 minutes
 
 .PARAMETER SqlInstance
 	SQL Server instance. Default: current computer name ($env:COMPUTERNAME).
@@ -42,7 +43,8 @@
 	-BackupPath to Invoke-sqmUserDatabaseBackup in Step 2.
 
 .PARAMETER ScheduleTime
-	Start time of the schedule in format 'HH:mm'. Default: '20:00'.
+	Start time of the schedule in format 'HH:mm'. When not specified, defaults depend on
+	BackupType: '20:15' for FULL, '00:00' for LOG, '20:00' for DIFF (see description).
 
 .PARAMETER ScheduleDays
 	Days of the week for the schedule. Valid values: 'Monday'..'Sunday', 'Weekdays', 'Weekend',
@@ -50,7 +52,8 @@
 
 .PARAMETER ScheduleIntervalMinutes
 	Repeat interval within a day in minutes (e.g. 15 = every 15 minutes). 0 = run once at
-	ScheduleTime. Default: 0.
+	ScheduleTime. When not specified, defaults to 15 for -BackupType LOG and 0 (once) for
+	FULL/DIFF (see description).
 
 .PARAMETER JobCategory
 	SQL Agent job category. Default: 'Database Maintenance'.
@@ -92,7 +95,7 @@
 	Request confirmation before creating the job.
 
 .EXAMPLE
-	# Weekly FULL backup Sunday 20:00 with all features
+	# Daily FULL backup, default schedule: every day at 20:15
 	New-sqmBackupMaintenanceJob -SqlInstance "SQL01" -BackupType FULL `
 	    -UseExcludeTable -CheckPreferredReplica `
 	    -MailTo "dba@company.com" -MailProfile "DBA-Mail"
@@ -103,9 +106,8 @@
 	    -UseExcludeTable -ScheduleTime "22:00"
 
 .EXAMPLE
-	# LOG backup every 15 minutes
-	New-sqmBackupMaintenanceJob -SqlInstance "SQL01" -BackupType LOG `
-	    -ScheduleIntervalMinutes 15 -UseExcludeTable
+	# LOG backup, default schedule: every day, every 15 minutes starting 00:00
+	New-sqmBackupMaintenanceJob -SqlInstance "SQL01" -BackupType LOG -UseExcludeTable
 
 .EXAMPLE
 	# Replace existing job
@@ -180,9 +182,33 @@ function New-sqmBackupMaintenanceJob
 		{
 			switch ($BackupType)
 			{
-				'FULL' { $ScheduleDays = @('Sunday') }
+				'FULL' { $ScheduleDays = @('EveryDay') }
 				'DIFF' { $ScheduleDays = @('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday') }
 				'LOG'  { $ScheduleDays = @('EveryDay') }
+			}
+		}
+
+		# Default-ScheduleTime je BackupType setzen wenn nicht explizit angegeben
+		if (-not $PSBoundParameters.ContainsKey('ScheduleTime'))
+		{
+			switch ($BackupType)
+			{
+				'FULL' { $ScheduleTime = '20:15' }
+				'DIFF' { $ScheduleTime = '20:00' }
+				# LOG-Sicherungen sollen den ganzen Tag abdecken, nicht nur ab dem sonst
+				# ueblichen Abend-Startpunkt - sonst wuerde "alle 15 Minuten" faktisch nur
+				# ein paar Stunden am Abend bedeuten.
+				'LOG'  { $ScheduleTime = '00:00' }
+			}
+		}
+
+		# Default-ScheduleIntervalMinutes je BackupType setzen wenn nicht explizit angegeben
+		if (-not $PSBoundParameters.ContainsKey('ScheduleIntervalMinutes'))
+		{
+			switch ($BackupType)
+			{
+				'LOG'  { $ScheduleIntervalMinutes = 15 }
+				default { $ScheduleIntervalMinutes = 0 }
 			}
 		}
 

@@ -1,5 +1,17 @@
 # sqmSQLTool — Changelog
 
+## [1.9.138.0] - 2026-09-17
+
+### Aenderung: New-sqmBackupMaintenanceJob — neue Default-Zeitplaene je BackupType
+
+FULL laeuft jetzt standardmaessig taeglich um 20:15 statt nur sonntags um 20:00. LOG laeuft
+standardmaessig alle 15 Minuten rund um die Uhr (Start 00:00) statt einmalig um 20:00 -
+vorher haette der reine Default fuer -BackupType LOG (ScheduleIntervalMinutes=0) ueberhaupt
+keine wiederkehrende Sicherung erzeugt. DIFF bleibt unveraendert (Montag-Samstag, 20:00).
+
+Alle drei Defaults gelten weiterhin nur, wenn -ScheduleDays/-ScheduleTime/
+-ScheduleIntervalMinutes nicht explizit angegeben werden.
+
 ## [1.9.137.0] - 2026-09-17
 
 ### Fix: New-sqmBackupMaintenanceJob — LOG-Job sicherte per FULL statt Transaktionsprotokoll
