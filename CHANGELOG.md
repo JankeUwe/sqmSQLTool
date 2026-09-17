@@ -1,5 +1,39 @@
 # sqmSQLTool — Changelog
 
+## [1.9.141.0] - 2026-09-17
+
+### Neu: jobs/OlaBackup-UserDatabases.sql — reines T-SQL statt PowerShell-Subsystem
+
+Auch mit dem exit-0/-Confirm-Fix aus 1.9.140.0 blieb ein Backup-Maintenance-Job als SQL
+Agent Job weiterhin haengen (dauerhaft "Wird ausgefuehrt"), obwohl exakt derselbe Step-
+Befehlstext manuell in einer PowerShell-Konsole kopiert und ausgefuehrt anstandslos
+durchlief. Statt die PowerShell-Subsystem-Ursache weiter einzukreisen, ersetzt dieses neue
+Skript den Ansatz vollstaendig: keine PowerShell-Subsystem-Abhaengigkeit mehr, reines
+Transact-SQL fuer einen SQL Agent Job-Step vom Typ "Transact-SQL Script (T-SQL)".
+
+Das Skript cursort durch die Kandidaten-Datenbanken (@Databases: ALL_DATABASES /
+USER_DATABASES / explizite Liste), prueft optional master.dbo.sqm_BackupExclude pro
+Datenbank (Tabelle nicht vorhanden = keine Ausschluesse) und ruft fuer jede nicht
+ausgeschlossene Datenbank einzeln Ola Hallengrens `master.dbo.DatabaseBackup` auf. Jeder
+Einzelaufruf steckt in TRY/CATCH: eine fehlschlagende Datenbank wird geloggt (RAISERROR)
+und die Schleife laeuft weiter, der Job-Step schlaegt erst am Ende fehl, wenn ueberhaupt
+mindestens eine Datenbank gescheitert ist - damit die Agent-History korrekt "N Datenbanken
+fehlgeschlagen" zeigt, waehrend alle anderen trotzdem gesichert wurden.
+
+Live gegen einen frischen SQL-2022-Testcontainer verifiziert: FULL-Lauf ueber drei
+Datenbanken erfolgreich, LOG-Lauf mit sqm_BackupExclude-Ausschluss einer Datenbank
+korrekt uebersprungen, und eine gezielt injizierte Einzeldatenbank-Fehlschlag-Simulation
+bestaetigt, dass die beiden anderen Datenbanken trotzdem fertig gesichert wurden, bevor
+der Job-Step als Ganzes fehlschlaegt.
+
+Ein anfaenglicher Fehler beim Testen wurde dabei selbst gefunden und behoben: ein
+direkter Verweis auf master.dbo.sqm_BackupExclude in einem Ad-hoc-Batch (kein Stored-
+Procedure-Body) scheitert mit "Invalid object name", sobald die Tabelle nicht existiert -
+und zwar unabhaengig davon, ob der referenzierende Codepfad zur Laufzeit ueberhaupt
+erreicht wird, weil Ad-hoc-Batches (anders als Stored Procedures) alle Objektnamen beim
+Parsen binden. Der Tabellenzugriff laeuft deshalb ueber sp_executesql, das erst beim
+tatsaechlichen Ausfuehren aufgeloest wird.
+
 ## [1.9.140.0] - 2026-09-17
 
 ### Fix: New-sqmBackupMaintenanceJob — Job blieb nach erfolgreichem Lauf haengen
