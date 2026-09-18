@@ -6,7 +6,9 @@
     Checks per database:
     - Recovery model
     - Last DBCC CHECKDB execution and whether it was error-free
-    - Last backup times (Full / Diff / Log)
+    - Last backup times (Full / Diff / Log). COPY_ONLY full backups are reported
+      separately (LastCopyOnlyFull) because they do not form a restore chain - SSMS
+      database properties do count them, which is why the two can disagree.
     - Whether the database is marked excluded (IsActive=0) in master.dbo.sqm_BackupExclude
       (the exclusion table New-sqmOlaUsrDbBackupJob / Invoke-sqmUserDatabaseBackup honour with
       -UseExcludeTable) - so a missing/old backup for an intentionally excluded database is not
@@ -180,16 +182,34 @@ WHERE db.name != 'tempdb';
 				$checkDbLookup = @{ }
 				foreach ($r in $checkDbRows) { $checkDbLookup[$r.DatabaseName] = $r.LastGoodCheckDb }
 				
-				# 3. Letzte Backups (Full, Diff, Log)
+				# 3. Letzte Backups (Full, Diff, Log). is_copy_only wird mitgruppiert statt
+				# weggefiltert: COPY_ONLY-Backups bilden keine Wiederherstellungskette (sie setzen
+				# die Differential-Basis nicht zurueck) und duerfen darum nicht als regulaeres Full
+				# gelten. SSMS/SMO zaehlt sie in den Datenbankeigenschaften aber sehr wohl mit, so
+				# dass dort ein Datum steht, wo dieser Bericht "(keins)" meldete. Beides wird jetzt
+				# getrennt gefuehrt und im Bericht benannt.
 				$backupQuery = @"
-SELECT database_name, type, MAX(backup_finish_date) AS LastBackup
+SELECT database_name, type, is_copy_only, MAX(backup_finish_date) AS LastBackup
 FROM msdb.dbo.backupset
-WHERE type IN ('D','I','L') AND is_copy_only = 0
-GROUP BY database_name, type;
+WHERE type IN ('D','I','L')
+GROUP BY database_name, type, is_copy_only;
 "@
 				$backupRows = Invoke-DbaQuery @connParams -Query $backupQuery -EnableException:$EnableException
 				$backupLookup = @{ }
-				foreach ($r in $backupRows) { $backupLookup["$($r.database_name)|$($r.type)"] = $r.LastBackup }
+				$copyOnlyLookup = @{ }
+				foreach ($r in $backupRows)
+				{
+					# is_copy_only kommt je nach Provider als [bool] oder als BIT 1/0 zurueck
+					$isCopyOnly = ($r.is_copy_only -eq $true -or $r.is_copy_only -eq 1)
+					if (-not $isCopyOnly)
+					{
+						$backupLookup["$($r.database_name)|$($r.type)"] = $r.LastBackup
+					}
+					elseif ($r.type -eq 'D')
+					{
+						$copyOnlyLookup[$r.database_name] = $r.LastBackup
+					}
+				}
 
 				# 3b. Backup-Ausschlussliste (master.dbo.sqm_BackupExclude) - dieselbe Bedingung
 				# (IsActive = 0 AND IsOrphaned = 0 - IsActive=1 heisst "wird gesichert", Default
@@ -291,6 +311,7 @@ END
 					# Backups
 					$lastFull = $backupLookup["$dbName|D"]
 					$lastLog = $backupLookup["$dbName|L"]
+					$lastCopyOnlyFull = $copyOnlyLookup[$dbName]
 
 					# Backup-Ausschluss (sqm_BackupExclude)
 					$excludedFromBackup = $excludeLookup.ContainsKey($dbName)
@@ -331,7 +352,10 @@ END
 							LastCheckDb    = if ($lastCheckDb) { $lastCheckDb.ToString('yyyy-MM-dd') } else { '(unbekannt)' }
 							CheckDbAgeDays = if ($checkDbAgeD) { [math]::Round($checkDbAgeD, 0) } else { $null }
 							CheckDbStatus  = $checkDbStatus
-							LastFullBackup = if ($lastFull) { $lastFull.ToString('yyyy-MM-dd HH:mm') } else { '(keins)' }
+							LastFullBackup = if ($lastFull) { $lastFull.ToString('yyyy-MM-dd HH:mm') }
+								elseif ($lastCopyOnlyFull) { "(nur COPY_ONLY: $($lastCopyOnlyFull.ToString('yyyy-MM-dd HH:mm')))" }
+								else { '(keins)' }
+							LastCopyOnlyFull = if ($lastCopyOnlyFull) { $lastCopyOnlyFull.ToString('yyyy-MM-dd HH:mm') } else { '' }
 							LastLogBackup  = if ($lastLog) { $lastLog.ToString('yyyy-MM-dd HH:mm') } else { 'n/a' }
 							ExcludedFromBackup = $excludedFromBackup
 							ExcludeReason  = $excludeReason
@@ -377,6 +401,11 @@ END
 					{
 						$lines.Add("# Vom Backup ausgeschlossen (sqm_BackupExclude): $($excludedNames -join ', ')")
 					}
+					$copyOnlyNames = @($detailRows | Where-Object { $_.LastCopyOnlyFull -and $_.LastFullBackup -like '(nur COPY_ONLY*' } | Select-Object -ExpandProperty Database)
+					if ($copyOnlyNames.Count -gt 0)
+					{
+						$lines.Add("# Nur COPY_ONLY-Full vorhanden (zaehlt nicht fuer die Wiederherstellungskette): $($copyOnlyNames -join ', ')")
+					}
 					$lines.Add("# ================================================================")
 					$lines.Add("")
 					$lines.Add(("{0,-35} {1,-10} {2,-12} {3,-6} {4,-6} {5,-28} {6,-7} {7,-8} {8,-8} {9}" -f
@@ -405,10 +434,13 @@ END
 							'Ausgeschlossen' + $(if ($e.ExcludeReason) { " ($([System.Net.WebUtility]::HtmlEncode($e.ExcludeReason)))" } else { '' })
 						}
 						else { '' }
-						"<tr><td class='$sevClass'>$($e.OverallStatus)</td><td>$([System.Net.WebUtility]::HtmlEncode($e.Database))</td><td>$($e.RecoveryModel)</td><td>$($e.TrustworthyOn)</td><td>$([System.Net.WebUtility]::HtmlEncode($e.IsolationLevel))</td><td>$($e.SizeMB)</td><td>$($e.CheckDbStatus) ($($e.CheckDbAgeDays)d)</td><td>$($e.VlfStatus) ($($e.VlfCount))</td><td>$($e.AutoGrowthEvents)</td><td>$($e.LastFullBackup)</td><td>$($e.LastLogBackup)</td><td>$excludeCell</td></tr>"
+						# Groesse rechtsbuendig mit Tausendertrennzeichen der aktuellen Kultur
+						$sizeCell = '{0:N1}' -f [double]$e.SizeMB
+						$copyOnlyCell = if ($e.LastCopyOnlyFull) { $e.LastCopyOnlyFull } else { '' }
+						"<tr><td class='$sevClass'>$($e.OverallStatus)</td><td>$([System.Net.WebUtility]::HtmlEncode($e.Database))</td><td>$($e.RecoveryModel)</td><td>$($e.TrustworthyOn)</td><td>$([System.Net.WebUtility]::HtmlEncode($e.IsolationLevel))</td><td class='num'>$sizeCell</td><td>$($e.CheckDbStatus) ($($e.CheckDbAgeDays)d)</td><td>$($e.VlfStatus) ($($e.VlfCount))</td><td>$($e.AutoGrowthEvents)</td><td>$($e.LastFullBackup)</td><td>$copyOnlyCell</td><td>$($e.LastLogBackup)</td><td>$excludeCell</td></tr>"
 					}
 					$bodyHtml = "<p>OK: $cntOk | Warning: $cntWarn | Critical: $cntCrit</p>" +
-						"<table><tr><th>Status</th><th>Datenbank</th><th>Recovery</th><th>Trustworthy</th><th>IsolationLevel</th><th>SizeMB</th><th>CheckDB</th><th>VLF</th><th>AutoGrowth</th><th>Letztes Full</th><th>Letztes Log</th><th>Backup-Ausschluss</th></tr>" +
+						"<table><tr><th>Status</th><th>Datenbank</th><th>Recovery</th><th>Trustworthy</th><th>IsolationLevel</th><th class='num'>SizeMB</th><th>CheckDB</th><th>VLF</th><th>AutoGrowth</th><th>Letztes Full</th><th>Nur COPY_ONLY</th><th>Letztes Log</th><th>Backup-Ausschluss</th></tr>" +
 						($rowsHtml -join '') + "</table>"
 					$html = ConvertTo-sqmHtmlReport -Title "Database Health - $instance" -Subtitle "Erstellt: $timestamp" -BodyHtml $bodyHtml
 					$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force

@@ -114,6 +114,62 @@ Describe 'Get-sqmDatabaseHealth' {
         }
     }
 
+    Context 'COPY_ONLY-Backups und Groessenformatierung' {
+        BeforeAll {
+            Mock -ModuleName sqmSQLTool Connect-DbaInstance {
+                New-MockSqlInstance -Name 'TESTSERVER'
+            }
+            Mock -ModuleName sqmSQLTool Get-DbaDatabase {
+                @(
+                    New-MockDatabase -Name 'CopyOnlyDb' -Status 'Normal' -RecoveryModel 'Full' -Size 12345.6
+                    New-MockDatabase -Name 'RegularDb'  -Status 'Normal' -RecoveryModel 'Full' -Size 512
+                )
+            }
+            Mock -ModuleName sqmSQLTool Invoke-DbaQuery -ParameterFilter {
+                $Query -like '*msdb.dbo.backupset*'
+            } {
+                @(
+                    # CopyOnlyDb hat NUR ein COPY_ONLY-Full
+                    [PSCustomObject]@{ database_name = 'CopyOnlyDb'; type = 'D'; is_copy_only = $true;  LastBackup = [datetime]'2026-09-18 06:18:00' }
+                    # RegularDb hat beides - das regulaere Full gewinnt
+                    [PSCustomObject]@{ database_name = 'RegularDb';  type = 'D'; is_copy_only = $false; LastBackup = [datetime]'2026-09-17 22:00:00' }
+                    [PSCustomObject]@{ database_name = 'RegularDb';  type = 'D'; is_copy_only = $true;  LastBackup = [datetime]'2026-09-18 06:18:00' }
+                )
+            }
+            Mock -ModuleName sqmSQLTool Invoke-DbaQuery { @() }
+            Mock -ModuleName sqmSQLTool Invoke-sqmLogging { }
+        }
+
+        It 'meldet ein reines COPY_ONLY-Full nicht als "(keins)"' {
+            $r = Get-sqmDatabaseHealth -SqlInstance 'TESTSERVER' -OutputPath $script:TestDir -NoOpen
+            $row = $r.DetailRows | Where-Object Database -eq 'CopyOnlyDb'
+            $row.LastFullBackup   | Should -Be '(nur COPY_ONLY: 2026-09-18 06:18)'
+            $row.LastCopyOnlyFull | Should -Be '2026-09-18 06:18'
+        }
+
+        It 'bevorzugt das regulaere Full, wenn beides vorhanden ist' {
+            $r = Get-sqmDatabaseHealth -SqlInstance 'TESTSERVER' -OutputPath $script:TestDir -NoOpen
+            $row = $r.DetailRows | Where-Object Database -eq 'RegularDb'
+            $row.LastFullBackup   | Should -Be '2026-09-17 22:00'
+            $row.LastCopyOnlyFull | Should -Be '2026-09-18 06:18'
+        }
+
+        It 'schreibt die COPY_ONLY-Spalte und den Hinweis in die Berichte' {
+            $r = Get-sqmDatabaseHealth -SqlInstance 'TESTSERVER' -OutputPath $script:TestDir -NoOpen
+            $html = Get-Content $r.HtmlFile -Raw
+            $html | Should -Match 'Nur COPY_ONLY'
+            (Get-Content $r.TxtFile -Raw) | Should -Match 'Nur COPY_ONLY-Full vorhanden'
+        }
+
+        It 'gibt die Groesse rechtsbuendig mit Tausendertrennung aus' {
+            $r = Get-sqmDatabaseHealth -SqlInstance 'TESTSERVER' -OutputPath $script:TestDir -NoOpen
+            $html = Get-Content $r.HtmlFile -Raw
+            $expected = '{0:N1}' -f 12345.6   # kulturabhaengig, genau wie im Bericht
+            $html | Should -BeLike "*<td class='num'>$expected</td>*"
+            $html | Should -Match "th class='num'>SizeMB"
+        }
+    }
+
     Context 'Fehlerbehandlung' {
         It 'Wirft Fehler bei nicht erreichbarer Instanz (kein Mock)' {
             { Get-sqmDatabaseHealth -SqlInstance 'NICHT_ERREICHBAR_99999' -OutputPath $script:TestDir -EnableException -ErrorAction Stop } |

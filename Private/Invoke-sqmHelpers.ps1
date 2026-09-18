@@ -271,6 +271,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: #060f20; color: #
 table { width: 100%; border-collapse: collapse; background: #0d1f38; margin-bottom: 18px; }
 th { background: #0b1e3d; color: #94a8c0; font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 8px 10px; text-align: left; border-bottom: 1px solid #1e3a5f; }
 td { padding: 7px 10px; border-bottom: 1px solid #14283f; }
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 tr:hover { background: rgba(45,134,193,0.05); }
 .ok   { color: #2ecc71; }
 .warn { color: #f1c40f; }

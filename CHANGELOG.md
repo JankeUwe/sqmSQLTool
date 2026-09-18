@@ -1,4 +1,37 @@
-# sqmSQLTool — Changelog
+﻿# sqmSQLTool — Changelog
+
+## [1.9.146.0] - 2026-09-18
+
+### Fix: Get-sqmDatabaseHealth meldete "(keins)" trotz vorhandenem COPY_ONLY-Backup
+
+Die Backup-Abfrage filterte COPY_ONLY-Sicherungen mit `is_copy_only = 0` komplett weg, so dass
+`LastFullBackup` als `(keins)` im Bericht stand, waehrend die SSMS-Datenbankeigenschaften ein
+Datum anzeigten. Im Container nachgestellt und gemessen (SQL 2022, frische DB ohne Historie):
+
+| Fall | msdb.dbo.backupset | SMO/SSMS LastBackupDate | alte Health-Abfrage |
+|---|---|---|---|
+| normales FULL | `type=D, copy_only=False` | Datum | Datum |
+| COPY_ONLY FULL | `type=D, copy_only=True` | Datum | keine Zeile -> `(keins)` |
+| nur FILEGROUP | `type=F` | leer | keine Zeile |
+| DB nach Backup umbenannt | Name passt nicht mehr | leer | keine Zeile |
+
+Nur der COPY_ONLY-Fall erzeugt also den Widerspruch, weil SMO nicht auf `is_copy_only` filtert.
+
+COPY_ONLY zaehlt weiterhin nicht als regulaeres Full, denn es setzt die Differential-Basis nicht
+zurueck und bildet keine Wiederherstellungskette. Neu ist nur, dass es benannt statt verschwiegen
+wird:
+
+- `LastFullBackup` zeigt `(nur COPY_ONLY: 2026-09-18 06:18)`, wenn es ausschliesslich COPY_ONLY
+  gibt, sonst unveraendert das Datum des regulaeren Fulls bzw. `(keins)`.
+- Neues Feld `LastCopyOnlyFull` in Objekt, CSV und HTML (Spalte "Nur COPY_ONLY").
+- Der TXT-Kopf listet betroffene Datenbanken unter "Nur COPY_ONLY-Full vorhanden".
+
+### Aenderung: Datenbankgroessen im HTML rechtsbuendig mit Tausendertrennung
+
+Die Spalte SizeMB wird als `{0:N1}` der aktuellen Kultur formatiert (z. B. `12.345,6`) und ueber
+die neue CSS-Klasse `.num` in `ConvertTo-sqmHtmlReport` rechtsbuendig mit `tabular-nums`
+ausgegeben. CSV und TXT liefern weiterhin den unformatierten Zahlwert, damit sie auswertbar
+bleiben.
 
 ## [1.9.145.0] - 2026-09-17
 

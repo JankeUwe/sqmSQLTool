@@ -45,12 +45,14 @@ function New-MockDatabase {
     param(
         [string]$Name   = 'TestDB',
         [string]$Status = 'Normal',
-        [string]$RecoveryModel = 'Full'
+        [string]$RecoveryModel = 'Full',
+        [double]$Size = 0
     )
     [PSCustomObject]@{
         Name          = $Name
         Status        = $Status
         RecoveryModel = $RecoveryModel
+        Size          = $Size
         SizeMB        = 1024
         SqlInstance   = 'TESTSERVER'
     }
