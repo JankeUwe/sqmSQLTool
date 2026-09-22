@@ -1,4 +1,4 @@
-# sqmSQLTool - Complete Function Reference
+﻿# sqmSQLTool - Complete Function Reference
 
 ## Installation
 
@@ -3107,6 +3107,57 @@ Shows which accounts would get Modify on which directories, without changing any
 ```powershell
 Invoke-sqmNtfsSetup -Directory 'E:\MSSQL\DATA','F:\MSSQL\LOG' -Account 'NT SERVICE\MSSQLSERVER'
 Sets permissions only on the given directories for the given account.
+
+### Move-sqmDatabaseFile
+
+Verschiebt Datenbankdateien (MDF/NDF/LDF) auf ein anderes Laufwerk oder in ein anderes Verzeichnis.
+
+Benutzerdatenbanken werden ueber OFFLINE -> kopieren -> ALTER DATABASE MODIFY FILE -> ONLINE
+    verschoben, tempdb ueber MODIFY FILE + Instanz-Neustart (es wird nichts kopiert, die Dateien
+    entstehen beim Start neu), model/msdb ueber MODIFY FILE + Dienst stoppen/kopieren/starten.
+    master wird abgelehnt, dafuer sind die Startparameter -d/-l/-e zustaendig.
+
+    Vor der ersten Aenderung: Datenbankzustand, AlwaysOn-Mitgliedschaft, Sichtbarkeit des
+    Zielverzeichnisses aus Sicht der Instanz, Schreibprobe mit einer temporaeren 8-MB-Datenbank
+    und freier Platz am Ziel. Alte Dateien werden erst entfernt, wenn die Datenbank am neuen Ort
+    nachweislich laeuft.
+
+**Parameters:**
+
+- **-SqlInstance** - Ziel-Instanz. Ohne Angabe wird $env:COMPUTERNAME verwendet.
+- **-SqlCredential** - Alternative SQL-Anmeldeinformationen.
+- **-Database** - Name der Datenbank, deren Dateien verschoben werden (z. B. "SalesDB" oder "tempdb").
+- **-FileDestination** - Zielverzeichnis, aus Sicht des SQL Servers (z. B. "G:\MSSQL\Data").
+- **-LogFileDestination** - Abweichendes Zielverzeichnis fuer Logdateien.
+- **-FileType** - All (Standard), Data (MDF/NDF) oder Log (LDF).
+- **-LogicalFileName** - Logische Namen einzelner Dateien, statt der ganzen Datenbank.
+- **-Credential** - Windows-Anmeldeinformationen fuer Dateioperationen und Dienststeuerung auf dem Zielhost.
+- **-KeepOldFiles** - Laesst die Dateien am alten Ort liegen.
+- **-NoRestart** - Nur tempdb: traegt die Pfade um, startet aber nicht neu (wirkt beim naechsten Start).
+- **-SkipWriteProbe** - Ueberspringt die Schreibprobe im Zielverzeichnis.
+- **-SkipSpaceCheck** - Ueberspringt die Pruefung des freien Speicherplatzes.
+- **-SpaceBufferPercent** - Sicherheitsaufschlag auf die benoetigte Groesse. Standard: 20.
+- **-RestartTimeoutSeconds** - Wartezeit auf die Instanz nach einer Dienstaktion. Standard: 300.
+- **-Force** - Beendet offene Verbindungen und uebergeht die AlwaysOn-Sperre.
+- **-EnableException** - Ausnahmen sofort ausloesen statt Ergebniszeile mit Status "Failed".
+
+**Examples (4):**
+
+```powershell
+Move-sqmDatabaseFile -SqlInstance SQL01 -Database tempdb -FileDestination 'G:\MSSQL\TempDB'
+Verschiebt alle tempdb-Dateien, startet die Instanz neu und entfernt die alten Dateien.
+
+```powershell
+Move-sqmDatabaseFile -SqlInstance SQL01 -Database tempdb -FileDestination 'G:\MSSQL\TempDB' -WhatIf
+Fuehrt alle Vorpruefungen aus und zeigt den geplanten Ablauf, ohne etwas zu veraendern.
+
+```powershell
+Move-sqmDatabaseFile -SqlInstance SQL01 -Database SalesDB -LogicalFileName 'SalesDB_log' -FileDestination 'H:\MSSQL\Log'
+Verschiebt nur die Logdatei der Datenbank SalesDB.
+
+```powershell
+Move-sqmDatabaseFile -SqlInstance SQL01 -Database SalesDB -FileDestination 'G:\MSSQL\Data' -LogFileDestination 'H:\MSSQL\Log' -Force
+Verschiebt Daten- und Logdateien auf getrennte Laufwerke und beendet dabei offene Verbindungen.
 
 ## 11. Module & Update Management
 

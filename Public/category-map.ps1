@@ -111,6 +111,7 @@ $categoryMap = @{
     'Invoke-sqmUpdateStatistics'          = 'Database Maintenance'
     'Invoke-sqmUserDatabaseBackup'        = 'Backup & Recovery'
     'Move-sqmAlwaysOnListener'            = 'Always On & Availability Groups'
+    'Move-sqmDatabaseFile'                = 'Storage & Disk Management'
     'New-sqmAgentProxy'                   = 'SQL Agent & Proxy Jobs'
     'New-sqmAlwaysOnRepairJob'            = 'SQL Agent & Proxy Jobs'
     'New-sqmAutoLoginSyncJob'             = 'SQL Agent & Proxy Jobs'

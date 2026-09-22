@@ -1,5 +1,69 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.147.0] - 2026-09-22
+
+### Neu: Move-sqmDatabaseFile - Datenbankdateien auf ein anderes Laufwerk verschieben
+
+Bisher gab es dafuer keine Funktion. Der naheliegende Weg ueber dbatools scheidet fuer den
+haeufigsten Fall aus: `Move-DbaDbFile` lehnt master, model, msdb und tempdb grundsaetzlich ab
+("System database detected as input"), und gerade tempdb ist die Datenbank, die man verschieben
+will, wenn ein Laufwerk zu klein wird.
+
+Drei Ablaeufe, je nach Datenbank:
+
+| Datenbank | Ablauf | Dateien kopieren |
+|---|---|---|
+| Benutzerdatenbank | OFFLINE -> kopieren -> MODIFY FILE -> ONLINE | ja |
+| tempdb | MODIFY FILE -> Instanz-Neustart | nein, wird beim Start neu angelegt |
+| model / msdb | MODIFY FILE -> Dienst stoppen -> kopieren -> Dienst starten | ja |
+| master | abgelehnt, dafuer sind die Startparameter -d/-l/-e zustaendig | - |
+
+Bei tempdb bleiben die alten Dateien sonst als Leichen auf dem alten Laufwerk liegen, weil SQL
+Server sie beim Start nicht aufraeumt, sondern am neuen Ort neue anlegt. Die Funktion entfernt
+sie nach dem Neustart, aber erst nachdem der neue Pfad per Test-DbaPath bestaetigt ist.
+
+Vorgeprueft wird, bevor irgendetwas veraendert wird:
+
+- Datenbankzustand (ONLINE/OFFLINE, kein Snapshot), AlwaysOn-Mitgliedschaft ueber
+  `Get-sqmDatabaseAgMembership` (eine AG-Datenbank laesst sich nicht offline setzen).
+- Sichtbarkeit des Zielverzeichnisses **aus Sicht der Instanz** (Test-DbaPath / xp_fileexist).
+  Fehlt es, wird es angelegt, die ACL des Quellverzeichnisses uebernommen und dem Dienstkonto
+  der Engine explizit Vollzugriff eingeraeumt.
+- Schreibprobe: im Zielverzeichnis wird testweise eine 8-MB-Datenbank angelegt und sofort wieder
+  verworfen. Erst das beweist, dass das Dienstkonto dort Dateien anlegen darf - eine lesbare ACL
+  oder ein sichtbarer Pfad beweisen es nicht. Bei tempdb ist das der entscheidende Test: ein
+  nicht beschreibbarer tempdb-Pfad bedeutet, dass die Instanz nach dem Neustart nicht mehr
+  hochkommt. Gegen eine echte Engine geprueft, der Fehlerfall meldet
+  `CREATE FILE encountered operating system error 5(Access is denied.)`.
+- Freier Platz am Ziel gegen die Summe der Dateigroessen plus Puffer (Standard 20 %), ueber
+  `Get-DbaDiskSpace` (kennt Mountpoints), Rueckfallebene `xp_fixeddrives`.
+
+Scheitert eine Vorpruefung, wird nichts veraendert. Scheitert das Kopieren mitten im Vorgang,
+werden bereits abgesetzte MODIFY FILE zurueckgesetzt und die Datenbank geht mit den alten Pfaden
+wieder online. Der SQL Server Agent wird nach einer Dienstaktion in den Zustand von vorher
+zurueckversetzt - `Start-DbaService -Type Engine` startet ihn nicht mit, und ein stillschweigend
+gestoppter Agent faellt sonst erst auf, wenn nachts die Sicherung ausbleibt.
+
+`-WhatIf` laeuft alle Vorpruefungen durch und zeigt den geplanten Ablauf, ohne etwas zu aendern.
+
+### Hinweis fuer alle Funktionen mit Pfaden auf einem entfernten Server: kein Join-Path
+
+Beim Test aufgefallen und in dieser Funktion vermieden: `Join-Path` loest den Laufwerksbuchstaben
+gegen die PSDrives der **aufrufenden** Maschine auf. Fuer ein `G:\...` auf einem entfernten SQL
+Server, das es lokal nicht gibt, liefert es einen nicht-terminierenden Fehler und einen LEEREN
+String:
+
+```
+PS> Join-Path 'G:\TempDB' 'tempdb.mdf'
+Join-Path: Laufwerk wurde nicht gefunden. Ein Laufwerk mit dem Namen "G" ist nicht vorhanden.
+PS> "'$r'"
+''
+```
+
+Das haette hier zu `ALTER DATABASE ... FILENAME = N''` gefuehrt. Die Funktion setzt Serverpfade
+darum ueber einen eigenen String-Join zusammen (`_CombineServerPath`). `Split-Path -Parent/-Leaf`
+ist davon nicht betroffen und funktioniert auch fuer fremde Laufwerke.
+
 ## [1.9.146.0] - 2026-09-18
 
 ### Fix: Get-sqmDatabaseHealth meldete "(keins)" trotz vorhandenem COPY_ONLY-Backup
