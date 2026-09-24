@@ -1,5 +1,55 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.149.0] - 2026-09-24
+
+### Neu: Invoke-sqmDatabaseStandardization - Datenbanken auf den Hausstandard bringen
+
+Fuenf Schritte pro Benutzerdatenbank, jeder einzeln abschaltbar (`-Skip...`), mit `-WhatIf` und
+CSV-Protokoll:
+
+| Schritt | Was passiert |
+|---|---|
+| FixOrphanUser | User ohne passende SID, aber mit gleichnamigem Login: `ALTER USER ... WITH LOGIN` |
+| RemoveUserWithoutLogin | Uebrige User ohne Login: besessene Schemas/Rollen an dbo, dann `DROP USER` (eine Transaktion) |
+| CompatibilityLevel | Auf die Stufe der Serverversion anheben (2022 = 160), nie absenken |
+| TargetRecoveryTime | `TARGET_RECOVERY_TIME = 60 SECONDS` (einstellbar) |
+| DatabaseOwner | sa, ermittelt ueber SID 0x01 (funktioniert auch nach Umbenennung) |
+
+Nicht entfernt werden: User `WITHOUT LOGIN` (Service Broker, Signaturen; nur mit
+`-IncludeUsersWithoutLogin`), Contained User, Zertifikats-User, interne `##...##`-User und
+**Windows-User, die keinen eigenen Login haben, aber ueber einen Gruppen-Login auf den Server kommen**.
+Letzteres prueft `xp_logininfo`; ohne die Pruefung wuerde man einem funktionierenden Konto den
+Datenbankzugriff wegnehmen. Offline-, Read-only- und AG-Secondary-Datenbanken werden uebersprungen.
+
+### Invoke-sqmRestoreDatabase ruft die Standardisierung auf
+
+Die bisherigen Schritte 7-9 (Repair-DbaDbOrphanUser, Windows-User ohne Login entfernen, Owner sa)
+sind durch den Aufruf von `Invoke-sqmDatabaseStandardization` ersetzt. Neu nach jedem Restore:
+Kompatibilitaetsstufe auf Serverniveau und TARGET_RECOVERY_TIME 60 s. Mit `-KeepCompatibilityLevel`
+bleibt die Stufe aus dem Backup erhalten (Anwendung noch nicht fuer die neue Stufe freigegeben).
+
+Behobene Schwaechen des alten Schritts 8:
+- `DROP USER` lief mit `-ErrorAction SilentlyContinue`. Besass der User ein Schema, scheiterte der
+  Drop, gemeldet wurde trotzdem "Success". Jetzt: Schema/Rolle an dbo, Fehler werden als Failed gemeldet.
+- Es wurden nur Windows-User/-Gruppen betrachtet, SQL-User ohne Login blieben liegen.
+- Windows-User mit Zugriff ueber eine Gruppe wurden geloescht.
+
+Die Aktionsnamen im Ergebnis haben sich geaendert: `FixOrphans`/`RemoveOrphanWindowsLogins`/`SetDbOwner`
+heissen jetzt `FixOrphanUser`/`RemoveUserWithoutLogin`/`DatabaseOwner`, dazu `CompatibilityLevel` und
+`TargetRecoveryTime` (eine Zeile pro User bzw. Einstellung).
+
+### Fix: Invoke-sqmRestoreDatabase -DatabaseName ohne -BackupFile
+
+Der dokumentierte Aufruf `Invoke-sqmRestoreDatabase -DatabaseName X` (juengste Backupkette aus der
+Historie) scheiterte beim Parameter-Binding mit "fehlender Pflichtparameter BackupFile": mit nur
+`-DatabaseName` passen alle drei Parametersaetze, PowerShell nahm den Default `SingleFile`.
+Default ist jetzt `FromHistory`.
+
+Live gegen DEV01 (SQL 2022) unter PS 5.1 und PS 7 geprueft: alle fuenf Schritte, `-WhatIf` ohne
+Aenderung, zweiter Lauf nur Skipped, Gruppenzugriffs-Schutz (temporaerer Login
+"Authentifizierte Benutzer"), Namen mit `]` und Hochkomma, Restore mit und ohne
+`-KeepCompatibilityLevel`. 20 neue Unit-Tests, gesamte Suite gruen (545 passed).
+
 ## [1.9.148.0] - 2026-09-24
 
 ### Fix: Get-sqmAgentJobScheduleReport - Zeitplan zeigte bei Weekly keinen Wochentag

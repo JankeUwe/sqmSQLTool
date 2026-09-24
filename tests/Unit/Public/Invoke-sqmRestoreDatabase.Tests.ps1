@@ -331,8 +331,7 @@ Describe 'Invoke-sqmRestoreDatabase - AG-Erkennung' {
             Mock Connect-DbaInstance { [PSCustomObject]@{ Name = 'SQL01'; Databases = @{} } }
             Mock Get-sqmDatabaseAgMembership { [PSCustomObject]@{ IsAgDatabase = $false; HadrEnabled = $false } }
             Mock Invoke-DbaQuery { $null }
-            Mock Repair-DbaDbOrphanUser { $null }
-            Mock Set-DbaDbOwner { $null }
+            Mock Invoke-sqmDatabaseStandardization { }
             Mock Stop-DbaProcess { }
 
             $script:exclusiveAccessRestoreAttempts = 0
@@ -368,8 +367,7 @@ Describe 'Invoke-sqmRestoreDatabase - AG-Erkennung' {
             Mock Connect-DbaInstance { [PSCustomObject]@{ Name = 'SQL01'; Databases = @{} } }
             Mock Get-sqmDatabaseAgMembership { [PSCustomObject]@{ IsAgDatabase = $false; HadrEnabled = $false } }
             Mock Invoke-DbaQuery { $null }
-            Mock Repair-DbaDbOrphanUser { $null }
-            Mock Set-DbaDbOwner { $null }
+            Mock Invoke-sqmDatabaseStandardization { }
             Mock Stop-DbaProcess { }
             Mock Restore-DbaDatabase { throw "Exclusive access could not be obtained because the database is in use." }
 

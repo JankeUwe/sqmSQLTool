@@ -9,9 +9,11 @@ deletion on secondary replicas). By default, once the restore completes, the dat
 automatically re-added to the AG (Add-DbaAgDatabase with SeedingMode Automatic), which also
 reseeds the secondaries - use -NoRejoinAvailabilityGroup to leave it standalone instead. Database
 users are exported before the restore (for later recovery). Optionally a backup of the original
-database can be created. After the restore, users are recovered, orphaned users are repaired,
-non-existent Windows logins are removed, and the database owner is set to the SA account
-(regardless of its name).
+database can be created. After the restore, users are recovered and the database is brought to
+the house standard via Invoke-sqmDatabaseStandardization: orphaned users are re-mapped to their
+logins, users without a login are removed, the compatibility level is raised to the server's level
+(skip with -KeepCompatibilityLevel), TARGET_RECOVERY_TIME is set to 60 seconds and the owner is set
+to the sa account (regardless of its name).
 
 AG or not, the function behaves identically apart from the AG-specific steps themselves (remove
 from AG, delete on secondaries, rejoin/reseed). Every operation - the optional pre-restore backup,
@@ -67,8 +69,8 @@ should genuinely stay standalone (e.g. a scratch/test restore), or `-NoRejoinAva
 still do the detection/logging but skip the actual join.
 
 The rejoin itself runs in a `finally` block once the restore has actually completed, so it is
-attempted even if a later, non-critical post-restore cleanup step (user re-import, orphan-user
-repair, stale Windows-login removal, owner assignment) throws - including with -EnableException.
+attempted even if a later, non-critical post-restore cleanup step (user re-import,
+standardization) throws - including with -EnableException.
 A database that was an AG member at the start of the run will never be left un-rejoined just
 because one of those cleanup steps failed.
 
@@ -182,6 +184,11 @@ Automatic, which also seeds the secondaries). Use this switch to suppress just t
 rejoin while still doing the rest (secondary cleanup etc.), leaving the database outside the AG
 after the restore.
 
+.PARAMETER KeepCompatibilityLevel
+Optional: Leaves the compatibility level as it came out of the backup instead of raising it to the
+server's level. Use this when the application is not yet certified for the new level - a new
+level can change execution plans.
+
 .PARAMETER EnableException
 Switch to allow exceptions to pass through (by default errors are logged and returned as objects).
 
@@ -239,12 +246,12 @@ Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\NewApp.bak
 Invoke-sqmRestoreDatabase -SqlInstance "SQL01" -BackupFile "D:\Backup\NewApp.bak" -DatabaseName "NewApp_scratch" -KeepAlwaysOn
 
 .NOTES
-Requires dbatools module, Invoke-sqmLogging, Get-sqmConfig, Set-sqmSqlPolicyState.
+Requires dbatools module, Invoke-sqmLogging, Get-sqmConfig, Set-sqmSqlPolicyState, Invoke-sqmDatabaseStandardization.
 The function assumes that the executing login has sysadmin rights on the target instance and all secondary replicas.
 
 For databases whose users are backed by their own SQL Server authentication logins rather than
 Windows logins (e.g. an application database with hundreds/thousands of SQL logins such as
-"Frontarena"), this function's own orphan-user repair (step 7) only fixes SID mismatches for
+"Frontarena"), this function's own orphan-user repair (Invoke-sqmDatabaseStandardization) only fixes SID mismatches for
 logins that already exist by name on the target - it does not know about password changes that
 happened on the source since the target's logins were created. Run Sync-sqmDatabaseLogins (or the
 Export-sqmDatabaseLogins / Import-sqmDatabaseLogins pair, if source and target cannot reach each
@@ -253,7 +260,11 @@ logins' passwords and SIDs in line with the source.
 #>
 function Invoke-sqmRestoreDatabase
 {
-	[CmdletBinding(DefaultParameterSetName = 'SingleFile', SupportsShouldProcess = $true, ConfirmImpact = 'None')]
+	# DefaultParameterSetName = 'FromHistory', nicht 'SingleFile': mit nur -DatabaseName passen alle drei
+	# Saetze, PowerShell nimmt dann den Default. Stand der auf SingleFile, scheiterte der dokumentierte
+	# Aufruf "Invoke-sqmRestoreDatabase -DatabaseName X" am fehlenden Pflichtparameter -BackupFile.
+	# -BackupFile/-BackupFiles legen den Satz ohnehin eindeutig fest.
+	[CmdletBinding(DefaultParameterSetName = 'FromHistory', SupportsShouldProcess = $true, ConfirmImpact = 'None')]
 	param (
 		[Parameter(Mandatory = $false, Position = 0)]
 		[string]$SqlInstance,
@@ -298,6 +309,8 @@ function Invoke-sqmRestoreDatabase
 		[switch]$ForceSingleUser,
 		[Parameter(Mandatory = $false)]
 		[switch]$NoRejoinAvailabilityGroup,
+		[Parameter(Mandatory = $false)]
+		[switch]$KeepCompatibilityLevel,
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
@@ -1165,102 +1178,43 @@ function Invoke-sqmRestoreDatabase
 				}
 			}
 
-			# ---- 7. Verwaiste User reparieren ----
-			$orphanFixAction = "Repariere verwaiste User in Datenbank '$finalDbName'"
-			if ($PSCmdlet.ShouldProcess($finalDbName, $orphanFixAction))
+			# ---- 7-9. Datenbank standardisieren ----
+			# Verwaiste User binden, User ohne Login entfernen, Kompatibilitaetsstufe anheben,
+			# TARGET_RECOVERY_TIME 60 s, Owner sa. Frueher standen hier drei eigene Schritte; die Logik
+			# lebt jetzt in Invoke-sqmDatabaseStandardization, damit sie auch ohne Restore aufrufbar ist.
+			$standardizeAction = "Standardisiere Datenbank '$finalDbName' (verwaiste User, User ohne Login, Kompatibilitaetsstufe, TARGET_RECOVERY_TIME, Owner sa)"
+			if ($PSCmdlet.ShouldProcess($finalDbName, $standardizeAction))
 			{
 				try
 				{
-					Invoke-sqmLogging -Message $orphanFixAction -FunctionName $functionName -Level "INFO"
-					$repairResult = Repair-DbaDbOrphanUser -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -Confirm:$false -EnableException -ErrorAction Stop
-					$repairedCount = if ($repairResult) { @($repairResult).Count } else { 0 }
-					Invoke-sqmLogging -Message "Verwaiste User repariert: $repairedCount." -FunctionName $functionName -Level "INFO"
-					$results += [PSCustomObject]@{ Action = "FixOrphans"; Status = "Success"; Message = "Repair-DbaDbOrphanUser: $repairedCount User repariert." }
-				}
-				catch
-				{
-					$errMsg = "Fehler bei der Reparatur verwaister User: $($_.Exception.Message)"
-					Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
-					if ($EnableException) { throw }
-					$results += [PSCustomObject]@{ Action = "FixOrphans"; Status = "Failed"; Message = $errMsg }
-				}
-			}
-			else
-			{
-				$results += [PSCustomObject]@{ Action = "FixOrphans"; Status = "Skipped"; Message = "WhatIf - Reparatur uebersprungen." }
-			}
-
-			# ---- 8. Domaenenfremde Accounts entfernen ----
-			$removeOrphanLoginsAction = "Entferne nicht mehr existierende Windows-Logins aus Datenbank '$finalDbName'"
-			if ($PSCmdlet.ShouldProcess($finalDbName, $removeOrphanLoginsAction))
-			{
-				try
-				{
-					Invoke-sqmLogging -Message $removeOrphanLoginsAction -FunctionName $functionName -Level "INFO"
-					$query = @"
-DECLARE @dbname sysname = DB_NAME();
-SELECT dp.name AS UserName
-FROM sys.database_principals dp
-LEFT JOIN sys.server_principals sp ON dp.sid = sp.sid
-WHERE dp.type IN ('U', 'G')
-  AND sp.sid IS NULL
-  AND dp.name NOT IN ('dbo', 'guest', 'INFORMATION_SCHEMA', 'sys')
-"@
-					$missingLogins = Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -Query $query -EnableException -ErrorAction Stop
-					foreach ($login in $missingLogins)
-					{
-						$userName = $login.UserName
-						Invoke-sqmLogging -Message "Entferne Windows-User '$userName' (Login existiert nicht mehr)." -FunctionName $functionName -Level "DEBUG"
-						$dropQuery = "DROP USER [$userName]"
-						Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -Query $dropQuery -ErrorAction SilentlyContinue
+					Invoke-sqmLogging -Message $standardizeAction -FunctionName $functionName -Level "INFO"
+					$standardizeParams = @{
+						SqlInstance            = $workInstance
+						SqlCredential          = $SqlCredential
+						Database               = $finalDbName
+						SkipCompatibilityLevel = $KeepCompatibilityLevel
+						Confirm                = $false
+						EnableException        = $EnableException
 					}
-					Invoke-sqmLogging -Message "Nicht mehr existierende Windows-Logins wurden entfernt." -FunctionName $functionName -Level "INFO"
-					$results += [PSCustomObject]@{ Action = "RemoveOrphanWindowsLogins"; Status = "Success"; Message = "Entfernt: $($missingLogins.Count) User." }
-				}
-				catch
-				{
-					$errMsg = "Fehler beim Entfernen nicht existierender Windows-Logins: $($_.Exception.Message)"
-					Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
-					if ($EnableException) { throw }
-					$results += [PSCustomObject]@{ Action = "RemoveOrphanWindowsLogins"; Status = "Failed"; Message = $errMsg }
-				}
-			}
-			else
-			{
-				$results += [PSCustomObject]@{ Action = "RemoveOrphanWindowsLogins"; Status = "Skipped"; Message = "WhatIf - Entfernen uebersprungen." }
-			}
-
-			# ---- 9. 'sa' Konto als Datenbankeigentuemer setzen ----
-			$setOwnerAction = "Setze sa-Konto (SID 0x01) als Datenbankeigentuemer fuer '$finalDbName'"
-			if ($PSCmdlet.ShouldProcess($finalDbName, $setOwnerAction))
-			{
-				try
-				{
-					Invoke-sqmLogging -Message $setOwnerAction -FunctionName $functionName -Level "INFO"
-					$saNameRow = Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential `
-						-Database 'master' `
-						-Query "SELECT name FROM sys.server_principals WHERE sid = 0x01" `
-						-EnableException -ErrorAction Stop
-					if (-not $saNameRow -or [string]::IsNullOrWhiteSpace($saNameRow.name))
+					$standardizeRows = @(Invoke-sqmDatabaseStandardization @standardizeParams)
+					foreach ($row in $standardizeRows)
 					{
-						throw "sa-Login (SID 0x01) nicht gefunden."
+						$status = switch ($row.Status) { 'OK' { 'Success' } default { $row.Status } }
+						$detail = if ("$($row.OldValue)" -ne '' -and "$($row.NewValue)" -ne '') { " ($($row.OldValue) -> $($row.NewValue))" } else { '' }
+						$results += [PSCustomObject]@{ Action = $row.Step; Status = $status; Message = "$($row.Target)$detail`: $($row.Message)" }
 					}
-					$saName = $saNameRow.name
-					Set-DbaDbOwner -SqlInstance $workInstance -SqlCredential $SqlCredential -Database $finalDbName -TargetLogin $saName -Confirm:$false -EnableException -ErrorAction Stop
-					Invoke-sqmLogging -Message "Datenbankeigentuemer auf '$saName' gesetzt." -FunctionName $functionName -Level "INFO"
-					$results += [PSCustomObject]@{ Action = "SetDbOwner"; Status = "Success"; Message = "Eigentuemer: $saName" }
 				}
 				catch
 				{
-					$errMsg = "Fehler beim Setzen des Datenbankeigentuemers: $($_.Exception.Message)"
+					$errMsg = "Fehler bei der Standardisierung: $($_.Exception.Message)"
 					Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 					if ($EnableException) { throw }
-					$results += [PSCustomObject]@{ Action = "SetDbOwner"; Status = "Failed"; Message = $errMsg }
+					$results += [PSCustomObject]@{ Action = "Standardization"; Status = "Failed"; Message = $errMsg }
 				}
 			}
 			else
 			{
-				$results += [PSCustomObject]@{ Action = "SetDbOwner"; Status = "Skipped"; Message = "WhatIf - Setzen des Eigentuemers uebersprungen." }
+				$results += [PSCustomObject]@{ Action = "Standardization"; Status = "Skipped"; Message = "WhatIf - Standardisierung uebersprungen." }
 			}
 
 			# AG-Rejoin (Schritt 10) laeuft NICHT mehr hier, sondern im finally-Block weiter unten -

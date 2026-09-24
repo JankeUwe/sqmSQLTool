@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.9.148.0'
+	ModuleVersion		   = '1.9.149.0'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
@@ -167,6 +167,7 @@
 		'Install-sqmSsrsReportServer',
 		'Invoke-sqmCollationChange',
 		'Invoke-sqmConfigRollback',
+		'Invoke-sqmDatabaseStandardization',
 		'Invoke-sqmDeployScripts',
 		'Invoke-sqmDistributedFailover',
 		'Invoke-sqmExtendedEvents',

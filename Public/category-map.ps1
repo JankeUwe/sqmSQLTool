@@ -82,6 +82,7 @@ $categoryMap = @{
     'Invoke-sqmAlwaysOnSetup'             = 'Always On & Availability Groups'
     'Invoke-sqmCollationChange'           = 'Configuration Management'
     'Invoke-sqmConfigRollback'            = 'Configuration Management'
+    'Invoke-sqmDatabaseStandardization'   = 'Database Maintenance'
     'Invoke-sqmDeployScripts'             = 'Script Execution & Deployment'
     'Invoke-sqmDistributedFailover'       = 'Always On & Availability Groups'
     'Invoke-sqmExtendedEvents'            = 'Extended Events & Diagnostics'

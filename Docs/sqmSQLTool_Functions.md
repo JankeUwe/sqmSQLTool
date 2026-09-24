@@ -5879,6 +5879,43 @@ Find-sqmDatabaseObject -SqlInstance "SQL01" -ObjectName "sp_GetOrders"
 ```powershell
 Find-sqmDatabaseObject -SqlInstance "SQL01" -ObjectName "*log*" -ObjectType "TABLE","VIEW" -Database "Sales*"
 
+### Invoke-sqmDatabaseStandardization
+
+Brings user databases to the house standard: orphaned users re-mapped, users without login removed, compatibility level raised to the server level, TARGET_RECOVERY_TIME 60 seconds, owner sa.
+
+Per database: (1) users whose SID matches no login but whose name matches a login are re-mapped
+    (ALTER USER ... WITH LOGIN); (2) remaining users without login are dropped, owned schemas/roles
+    are handed to dbo first (in one transaction); (3) compatibility level raised to the server's level,
+    never lowered; (4) TARGET_RECOVERY_TIME = 60 SECONDS; (5) owner = sa (via SID 0x01).
+    Never dropped: WITHOUT LOGIN users (unless -IncludeUsersWithoutLogin), contained users,
+    certificate users, ##internal## users and Windows users that reach the server through a group login
+    (checked via xp_logininfo). Offline, read-only and AG secondary databases are skipped.
+    Invoke-sqmRestoreDatabase calls this function after every restore.
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance(s), pipeline-capable (default: current computer name).
+- **-SqlCredential** - PSCredential for the connection.
+- **-Database** - Database name(s), wildcards allowed (default: all user databases).
+- **-ExcludeDatabase** - Databases to exclude, wildcards allowed.
+- **-TargetRecoveryTimeSeconds** - Value for TARGET_RECOVERY_TIME (default: 60).
+- **-IncludeUsersWithoutLogin** - Also drop users deliberately created WITHOUT LOGIN.
+- **-SkipOrphanRepair / -SkipUserRemoval / -SkipCompatibilityLevel / -SkipTargetRecoveryTime / -SkipOwner** - Switch off individual steps.
+- **-OutputPath** - Directory for the CSV change log (default: <module OutputPath>\DatabaseStandardization).
+- **-ContinueOnError** - Continue with the next instance on error.
+- **-EnableException** - Throw exceptions immediately.
+
+**Examples (3):**
+
+```powershell
+Invoke-sqmDatabaseStandardization -SqlInstance "SQL01" -WhatIf
+
+```powershell
+Invoke-sqmDatabaseStandardization -SqlInstance "SQL01" -Database "Arena"
+
+```powershell
+Invoke-sqmDatabaseStandardization -SqlInstance "SQL01" -Database "App*" -SkipCompatibilityLevel
+
 ### Invoke-sqmLogShrink
 
 Shrinks the transaction log file (LDF) of one or more databases.
