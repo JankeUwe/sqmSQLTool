@@ -1,5 +1,26 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.148.0] - 2026-09-24
+
+### Fix: Get-sqmAgentJobScheduleReport - Zeitplan zeigte bei Weekly keinen Wochentag
+
+Ein Zeitplan "Weekly, Sunday" erschien im HTML-Report nur als `Weekly`, die eigentliche Information
+fehlte. Ursache: `freq_interval` (bei Weekly eine Bitmaske der Wochentage) wurde nicht ausgewertet,
+`freq_recurrence_factor` und `freq_relative_interval` wurden gar nicht erst abgefragt.
+
+Jetzt vollstaendig:
+
+| Zeitplan | vorher | jetzt |
+|---|---|---|
+| Weekly, Sonntag 02:30 | `Weekly @ 02:30` | `Weekly on Sunday @ 02:30` |
+| alle 2 Wochen Mo+Fr, 06-18 Uhr alle 2 h | `Weekly every 2 hour(s) @ 06:00` | `Weekly (every 2 weeks) on Monday, Friday every 2 hour(s) between 06:00 and 18:00` |
+| Monatlich letzter Sonntag | `Monthly (relative)` | `Monthly on the last Sunday @ 05:00` |
+| Monatlich Tag 15, alle 3 Monate | `Monthly (day 15)` | `Monthly (every 3 months) on day 15 @ 04:00` |
+| Einmalig | `One Time` | `One Time on 2026-10-01 @ 12:00` |
+
+Ausserdem: Startzeit 00:00 wurde bisher unterschlagen (Bedingung `-gt 0`), bei Intervall-Zeitplaenen
+wird das Zeitfenster (`active_end_time`) genannt, sofern es nicht der ganze Tag ist.
+Live gegen DEV01 unter PS 5.1 verifiziert, 10 neue Unit-Tests fuer den Zeitplantext.
 ## [1.9.147.0] - 2026-09-22
 
 ### Neu: Move-sqmDatabaseFile - Datenbankdateien auf ein anderes Laufwerk verschieben

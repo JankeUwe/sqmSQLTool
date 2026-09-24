@@ -176,3 +176,26 @@ Describe 'Get-sqmAgentJobScheduleReport - Statusableitung' {
         }
     }
 }
+
+Describe '_ConvertJobSchedule - Zeitplantext' {
+
+    # Frueher lieferte freq_type 8 nur 'Weekly' ohne Wochentag, freq_type 32 nur 'Monthly (relative)'.
+    It 'liefert fuer <Case> den Text "<Expected>"' -TestCases @(
+        @{ Case = 'Weekly Sonntag';          Expected = 'Weekly on Sunday @ 00:00';                 P = @{ FrequencyType = 8;  FrequencyInterval = 1;   RecurrenceFactor = 1; StartTime = 0 } }
+        @{ Case = 'Weekly Mo+Mi+Fr';         Expected = 'Weekly on Monday, Wednesday, Friday @ 22:30'; P = @{ FrequencyType = 8;  FrequencyInterval = 42;  RecurrenceFactor = 1; StartTime = 223000 } }
+        @{ Case = 'Weekly alle Tage';        Expected = 'Weekly on all days @ 01:00';              P = @{ FrequencyType = 8;  FrequencyInterval = 127; RecurrenceFactor = 1; StartTime = 10000 } }
+        @{ Case = 'alle 2 Wochen Samstag';   Expected = 'Weekly (every 2 weeks) on Saturday @ 03:00'; P = @{ FrequencyType = 8; FrequencyInterval = 64; RecurrenceFactor = 2; StartTime = 30000 } }
+        @{ Case = 'Monthly Tag 15';          Expected = 'Monthly on day 15 @ 04:00';                P = @{ FrequencyType = 16; FrequencyInterval = 15;  RecurrenceFactor = 1; StartTime = 40000 } }
+        @{ Case = 'letzter Sonntag im Monat';Expected = 'Monthly on the last Sunday @ 05:00';       P = @{ FrequencyType = 32; FrequencyInterval = 1;   RelativeInterval = 16; RecurrenceFactor = 1; StartTime = 50000 } }
+        @{ Case = 'erster Wochentag';        Expected = 'Monthly on the first weekday @ 06:00';     P = @{ FrequencyType = 32; FrequencyInterval = 9;   RelativeInterval = 1;  RecurrenceFactor = 1; StartTime = 60000 } }
+        @{ Case = 'Daily alle 15 Min';       Expected = 'Daily (every 1 day(s)) every 15 minute(s)'; P = @{ FrequencyType = 4; FrequencyInterval = 1; SubdayType = 4; SubdayInterval = 15; StartTime = 0; EndTime = 235959 } }
+        @{ Case = 'Weekly Mo stuendl. Fenster'; Expected = 'Weekly on Monday every 1 hour(s) between 06:00 and 18:00'; P = @{ FrequencyType = 8; FrequencyInterval = 2; RecurrenceFactor = 1; SubdayType = 8; SubdayInterval = 1; StartTime = 60000; EndTime = 180000 } }
+        @{ Case = 'One Time';                Expected = 'One Time on 2026-10-01 @ 12:00';          P = @{ FrequencyType = 1;  FrequencyInterval = 0;   StartDate = 20261001; StartTime = 120000 } }
+    ) {
+        param($Case, $Expected, $P)
+        InModuleScope sqmSQLTool -Parameters @{ P = $P; Expected = $Expected } {
+            param($P, $Expected)
+            _ConvertJobSchedule @P | Should -Be $Expected
+        }
+    }
+}

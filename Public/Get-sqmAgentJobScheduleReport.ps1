@@ -194,7 +194,11 @@ function Get-sqmAgentJobScheduleReport {
                 ss.freq_interval AS FrequencyInterval,
                 ss.freq_subday_type AS SubdayType,
                 ss.freq_subday_interval AS SubdayInterval,
+                ss.freq_relative_interval AS RelativeInterval,
+                ss.freq_recurrence_factor AS RecurrenceFactor,
+                ss.active_start_date AS ActiveStartDate,
                 ss.active_start_time AS ActiveStartTime,
+                ss.active_end_time AS ActiveEndTime,
                 lr.run_date AS LastRunDate,
                 lr.run_time AS LastRunTime,
                 CASE WHEN lr.run_status IS NULL THEN NULL
@@ -229,7 +233,11 @@ function Get-sqmAgentJobScheduleReport {
                                        -FrequencyInterval $history.FrequencyInterval `
                                        -SubdayType $history.SubdayType `
                                        -SubdayInterval $history.SubdayInterval `
-                                       -StartTime $history.ActiveStartTime
+                                       -RelativeInterval $history.RelativeInterval `
+                                       -RecurrenceFactor $history.RecurrenceFactor `
+                                       -StartDate $history.ActiveStartDate `
+                                       -StartTime $history.ActiveStartTime `
+                                       -EndTime $history.ActiveEndTime
                     # Mehr als ein Zeitplan: nur der erste (nach schedule_id) wird angezeigt, das
                     # wird kenntlich gemacht statt es stillschweigend zu verschweigen.
                     if ([int]$history.ScheduleCount -gt 1) { $text += " (+$([int]$history.ScheduleCount - 1) weitere(r) Zeitplan/Zeitplaene)" }
@@ -352,59 +360,98 @@ function _ConvertJobSchedule {
         [object]$FrequencyInterval,
         [object]$SubdayType,
         [object]$SubdayInterval,
-        [object]$StartTime
+        [object]$RelativeInterval,
+        [object]$RecurrenceFactor,
+        [object]$StartDate,
+        [object]$StartTime,
+        [object]$EndTime
     )
 
     # Convert to int, handle NULL/empty
-    [int]$FrequencyType = if ([int]::TryParse($FrequencyType, [ref]$null)) { [int]$FrequencyType } else { 0 }
-    [int]$FrequencyInterval = if ([int]::TryParse($FrequencyInterval, [ref]$null)) { [int]$FrequencyInterval } else { 0 }
-    [int]$SubdayType = if ([int]::TryParse($SubdayType, [ref]$null)) { [int]$SubdayType } else { 0 }
-    [int]$SubdayInterval = if ([int]::TryParse($SubdayInterval, [ref]$null)) { [int]$SubdayInterval } else { 0 }
-    [int]$StartTime = if ([int]::TryParse($StartTime, [ref]$null)) { [int]$StartTime } else { 0 }
+    [int]$FrequencyType = if ([int]::TryParse([string]$FrequencyType, [ref]$null)) { [int][string]$FrequencyType } else { 0 }
+    [int]$FrequencyInterval = if ([int]::TryParse([string]$FrequencyInterval, [ref]$null)) { [int][string]$FrequencyInterval } else { 0 }
+    [int]$SubdayType = if ([int]::TryParse([string]$SubdayType, [ref]$null)) { [int][string]$SubdayType } else { 0 }
+    [int]$SubdayInterval = if ([int]::TryParse([string]$SubdayInterval, [ref]$null)) { [int][string]$SubdayInterval } else { 0 }
+    [int]$RelativeInterval = if ([int]::TryParse([string]$RelativeInterval, [ref]$null)) { [int][string]$RelativeInterval } else { 0 }
+    [int]$RecurrenceFactor = if ([int]::TryParse([string]$RecurrenceFactor, [ref]$null)) { [int][string]$RecurrenceFactor } else { 0 }
+    [int]$StartDate = if ([int]::TryParse([string]$StartDate, [ref]$null)) { [int][string]$StartDate } else { 0 }
+    [int]$StartTime = if ([int]::TryParse([string]$StartTime, [ref]$null)) { [int][string]$StartTime } else { 0 }
+    # active_end_time fehlt/NULL = bis Tagesende (SQL Agent-Default 235959)
+    [int]$EndTime = if ([int]::TryParse([string]$EndTime, [ref]$null)) { [int][string]$EndTime } else { 235959 }
 
     if (-not $FrequencyType) { return 'No Schedule' }
 
-    # Frequency Type: 1=Once, 4=Daily, 8=Weekly, 16=Monthly, 32=Monthly Relative, 64=When Agent starts, 128=When CPU idle
+    # HHMMSS -> HH:MM bzw. HH:MM:SS
+    $fmtTime = {
+        param([int]$t)
+        $h = [int][math]::Floor($t / 10000)
+        $m = [int][math]::Floor(($t % 10000) / 100)
+        $s = [int]($t % 100)
+        if ($s -gt 0) { '{0:D2}:{1:D2}:{2:D2}' -f $h, $m, $s } else { '{0:D2}:{1:D2}' -f $h, $m }
+    }
+
+    # sysschedules.freq_interval bei Weekly ist eine Bitmaske: 1=So, 2=Mo, 4=Di, 8=Mi, 16=Do, 32=Fr, 64=Sa.
+    # Frueher wurde hier nur 'Weekly' ausgegeben - die eigentliche Information (WELCHER Tag) fehlte.
+    # Anzeige beginnt mit Montag.
+    # Absichtlich ein Array statt [ordered]@{}: OrderedDictionary interpretiert einen [int]-Index als
+    # POSITION, nicht als Schluessel - $od[2] waere der dritte Eintrag, nicht Bit 2.
+    $weekDays = @(
+        @(2, 'Monday'), @(4, 'Tuesday'), @(8, 'Wednesday'), @(16, 'Thursday'),
+        @(32, 'Friday'), @(64, 'Saturday'), @(1, 'Sunday')
+    )
+    # freq_interval bei Monthly relative (32): 1..7 = So..Sa, 8 = Tag, 9 = Wochentag, 10 = Wochenendtag
+    $relativeDays = @{ 1 = 'Sunday'; 2 = 'Monday'; 3 = 'Tuesday'; 4 = 'Wednesday'; 5 = 'Thursday'; 6 = 'Friday'; 7 = 'Saturday'; 8 = 'day'; 9 = 'weekday'; 10 = 'weekend day' }
+    # freq_relative_interval: 1=First, 2=Second, 4=Third, 8=Fourth, 16=Last
+    $relativeOrdinals = @{ 1 = 'first'; 2 = 'second'; 4 = 'third'; 8 = 'fourth'; 16 = 'last' }
+
     $freqDesc = switch ($FrequencyType) {
-        1  { 'One Time' }
-        4  { "Daily (every $FrequencyInterval day(s))" }
-        8  { 'Weekly' }
-        16 { "Monthly (day $FrequencyInterval)" }
-        32 { 'Monthly (relative)' }
+        1 {
+            if ($StartDate -gt 0) {
+                $d = $StartDate.ToString().PadLeft(8, '0')
+                "One Time on $($d.Substring(0,4))-$($d.Substring(4,2))-$($d.Substring(6,2))"
+            } else { 'One Time' }
+        }
+        4 { "Daily (every $FrequencyInterval day(s))" }
+        8 {
+            $days = @($weekDays | Where-Object { $FrequencyInterval -band $_[0] } | ForEach-Object { $_[1] })
+            $dayText = if ($days.Count -eq 7) { 'all days' }
+                       elseif ($days.Count -gt 0) { $days -join ', ' }
+                       else { "unknown day(s) (mask $FrequencyInterval)" }
+            if ($RecurrenceFactor -gt 1) { "Weekly (every $RecurrenceFactor weeks) on $dayText" } else { "Weekly on $dayText" }
+        }
+        16 {
+            if ($RecurrenceFactor -gt 1) { "Monthly (every $RecurrenceFactor months) on day $FrequencyInterval" } else { "Monthly on day $FrequencyInterval" }
+        }
+        32 {
+            $ord = if ($relativeOrdinals.ContainsKey($RelativeInterval)) { $relativeOrdinals[$RelativeInterval] } else { "?($RelativeInterval)" }
+            $day = if ($relativeDays.ContainsKey($FrequencyInterval)) { $relativeDays[$FrequencyInterval] } else { "?($FrequencyInterval)" }
+            if ($RecurrenceFactor -gt 1) { "Monthly (every $RecurrenceFactor months) on the $ord $day" } else { "Monthly on the $ord $day" }
+        }
         64 { 'When SQL Agent starts' }
         128 { 'When CPU is idle' }
         default { "Frequency Type: $FrequencyType" }
     }
 
-    # Add subday interval if present
-    # freq_subday_type: 1=AtSpecifiedTime, 2=Seconds, 4=Minutes, 8=Hours, 16=Days
-    if ($SubdayType -and $SubdayInterval) {
-        $subdayDesc = switch ($SubdayType) {
-            1 { '' }  # At specified time only - no subday interval
-            2 { "every $SubdayInterval second(s)" }
-            4 { "every $SubdayInterval minute(s)" }
-            8 { "every $SubdayInterval hour(s)" }
-            16 { "every $SubdayInterval day(s)" }
-            default { '' }
-        }
-        if ($subdayDesc) {
-            $freqDesc += " $subdayDesc"
-        }
+    # Agent-Start / CPU idle haben keine Uhrzeit
+    if ($FrequencyType -in 64, 128) { return $freqDesc }
+
+    # freq_subday_type: 1=AtSpecifiedTime, 2=Seconds, 4=Minutes, 8=Hours
+    $subdayUnit = switch ($SubdayType) {
+        2 { 'second(s)' }
+        4 { 'minute(s)' }
+        8 { 'hour(s)' }
+        default { $null }
     }
 
-    # Add start time (format: HHMMSS)
-    if ($StartTime -gt 0) {
-        $hours = [int][math]::Floor($StartTime / 10000)
-        $minutes = [int][math]::Floor(($StartTime % 10000) / 100)
-        $seconds = [int]($StartTime % 100)
-
-        # Format as HH:MM or HH:MM:SS if seconds present
-        if ($seconds -gt 0) {
-            $timeStr = "{0:D2}:{1:D2}:{2:D2}" -f $hours, $minutes, $seconds
-        } else {
-            $timeStr = "{0:D2}:{1:D2}" -f $hours, $minutes
+    if ($subdayUnit -and $SubdayInterval -gt 0 -and $FrequencyType -ne 1) {
+        $freqDesc += " every $SubdayInterval $subdayUnit"
+        # Zeitfenster nur nennen, wenn es nicht der ganze Tag ist
+        if ($StartTime -gt 0 -or $EndTime -lt 235959) {
+            $freqDesc += " between $(& $fmtTime $StartTime) and $(& $fmtTime $EndTime)"
         }
-        $freqDesc += " @ $timeStr"
+    } else {
+        # Einmal am Tag: Uhrzeit immer nennen, auch 00:00 (vorher bei Mitternacht unterschlagen)
+        $freqDesc += " @ $(& $fmtTime $StartTime)"
     }
 
     return $freqDesc
