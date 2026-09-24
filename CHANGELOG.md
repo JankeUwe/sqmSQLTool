@@ -762,6 +762,156 @@ apply the fix immediately instead of leaving it for the next manual restart.
 Not live-tested against DEV01 - the lab has no SSAS instance installed. Verified only by
 reading the XML structure `Set-sqmSsasDeploymentMode` already parses successfully in production.
 
+## [1.9.125.0] — 2026-09-01
+
+### Fix: `Compare-sqmServerConfiguration` meldet Verbindungsfehler, statt `$null` zu liefern
+
+Scheiterte `Connect-DbaInstance` fuer eine der beiden Instanzen (z.B. Firewall blockiert den Port),
+landete das nur im aeusseren catch: Eintrag in die Logdatei, `return $null`, nichts auf der Konsole
+und kein Ergebnisobjekt, das der Aufrufer auswerten koennte - eine stille Sackgasse.
+
+Quelle und Ziel werden jetzt einzeln verbunden und einzeln abgefangen, die Meldung nennt also die
+nicht erreichbare Instanz. Dieser Pfad und der allgemeine catch schreiben jetzt `Write-Error`
+(sichtbar auch ohne `-EnableException`) und liefern eine Ergebnisliste mit einer
+`Critical`-Zeile `Connection`, die den Fehler beschreibt, statt `$null`.
+
+## [1.9.124.0] — 2026-09-01
+
+### Fix: Leerzeichen hinter `-q` machte den Collation-Rebuild zur stillen Nulloperation
+
+Ein realer Server lieferte nach zwei vorherigen Korrekturen (1.9.121.0 Readiness-Retry,
+1.9.122.0 Stream-Drain) exakt denselben Fehler: gleiche Warnung "The system cannot find the file
+specified", gleicher Abbruch bei der abschliessenden Pruefung. Beide Korrekturen betrafen das
+Timing rund um `sqlservr.exe`, keine hat am Ergebnis etwas geaendert. Das hiess: der eigentliche
+Rebuild lief gar nicht, unabhaengig vom Timing.
+
+`sqlservr.exe` hat einen eigenen Argument-Parser, kein getopt: Schalter mit Wert (`-d`, `-e`,
+`-l` und ebenso `-q`) verlangen den Wert **ohne Leerzeichen**. Der Code uebergab `-q "$NewCollation"`
+mit Leerzeichen. Das wird sehr wahrscheinlich als leeres `-q` plus unbekanntes Zusatzargument
+gelesen, `sqlservr.exe` startet dann normal im Single-User-Modus und baut nichts um.
+
+Fix: `-q"$NewCollation"` ohne Leerzeichen, so wie `sqlservr.exe` es erwartet.
+
+## [1.9.123.0] — 2026-09-01
+
+### Fix: Empfehlung fuer "max server memory" auf Hosts mit mehreren Instanzen aufteilen
+
+`Set-sqmMaxMemory` und `Test-sqmMaxMemory` berechneten den empfohlenen Wert als Prozentsatz des
+**gesamten** Arbeitsspeichers, ohne andere Instanzen auf demselben Host zu kennen. Laufen dort
+mehrere Engine-Instanzen, ueberbucht derselbe Prozentsatz pro Instanz den Speicher massiv (zwei
+Instanzen mit je 90 % = 180 %), und `Test-sqmMaxMemory` meldete einen korrekt aufgeteilten Wert
+als `TooLow`, weil auch das Toleranzband gegen den Gesamtspeicher gerechnet wurde.
+
+Neu: `Get-sqmHostEngineInstanceCount` (Private) zaehlt die Engine-Instanzen eines Hosts ueber
+`Get-DbaService`, mit Rueckfall auf `Get-Service` (MSSQLSERVER / MSSQL$<Name>), wenn der Host die
+lokale Maschine ist und `Get-DbaService` nicht verfuegbar ist (z.B. WinRM gesperrt). Beide
+oeffentlichen Funktionen teilen das Speicherbudget (und die Toleranzgrenzen) durch diese Anzahl.
+Neuer Parameter `-InstanceCount` uebersteuert die automatische Erkennung.
+
+## [1.9.122.0] — 2026-09-01
+
+### Fix: wahrscheinlicher Haenger beim Collation-Rebuild (umgeleitete Streams nie gelesen)
+
+Die ausfuehrliche Ausgabe eines realen Laufs zeigte `xp_readerrorlog` mit "The system cannot find
+the file specified", dem klassischen Named-Pipes-Fehler 2: es hat nie jemand zugehoert. Dazu kam:
+`RedirectStandardOutput` und `RedirectStandardError` waren fuer `sqlservr.exe` gesetzt, wurden
+aber nirgends gelesen. Der .NET-Pipe-Puffer fasst nur wenige KB, `sqlservr.exe` mit
+`-T4022 -T3659` erzeugt beim `-q`-Rebuild weit mehr. Ist der Puffer voll, blockiert der Prozess
+beim naechsten Schreibversuch und haengt bis zum Ablauf von `-StartupTimeoutSeconds`. `Kill()`
+bricht den Rebuild dann mittendrin ab, der Dienst startet unauffaellig mit der **alten**
+Collation, und erst die abschliessende Pruefung wirft.
+
+Fix: beide Streams werden asynchron geleert (`OutputDataReceived`/`ErrorDataReceived` mit
+`BeginOutputReadLine`/`BeginErrorReadLine`), die mitgeschnittene Ausgabe wird protokolliert und in
+der Timeout-Warnung aus 1.9.121.0 angezeigt. Ein naechster Fehlschlag zeigt so die Diagnose von
+`sqlservr.exe` selbst statt nichts.
+
+## [1.9.121.0] — 2026-09-01
+
+### Fix: Readiness-Erkennung beim Collation-Rebuild und wirkungsloses `-ExcludeDatabase`
+
+`Invoke-sqmCollationChange` suchte die Bereitschaftsmeldung im Errorlog von `sqlservr.exe` genau
+einmal, direkt nach `Process.Start()`. Zu diesem Zeitpunkt nimmt die Instanz noch keine
+Verbindungen an, die Pruefung scheiterte also fast immer still, und die Readiness-Erkennung griff
+nie. Uebrig blieben das Selbstbeenden von `sqlservr.exe` oder ein blinder
+`StartupTimeoutSeconds`-Timeout mit anschliessendem `Kill()`, der den Rebuild abbrechen kann,
+bevor er festgeschrieben ist. Der Dienst startet dann normal mit der alten Collation, und ausser
+dem abschliessenden Pruefungsfehler zeigt nichts das Problem an.
+
+Fix: die Errorlog-Abfrage laeuft jetzt in jedem Poll-Durchlauf statt einmal, und die Funktion
+warnt ausdruecklich, wenn der Prozess beendet werden musste, ohne dass je eine Bereitschaftsmeldung
+kam, statt bedingungslos gruen "abgeschlossen" zu melden.
+
+Ausserdem war `-ExcludeDatabase` dauerhaft wirkungslos: im inneren `Where-Object` ueberdeckte `$_`
+das aeussere Datenbankobjekt mit dem gerade geprueften Muster-String, `$_.Name` war also immer
+`$null`, und der Filter schloss nie etwas aus.
+
+## [1.9.120.0] — 2026-09-01
+
+### Fix: GUI-Absturz "Cannot index into a null array" am Collation-Auswahlknopf
+
+Der Click-Handler des "List..."-Knopfs fuer `Invoke-sqmCollationChange` prueft jetzt, ob
+`$script:guiState`, `.Controls` und `.Creds` schon befuellt sind. Vorher warf er in
+`Show-sqmToolGui.ps1` Zeile 773 "Cannot index into a null array".
+
+## [1.9.119.0] — 2026-09-01
+
+### Neu: `Test-sqmLoginGroupAccess` - Zugriffsprobleme bei AD-Gruppen-Logins diagnostizieren
+
+In Umgebungen, in denen Logins nur als AD-Gruppen angelegt werden (nicht pro Benutzer), fehlt
+einem Benutzer, der sich nicht verbinden kann, eines von zwei Dingen: keine seiner AD-Gruppen ist
+als Login angelegt (oder der Login ist deaktiviert bzw. hat `CONNECT SQL` verweigert), oder es
+gibt einen nutzbaren Login, aber keinen passenden Datenbankbenutzer in der Zieldatenbank.
+
+Die Funktion loest die AD-Gruppen des Benutzers (direkt und verschachtelt) ueber
+`Get-sqmADMemberGroups` auf, gleicht sie mit den Windows-Gruppen-Logins in `sys.server_principals`
+ab und prueft fuer jeden nutzbaren Login in jeder erreichbaren Datenbank per SID, ob ein
+Datenbankbenutzer existiert und in welchen Rollen er ist. Ergebnis ist eine Diagnose
+(`NoGroups`/`NoLoginGroup`/`LoginBlocked`/`NoDatabaseAccess`/.../`OK`) plus TXT/HTML/CSV-Reports.
+
+Verifiziert: die T-SQL-Abfragen laufen gegen SQL 2022, und ohne gefundene AD-Gruppen liefert die
+Funktion ein sauberes typisiertes Ergebnis statt abzustuerzen. Den Gruppenabgleich selbst konnte
+das Labor ohne AD-Domaene nicht durchspielen.
+
+Nachgezogen: doppelte `ErrorAction`-Bindung (Splat mit `ErrorAction=Stop` plus explizites
+`-ErrorAction Stop`) entfernt, die unter Windows PowerShell 5.1 abbricht. Der Pre-Push-Hook hatte
+das vor dem Push abgefangen.
+
+## [1.9.118.0] — 2026-09-01
+
+### Fix: `Get-sqmADMemberGroups` zeigte den echten Namen des abgefragten Kontos nicht
+
+Der Report loeste den DisplayName fuer jede gefundene **Gruppe** auf, aber nie fuer die abgefragte
+Identitaet selbst. Kopf und CSV/HTML zeigten nur den uebergebenen SamAccountName bzw. UPN.
+
+Jetzt wird er auf dieselbe Weise aufgeloest wie bei den Gruppen: `Get-ADObject`, wenn das AD-Modul
+da ist (per LDAPFilter statt `Get-ADUser`, weil die Identitaet laut Dokumentation Benutzer, Gruppe
+oder Computer sein kann), sonst per LDAP/ADSI. Neue Eigenschaft `DisplayName` am Ergebnisobjekt
+und eine Zeile "Real Name" im TXT/HTML-Report.
+
+## [1.9.117.0] — 2026-09-01
+
+### Neu: `Get-sqmSupportedCollations` und Collation-Auswahl in der GUI
+
+`Get-sqmSupportedCollations` fragt `sys.fn_helpcollations()` live auf der Zielinstanz ab.
+Collations haengen von Version und Edition ab, eine fest verdrahtete Liste wuerde veralten oder
+Werte anbieten, die das Ziel gar nicht kennt.
+
+`Show-sqmToolGui`: `-NewCollation` von `Invoke-sqmCollationChange` bekommt einen "List..."-Knopf
+(gleiches Muster wie die vorhandenen Browse-Knoepfe). Er oeffnet eine filterbare Auswahl, befuellt
+ueber `Get-sqmSupportedCollations` mit den im Formular eingetragenen `-SqlInstance`/`-SqlCredential`,
+und schreibt die Auswahl ins vorhandene Textfeld. Wie die GUI Parameterwerte liest, bleibt
+unveraendert, Befehlsaufbau und Ausfuehrung sind nicht beruehrt.
+
+## [1.9.116.0] — 2026-09-01
+
+### Neu: `Get-sqmDatabaseCollationReport` - Collation der Datenbanken gegen die Instanz
+
+Vergleicht die Collation jeder Datenbank mit der Collation der Instanz (die tempdb immer
+verwendet) und warnt bei Abweichungen. Die fuehren zu "Cannot resolve collation conflict" bei
+tempdb-Operationen sowie bei datenbankuebergreifenden Joins und Vergleichen. Schreibt TXT- und
+HTML-Reports wie die uebrigen `Get-sqm*Report`-Funktionen.
+
 ## [1.9.115.0] — 2026-08-30
 
 ### New: `Register-sqmAuditSession` — Extended Events session for the login/database/metadata audit gap
@@ -1479,8 +1629,8 @@ Funktionsanzahl im Modul: 162 -> 163 (README aktualisiert).
 
 ### Fix: `Invoke-sqmRestoreDatabase` scheiterte trotz erfolgreichem SetSingleUser mit "Exclusive access could not be obtained"
 
-Gemeldet anhand eines echten Laufs (SFCSDBS103IHZ, Restore von `arena` aus
-`F:\DB_Transfer_Prod\arena.bak`): `SetSingleUser` protokollierte Erfolg, der direkt
+Gemeldet anhand eines echten Laufs (SQL01, Restore von `SalesDB` aus
+`F:\Transfer\SalesDB.bak`): `SetSingleUser` protokollierte Erfolg, der direkt
 anschliessende `Restore-DbaDatabase`-Aufruf scheiterte trotzdem mit "Exclusive access could not
 be obtained because the database is in use."
 
@@ -1658,7 +1808,7 @@ Session mangels Elevation nicht ausgefuehrt.
 
 ### Feature: `Export-sqmDatabaseLogins` / `Import-sqmDatabaseLogins` / `Sync-sqmDatabaseLogins`
 
-Hintergrund: Datenbanken wie `Frontarena` werden regelmaessig von Prod nach Test kopiert und dort
+Hintergrund: Datenbanken wie `TradingDB` werden regelmaessig von Prod nach Test kopiert und dort
 per `Invoke-sqmRestoreDatabase` restored. Die Datenbank enthaelt ca. 1500 SQL-Server-Logins als
 Datenbank-User; die zugehoerigen Server-Logins mit den aktuellen Kennwoertern liegen nur auf Prod
 und aendern sich dort von Zeit zu Zeit (Passwortrichtlinie/Ablauf) - Test bekommt das nie
@@ -1691,7 +1841,7 @@ Annahme. Die neue Loesung ist daher rein dateibasiert:
 
 `Invoke-sqmRestoreDatabase` selbst wurde NICHT veraendert (kein zusaetzlicher Parameterpfad in einer
 bereits sehr umfangreichen, AG-sensiblen Funktion) - fuer Datenbanken mit eigenstaendigen SQL-Logins
-wie `Frontarena` wird `Sync-sqmDatabaseLogins` (oder das Export-/Import-Paar) direkt im Anschluss an
+wie `TradingDB` wird `Sync-sqmDatabaseLogins` (oder das Export-/Import-Paar) direkt im Anschluss an
 den Restore aufgerufen, siehe Verweis in dessen `.NOTES`.
 
 ## [1.9.77.0] — 2026-08-08
@@ -1726,7 +1876,7 @@ wegzureissen.
 
 ### Fix: `Invoke-sqmRestoreDatabase` scheiterte beim AG-Rejoin mit "RecoveryModel ... is not Full, but Simple"
 
-Vorfall auf `SFCSDBS103IHZ`: Restore von `Test` aus einem Backup, das (oder dessen Quelldatenbank)
+Vorfall auf `SQL01`: Restore von `Test` aus einem Backup, das (oder dessen Quelldatenbank)
 in SIMPLE Recovery stand. Restore, User-Import und Owner-Zuweisung liefen erfolgreich durch, aber
 `Add-DbaAgDatabase` scheiterte zuverlaessig mit "RecoveryModel of database [Test] is not Full, but
 Simple" - eine AG verlangt zwingend Full Recovery mit luecklosser Log-Chain.
@@ -1936,8 +2086,8 @@ Tagesabstand ("4 days" statt immer "Never"), echte Nie-gesichert-Faelle zeigen w
 Folgefix zu 1.9.68.0: dieselbe Ursache (geteiltes Dienstkonto ueber alle AG-Repliken +
 Listener), aber fuer die Partnerreplik selbst statt nur fuer den Listener. Der generische
 Soll-/Ist-Vergleich kennt nur die 4 eigenen Instanz-SPNs - SPNs, die im `setspn -L`-Ergebnis
-auftauchen, aber zu einer anderen Replik derselben AG gehoeren (z.B. `sfcsdbs104ihz` im Bericht
-von `sfcsdbs103ihz`), wurden faelschlich als `Unexpected` gemeldet, obwohl das im AG-Kontext mit
+auftauchen, aber zu einer anderen Replik derselben AG gehoeren (z.B. `SQL02` im Bericht
+von `SQL01`), wurden faelschlich als `Unexpected` gemeldet, obwohl das im AG-Kontext mit
 geteiltem Dienstkonto normal und korrekt ist.
 
 `Get-sqmSpnReport` ermittelt jetzt zusaetzlich ueber `sys.availability_replicas` die
@@ -1961,11 +2111,11 @@ SPNs anschliessend korrekt gegen die Listener-Erwartungsliste (`OK`/`Missing`), 
 nur eine ZUSAETZLICHE Zeile hinzu statt die aeltere zu ersetzen - dieselbe SPN stand danach
 zweimal im Bericht, einmal `[Unexpected]` und einmal `[OK]`.
 
-Beispiel (2-Knoten-AG, Listener `LFCS20DBSQL1`, geteiltes Dienstkonto):
+Beispiel (2-Knoten-AG, Listener `AG01`, geteiltes Dienstkonto):
 
 ```
-MSSQLSvc/LFCS20DBSQL1:1433 [Unexpected]   <- generischer Vergleich, kennt Listener-SPNs nicht
-MSSQLSvc/LFCS20DBSQL1:1433 [OK]           <- Listener-Check, korrekt
+MSSQLSvc/AG01:1433 [Unexpected]   <- generischer Vergleich, kennt Listener-SPNs nicht
+MSSQLSvc/AG01:1433 [OK]           <- Listener-Check, korrekt
 ```
 
 Nach dem Listener-Check wird jetzt die veraltete generische `Unexpected`-Zeile fuer jede SPN
@@ -1975,13 +2125,13 @@ werden weiterhin unveraendert als `Unexpected` gemeldet.
 
 ## [1.9.67.0] — 2026-08-07
 
-### Fix: FI-TS-Installation synchronisierte dbatools bei JEDER Installation neu, auch wenn aktuell
+### Fix: Kunden-Installation synchronisierte dbatools bei JEDER Installation neu, auch wenn aktuell
 
-Im FITS-Zweig von `Install.ps1` (Quelle `W:\...` bzw. `\\tsclient\W\...`) lief `robocopy ... /MIR`
+Im Kunden-Zweig von `Install.ps1` (Quelle `<Freigabe>\...` bzw. `\\<Freigabe>\...`) lief `robocopy ... /MIR`
 fuer `dbatools` und `dbatools.library` bislang bedingungslos bei jeder Installation - anders als
 der PSGallery-Zweig gab es keinen "ist eh schon aktuell"-Kurzschluss. `/MIR` muss dafuer den
 kompletten Dateibaum auf beiden Seiten enumerieren und vergleichen (dbatools: mehrere tausend
-kleine `.ps1`-Dateien), ueber die Citrix-Freigabe `\\tsclient\W\` mit spuerbarer Latenz pro Datei -
+kleine `.ps1`-Dateien), ueber die Citrix-Freigabe `\\<Freigabe>\` mit spuerbarer Latenz pro Datei -
 das dauerte lange, selbst wenn am Ende nichts zu kopieren war.
 
 Jetzt wird vorab die hoechste Versions-Ordnernummer auf Quelle und Ziel verglichen
@@ -2057,7 +2207,7 @@ Katalogsicht umgestellt. Die uebrigen vier Befehle kommen im Modul nicht vor.
 
 ### Neu: Warnung, wenn die "temporaere" Rolle in Wahrheit dauerhaft ueber eine Gruppe besteht
 
-Auf DWP1W02SQLT0001 stellte sich heraus, dass die betroffenen Logins die sysadmin-Rolle bereits
+Auf SQL01 stellte sich heraus, dass die betroffenen Logins die sysadmin-Rolle bereits
 ueber AD-Gruppenmitgliedschaft besassen. Das hat eine Konsequenz, die ueber den Bug aus 1.9.61.0
 hinausgeht und die Kernzusage dieser Funktion beruehrt: `ALTER SERVER ROLE ... DROP MEMBER`
 entfernt beim Entzug nur die DIREKTE Mitgliedschaft. Eine ueber eine Gruppe geerbte Berechtigung
@@ -2117,7 +2267,7 @@ liess sich mangels Domaene in der Testumgebung nicht live nachstellen.
 ### Fix (Ursache gefunden): `IS_SRVROLEMEMBER()` prueft EFFEKTIVE, nicht direkte Rollenmitgliedschaft
 
 Das ist die eigentliche Ursache hinter "kein Fehler, Log sagt erfolgreich, trotzdem kein sysadmin"
-auf DWP1W02SQLT0001 - und auch hinter allen vorherigen Fehlversuchen in dieser Reihe.
+auf SQL01 - und auch hinter allen vorherigen Fehlversuchen in dieser Reihe.
 
 `IS_SRVROLEMEMBER('sysadmin', N'<Login>')` liefert die EFFEKTIVE Mitgliedschaft **inklusive
 Vererbung ueber Windows-/AD-Gruppen**. Ist der Login Mitglied einer AD-Gruppe, die ihrerseits als
@@ -2147,7 +2297,7 @@ erfolgreich, Revoke -> 0, erneuter Revoke (idempotent) erfolgreich.
 
 ### Fix: `Invoke-sqmTempSysadminAction` meldete Erfolg, obwohl die Rolle nie vergeben wurde
 
-Auf DWP1W02SQLT0001 beobachtet: kein Fehler, der Revoke-Job wird angelegt, aber die Rolle war
+Auf SQL01 beobachtet: kein Fehler, der Revoke-Job wird angelegt, aber die Rolle war
 danach nachweislich nicht vergeben. Ursache: die Grant-/Revoke-Anweisung ist bedingt (`IF
 IS_SRVROLEMEMBER('$Role', N'$Login') = 0 ALTER SERVER ROLE ... ADD MEMBER ...`) -
 `IS_SRVROLEMEMBER()` liefert laut Doku `NULL` statt `0`/`1`, wenn es Login oder Rolle nicht
@@ -2169,7 +2319,7 @@ DEV01 (normaler Grant+Revoke-Rundlauf funktioniert weiterhin unveraendert), NULL
 
 ### Fix: sysadmin-Grant scheiterte trotz deaktivierter Policy - alle Server-Trigger statt nur eine Policy deaktivieren
 
-Nachtrag zu 1.9.53.0/1.9.54.0: auf DWP1W02SQLT0001 manuell vorab deaktiviert getestet ("New
+Nachtrag zu 1.9.53.0/1.9.54.0: auf SQL01 manuell vorab deaktiviert getestet ("New
 Login_Enforce Passwort Policy" aus, unser Code also gar nicht im Spiel) - der Grant scheiterte
 trotzdem identisch am selben Trigger-Rollback. Damit war ausgeschlossen, dass es an unserer
 `DisablePolicy`-Logik liegt: entweder eine ZWEITE, aktive Policy mit demselben Auswertungsmodus,
@@ -2230,13 +2380,13 @@ nachgestellt und verifiziert (Cap-Ermittlung, installierte Version, PSGallery-Ve
 
 ### Neu: `DbatoolsSharePath`-Konfigurationsschluessel fuer die dbatools-Freigabe
 
-Nachtrag zu 1.9.56.0: der Pfad zur FI-TS-Freigabe mit der dbatools + dbatools.library-Baseline
+Nachtrag zu 1.9.56.0: der Pfad zur Kunden-Freigabe mit der dbatools + dbatools.library-Baseline
 wurde bisher implizit aus `-Source` hergeleitet (Geschwisterordner `Modules` neben `Tools`) -
 funktioniert nur, wenn diese Ordnerkonvention exakt so vorliegt, und laesst sich nicht explizit
 setzen/uebersteuern.
 
-Neu: `Set-sqmConfig -DbatoolsSharePath '<Pfad>'` (neutraler Default `$null`, FI-TS-Default
-`W:\75084-Datenbanken\MSSQL\SQLSources\Modules` - analog zum bereits vorhandenen
+Neu: `Set-sqmConfig -DbatoolsSharePath '<Pfad>'` (neutraler Default `$null`, Kunden-Default
+`<Freigabe>\SQLSources\Modules` - analog zum bereits vorhandenen
 `SsrsInstallerPath`). `Install.ps1` Schritt 5b liest diesen Key jetzt vorrangig (direkt aus
 `config.json`, da das Modul an dieser Stelle noch nicht importiert ist - dbatools muss zuerst da
 sein) und faellt nur auf die bisherige Herleitung zurueck, wenn der Key noch nicht gesetzt ist.
@@ -2244,28 +2394,28 @@ Nach erfolgreichem Modulimport wird ein neu ermittelter Pfad automatisch in die 
 zurueckgeschrieben (Schritt 6a) - kuenftige Installationen und andere Modulfunktionen finden ihn
 dann direkt ueber `Get-sqmConfig`, ohne ihn erneut herzuleiten.
 
-Verifiziert: Default leer ausserhalb FI-TS, `Set-sqmConfig` persistiert korrekt nach
+Verifiziert: Default leer ausserhalb der Kundenumgebung, `Set-sqmConfig` persistiert korrekt nach
 `config.json`, Wert bleibt nach einem frischen Modul-Reimport erhalten. Direktes
 config.json-Parsing (Schluessel fehlt / ist `null` / ist gesetzt) fuer alle drei Faelle geprueft.
 
 ## [1.9.56.0] — 2026-08-05
 
-### Fix: dbatools-Update in FITS-Umgebungen von PSGallery auf Freigabelaufwerk-Sideload umgestellt
+### Fix: dbatools-Update in Kundenumgebungen von PSGallery auf Freigabelaufwerk-Sideload umgestellt
 
-Nachtrag zu 1.9.55.0: der dortige PSGallery-basierte Versionscheck ist fuer FI-TS-gehostete
-Instanzen (wie DWP1W02SQLT0001) der falsche Weg - PSGallery ist auf einer abgeschotteten
+Nachtrag zu 1.9.55.0: der dortige PSGallery-basierte Versionscheck ist fuer beim Kunden gehostete
+Instanzen (wie der betroffene Produktivserver) der falsche Weg - PSGallery ist auf einer abgeschotteten
 Produktivinstanz nicht erreichbar. Unter `<SQLSources>\Modules` (Geschwisterordner von `Tools`,
-wo `sqmSQLTool` selbst per UNC-Installation herkommt) liegt dort bereits ein von FI-TS gepflegtes,
+wo `sqmSQLTool` selbst per UNC-Installation herkommt) liegt dort bereits ein vom Kunden gepflegtes,
 fertiges Ordnerpaar `dbatools` + `dbatools.library` (das binaere Begleitmodul von dbatools 2.x).
 
-Fix: Schritt 5b erkennt eine FITS-Installation jetzt VOR dem PSGallery-Zweig (gleiche Erkennung
-wie die bestehende FI-TS-Konfiguration in Schritt 7 - `$isFitsInstall` wird jetzt einmalig
+Fix: Schritt 5b erkennt eine Kunden-Installation jetzt VOR dem PSGallery-Zweig (gleiche Erkennung
+wie die bestehende Kunden-Konfiguration in Schritt 7 - die Erkennung wird jetzt einmalig
 berechnet und in beiden Schritten wiederverwendet statt dupliziert). Ist der abgeleitete
 `Modules`-Pfad relativ zu `-Source` vorhanden und enthaelt beide Ordner, werden `dbatools` und
 `dbatools.library` per `robocopy /MIR` in den Ziel-Scope gespiegelt - PSGallery bleibt der Weg
-fuer alle anderen (Nicht-FITS-)Umgebungen. Pfad-Ableitung gegen die reale
-`InstallSourcePath`-Konfiguration von DWP1W02SQLT0001 verifiziert
-(`\\tsclient\W\75084-Datenbanken\MSSQL\SQLSources\Tools\sqmSQLTool-main` ->
+fuer alle anderen (Nicht-Kunden-)Umgebungen. Pfad-Ableitung gegen die reale
+`InstallSourcePath`-Konfiguration des betroffenen Servers verifiziert
+(`\\<Freigabe>\SQLSources\Tools\sqmSQLTool-main` ->
 `...\SQLSources\Modules`, exakter Treffer).
 
 ## [1.9.55.0] — 2026-08-05
@@ -2286,7 +2436,7 @@ ohne Aenderung, ein echter Aufruf ohne `-Confirm` laeuft ohne Prompt/Haengenblei
 
 ### Neu: `Install.ps1` erkennt und aktualisiert veraltete dbatools-Installationen
 
-Auf DWP1W02SQLT0001 stand seit 2022 unbemerkt dbatools 1.1.95 - mehrere Major-Versionen veraltet,
+Auf SQL01 stand seit 2022 unbemerkt dbatools 1.1.95 - mehrere Major-Versionen veraltet,
 sehr wahrscheinlich Ursache fuer eine abweichende `Get-DbaPbmPolicy`-Rueckgabeform, die aeltere
 Codepfade in `Set-sqmSqlPolicyState` nicht abdeckten. Die bisherige Pruefung war rein binaer
 ("Ordner vorhanden -> ok") und haette das nie aufgedeckt, unabhaengig davon wie alt die Version war.
@@ -2303,7 +2453,7 @@ dbatools 2.8.2 - erkannte korrekt 2.8.4 als neuere verfuegbare Version.
 
 ### Fix: `Invoke-sqmTempSysadminAction` - Fehlschlag der Policy-Deaktivierung war unsichtbar
 
-Nachtrag zu 1.9.53.0: auf DWP1W02SQLT0001 (`DefaultPolicy` korrekt auf 'New Login_Enforce
+Nachtrag zu 1.9.53.0: auf SQL01 (`DefaultPolicy` korrekt auf 'New Login_Enforce
 Passwort Policy' gesetzt, passend zum dort per `sp_syspolicy_add_policy` angelegten Server/Login-
 Facet und dem serverweiten `syspolicy_server_trigger FOR ALTER_LOGIN, CREATE_LOGIN` - `ALTER SERVER
 ROLE ADD MEMBER` loest intern ebenfalls ein `ALTER_LOGIN`-Ereignis aus, der Trigger sollte also
@@ -2324,7 +2474,7 @@ DEV01 verifiziert.
 
 ### Fix: `Invoke-sqmTempSysadminAction` scheiterte auf Instanzen mit "On Change: Prevent"-PBM-Policy an ALTER SERVER ROLE
 
-Auf DWP1W02SQLT0001 (DWPBANK-PROD) schlug `Grant-sqmTemporarySysadmin` fehl mit "The transaction
+Auf einem Kunden-Produktivserver schlug `Grant-sqmTemporarySysadmin` fehl mit "The transaction
 ended in the trigger. The batch has been aborted." - Ursache: der eingebaute
 `syspolicy_server_trigger` (Policy-Based Management) fing die `ALTER SERVER ROLE [sysadmin] ADD
 MEMBER`-Anweisung ab und rollte sie zurueck, weil dort eine Policy mit Auswertungsmodus
@@ -2521,7 +2671,7 @@ Kombination einzeln an, damit klar ist, dass EINE davon ausreicht.
 
 ### Fix: `Invoke-sqmRestoreDatabase` meldete einen fehlgeschlagenen Secondary-Drop faelschlich als Erfolg
 
-Nachtrag zu 1.9.43.0: In einem realen AG-Restore (sfcsdbs103ihz/sfcsdbs104ihz, Datenbank
+Nachtrag zu 1.9.43.0: In einem realen AG-Restore (SQL01/SQL02, Datenbank
 `AlwaysOnTest`) lief der Secondary-Drop zwar an, `Remove-DbaDatabase` scheiterte dabei aber mit
 "Cannot drop the database 'AlwaysOnTest', because it does not exist or you do not have
 permission." - ohne eine Exception zu werfen, auch nicht mit `-EnableException`. `Remove-DbaDatabase`
@@ -2563,13 +2713,13 @@ vorhanden ist (`$secondaryServer.Databases[$finalDbName]`), nicht mehr zusaetzli
 ### Fix: `Invoke-sqmMonitoringKey` schrieb/las den falschen Registry-Pfad
 
 Die Quelldatei war auf `HKLM:\<RegistryBase>\dtcSoftware\sqmSQLTool` zurueckgefallen, obwohl die
-reale System-Center-Konvention beim Kunden `HKLM:\SYSTEM\FITS\Systemcenter` lautet, mit den Werten
+reale System-Center-Konvention beim Kunden `HKLM:\SYSTEM\<Kunde>\Systemcenter` lautet, mit den Werten
 `SQL` (0/1/2 - None/Standard/Full, kundenabhaengig und manuell zu setzen) und
 `SQLFreeSpaceVersion` (Standard/Cluster, per `-AutoDetectSQLFreeSpaceVersion` ueber die
 AG-Zugehoerigkeit automatisch erkennbar) direkt unter diesem Schluessel. Die gebaute/verteilte
 Kopie in `bin/Public` hatte weiterhin den richtigen Pfad - nur die Quelle war betroffen.
 
-Fix: `$regSubKey` wieder auf `$RegistryBase\FITS\SystemCenter` gesetzt. Neuer Pester-Test
+Fix: `$regSubKey` wieder auf `$RegistryBase\<Kunde>\SystemCenter` gesetzt. Neuer Pester-Test
 (`Invoke-sqmMonitoringKey.Tests.ps1`, komplett gemockt) haelt den Pfad fest und schlaegt
 nachweislich fehl, sobald der alte `dtcSoftware\sqmSQLTool`-Pfad zurueckkommt.
 
@@ -2689,8 +2839,8 @@ wird - statt PowerShell interaktiv nach dem Parameter fragen zu lassen.
 
 ### Fix: `Invoke-sqmRestoreDatabase` protokollierte "Restore erfolgreich", ohne dass ueberhaupt restored wurde
 
-Vorfall auf `SFCSDBS103IHZ` (AG `LFCS20DBSQL1`, Restore aus `F:\DB_Transfer_Prod\*.bak`): das
-Log zeigte fuer alle vier Laeufe (amb, custom, arena, amb) durchgehend "Success" - inklusive
+Vorfall auf `SQL01` (AG `AG01`, Restore aus `F:\Transfer\*.bak`): das
+Log zeigte fuer alle vier Laeufe (OrderDB, custom, SalesDB, OrderDB) durchgehend "Success" - inklusive
 "Restore von ... erfolgreich" und "erfolgreich in AG aufgenommen". Eine Gegenprobe direkt in SQL
 Server (`msdb.dbo.restorehistory`, letzter Eintrag pro Datenbank ueber `ROW_NUMBER() OVER
 (PARTITION BY d.Name ORDER BY r.restore_date DESC)`) zeigte aber: das `restore_date` war eine
@@ -2745,7 +2895,7 @@ bei Abweichung von MULTI_USER zurueckgesetzt - vorher hing dieser Ruecksprung an
 SINGLE_USER erzwungen hatte. `RESTORE DATABASE` uebernimmt aber den User-Access-Modus, der zum
 Zeitpunkt der Datensicherung im Backup selbst galt (Boot-Page der Datenbank) - stand die
 Quelldatenbank beim Sichern in RESTRICTED_USER (ueblich bei einer Migrations-Sicherung wie unter
-`F:\DB_Transfer_Prod\`), kaeme eine wiederhergestellte Kopie in genau diesem Modus wieder hoch,
+`F:\Transfer\`), kaeme eine wiederhergestellte Kopie in genau diesem Modus wieder hoch,
 unabhaengig davon, ob `$wasSingleUser` je `$true` war - und ein sysadmin-Login (unter dem diese
 Funktion laut NOTES laufen muss) koennte sich trotzdem weiter verbinden, sodass der Zustand
 unbemerkt bliebe.
@@ -3011,9 +3161,9 @@ erst mehrere Schritte spaeter an den Operationen gescheitert, die SQL Server bei
 grundsaetzlich ablehnt:
 
 ```
-[Invoke-DbaQuery] The operation cannot be performed on database "amb" because it is involved in
+[Invoke-DbaQuery] The operation cannot be performed on database "OrderDB" because it is involved in
 a database mirroring session or an availability group. ALTER DATABASE statement failed.
-[Restore-DbaDatabase] RESTORE cannot operate on database 'amb' because it is configured for
+[Restore-DbaDatabase] RESTORE cannot operate on database 'OrderDB' because it is configured for
 database mirroring or has joined an availability group.
 ```
 
