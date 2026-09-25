@@ -769,6 +769,11 @@
 					$btnList.Text = 'List...'
 					$btnList.Width = 100
 					& $styleButton $btnList
+					# GetNewClosure() only captures variables LOCAL to the current scope - the palette
+					# and $styleButton live in the parent (function) scope and would be $null inside the
+					# click handler ("Cannot convert null to type System.Drawing.Color"). Copy them here.
+					$cWindow = $cWindow; $cPanel = $cPanel; $cText = $cText; $cDim = $cDim
+					$cBtn = $cBtn; $cAccent = $cAccent; $cBorder = $cBorder; $styleButton = $styleButton
 					$btnList.Add_Click({
 							# $script:guiState is torn down/rebuilt (Add_AfterSelect AND Add_NodeMouseClick
 							# both fire $loadFunction on the same tree click, see below) between this

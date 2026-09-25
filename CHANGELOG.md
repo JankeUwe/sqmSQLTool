@@ -1,5 +1,16 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.150.0] - 2026-09-25
+
+### Fix: Invoke-sqmCollationChange - zwei Fehler
+
+- **Pre-Flight-Check:** `Select-Object -ExpandProperty name -Join ','` ist kein gueltiger Parameter
+  (ParameterBindingException "Join"). Tritt genau dann auf, wenn die Instanz AG-Mitglied ist, und
+  verdeckte damit die eigentliche Meldung. Jetzt `(...) -join ','`, die AG-Meldung erscheint korrekt.
+- **GUI, Button "List..." bei -NewCollation:** Absturz "Cannot convert null to type System.Drawing.Color".
+  `GetNewClosure()` erfasst nur lokale Variablen, Farbpalette und `$styleButton` lagen im
+  Funktions-Scope und waren im Click-Handler `$null`. Werden jetzt vor dem Handler lokal kopiert.
+
 ## [1.9.149.0] - 2026-09-24
 
 ### Neu: Invoke-sqmDatabaseStandardization - Datenbanken auf den Hausstandard bringen

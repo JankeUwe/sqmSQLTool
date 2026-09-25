@@ -239,7 +239,7 @@ function Invoke-sqmCollationChange
 			$agCount = Invoke-DbaQuery @connParams -Query "SELECT COUNT(*) FROM sys.availability_replicas WHERE replica_server_name = @@SERVERNAME" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Column1
 			if ($agCount -gt 0)
 			{
-				$agNames = Invoke-DbaQuery @connParams -Query "SELECT ag.name FROM sys.availability_groups ag JOIN sys.availability_replicas ar ON ag.group_id = ar.group_id WHERE ar.replica_server_name = @@SERVERNAME" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty name -Join ','
+				$agNames = (Invoke-DbaQuery @connParams -Query "SELECT ag.name FROM sys.availability_groups ag JOIN sys.availability_replicas ar ON ag.group_id = ar.group_id WHERE ar.replica_server_name = @@SERVERNAME" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty name) -join ','
 				throw "AlwaysOn Availability Group erkannt: $agNames. Vor der Collation-aenderung muessen alle AG-Datenbanken manuell ausgetragen werden."
 			}
 			
