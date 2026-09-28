@@ -8,13 +8,17 @@
     Checks after failover: new primary reachable, all DBs SYNCHRONIZED.
 
 .PARAMETER SqlInstance
-    Current PRIMARY instance.
+    Any replica of the AG. Default: the current computer name.
+    If this instance is not the primary, the function determines the current primary of the
+    AG from there and runs the failover from that primary.
 
 .PARAMETER SqlCredential
     PSCredential for the connection.
 
 .PARAMETER AvailabilityGroup
-    Name of the availability group.
+    Name of the availability group. Optional: if -SqlInstance has exactly one AG, it is used.
+    With several AGs the function lists them and asks; in a non-interactive session (Agent
+    job, -NonInteractive) it stops with the list of AG names instead.
 
 .PARAMETER TargetReplica
     Instance name of the target replica. If not specified, the first
@@ -38,6 +42,10 @@
     Invoke-sqmFailover -SqlInstance "SQL01" -AvailabilityGroup "AG_Prod" -WhatIf
 
 .EXAMPLE
+    # On any node of a single-AG cluster: instance, AG and primary are determined automatically
+    Invoke-sqmFailover -WhatIf
+
+.EXAMPLE
     Invoke-sqmFailover -SqlInstance "SQL01" -AvailabilityGroup "AG_Prod" `
         -TargetReplica "SQL02" -MaxRedoQueueMB 10
 
@@ -51,11 +59,11 @@ function Invoke-sqmFailover
 	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 	[OutputType([PSCustomObject])]
 	param (
-		[Parameter(Mandatory = $true)]
+		[Parameter(Mandatory = $false)]
 		[string]$SqlInstance,
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
-		[Parameter(Mandatory = $true)]
+		[Parameter(Mandatory = $false)]
 		[string]$AvailabilityGroup,
 		[Parameter(Mandatory = $false)]
 		[string]$TargetReplica,
@@ -80,7 +88,10 @@ function Invoke-sqmFailover
 			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 			throw $errMsg
 		}
-		Invoke-sqmLogging -Message (_s 'Failover_Starting' $functionName, $AvailabilityGroup, $SqlInstance, $TargetReplica) -FunctionName $functionName -Level "INFO"
+		if ([string]::IsNullOrWhiteSpace($SqlInstance))
+		{
+			$SqlInstance = $env:COMPUTERNAME
+		}
 	}
 
 	process
@@ -101,22 +112,86 @@ function Invoke-sqmFailover
 			$connParams = @{ SqlInstance = $SqlInstance }
 			if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
 
+			# AG ermitteln, wenn keine angegeben: eine vorhanden -> diese, mehrere -> nachfragen.
+			# sys.availability_groups ist auf jedem Replikat lesbar, auch auf einem Secondary.
+			if ([string]::IsNullOrWhiteSpace($AvailabilityGroup))
+			{
+				$agNames = @(Invoke-DbaQuery @connParams -Database master -EnableException `
+						-Query "SELECT name FROM sys.availability_groups ORDER BY name" |
+					ForEach-Object { $_.name })
+				if ($agNames.Count -eq 0)
+				{
+					$result.Status  = 'Failed'
+					$result.Message = _s 'Failover_NoAgFound' $SqlInstance
+					Invoke-sqmLogging -Message $result.Message -FunctionName $functionName -Level "ERROR"
+					if ($EnableException) { throw $result.Message }
+					return $result
+				}
+				if ($agNames.Count -eq 1)
+				{
+					$AvailabilityGroup = $agNames[0]
+					Invoke-sqmLogging -Message (_s 'Failover_AgAutoSelected' $SqlInstance, $AvailabilityGroup) -FunctionName $functionName -Level "INFO"
+				}
+				else
+				{
+					if (-not (Test-sqmInteractiveSession))
+					{
+						$result.Status  = 'Failed'
+						$result.Message = _s 'Failover_MultipleAgs' $SqlInstance, ($agNames -join ', ')
+						Invoke-sqmLogging -Message $result.Message -FunctionName $functionName -Level "ERROR"
+						if ($EnableException) { throw $result.Message }
+						return $result
+					}
+					Write-Host "`nVerfuegbarkeitsgruppen auf '$SqlInstance':"
+					for ($i = 0; $i -lt $agNames.Count; $i++)
+					{
+						Write-Host ("  [{0}] {1}" -f ($i + 1), $agNames[$i])
+					}
+					while ([string]::IsNullOrWhiteSpace($AvailabilityGroup))
+					{
+						$answer = Read-Host "Welche AG soll umgeschaltet werden? (1-$($agNames.Count), leer = Abbruch)"
+						if ([string]::IsNullOrWhiteSpace($answer))
+						{
+							$result.Status  = 'Failed'
+							$result.Message = _s 'Failover_AgPromptAbort'
+							Invoke-sqmLogging -Message $result.Message -FunctionName $functionName -Level "WARNING"
+							return $result
+						}
+						$num = 0
+						if ([int]::TryParse($answer.Trim(), [ref]$num) -and $num -ge 1 -and $num -le $agNames.Count)
+						{
+							$AvailabilityGroup = $agNames[$num - 1]
+						}
+						else
+						{
+							Write-Host "Ungueltige Eingabe '$answer'."
+						}
+					}
+					Invoke-sqmLogging -Message (_s 'Failover_AgChosen' $AvailabilityGroup, ($agNames -join ', ')) -FunctionName $functionName -Level "INFO"
+				}
+			}
+			$result.AvailabilityGroup = $AvailabilityGroup
+			$agLiteral = $AvailabilityGroup -replace "'", "''"
+
 			# PRE-CHECK 1: AG existiert und Instanz ist Primary
 			$agCheckSql = @"
 SELECT
     ag.name                                      AS AgName,
     ars.role_desc                                AS Role,
     ars.synchronization_health_desc             AS SyncHealth,
-    ars.operational_state_desc                  AS OperState
+    ars.operational_state_desc                  AS OperState,
+    ags.primary_replica                         AS PrimaryReplica
 FROM sys.availability_groups ag
 JOIN sys.dm_hadr_availability_replica_states ars
     ON ag.group_id = ars.group_id
 JOIN sys.availability_replicas ar
     ON ars.replica_id = ar.replica_id
-WHERE ag.name = N'$AvailabilityGroup'
+LEFT JOIN sys.dm_hadr_availability_group_states ags
+    ON ag.group_id = ags.group_id
+WHERE ag.name = N'$agLiteral'
   AND ars.is_local = 1
 "@
-			$localState = Invoke-DbaQuery @connParams -Database master -Query $agCheckSql -ErrorAction Stop
+			$localState = Invoke-DbaQuery @connParams -Database master -Query $agCheckSql -EnableException
 
 			if (-not $localState)
 			{
@@ -127,14 +202,40 @@ WHERE ag.name = N'$AvailabilityGroup'
 				return $result
 			}
 
+			# Nicht Primary: den aktuellen Primary der AG nehmen. Ein Secondary kennt ihn ueber
+			# sys.dm_hadr_availability_group_states.primary_replica; NULL heisst, der Secondary
+			# hat gerade keine Verbindung zum Primary (oder kein Quorum) - dann abbrechen statt raten.
 			if ($localState.Role -ne 'PRIMARY')
 			{
-				$result.Status  = 'Failed'
-				$result.Message = _s 'Failover_NotPrimary' $SqlInstance, $localState.Role
-				Invoke-sqmLogging -Message $result.Message -FunctionName $functionName -Level "ERROR"
-				if ($EnableException) { throw $result.Message }
-				return $result
+				$primaryName = $localState.PrimaryReplica
+				if ($primaryName -is [System.DBNull] -or [string]::IsNullOrWhiteSpace($primaryName))
+				{
+					$result.Status  = 'Failed'
+					$result.Message = _s 'Failover_PrimaryUnknown' $SqlInstance, $AvailabilityGroup, $localState.Role
+					Invoke-sqmLogging -Message $result.Message -FunctionName $functionName -Level "ERROR"
+					if ($EnableException) { throw $result.Message }
+					return $result
+				}
+
+				Invoke-sqmLogging -Message (_s 'Failover_PrimaryRedirect' $SqlInstance, $AvailabilityGroup, $localState.Role, $primaryName) -FunctionName $functionName -Level "INFO"
+				$SqlInstance = [string]$primaryName
+				$connParams['SqlInstance'] = $SqlInstance
+
+				# Rolle auf dem ermittelten Primary gegenpruefen - zwischen beiden Abfragen kann
+				# bereits ein Failover gelaufen sein.
+				$localState = Invoke-DbaQuery @connParams -Database master -Query $agCheckSql -EnableException
+				if (-not $localState -or $localState.Role -ne 'PRIMARY')
+				{
+					$role = if ($localState) { $localState.Role } else { 'unbekannt' }
+					$result.Status  = 'Failed'
+					$result.Message = _s 'Failover_NotPrimary' $SqlInstance, $role
+					Invoke-sqmLogging -Message $result.Message -FunctionName $functionName -Level "ERROR"
+					if ($EnableException) { throw $result.Message }
+					return $result
+				}
 			}
+			$result.OldPrimary = $SqlInstance
+			Invoke-sqmLogging -Message (_s 'Failover_Starting' $functionName, $AvailabilityGroup, $SqlInstance, $TargetReplica) -FunctionName $functionName -Level "INFO"
 
 			# PRE-CHECK 2: Replikate abfragen
 			$replicaSql = @"
@@ -153,10 +254,10 @@ JOIN sys.dm_hadr_availability_replica_states ars
     ON ar.replica_id = ars.replica_id
 LEFT JOIN sys.dm_hadr_database_replica_states drs
     ON ar.replica_id = drs.replica_id
-WHERE ag.name = N'$AvailabilityGroup'
+WHERE ag.name = N'$agLiteral'
   AND ars.role_desc = 'SECONDARY'
 "@
-			$replicas = Invoke-DbaQuery @connParams -Database master -Query $replicaSql -ErrorAction Stop
+			$replicas = Invoke-DbaQuery @connParams -Database master -Query $replicaSql -EnableException
 
 			if (-not $replicas)
 			{
@@ -235,8 +336,8 @@ WHERE ag.name = N'$AvailabilityGroup'
 			$targetConn = @{ SqlInstance = $target.ReplicaServer }
 			if ($SqlCredential) { $targetConn['SqlCredential'] = $SqlCredential }
 
-			$failoverSql = "ALTER AVAILABILITY GROUP [$AvailabilityGroup] FAILOVER;"
-			Invoke-DbaQuery @targetConn -Database master -Query $failoverSql -ErrorAction Stop
+			$failoverSql = "ALTER AVAILABILITY GROUP [$($AvailabilityGroup -replace ']', ']]')] FAILOVER;"
+			Invoke-DbaQuery @targetConn -Database master -Query $failoverSql -EnableException
 
 			Invoke-sqmLogging -Message (_s 'Failover_Waiting' $WaitAfterFailoverSeconds) -FunctionName $functionName -Level "INFO"
 			Start-Sleep -Seconds $WaitAfterFailoverSeconds
@@ -252,10 +353,10 @@ SELECT
 FROM sys.availability_groups ag
 JOIN sys.dm_hadr_availability_replica_states ars
     ON ag.group_id = ars.group_id
-WHERE ag.name = N'$AvailabilityGroup'
+WHERE ag.name = N'$agLiteral'
   AND ars.is_local = 1
 "@
-				$postState = Invoke-DbaQuery @targetConn -Database master -Query $postCheckSql -ErrorAction Stop
+				$postState = Invoke-DbaQuery @targetConn -Database master -Query $postCheckSql -EnableException
 
 				if ($postState -and $postState.Role -eq 'PRIMARY')
 				{

@@ -108,6 +108,13 @@
     'Failover_Starting'             = "Starte {0}: AG='{1}', Primary='{2}', Target='{3}'"
     'Failover_AgNotFound'           = "AG '{0}' nicht gefunden oder Instanz '{1}' ist kein Mitglied."
     'Failover_NotPrimary'           = "Instanz '{0}' ist nicht Primary (aktuell: {1}). Failover muss von der Primary aus initiiert werden."
+    'Failover_NoAgFound'            = "Auf '{0}' ist keine Verfuegbarkeitsgruppe vorhanden."
+    'Failover_AgAutoSelected'       = "Kein -AvailabilityGroup angegeben. Einzige AG auf '{0}': '{1}'."
+    'Failover_AgChosen'             = "Verfuegbarkeitsgruppe per Rueckfrage gewaehlt: '{0}' (zur Auswahl: {1})."
+    'Failover_MultipleAgs'          = "Auf '{0}' gibt es mehrere Verfuegbarkeitsgruppen ({1}). Ohne interaktive Sitzung kann nicht nachgefragt werden - bitte -AvailabilityGroup angeben."
+    'Failover_AgPromptAbort'        = 'Abbruch: keine Verfuegbarkeitsgruppe ausgewaehlt.'
+    'Failover_PrimaryRedirect'      = "'{0}' ist in AG '{1}' nicht Primary (Rolle: {2}). Verwende den Primary '{3}'."
+    'Failover_PrimaryUnknown'       = "'{0}' ist in AG '{1}' nicht Primary (Rolle: {2}), und der Primary laesst sich von dort nicht ermitteln (Verbindung zum Primary/Quorum pruefen)."
     'Failover_NoSecondaries'        = "Keine Sekundaer-Replikate fuer AG '{0}' gefunden."
     'Failover_TargetNotFound'       = "Ziel-Replikat '{0}' nicht gefunden oder nicht Sekundaer."
     'Failover_NoSuitableTarget'     = 'Kein geeignetes Ziel-Replikat gefunden (SYNCHRONIZED benoetigt).'

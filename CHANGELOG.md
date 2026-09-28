@@ -1,5 +1,22 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.154.0] - 2026-09-28
+
+### Invoke-sqmFailover nach Modulstandard: Instanz, AG und Primary werden selbst ermittelt
+
+- **`-SqlInstance` optional**, Standard ist der aktuelle Rechnername.
+- **Instanz ist Secondary:** Statt abzubrechen wird der aktuelle Primary der AG ermittelt
+  (`sys.dm_hadr_availability_group_states.primary_replica`, vom Secondary aus lesbar) und der Failover
+  von dort ausgefuehrt. Die Rolle wird auf dem ermittelten Primary gegengeprueft. Kennt der Secondary
+  keinen Primary (NULL, z. B. keine Verbindung oder kein Quorum), bricht die Funktion ab statt zu raten.
+- **`-AvailabilityGroup` optional:** Eine AG vorhanden: wird verwendet. Mehrere: nummerierte Liste mit
+  Rueckfrage (leer = Abbruch), in nicht-interaktiven Sitzungen Abbruch mit den AG-Namen, wie bei
+  `Add-sqmDatabaseToAG`.
+- `Invoke-DbaQuery` laeuft jetzt mit `-EnableException` statt `-ErrorAction Stop`. Vorher wurde ein
+  Fehler (auch beim eigentlichen `ALTER AVAILABILITY GROUP ... FAILOVER`) nicht im catch gefangen.
+- AG-Namen werden in den Abfragen maskiert (`'` und `]`).
+- Neue Unit-Tests (bisher gab es fuer die Funktion keine).
+
 ## [1.9.153.0] - 2026-09-28
 
 ### Fix: Copy-sqmNTFSPermissions -CreateMissingFolders legte keine Unterordner an

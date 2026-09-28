@@ -108,6 +108,13 @@
     'Failover_Starting'             = "Starting {0}: AG='{1}', Primary='{2}', Target='{3}'"
     'Failover_AgNotFound'           = "AG '{0}' not found or instance '{1}' is not a member."
     'Failover_NotPrimary'           = "Instance '{0}' is not Primary (current role: {1}). Failover must be initiated from the Primary."
+    'Failover_NoAgFound'            = "No availability group found on '{0}'."
+    'Failover_AgAutoSelected'       = "No -AvailabilityGroup given. Only AG on '{0}': '{1}'."
+    'Failover_AgChosen'             = "Availability group chosen at the prompt: '{0}' (available: {1})."
+    'Failover_MultipleAgs'          = "'{0}' has several availability groups ({1}). No interactive session to ask in - please pass -AvailabilityGroup."
+    'Failover_AgPromptAbort'        = 'Aborted: no availability group selected.'
+    'Failover_PrimaryRedirect'      = "'{0}' is not Primary in AG '{1}' (role: {2}). Using the Primary '{3}'."
+    'Failover_PrimaryUnknown'       = "'{0}' is not Primary in AG '{1}' (role: {2}), and the Primary cannot be determined from there (check connectivity to the Primary/quorum)."
     'Failover_NoSecondaries'        = "No secondary replicas found for AG '{0}'."
     'Failover_TargetNotFound'       = "Target replica '{0}' not found or not secondary."
     'Failover_NoSuitableTarget'     = 'No suitable target replica found (SYNCHRONIZED required).'
