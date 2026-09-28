@@ -115,6 +115,8 @@
     'Failover_AgPromptAbort'        = 'Abbruch: keine Verfuegbarkeitsgruppe ausgewaehlt.'
     'Failover_PrimaryRedirect'      = "'{0}' ist in AG '{1}' nicht Primary (Rolle: {2}). Verwende den Primary '{3}'."
     'Failover_PrimaryUnknown'       = "'{0}' ist in AG '{1}' nicht Primary (Rolle: {2}), und der Primary laesst sich von dort nicht ermitteln (Verbindung zum Primary/Quorum pruefen)."
+    'Failover_LocalTarget'          = "Aufgerufen auf dem Secondary '{0}' ohne -TargetReplica: '{0}' wird Ziel des Failovers."
+    'Failover_LocalNotReady'        = "Aufgerufen auf dem Secondary '{0}', der damit Ziel waere, aber nicht bereit ist ({1}). Manueller Failover braucht SYNCHRONOUS_COMMIT/SYNCHRONIZED fuer alle Datenbanken. Ein anderes Ziel mit -TargetReplica angeben."
     'Failover_NoSecondaries'        = "Keine Sekundaer-Replikate fuer AG '{0}' gefunden."
     'Failover_TargetNotFound'       = "Ziel-Replikat '{0}' nicht gefunden oder nicht Sekundaer."
     'Failover_NoSuitableTarget'     = 'Kein geeignetes Ziel-Replikat gefunden (SYNCHRONIZED benoetigt).'

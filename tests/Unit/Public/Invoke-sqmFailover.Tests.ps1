@@ -26,7 +26,7 @@ BeforeAll {
         # Lokaler Zustand (Pre-Check 1): erkennbar an OperState
         Mock -ModuleName sqmSQLTool Invoke-DbaQuery -ParameterFilter { $Query -match 'OperState' } -MockWith {
             $role = if ("$SqlInstance" -eq 'SQL01') { 'PRIMARY' } else { 'SECONDARY' }
-            [PSCustomObject]@{ AgName = 'AG1'; Role = $role; SyncHealth = 'HEALTHY'; OperState = 'ONLINE'; PrimaryReplica = $script:primary }
+            [PSCustomObject]@{ AgName = 'AG1'; Role = $role; SyncHealth = 'HEALTHY'; OperState = 'ONLINE'; ReplicaServer = "$SqlInstance"; PrimaryReplica = $script:primary }
         }
         Mock -ModuleName sqmSQLTool Invoke-DbaQuery -ParameterFilter { $Query -match "role_desc = 'SECONDARY'" } -MockWith {
             [PSCustomObject]@{ ReplicaServer = 'SQL02'; Role = 'SECONDARY'; SyncHealth = 'HEALTHY'; SyncState = 'SYNCHRONIZED'; RedoQueueKB = 0; LogSendQueueKB = 0; AvailMode = 'SYNCHRONOUS_COMMIT' }
@@ -91,6 +91,43 @@ Describe 'Invoke-sqmFailover' {
             $r.Status | Should -Be 'Failed'
             $r.Message | Should -BeLike '*SQL02*AG1*'
             Should -Invoke -ModuleName sqmSQLTool Invoke-DbaQuery -ParameterFilter { $Query -match 'FAILOVER;' } -Exactly 0
+        }
+    }
+
+    Context 'Drei Knoten: Zielwahl ohne -TargetReplica' {
+        BeforeEach {
+            & $script:SetupTopology
+            # SQL03 haette die kleinere Redo-Queue und gewaenne die automatische Auswahl
+            $script:sql02Mode = 'SYNCHRONOUS_COMMIT'
+            Mock -ModuleName sqmSQLTool Invoke-DbaQuery -ParameterFilter { $Query -match "role_desc = 'SECONDARY'" } -MockWith {
+                [PSCustomObject]@{ ReplicaServer = 'SQL02'; Role = 'SECONDARY'; SyncHealth = 'HEALTHY'; SyncState = 'SYNCHRONIZED'; RedoQueueKB = 512; LogSendQueueKB = 0; AvailMode = $script:sql02Mode }
+                [PSCustomObject]@{ ReplicaServer = 'SQL03'; Role = 'SECONDARY'; SyncHealth = 'HEALTHY'; SyncState = 'SYNCHRONIZED'; RedoQueueKB = 0; LogSendQueueKB = 0; AvailMode = 'SYNCHRONOUS_COMMIT' }
+            }
+        }
+
+        It 'Aufgerufen auf dem Secondary SQL02: SQL02 wird Ziel, nicht der beste andere Knoten' {
+            $r = Invoke-sqmFailover -SqlInstance 'SQL02' -AvailabilityGroup 'AG1' -Confirm:$false
+            $r.Status | Should -Be 'Success'
+            $r.NewPrimary | Should -Be 'SQL02'
+            Should -Invoke -ModuleName sqmSQLTool Invoke-DbaQuery -ParameterFilter { $Query -match 'FAILOVER;' -and "$SqlInstance" -eq 'SQL02' } -Exactly 1
+        }
+
+        It 'Lokaler Secondary nicht bereit (asynchron): Abbruch statt Ausweichen auf SQL03' {
+            $script:sql02Mode = 'ASYNCHRONOUS_COMMIT'
+            $r = Invoke-sqmFailover -SqlInstance 'SQL02' -AvailabilityGroup 'AG1' -Confirm:$false
+            $r.Status | Should -Be 'Failed'
+            $r.Message | Should -BeLike '*SQL02*ASYNCHRONOUS_COMMIT*'
+            Should -Invoke -ModuleName sqmSQLTool Invoke-DbaQuery -ParameterFilter { $Query -match 'FAILOVER;' } -Exactly 0
+        }
+
+        It '-TargetReplica hat Vorrang vor dem lokalen Knoten' {
+            $r = Invoke-sqmFailover -SqlInstance 'SQL02' -AvailabilityGroup 'AG1' -TargetReplica 'SQL03' -Confirm:$false
+            $r.NewPrimary | Should -Be 'SQL03'
+        }
+
+        It 'Aufgerufen auf dem Primary: automatische Auswahl wie bisher (kleinste Redo-Queue)' {
+            $r = Invoke-sqmFailover -SqlInstance 'SQL01' -AvailabilityGroup 'AG1' -Confirm:$false
+            $r.NewPrimary | Should -Be 'SQL03'
         }
     }
 

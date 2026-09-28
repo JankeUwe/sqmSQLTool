@@ -1,5 +1,20 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.155.0] - 2026-09-28
+
+### Invoke-sqmFailover: aufgerufen auf einem Secondary wird dieser Secondary das Ziel
+
+Ohne `-TargetReplica` wurde bisher immer der synchrone Secondary mit der kleinsten Redo-Queue
+gewaehlt. Bei drei und mehr Knoten konnte ein Aufruf auf SQL02 damit SQL03 zum Primary machen.
+Jetzt gilt:
+
+- **Aufgerufen auf einem Secondary:** dieser Knoten wird Ziel. Ist er nicht bereit (nicht
+  SYNCHRONOUS_COMMIT/SYNCHRONIZED fuer alle Datenbanken), bricht die Funktion mit Nennung des
+  Zustands ab, statt still auf einen anderen Knoten auszuweichen. Die Redo-Queue-Pruefung nimmt
+  dabei die groesste Queue ueber alle Datenbanken dieses Knotens.
+- **Aufgerufen auf dem Primary:** automatische Auswahl wie bisher.
+- **`-TargetReplica`** hat immer Vorrang.
+
 ## [1.9.154.0] - 2026-09-28
 
 ### Invoke-sqmFailover nach Modulstandard: Instanz, AG und Primary werden selbst ermittelt

@@ -115,6 +115,8 @@
     'Failover_AgPromptAbort'        = 'Aborted: no availability group selected.'
     'Failover_PrimaryRedirect'      = "'{0}' is not Primary in AG '{1}' (role: {2}). Using the Primary '{3}'."
     'Failover_PrimaryUnknown'       = "'{0}' is not Primary in AG '{1}' (role: {2}), and the Primary cannot be determined from there (check connectivity to the Primary/quorum)."
+    'Failover_LocalTarget'          = "Called on secondary '{0}' without -TargetReplica: '{0}' becomes the failover target."
+    'Failover_LocalNotReady'        = "Called on secondary '{0}', which would be the target but is not ready ({1}). A manual failover needs SYNCHRONOUS_COMMIT/SYNCHRONIZED for every database. Pass another target with -TargetReplica."
     'Failover_NoSecondaries'        = "No secondary replicas found for AG '{0}'."
     'Failover_TargetNotFound'       = "Target replica '{0}' not found or not secondary."
     'Failover_NoSuitableTarget'     = 'No suitable target replica found (SYNCHRONIZED required).'

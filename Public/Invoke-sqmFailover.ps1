@@ -21,8 +21,12 @@
     job, -NonInteractive) it stops with the list of AG names instead.
 
 .PARAMETER TargetReplica
-    Instance name of the target replica. If not specified, the first
-    SYNCHRONIZED secondary replica is selected automatically.
+    Instance name of the target replica. If not specified:
+    - called on a secondary: that secondary becomes the target. If it is not ready
+      (not SYNCHRONOUS_COMMIT and SYNCHRONIZED for every database) the function stops
+      instead of switching to another node.
+    - called on the primary: the SYNCHRONIZED synchronous-commit secondary with the
+      smallest redo queue is selected automatically.
 
 .PARAMETER MaxRedoQueueMB
     Maximum redo queue size in MB. Failover is aborted if exceeded.
@@ -180,6 +184,7 @@ SELECT
     ars.role_desc                                AS Role,
     ars.synchronization_health_desc             AS SyncHealth,
     ars.operational_state_desc                  AS OperState,
+    ar.replica_server_name                      AS ReplicaServer,
     ags.primary_replica                         AS PrimaryReplica
 FROM sys.availability_groups ag
 JOIN sys.dm_hadr_availability_replica_states ars
@@ -205,8 +210,12 @@ WHERE ag.name = N'$agLiteral'
 			# Nicht Primary: den aktuellen Primary der AG nehmen. Ein Secondary kennt ihn ueber
 			# sys.dm_hadr_availability_group_states.primary_replica; NULL heisst, der Secondary
 			# hat gerade keine Verbindung zum Primary (oder kein Quorum) - dann abbrechen statt raten.
+			# Der angegebene Secondary wird als Wunschziel gemerkt: wer auf SQL02 einen Failover
+			# startet, will in aller Regel, dass SQL02 Primary wird.
+			$requestedReplica = $null
 			if ($localState.Role -ne 'PRIMARY')
 			{
+				$requestedReplica = [string]$localState.ReplicaServer
 				$primaryName = $localState.PrimaryReplica
 				if ($primaryName -is [System.DBNull] -or [string]::IsNullOrWhiteSpace($primaryName))
 				{
@@ -281,6 +290,33 @@ WHERE ag.name = N'$agLiteral'
 					if ($EnableException) { throw $result.Message }
 					return $result
 				}
+			}
+			elseif ($requestedReplica)
+			{
+				# Aufgerufen auf einem Secondary: dieser wird Ziel. Ist er nicht bereit, wird nicht
+				# still auf einen anderen Knoten ausgewichen - das waere nicht das, was gemeint war.
+				# Eine Zeile je Datenbank: bereit ist das Replikat nur, wenn ALLE synchron sind.
+				$localRows = @($replicas | Where-Object { $_.ReplicaServer -ieq $requestedReplica })
+				$notReady = @($localRows | Where-Object { $_.SyncState -ne 'SYNCHRONIZED' -or $_.AvailMode -ne 'SYNCHRONOUS_COMMIT' })
+				if ($localRows.Count -eq 0 -or $notReady.Count -gt 0)
+				{
+					$result.Status  = 'Failed'
+					if ($localRows.Count -eq 0)
+					{
+						$result.Message = _s 'Failover_TargetNotFound' $requestedReplica
+					}
+					else
+					{
+						$states = ($notReady | ForEach-Object { "$($_.AvailMode)/$($_.SyncState)" } | Sort-Object -Unique) -join ', '
+						$result.Message = _s 'Failover_LocalNotReady' $requestedReplica, $states
+					}
+					Invoke-sqmLogging -Message $result.Message -FunctionName $functionName -Level "ERROR"
+					if ($EnableException) { throw $result.Message }
+					return $result
+				}
+				# Groesste Redo-Queue ueber alle Datenbanken, damit Pre-Check 3 die unguenstigste prueft
+				$target = $localRows | Sort-Object RedoQueueKB -Descending | Select-Object -First 1
+				Invoke-sqmLogging -Message (_s 'Failover_LocalTarget' $requestedReplica) -FunctionName $functionName -Level "INFO"
 			}
 			else
 			{
