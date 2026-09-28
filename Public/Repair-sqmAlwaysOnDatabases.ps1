@@ -3,7 +3,10 @@
 Checks all AlwaysOn databases for problems and repairs them (Remove -> Cleanup -> Add).
 
 .DESCRIPTION
-- Determines all databases in all Availability Groups.
+- Only processes Availability Groups in which -SqlInstance is the primary replica. AGs where it
+  is secondary are skipped and logged: removing and re-adding a database only works on the
+  primary. Run the job on every node and each node repairs the AGs it is primary of.
+- Determines all databases in those Availability Groups.
 - Checks whether a database is problematic (synchronization status not 'HEALTHY' or 'SYNCHRONIZED').
 - Ensures that Automatic Seeding is enabled on all replicas (calls Invoke-sqmSqlAlwaysOnAutoseeding).
 - On problems: removes database from AG, deletes it from all secondaries, re-adds it with AutoSeed.
@@ -99,13 +102,35 @@ function Repair-sqmAlwaysOnDatabases
 	{
 		try
 		{
-			# --- 1. Automatic Seeding auf allen Replikaten sicherstellen ---
-			Invoke-sqmLogging -Message "Pruefe/aktiviere Automatic Seeding auf allen AlwaysOn-Replikaten." -FunctionName $functionName -Level "INFO"
+			# --- 1. AGs ermitteln, in denen diese Instanz Primary ist ---
+			# Entfernen, Seeding-Modus setzen und Hinzufuegen gehen nur auf dem Primary. Auf einem
+			# Secondary wuerde Remove-DbaAgDatabase die lokale Kopie aus der AG nehmen (SET HADR OFF)
+			# und das anschliessende Add-DbaAgDatabase scheitern - die Datenbank bliebe draussen.
+			# Laeuft der Job auf allen Knoten, repariert so jeder genau die AGs, deren Primary er ist.
+			$allAGs = @(Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -EnableException)
+			if ($allAGs.Count -eq 0)
+			{
+				Invoke-sqmLogging -Message "Keine Verfuegbarkeitsgruppen gefunden." -FunctionName $functionName -Level "WARNING"
+				return
+			}
+			foreach ($ag in ($allAGs | Where-Object { "$($_.LocalReplicaRole)" -ne 'Primary' }))
+			{
+				Invoke-sqmLogging -Message "AG '$($ag.Name)': '$SqlInstance' ist nicht Primary (Rolle: $($ag.LocalReplicaRole), Primary: $($ag.PrimaryReplica)). Wird hier uebersprungen." -FunctionName $functionName -Level "INFO"
+			}
+			$primaryAGs = @($allAGs | Where-Object { "$($_.LocalReplicaRole)" -eq 'Primary' })
+			if ($primaryAGs.Count -eq 0)
+			{
+				Invoke-sqmLogging -Message "'$SqlInstance' ist in keiner Verfuegbarkeitsgruppe Primary. Nichts zu reparieren." -FunctionName $functionName -Level "INFO"
+				return
+			}
+
+			# --- 2. Automatic Seeding auf den Replikaten dieser AGs sicherstellen ---
+			Invoke-sqmLogging -Message "Pruefe/aktiviere Automatic Seeding fuer: $($primaryAGs.Name -join ', ')" -FunctionName $functionName -Level "INFO"
 			$seedingParams = @{
-				SqlInstance	    = $SqlInstance
-				SqlCredential   = $SqlCredential
-				All			    = $true
-				EnableException = $EnableException
+				SqlInstance	      = $SqlInstance
+				SqlCredential     = $SqlCredential
+				AvailabilityGroup = [string[]]$primaryAGs.Name
+				EnableException   = $EnableException
 			}
 			# Rufe vorhandene Funktion auf (sie setzt Seeding auf Automatic fuer alle AGs)
 			$seedingResults = Invoke-sqmSqlAlwaysOnAutoseeding @seedingParams
@@ -114,16 +139,9 @@ function Repair-sqmAlwaysOnDatabases
 				Invoke-sqmLogging -Message "Automatic Seeding fuer Replikat $($_.ReplicaName): $($_.Status)" -FunctionName $functionName -Level "DEBUG"
 			}
 			
-			# --- 2. Alle AGs und deren Datenbanken abrufen ---
-			$allAGs = Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction Stop
-			if (-not $allAGs)
-			{
-				Invoke-sqmLogging -Message "Keine Verfuegbarkeitsgruppen gefunden." -FunctionName $functionName -Level "WARNING"
-				return
-			}
-			
+			# --- 3. Datenbanken dieser AGs pruefen ---
 			$problematicDatabases = @()
-			foreach ($ag in $allAGs)
+			foreach ($ag in $primaryAGs)
 			{
 				$agDbs = Get-DbaAgDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $ag.Name
 				foreach ($agDb in $agDbs)
@@ -150,7 +168,7 @@ function Repair-sqmAlwaysOnDatabases
 				return $results
 			}
 			
-			# --- 3. Reparatur fuer jede problematische DB ---
+			# --- 4. Reparatur fuer jede problematische DB ---
 			foreach ($prob in $problematicDatabases)
 			{
 				$dbName = $prob.DatabaseName

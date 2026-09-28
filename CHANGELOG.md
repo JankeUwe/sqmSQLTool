@@ -1,5 +1,22 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.152.0] - 2026-09-28
+
+### Fix: Repair-sqmAlwaysOnDatabases repariert nur noch AGs, in denen die Instanz Primary ist
+
+Bisher wurden alle AGs der Instanz verarbeitet, auch die, in denen sie nur Secondary ist. Dort
+haette `Remove-DbaAgDatabase` die lokale Kopie aus der AG genommen und das anschliessende
+`Add-DbaAgDatabase` waere gescheitert, die Datenbank waere auf diesem Knoten draussen geblieben.
+Secondary-AGs werden jetzt uebersprungen und protokolliert (mit Nennung des tatsaechlichen
+Primary). Auch `Invoke-sqmSqlAlwaysOnAutoseeding` wird nur noch fuer die Primary-AGs aufgerufen
+statt mit `-All`. Laeuft der Job auf allen Knoten, repariert jeder die AGs, deren Primary er ist.
+
+### Doku: Beispiel in New-sqmAgentCommandJob
+
+Das Zwei-Schritt-Beispiel uebergab `Repair-sqmAlwaysOnDatabases` den Parameter
+`AvailabilityGroupName`, den die Funktion nicht hat. Ein so angelegter Job waere am
+Parameter-Binding gescheitert. Ersetzt durch `NoReport = $true`.
+
 ## [1.9.151.0] - 2026-09-28
 
 ### Add-sqmDatabaseToAG: AG-Auswahl automatisch, FULL-Backup nach Umstellung auf Full

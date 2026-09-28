@@ -85,7 +85,7 @@ New-sqmAgentCommandJob -SqlInstance 'SQL01' -JobName 'sqmCmd_LoginCompare_AG1' -
 # Two steps chained in one job, scheduled daily at 03:00.
 New-sqmAgentCommandJob -SqlInstance 'SQL01' -JobName 'sqmCmd_AGMaintenance' -ScheduleType Daily -ScheduleTime '03:00' -Command @(
     @{ FunctionName = 'Compare-sqmAlwaysOnLogins';   Parameters = @{ SqlInstance = 'SQL01'; AvailabilityGroupName = 'AG1'; FailOnDrift = $true } },
-    @{ FunctionName = 'Repair-sqmAlwaysOnDatabases'; Parameters = @{ SqlInstance = 'SQL01'; AvailabilityGroupName = 'AG1' } }
+    @{ FunctionName = 'Repair-sqmAlwaysOnDatabases'; Parameters = @{ SqlInstance = 'SQL01'; NoReport = $true } }
 )
 
 .EXAMPLE
