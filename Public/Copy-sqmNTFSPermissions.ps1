@@ -20,6 +20,8 @@
 .PARAMETER CreateMissingFolders
     Automatically creates missing target folders (directories only, not files).
     Files missing at the destination are skipped.
+    Implies -Recurse: creating the missing folder structure only makes sense for the whole
+    tree. Without it, only the top-level folder itself would be processed.
 
 .PARAMETER IncludeSystemAndHidden
     Includes hidden and system objects in the processing.
@@ -40,7 +42,7 @@ function Copy-sqmNTFSPermissions {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [Parameter(Mandatory = $true, Position = 0)]
-        [ValidateScript({ Test-Path $_ -PathType Container })]
+        [ValidateScript({ Test-Path -LiteralPath $_ -PathType Container })]
         [string]$SourcePath,
 
         [Parameter(Mandatory = $true, Position = 1)]
@@ -52,7 +54,19 @@ function Copy-sqmNTFSPermissions {
     )
 
     begin {
+        # Quellpfad auf den vollstaendigen Pfad normalisieren. Der relative Pfad jedes Objekts
+        # wird per Substring aus FullName gebildet; ein relativ angegebener Quellpfad ("Daten")
+        # ist kuerzer als FullName ("D:\Daten") und fuehrte dazu, dass die komplette
+        # Verzeichniskette unter dem Ziel nachgebaut wurde.
+        $SourcePath = (Get-Item -LiteralPath $SourcePath -Force).FullName.TrimEnd('\')
         $DestinationPath = [System.IO.Path]::GetFullPath($DestinationPath)
+
+        # Fehlende Ordner anlegen heisst, die Struktur des ganzen Baums anlegen. Ohne -Recurse
+        # wurde nur der oberste Ordner verarbeitet, und keiner der Unterordner entstand.
+        if ($CreateMissingFolders -and -not $Recurse) {
+            Write-Verbose "-CreateMissingFolders schliesst -Recurse ein: der gesamte Baum wird verarbeitet."
+            $Recurse = [switch]$true
+        }
         if (-not (Test-Path -LiteralPath $DestinationPath -PathType Container)) {
             if ($CreateMissingFolders) {
                 if ($PSCmdlet.ShouldProcess($DestinationPath, "Erstelle Zielverzeichnis")) {
@@ -65,10 +79,11 @@ function Copy-sqmNTFSPermissions {
         }
 
         if ($Recurse) {
-            $allItems = @(Get-Item -Path $SourcePath -Force:$IncludeSystemAndHidden) +
-                        @(Get-ChildItem -Path $SourcePath -Recurse -Force:$IncludeSystemAndHidden -ErrorAction SilentlyContinue)
+            # -LiteralPath: mit -Path werden [ ] in Ordnernamen als Wildcard gelesen
+            $allItems = @(Get-Item -LiteralPath $SourcePath -Force:$IncludeSystemAndHidden) +
+                        @(Get-ChildItem -LiteralPath $SourcePath -Recurse -Force:$IncludeSystemAndHidden -ErrorAction SilentlyContinue)
         } else {
-            $allItems = @(Get-Item -Path $SourcePath -Force:$IncludeSystemAndHidden)
+            $allItems = @(Get-Item -LiteralPath $SourcePath -Force:$IncludeSystemAndHidden)
         }
 
         $total   = $allItems.Count
@@ -78,8 +93,8 @@ function Copy-sqmNTFSPermissions {
     process {
         foreach ($sourceItem in $allItems) {
             $current++
-            $relativePath = $sourceItem.FullName.Substring($SourcePath.TrimEnd('\').Length).TrimStart('\')
-            $destItemPath = Join-Path -Path $DestinationPath -ChildPath $relativePath
+            $relativePath = $sourceItem.FullName.Substring($SourcePath.Length).TrimStart('\')
+            $destItemPath = if ($relativePath) { $DestinationPath.TrimEnd('\') + '\' + $relativePath } else { $DestinationPath }
 
             Write-Progress -Activity "Kopiere NTFS-Berechtigungen" `
                            -Status "$current von $total : $relativePath" `
@@ -110,9 +125,9 @@ function Copy-sqmNTFSPermissions {
             }
 
             try {
-                $acl = Get-Acl -Path $sourceItem.FullName -ErrorAction Stop
+                $acl = Get-Acl -LiteralPath $sourceItem.FullName -ErrorAction Stop
                 if ($PSCmdlet.ShouldProcess($destItemPath, "Setze ACL von '$($sourceItem.FullName)'")) {
-                    Set-Acl -Path $destItemPath -AclObject $acl -ErrorAction Stop
+                    Set-Acl -LiteralPath $destItemPath -AclObject $acl -ErrorAction Stop
                     Write-Verbose "ACL kopiert: $relativePath"
                 }
             } catch {

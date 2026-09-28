@@ -95,6 +95,50 @@ Describe 'Copy-sqmNTFSPermissions' {
                 if (Test-Path $newDst) { Remove-Item $newDst -Recurse -Force }
             }
         }
+
+        It 'Legt auch die Unterordner an, ohne dass -Recurse angegeben ist' {
+            $newDst = Join-Path $env:TEMP "sqmTest_NewDst_$(Get-Random)"
+            try {
+                Copy-sqmNTFSPermissions -SourcePath $script:SrcDir -DestinationPath $newDst -CreateMissingFolders 3>$null 6>$null
+                Join-Path $newDst 'Sub' | Should -Exist
+            } finally {
+                if (Test-Path $newDst) { Remove-Item $newDst -Recurse -Force }
+            }
+        }
+
+        It 'Relativer Quellpfad: Struktur landet unter dem Ziel, nicht die ganze Pfadkette' {
+            $newDst = Join-Path $env:TEMP "sqmTest_NewDst_$(Get-Random)"
+            Push-Location (Split-Path $script:SrcDir -Parent)
+            try {
+                Copy-sqmNTFSPermissions -SourcePath (Split-Path $script:SrcDir -Leaf) -DestinationPath $newDst -Recurse -CreateMissingFolders 3>$null 6>$null
+                @(Get-ChildItem -LiteralPath $newDst -Directory).Name | Should -Be @('Sub')
+            } finally {
+                Pop-Location
+                if (Test-Path $newDst) { Remove-Item $newDst -Recurse -Force }
+            }
+        }
+
+        It 'Ordnernamen mit [ ]: Ordner angelegt und explizite ACE kopiert' {
+            $src = Join-Path $env:TEMP "sqmTest_Src_$(Get-Random)"
+            $newDst = Join-Path $env:TEMP "sqmTest_NewDst_$(Get-Random)"
+            try {
+                $bracket = New-Item -ItemType Directory -Path (Join-Path $src 'Projekt [2026]') -Force
+                $acl = Get-Acl -LiteralPath $bracket.FullName
+                # Jeder/Everyone ueber die SID, der Name ist sprachabhaengig
+                $everyone = [System.Security.Principal.SecurityIdentifier]::new('S-1-1-0')
+                $acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($everyone, 'Read', 'Allow'))
+                Set-Acl -LiteralPath $bracket.FullName -AclObject $acl
+
+                $warnings = Copy-sqmNTFSPermissions -SourcePath $src -DestinationPath $newDst -CreateMissingFolders 3>&1 6>$null
+                $warnings | Should -BeNullOrEmpty
+                $destAcl = Get-Acl -LiteralPath (Join-Path $newDst 'Projekt [2026]')
+                $explicit = $destAcl.Access | Where-Object { -not $_.IsInherited -and
+                    $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]) -eq $everyone }
+                $explicit | Should -Not -BeNullOrEmpty
+            } finally {
+                foreach ($p in $src, $newDst) { if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force } }
+            }
+        }
     }
 
     Context 'SupportsShouldProcess' {

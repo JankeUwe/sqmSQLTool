@@ -1,5 +1,20 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.153.0] - 2026-09-28
+
+### Fix: Copy-sqmNTFSPermissions -CreateMissingFolders legte keine Unterordner an
+
+Drei Fehler, alle nachgestellt:
+
+- **Ohne `-Recurse`** wurde nur der oberste Ordner verarbeitet, von den Unterordnern entstand keiner.
+  `-CreateMissingFolders` schliesst `-Recurse` jetzt ein. Damit werden auch die Rechte aller Dateien
+  und Unterordner kopiert, nicht mehr nur die des obersten Ordners.
+- **Relativer Quellpfad** (`-SourcePath "Daten"`): Der relative Pfad jedes Objekts wurde falsch
+  berechnet und die komplette Verzeichniskette (`\Users\...\Daten\A`) unter dem Ziel nachgebaut.
+  Der Quellpfad wird jetzt vorab auf den vollstaendigen Pfad aufgeloest.
+- **Ordnernamen mit `[ ]`** wurden von `-Path` als Wildcard gelesen: Ordner angelegt, ACL nicht
+  kopiert. Jetzt durchgehend `-LiteralPath`.
+
 ## [1.9.152.0] - 2026-09-28
 
 ### Fix: Repair-sqmAlwaysOnDatabases repariert nur noch AGs, in denen die Instanz Primary ist
