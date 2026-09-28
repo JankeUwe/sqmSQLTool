@@ -1,5 +1,24 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.151.0] - 2026-09-28
+
+### Add-sqmDatabaseToAG: AG-Auswahl automatisch, FULL-Backup nach Umstellung auf Full
+
+- **`-AvailabilityGroup` ist optional.** Ohne Angabe werden die AGs ermittelt, in denen die Instanz
+  Primary ist. Genau eine: wird verwendet. Mehrere: nummerierte Liste mit Rueckfrage (leer = Abbruch).
+  In einer nicht-interaktiven Sitzung (Agent-Job, `-NonInteractive`) wird nicht gefragt, sondern mit
+  der Liste der AG-Namen abgebrochen. Ist die Instanz nirgends Primary, nennt der Fehler den
+  tatsaechlichen Primary je AG.
+- **FULL-Backup nach `SET RECOVERY FULL`.** Bis zum ersten FULL-Backup fehlt die Log-Chain
+  ("pseudo-simple") und `Add-DbaAgDatabase` lehnt die Datenbank ab. Das Backup laeuft jetzt direkt
+  nach der Umstellung, und ebenso fuer Datenbanken, die schon Full sind, aber noch nie danach
+  gesichert wurden (`last_log_backup_lsn` ist NULL). Ziel: Standard-Backupverzeichnis der Instanz
+  oder neu `-BackupPath`. Schlaegt das Backup fehl (Status `BackupFailed`), wird auf den Secondaries
+  nichts geloescht und nichts hinzugefuegt.
+- `Set-DbaDbRecoveryModel` laeuft jetzt mit `-Confirm:$false -EnableException`: vorher konnte es
+  nachfragen, und ein Fehler kam wegen `-ErrorAction Stop` ohne `-EnableException` nicht im catch an.
+- Neue private Hilfsfunktion `Test-sqmInteractiveSession`.
+
 ## [1.9.150.0] - 2026-09-25
 
 ### Fix: Invoke-sqmCollationChange - zwei Fehler

@@ -3,8 +3,12 @@
 Adds one or more databases to an Always On availability group (AutoSeed).
 
 .DESCRIPTION
+- Determines the target AG automatically when -AvailabilityGroup is omitted (see below).
 - Checks whether the database is already in an AG.
-- Sets recovery mode to Full (if necessary).
+- Sets recovery mode to Full (if necessary) and takes a FULL backup right afterwards, so the
+  log chain exists before the database is added. The same backup is taken for a database that
+  is already in Full recovery but has never had a full backup since (log chain still broken,
+  "pseudo-simple") - Add-DbaAgDatabase would reject it otherwise.
 - Recognizes TDE-encrypted databases and checks their preconditions BEFORE any change.
 - Optionally distributes the TDE certificate to every secondary replica (-SyncTdeCertificate).
 - Drops existing databases on all secondary replicas.
@@ -25,7 +29,14 @@ Primary SQL instance (default: computer name).
 Credentials.
 
 .PARAMETER AvailabilityGroup
-Name of the target availability group (mandatory).
+Name of the target availability group. Optional: when omitted, the AGs in which -SqlInstance
+is the primary replica are determined. Exactly one: it is used. Several: the function lists
+them and asks which one to use. In a non-interactive session (Agent job, -NonInteractive) it
+does not ask but aborts with the list of AG names - pass -AvailabilityGroup there.
+
+.PARAMETER BackupPath
+Target directory for the FULL backup taken after switching to Full recovery.
+Default: the instance's default backup directory.
 
 .PARAMETER Database
 Name or array of databases. Ignored when -All is set.
@@ -73,6 +84,10 @@ Add-sqmDatabaseToAG -AvailabilityGroup "AG1" -Database "SalesDB"
 Add-sqmDatabaseToAG -AvailabilityGroup "AG1" -All
 
 .EXAMPLE
+# AG is determined automatically (asks if the instance is primary of several AGs)
+Add-sqmDatabaseToAG -Database "SalesDB"
+
+.EXAMPLE
 # TDE-encrypted database including certificate distribution to all secondaries
 Add-sqmDatabaseToAG -AvailabilityGroup "AG1" -Database "PayrollDB" -SyncTdeCertificate `
     -TdeCertificateBackupPath "\\fileserver\sqlcerts$" `
@@ -96,12 +111,14 @@ function Add-sqmDatabaseToAG
 		[string]$SqlInstance,
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
-		[Parameter(Mandatory = $true)]
+		[Parameter(Mandatory = $false)]
 		[string]$AvailabilityGroup,
 		[Parameter(Mandatory = $false, ParameterSetName = 'Specific')]
 		[string[]]$Database,
 		[Parameter(Mandatory = $false, ParameterSetName = 'All')]
 		[switch]$All,
+		[Parameter(Mandatory = $false)]
+		[string]$BackupPath,
 		[Parameter(Mandatory = $false)]
 		[switch]$SyncTdeCertificate,
 		[Parameter(Mandatory = $false)]
@@ -199,7 +216,8 @@ function Add-sqmDatabaseToAG
 			return $versionCache[$Instance]
 		}
 
-		Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance, AG: $AvailabilityGroup" -FunctionName $functionName -Level "INFO"
+		$agLabel = if ([string]::IsNullOrWhiteSpace($AvailabilityGroup)) { '(wird ermittelt)' } else { $AvailabilityGroup }
+		Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance, AG: $agLabel" -FunctionName $functionName -Level "INFO"
 		$results = @()
 	}
 	
@@ -207,6 +225,63 @@ function Add-sqmDatabaseToAG
 	{
 		try
 		{
+			# Ohne -AvailabilityGroup: nur AGs kommen in Frage, in denen diese Instanz Primary
+			# ist - auf einem Secondary laesst sich keine Datenbank hinzufuegen.
+			if ([string]::IsNullOrWhiteSpace($AvailabilityGroup))
+			{
+				$allAgs = @(Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -EnableException)
+				if ($allAgs.Count -eq 0)
+				{
+					throw "Auf '$SqlInstance' ist keine Verfuegbarkeitsgruppe vorhanden."
+				}
+				$primaryAgs = @($allAgs | Where-Object { "$($_.LocalReplicaRole)" -eq 'Primary' } | Sort-Object -Property Name)
+				if ($primaryAgs.Count -eq 0)
+				{
+					$agList = ($allAgs | ForEach-Object { "$($_.Name) (Primary: $($_.PrimaryReplica))" }) -join ', '
+					throw "'$SqlInstance' ist in keiner Verfuegbarkeitsgruppe Primary. Datenbanken lassen sich nur auf dem Primary hinzufuegen: $agList"
+				}
+
+				if ($primaryAgs.Count -eq 1)
+				{
+					$AvailabilityGroup = $primaryAgs[0].Name
+					Invoke-sqmLogging -Message "Kein -AvailabilityGroup angegeben. Einzige AG mit '$SqlInstance' als Primary: '$AvailabilityGroup'." -FunctionName $functionName -Level "INFO"
+				}
+				else
+				{
+					$agNames = $primaryAgs.Name -join ', '
+					if (-not (Test-sqmInteractiveSession))
+					{
+						throw "'$SqlInstance' ist Primary mehrerer Verfuegbarkeitsgruppen ($agNames). Ohne interaktive Sitzung kann nicht nachgefragt werden - bitte -AvailabilityGroup angeben."
+					}
+
+					Write-Host "`n'$SqlInstance' ist Primary folgender Verfuegbarkeitsgruppen:"
+					for ($i = 0; $i -lt $primaryAgs.Count; $i++)
+					{
+						Write-Host ("  [{0}] {1}" -f ($i + 1), $primaryAgs[$i].Name)
+					}
+					$choice = $null
+					while (-not $choice)
+					{
+						$answer = Read-Host "In welche AG sollen die Datenbanken? (1-$($primaryAgs.Count), leer = Abbruch)"
+						if ([string]::IsNullOrWhiteSpace($answer))
+						{
+							throw "Abbruch: keine Verfuegbarkeitsgruppe ausgewaehlt."
+						}
+						$num = 0
+						if ([int]::TryParse($answer.Trim(), [ref]$num) -and $num -ge 1 -and $num -le $primaryAgs.Count)
+						{
+							$choice = $primaryAgs[$num - 1]
+						}
+						else
+						{
+							Write-Host "Ungueltige Eingabe '$answer'."
+						}
+					}
+					$AvailabilityGroup = $choice.Name
+					Invoke-sqmLogging -Message "Verfuegbarkeitsgruppe per Rueckfrage gewaehlt: '$AvailabilityGroup' (zur Auswahl: $agNames)." -FunctionName $functionName -Level "INFO"
+				}
+			}
+
 			# Verfuegbarkeitsgruppe validieren und sekundaere Replikate ermitteln
 			$ag = Get-DbaAvailabilityGroup -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $AvailabilityGroup -ErrorAction Stop
 			if (-not $ag) { throw "AG '$AvailabilityGroup' nicht gefunden." }
@@ -533,6 +608,8 @@ WITH PRIVATE KEY (FILE = N'$($files.PvkFile -replace "'", "''")', DECRYPTION BY 
 				}
 
 				# Recovery-Modus auf Full setzen
+				$recoveryChanged = $false
+				$prepNotes = @()
 				if ($db.RecoveryModel -ne 'Full')
 				{
 					$setRecoveryAction = "Setze Recovery-Modus fuer '$dbName' auf Full"
@@ -541,7 +618,9 @@ WITH PRIVATE KEY (FILE = N'$($files.PvkFile -replace "'", "''")', DECRYPTION BY 
 						try
 						{
 							Invoke-sqmLogging -Message $setRecoveryAction -FunctionName $functionName -Level "INFO"
-							Set-DbaDbRecoveryModel -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $dbName -RecoveryModel Full -ErrorAction Stop
+							Set-DbaDbRecoveryModel -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $dbName -RecoveryModel Full -Confirm:$false -EnableException
+							$recoveryChanged = $true
+							$prepNotes += "Recovery-Modus von '$($db.RecoveryModel)' auf Full umgestellt"
 						}
 						catch
 						{
@@ -558,7 +637,76 @@ WITH PRIVATE KEY (FILE = N'$($files.PvkFile -replace "'", "''")', DECRYPTION BY 
 						continue
 					}
 				}
-				
+
+				# FULL-Backup, damit die Log-Chain steht. Nach SET RECOVERY FULL verhaelt sich die
+				# Datenbank bis zum ersten FULL-Backup weiter wie SIMPLE ("pseudo-simple") und
+				# Add-DbaAgDatabase lehnt sie ab. Dasselbe gilt fuer eine Datenbank, die schon
+				# FULL ist, aber seitdem nie gesichert wurde: last_log_backup_lsn ist dann NULL.
+				# Laeuft VOR dem Loeschen auf den Secondaries, damit ein Backup-Fehler dort
+				# nichts zerstoert hat.
+				$needsBackup = $recoveryChanged
+				if (-not $needsBackup)
+				{
+					try
+					{
+						$lsnQuery = "SELECT last_log_backup_lsn FROM sys.database_recovery_status WHERE database_id = DB_ID(N'$($dbName -replace "'", "''")')"
+						$lsnRow = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database 'master' -Query $lsnQuery -EnableException
+						if ($lsnRow -and ($lsnRow.last_log_backup_lsn -is [System.DBNull]))
+						{
+							$needsBackup = $true
+							Invoke-sqmLogging -Message "Datenbank '$dbName' ist Full, hat aber noch kein FULL-Backup seit der Umstellung (Log-Chain fehlt)." -FunctionName $functionName -Level "INFO"
+						}
+					}
+					catch
+					{
+						# Nicht fatal: fehlt die Log-Chain tatsaechlich, meldet Add-DbaAgDatabase das selbst
+						Invoke-sqmLogging -Message "Log-Chain von '$dbName' nicht pruefbar ($($_.Exception.Message)). Es wird kein Backup erzwungen." -FunctionName $functionName -Level "WARNING"
+					}
+				}
+
+				if ($needsBackup)
+				{
+					$backupTarget = if ($BackupPath) { $BackupPath } else { 'Standard-Backupverzeichnis' }
+					$backupAction = "Erstelle FULL-Backup von '$dbName' ($backupTarget)"
+					if ($PSCmdlet.ShouldProcess($dbName, $backupAction))
+					{
+						try
+						{
+							Invoke-sqmLogging -Message $backupAction -FunctionName $functionName -Level "INFO"
+							$bkParams = @{
+								SqlInstance    = $SqlInstance
+								SqlCredential  = $SqlCredential
+								Database       = $dbName
+								Type           = 'Full'
+								CompressBackup  = $true
+								EnableException = $true
+							}
+							if ($BackupPath) { $bkParams.Path = $BackupPath }
+							$bk = Backup-DbaDatabase @bkParams
+							if ($bk -and $bk.BackupComplete -eq $false)
+							{
+								throw "Backup-DbaDatabase meldet BackupComplete = False."
+							}
+							$bkFile = ($bk | Select-Object -ExpandProperty BackupPath -ErrorAction SilentlyContinue) -join ', '
+							Invoke-sqmLogging -Message "FULL-Backup von '$dbName' erstellt: $bkFile" -FunctionName $functionName -Level "INFO"
+							$prepNotes += "FULL-Backup erstellt ($bkFile)"
+						}
+						catch
+						{
+							$errMsg = "FULL-Backup von '$dbName' fehlgeschlagen: $($_.Exception.Message). Ohne Backup fehlt die Log-Chain - die Datenbank wird nicht hinzugefuegt, auf den Secondaries wurde nichts geloescht."
+							Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
+							if ($EnableException) { throw }
+							$results += [PSCustomObject]@{ SqlInstance = $SqlInstance; DatabaseName = $dbName; Status = "BackupFailed"; Message = $errMsg }
+							continue
+						}
+					}
+					else
+					{
+						$results += [PSCustomObject]@{ SqlInstance = $SqlInstance; DatabaseName = $dbName; Status = "BackupSkipped"; Message = "WhatIf: FULL-Backup nicht erstellt." }
+						continue
+					}
+				}
+
 				# Vorhandene Datenbank auf Secondaries loeschen
 				foreach ($secondary in $secondaryInstances)
 				{
@@ -601,7 +749,7 @@ WITH PRIVATE KEY (FILE = N'$($files.PvkFile -replace "'", "''")', DECRYPTION BY 
 							SqlInstance  = $SqlInstance
 							DatabaseName = $dbName
 							Status	     = "Success"
-							Message	     = "Erfolgreich zur AG hinzugefuegt."
+							Message	     = (@($prepNotes) + "Erfolgreich zur AG '$AvailabilityGroup' hinzugefuegt.") -join '; '
 						}
 					}
 					catch

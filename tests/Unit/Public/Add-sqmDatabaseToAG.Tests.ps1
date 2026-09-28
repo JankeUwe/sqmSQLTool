@@ -27,7 +27,7 @@ Describe 'Add-sqmDatabaseToAG' {
 
     Context 'Parameter-Validierung' {
         It '<_> Parameter existiert' -ForEach @(
-            'SqlInstance', 'SqlCredential', 'AvailabilityGroup', 'Database', 'All',
+            'SqlInstance', 'SqlCredential', 'AvailabilityGroup', 'Database', 'All', 'BackupPath',
             'SyncTdeCertificate', 'TdeCertificateBackupPath', 'TdeCertificatePassword',
             'TdeMasterKeyPassword', 'KeepTdeCertificateBackup', 'EnableException'
         ) {
@@ -98,6 +98,152 @@ Describe 'Add-sqmDatabaseToAG' {
         It 'Fragt die Zertifikate gar nicht erst ab' {
             Add-sqmDatabaseToAG -SqlInstance 'SQL01' -AvailabilityGroup 'AG1' -Database 'PlainDB' -Confirm:$false | Out-Null
             Should -Invoke -ModuleName sqmSQLTool Invoke-DbaQuery -ParameterFilter { $Query -match 'WHERE CONVERT\(varchar\(100\), thumbprint, 1\)' } -Exactly 0
+        }
+    }
+
+    Context 'Automatische AG-Auswahl ohne -AvailabilityGroup' {
+        BeforeAll {
+            Mock -ModuleName sqmSQLTool Invoke-sqmLogging { }
+            Mock -ModuleName sqmSQLTool Write-Host { }
+            Mock -ModuleName sqmSQLTool Get-DbaAgReplica {
+                @([PSCustomObject]@{ Name = 'SQL01'; Role = 'Primary' },
+                    [PSCustomObject]@{ Name = 'SQL02'; Role = 'Secondary' })
+            }
+            Mock -ModuleName sqmSQLTool Get-DbaDatabase { [PSCustomObject]@{ Name = 'PlainDB'; RecoveryModel = 'Full'; IsAccessible = $true } }
+            Mock -ModuleName sqmSQLTool Get-DbaAgDatabase { $null }
+            Mock -ModuleName sqmSQLTool Remove-DbaDatabase { }
+            Mock -ModuleName sqmSQLTool Add-DbaAgDatabase { }
+            Mock -ModuleName sqmSQLTool Invoke-DbaQuery { @() }
+        }
+
+        It 'Genau eine AG mit dieser Instanz als Primary wird ohne Rueckfrage verwendet' {
+            # AG_SEC ist hier nur Secondary und kommt deshalb nicht in Frage
+            Mock -ModuleName sqmSQLTool Get-DbaAvailabilityGroup {
+                @([PSCustomObject]@{ Name = 'AG1'; LocalReplicaRole = 'Primary'; PrimaryReplica = 'SQL01' },
+                    [PSCustomObject]@{ Name = 'AG_SEC'; LocalReplicaRole = 'Secondary'; PrimaryReplica = 'SQL03' })
+            }
+            Mock -ModuleName sqmSQLTool Read-Host { throw 'darf nicht fragen' }
+            $r = Add-sqmDatabaseToAG -SqlInstance 'SQL01' -Database 'PlainDB' -Confirm:$false
+            $r.Status | Should -Be 'Success'
+            Should -Invoke -ModuleName sqmSQLTool Add-DbaAgDatabase -ParameterFilter { $AvailabilityGroup -eq 'AG1' } -Exactly 1
+            Should -Invoke -ModuleName sqmSQLTool Read-Host -Exactly 0
+        }
+
+        It 'Mehrere AGs: fragt nach und nimmt die gewaehlte' {
+            Mock -ModuleName sqmSQLTool Get-DbaAvailabilityGroup {
+                @([PSCustomObject]@{ Name = 'AG_B'; LocalReplicaRole = 'Primary'; PrimaryReplica = 'SQL01' },
+                    [PSCustomObject]@{ Name = 'AG_A'; LocalReplicaRole = 'Primary'; PrimaryReplica = 'SQL01' })
+            }
+            Mock -ModuleName sqmSQLTool Test-sqmInteractiveSession { $true }
+            # Erst ungueltig, dann 2 = AG_B (Liste ist nach Name sortiert)
+            $script:answers = [System.Collections.Queue]::new(@('x', '2'))
+            Mock -ModuleName sqmSQLTool Read-Host { $script:answers.Dequeue() }
+            $r = Add-sqmDatabaseToAG -SqlInstance 'SQL01' -Database 'PlainDB' -Confirm:$false
+            $r.Status | Should -Be 'Success'
+            Should -Invoke -ModuleName sqmSQLTool Read-Host -Exactly 2
+            Should -Invoke -ModuleName sqmSQLTool Add-DbaAgDatabase -ParameterFilter { $AvailabilityGroup -eq 'AG_B' } -Exactly 1
+        }
+
+        It 'Mehrere AGs ohne interaktive Sitzung: bricht mit Namensliste ab, aendert nichts' {
+            Mock -ModuleName sqmSQLTool Get-DbaAvailabilityGroup {
+                @([PSCustomObject]@{ Name = 'AG_A'; LocalReplicaRole = 'Primary'; PrimaryReplica = 'SQL01' },
+                    [PSCustomObject]@{ Name = 'AG_B'; LocalReplicaRole = 'Primary'; PrimaryReplica = 'SQL01' })
+            }
+            Mock -ModuleName sqmSQLTool Test-sqmInteractiveSession { $false }
+            Mock -ModuleName sqmSQLTool Read-Host { throw 'darf nicht fragen' }
+            $r = Add-sqmDatabaseToAG -SqlInstance 'SQL01' -Database 'PlainDB' -Confirm:$false
+            $r.Status | Should -Be 'GlobalError'
+            $r.Message | Should -BeLike '*AG_A, AG_B*'
+            Should -Invoke -ModuleName sqmSQLTool Add-DbaAgDatabase -Exactly 0
+        }
+
+        It 'Leere Eingabe bricht ab' {
+            Mock -ModuleName sqmSQLTool Get-DbaAvailabilityGroup {
+                @([PSCustomObject]@{ Name = 'AG_A'; LocalReplicaRole = 'Primary'; PrimaryReplica = 'SQL01' },
+                    [PSCustomObject]@{ Name = 'AG_B'; LocalReplicaRole = 'Primary'; PrimaryReplica = 'SQL01' })
+            }
+            Mock -ModuleName sqmSQLTool Test-sqmInteractiveSession { $true }
+            Mock -ModuleName sqmSQLTool Read-Host { '' }
+            $r = Add-sqmDatabaseToAG -SqlInstance 'SQL01' -Database 'PlainDB' -Confirm:$false
+            $r.Status | Should -Be 'GlobalError'
+            Should -Invoke -ModuleName sqmSQLTool Add-DbaAgDatabase -Exactly 0
+        }
+
+        It 'Instanz ist nirgends Primary: Fehler nennt den tatsaechlichen Primary' {
+            Mock -ModuleName sqmSQLTool Get-DbaAvailabilityGroup {
+                [PSCustomObject]@{ Name = 'AG1'; LocalReplicaRole = 'Secondary'; PrimaryReplica = 'SQL02' }
+            }
+            $r = Add-sqmDatabaseToAG -SqlInstance 'SQL01' -Database 'PlainDB' -Confirm:$false
+            $r.Status | Should -Be 'GlobalError'
+            $r.Message | Should -BeLike '*AG1 (Primary: SQL02)*'
+        }
+    }
+
+    Context 'Recovery Full und FULL-Backup' {
+        BeforeAll {
+            Mock -ModuleName sqmSQLTool Invoke-sqmLogging { }
+            Mock -ModuleName sqmSQLTool Get-DbaAvailabilityGroup { [PSCustomObject]@{ Name = 'AG1' } }
+            Mock -ModuleName sqmSQLTool Get-DbaAgReplica {
+                @([PSCustomObject]@{ Name = 'SQL01'; Role = 'Primary' },
+                    [PSCustomObject]@{ Name = 'SQL02'; Role = 'Secondary' })
+            }
+            Mock -ModuleName sqmSQLTool Get-DbaAgDatabase { $null }
+            Mock -ModuleName sqmSQLTool Add-DbaAgDatabase { }
+            Mock -ModuleName sqmSQLTool Set-DbaDbRecoveryModel { }
+            # Secondary hat eine alte Kopie, die fuer das Seeding geloescht wird
+            Mock -ModuleName sqmSQLTool Remove-DbaDatabase { }
+        }
+
+        BeforeEach {
+            Mock -ModuleName sqmSQLTool Invoke-DbaQuery { @() }
+            Mock -ModuleName sqmSQLTool Backup-DbaDatabase { [PSCustomObject]@{ BackupComplete = $true; BackupPath = 'X:\Backup\DB_FULL.bak' } }
+        }
+
+        It 'SIMPLE: stellt auf Full um, sichert und fuegt danach hinzu' {
+            Mock -ModuleName sqmSQLTool Get-DbaDatabase { [PSCustomObject]@{ Name = 'SimpleDB'; RecoveryModel = 'Simple'; IsAccessible = $true } }
+            $r = Add-sqmDatabaseToAG -SqlInstance 'SQL01' -AvailabilityGroup 'AG1' -Database 'SimpleDB' -Confirm:$false
+            $r.Status | Should -Be 'Success'
+            $r.Message | Should -BeLike '*DB_FULL.bak*'
+            Should -Invoke -ModuleName sqmSQLTool Set-DbaDbRecoveryModel -Exactly 1
+            Should -Invoke -ModuleName sqmSQLTool Backup-DbaDatabase -ParameterFilter { $Database -eq 'SimpleDB' -and $Type -eq 'Full' } -Exactly 1
+            Should -Invoke -ModuleName sqmSQLTool Add-DbaAgDatabase -Exactly 1
+        }
+
+        It '-BackupPath wird an Backup-DbaDatabase durchgereicht' {
+            Mock -ModuleName sqmSQLTool Get-DbaDatabase { [PSCustomObject]@{ Name = 'SimpleDB'; RecoveryModel = 'Simple'; IsAccessible = $true } }
+            Add-sqmDatabaseToAG -SqlInstance 'SQL01' -AvailabilityGroup 'AG1' -Database 'SimpleDB' -BackupPath 'X:\AgSeed' -Confirm:$false | Out-Null
+            Should -Invoke -ModuleName sqmSQLTool Backup-DbaDatabase -ParameterFilter { $Path -eq 'X:\AgSeed' } -Exactly 1
+        }
+
+        It 'Backup schlaegt fehl: kein Drop auf dem Secondary, kein Add' {
+            Mock -ModuleName sqmSQLTool Get-DbaDatabase { [PSCustomObject]@{ Name = 'SimpleDB'; RecoveryModel = 'Simple'; IsAccessible = $true } }
+            Mock -ModuleName sqmSQLTool Backup-DbaDatabase { throw 'Platte voll' }
+            $r = Add-sqmDatabaseToAG -SqlInstance 'SQL01' -AvailabilityGroup 'AG1' -Database 'SimpleDB' -Confirm:$false
+            $r.Status | Should -Be 'BackupFailed'
+            $r.Message | Should -BeLike '*Platte voll*'
+            Should -Invoke -ModuleName sqmSQLTool Remove-DbaDatabase -Exactly 0
+            Should -Invoke -ModuleName sqmSQLTool Add-DbaAgDatabase -Exactly 0
+        }
+
+        It 'Full ohne Log-Chain (last_log_backup_lsn NULL) wird ebenfalls gesichert' {
+            Mock -ModuleName sqmSQLTool Get-DbaDatabase { [PSCustomObject]@{ Name = 'NoChainDB'; RecoveryModel = 'Full'; IsAccessible = $true } }
+            Mock -ModuleName sqmSQLTool Invoke-DbaQuery -ParameterFilter { $Query -match 'last_log_backup_lsn' } -MockWith {
+                [PSCustomObject]@{ last_log_backup_lsn = [System.DBNull]::Value }
+            }
+            $r = Add-sqmDatabaseToAG -SqlInstance 'SQL01' -AvailabilityGroup 'AG1' -Database 'NoChainDB' -Confirm:$false
+            $r.Status | Should -Be 'Success'
+            Should -Invoke -ModuleName sqmSQLTool Set-DbaDbRecoveryModel -Exactly 0
+            Should -Invoke -ModuleName sqmSQLTool Backup-DbaDatabase -Exactly 1
+        }
+
+        It 'Full mit bestehender Log-Chain wird nicht gesichert' {
+            Mock -ModuleName sqmSQLTool Get-DbaDatabase { [PSCustomObject]@{ Name = 'ChainDB'; RecoveryModel = 'Full'; IsAccessible = $true } }
+            Mock -ModuleName sqmSQLTool Invoke-DbaQuery -ParameterFilter { $Query -match 'last_log_backup_lsn' } -MockWith {
+                [PSCustomObject]@{ last_log_backup_lsn = [decimal]42000000012300001 }
+            }
+            $r = Add-sqmDatabaseToAG -SqlInstance 'SQL01' -AvailabilityGroup 'AG1' -Database 'ChainDB' -Confirm:$false
+            $r.Status | Should -Be 'Success'
+            Should -Invoke -ModuleName sqmSQLTool Backup-DbaDatabase -Exactly 0
         }
     }
 
