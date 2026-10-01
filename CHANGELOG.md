@@ -1,5 +1,17 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.156.0] - 2026-10-01
+
+### Show-sqmWhoIsActiveMonitor: Filter nach Datenbank, Host und Login
+
+- Neue Filterleiste unter der Instanzzeile mit je einem Feld fuer Datenbank, Host und Login.
+- Treffer per Teilstring ohne Beachtung von Gross-/Kleinschreibung, mit `*` oder `?` als
+  Platzhaltermuster (z. B. `app*`). Mehrere Felder werden UND-verknuepft.
+- Der Filter wirkt sofort auf den angezeigten Snapshot (ohne neue Abfrage) und bleibt bei jedem
+  Tick aktiv. Die Statuszeile zeigt dann "x von y Session(s) (gefiltert)".
+- "Filter leeren" setzt alle Felder zurueck.
+- Nur Anzeige: CSV und HTML-Bericht nach "Stop" enthalten weiterhin alle Sessions.
+
 ## [1.9.155.0] - 2026-09-28
 
 ### Invoke-sqmFailover: aufgerufen auf einem Secondary wird dieser Secondary das Ziel

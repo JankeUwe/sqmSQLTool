@@ -16,6 +16,12 @@
     private Helfer Get-sqmWhoIsActiveSnapshot / Export-sqmWhoIsActiveReport) - dieser
     Dialog ist nur eine alternative, live-aktualisierende Ansicht derselben Daten.
 
+    Die Filterleiste unter der Instanzzeile filtert das Grid nach Datenbank, Host und
+    Login (Teilstring, Gross-/Kleinschreibung egal; mit * oder ? als Platzhaltermuster,
+    z. B. "app*"). Mehrere Felder werden UND-verknuepft. Der Filter wirkt sofort auf
+    den angezeigten Snapshot und bleibt bei jedem Tick aktiv. Er betrifft nur die
+    Anzeige: CSV und HTML-Bericht enthalten weiterhin alle Sessions.
+
 .PARAMETER SqlInstance
     SQL Server Instanz, mit der das Feld beim Oeffnen vorbelegt wird (default:
     aktueller Computername).
@@ -86,6 +92,8 @@ function Show-sqmWhoIsActiveMonitor
 	$script:wiaLoopStart	 = Get-Date
 	$script:wiaAllSnapshots  = [System.Collections.Generic.List[PSCustomObject]]::new()
 	$script:wiaLastSnapshot  = @()
+	$script:wiaStatusPrefix  = ''
+	$script:wiaShownInfo	 = ''
 
 	# ----- Hauptfenster -----------------------------------------------------------------
 	$form = New-Object System.Windows.Forms.Form
@@ -167,6 +175,54 @@ function Show-sqmWhoIsActiveMonitor
 
 	$pTop.Controls.AddRange(@($lblInstance, $txtInstance, $lblInterval, $nudInterval, $lblSleeping, $cboSleeping, $cbAutoOpen, $btnStartStop))
 
+	# ----- Filterleiste (Datenbank / Host / Login, wirkt nur auf die Anzeige) ---------
+	$pFilter = New-Object System.Windows.Forms.Panel
+	$pFilter.Dock	   = 'Top'
+	$pFilter.Height    = 36
+	$pFilter.BackColor = $cPanel
+
+	$lblFilter = New-Object System.Windows.Forms.Label
+	$lblFilter.Text	     = 'Filter:'
+	$lblFilter.AutoSize  = $true
+	$lblFilter.Location  = New-Object System.Drawing.Point(6, 9)
+	$lblFilter.ForeColor = $cDim
+	$pFilter.Controls.Add($lblFilter)
+
+	# Feld -> Eigenschaft im Snapshot-Objekt
+	$filterBoxes = [ordered]@{}
+	$fx = 90
+	foreach ($f in @(
+			@{ L = 'Datenbank:'; P = 'DatabaseName' }
+			@{ L = 'Host:';      P = 'HostName' }
+			@{ L = 'Login:';     P = 'LoginName' }
+		))
+	{
+		$lbl = New-Object System.Windows.Forms.Label
+		$lbl.Text	   = $f.L
+		$lbl.AutoSize  = $true
+		$lbl.Location  = New-Object System.Drawing.Point($fx, 9)
+		$lbl.ForeColor = $cDim
+		$fx += 70
+
+		$txt = New-Object System.Windows.Forms.TextBox
+		$txt.Location    = New-Object System.Drawing.Point($fx, 5)
+		$txt.Size	     = New-Object System.Drawing.Size(150, 24)
+		$txt.BackColor   = $cWindow
+		$txt.ForeColor   = $cText
+		$txt.BorderStyle = 'FixedSingle'
+		$fx += 164
+
+		$pFilter.Controls.AddRange(@($lbl, $txt))
+		$filterBoxes[$f.P] = $txt
+	}
+
+	$btnClearFilter = New-Object System.Windows.Forms.Button
+	$btnClearFilter.Text	 = 'Filter leeren'
+	$btnClearFilter.Location = New-Object System.Drawing.Point($fx, 3)
+	$btnClearFilter.Size	 = New-Object System.Drawing.Size(100, 26)
+	& $styleButton $btnClearFilter
+	$pFilter.Controls.Add($btnClearFilter)
+
 	# ----- DataGridView (aktueller Snapshot, wird bei jedem Tick neu befuellt) --------
 	$grid = New-Object System.Windows.Forms.DataGridView
 	$grid.Dock				 = 'Fill'
@@ -237,7 +293,9 @@ function Show-sqmWhoIsActiveMonitor
 	$pBottom.Controls.Add($lblStatus)
 	$pBottom.Controls.Add($btnClose)
 
+	# Reihenfolge bestimmt das Docking: pTop zuletzt hinzugefuegt -> liegt oben, pFilter darunter
 	$form.Controls.Add($grid)
+	$form.Controls.Add($pFilter)
 	$form.Controls.Add($pTop)
 	$form.Controls.Add($pBottom)
 
@@ -260,9 +318,36 @@ function Show-sqmWhoIsActiveMonitor
 		}
 	}
 
+	# Teilstring ohne Beachtung von Gross-/Kleinschreibung; mit * oder ? als Platzhaltermuster
+	function Get-FilteredRows
+	{
+		param ($Rows)
+		$active = @(foreach ($p in $filterBoxes.Keys)
+			{
+				$t = $filterBoxes[$p].Text.Trim()
+				if ($t) { @{ P = $p; T = $t; W = ($t -match '[*?]') } }
+			})
+		if ($active.Count -eq 0) { return @($Rows) }
+
+		@(foreach ($r in $Rows)
+			{
+				$ok = $true
+				foreach ($a in $active)
+				{
+					$v = [string]$r.($a.P)
+					$hit = if ($a.W) { $v -like $a.T } else { $v.IndexOf($a.T, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 }
+					if (-not $hit) { $ok = $false; break }
+				}
+				if ($ok) { $r }
+			})
+	}
+
 	function Update-Grid
 	{
 		param ($Rows)
+		$all = @($Rows)
+		$Rows = @(Get-FilteredRows $all)
+		$script:wiaShownInfo = if ($Rows.Count -ne $all.Count) { "$($Rows.Count) von $($all.Count) Session(s) (gefiltert)" } else { "$($all.Count) Session(s)" }
 		$grid.SuspendLayout()
 		$grid.Rows.Clear()
 		foreach ($r in $Rows)
@@ -289,6 +374,16 @@ function Show-sqmWhoIsActiveMonitor
 		$grid.ResumeLayout()
 	}
 
+	# Filter geaendert: letzten Snapshot neu darstellen, ohne neue Abfrage
+	function Update-FilterView
+	{
+		Update-Grid $script:wiaLastSnapshot
+		if ($script:wiaRunning -and $script:wiaStatusPrefix)
+		{
+			Set-Status "$($script:wiaStatusPrefix) - $($script:wiaShownInfo)" 'OK'
+		}
+	}
+
 	function Set-ControlsEnabled
 	{
 		param ([bool]$Enabled)
@@ -310,7 +405,8 @@ function Show-sqmWhoIsActiveMonitor
 			$script:wiaLastSnapshot = $rows
 
 			Update-Grid $rows
-			Set-Status "Iteration $($script:wiaIteration) - $($captureTime.ToString('HH:mm:ss')) - $($rows.Count) Session(s)" 'OK'
+			$script:wiaStatusPrefix = "Iteration $($script:wiaIteration) - $($captureTime.ToString('HH:mm:ss'))"
+			Set-Status "$($script:wiaStatusPrefix) - $($script:wiaShownInfo)" 'OK'
 		}
 		catch
 		{
@@ -375,6 +471,12 @@ function Show-sqmWhoIsActiveMonitor
 
 	$btnStartStop.Add_Click({
 			if ($script:wiaRunning) { Stop-Monitor } else { Start-Monitor }
+		})
+
+	foreach ($tb in $filterBoxes.Values) { $tb.Add_TextChanged({ Update-FilterView }) }
+
+	$btnClearFilter.Add_Click({
+			foreach ($tb in $filterBoxes.Values) { $tb.Text = '' }
 		})
 
 	$btnClose.Add_Click({ $form.Close() })
