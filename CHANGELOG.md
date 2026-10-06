@@ -1,5 +1,20 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.157.0] - 2026-10-06
+
+### Get-sqmOperationStatus: laufende Operationen wurden nicht angezeigt
+
+- Die Tabelle zeigte bei einem laufenden Backup/Restore nur leere Spalten (ausser `Status`):
+  An `Select-Object` gingen nur die Namen der berechneten Spalten (`Type`, `Database`,
+  `Progress`, ...), die auf den Objekten nicht existieren. Jetzt werden die berechneten
+  Eigenschaften selbst uebergeben.
+- Verbindungs- oder Anmeldefehler meldete die Funktion als "Keine aktiven Operationen gefunden",
+  weil `Invoke-DbaQuery` ohne `-EnableException` lief. Jetzt erscheint der echte Fehler.
+- Restores in der Anfangsphase (`percent_complete` = 0, z. B. Datei-Initialisierung) wurden
+  ausgefiltert und fehlen nicht mehr.
+- AutoSeed: Der Filter `internal_state_desc IN ('RUNNING','IN_PROGRESS')` traf nie, diese Werte
+  liefert `sys.dm_hadr_physical_seeding_stats` nicht. Laufend ist jetzt `end_time_utc IS NULL`.
+
 ## [1.9.156.0] - 2026-10-01
 
 ### Show-sqmWhoIsActiveMonitor: Filter nach Datenbank, Host und Login

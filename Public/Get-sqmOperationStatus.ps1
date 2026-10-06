@@ -102,10 +102,10 @@ SELECT
     DATEADD(ms, r.estimated_completion_time, GETDATE()) AS expected_completion_time
 FROM sys.dm_exec_requests r
 WHERE r.command IN ('BACKUP DATABASE', 'RESTORE DATABASE', 'BACKUP LOG', 'RESTORE LOG')
-    AND r.percent_complete > 0
 "@
-				
-				$backupRestoreOps = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Query $backupRestoreQuery -Database master -ErrorAction Stop
+
+				# -EnableException: ohne fehlt die Verbindung still und es erscheint "Keine aktiven Operationen"
+				$backupRestoreOps = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Query $backupRestoreQuery -Database master -EnableException
 				
 				# 2. AutoSeed Operationen ueber sys.dm_hadr_physical_seeding_stats abrufen
 				# Diese DMV existiert ab SQL Server 2016
@@ -127,18 +127,19 @@ SELECT
         ELSE 0
     END AS percent_complete
 FROM sys.dm_hadr_physical_seeding_stats
-WHERE internal_state_desc IN ('RUNNING', 'IN_PROGRESS')
+-- internal_state_desc kennt keine Werte 'RUNNING'/'IN_PROGRESS'; laufend = noch kein end_time_utc
+WHERE end_time_utc IS NULL
 "@
-				
+
 				$autoSeedOps = @()
 				try
 				{
-					$autoSeedOps = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Query $autoSeedQuery -Database master -ErrorAction Stop
+					$autoSeedOps = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Query $autoSeedQuery -Database master -EnableException
 				}
 				catch
 				{
 					# DMV existiert moeglicherweise nicht (z.B. SQL Server 2014 oder aelter)
-					if ($_.Exception.Message -match 'Invalid object name')
+					if ("$($_.Exception.Message) $($_.Exception.InnerException.Message)" -match 'Invalid object name|Ung.ltiger Objektname')
 					{
 						Write-Verbose "sys.dm_hadr_physical_seeding_stats nicht verfuegbar (SQL Server < 2016)"
 					}
@@ -232,7 +233,7 @@ WHERE internal_state_desc IN ('RUNNING', 'IN_PROGRESS')
 				
 				if ($allOps.Count -eq 0)
 				{
-					$msg = "Keine aktiven $($OperationType -replace 'AutoSeed', 'AutoSeed-')Operationen gefunden."
+					$msg = if ($OperationType) { "Keine aktiven $OperationType-Operationen gefunden." } else { "Keine aktiven Operationen gefunden." }
 					Write-Host $msg -ForegroundColor Yellow
 					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "INFO"
 				}
@@ -254,7 +255,9 @@ WHERE internal_state_desc IN ('RUNNING', 'IN_PROGRESS')
 						$displayProps += @{ Name = 'Transferred'; Expression = { $_.TransferredSize } }
 					}
 					
-					$allOps | Select-Object -Property ($displayProps | ForEach-Object { $_.Name }) | Format-Table -AutoSize
+					# Berechnete Eigenschaften direkt uebergeben: nur die Namen ('Type', 'Database', ...) existieren
+					# auf den Objekten nicht und ergaben leere Spalten.
+					$allOps | Select-Object -Property $displayProps | Format-Table -AutoSize
 				}
 				
 				# Kontinuierliche Ausfuehrung
