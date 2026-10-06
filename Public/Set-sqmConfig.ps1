@@ -89,6 +89,15 @@
     a share gets populated/kept in sync.
     Example: 'W:\75084-Datenbanken\MSSQL\SQLSources\Modules'
 
+.PARAMETER UpdateMode
+    Update-Pruefung beim Modulstart (erster Aufruf einer sqmSQLTool-Funktion in einer Sitzung,
+    hoechstens einmal je UpdateCheckIntervalHours, Standard 24):
+    Prompt = neuere Version anbieten (Standard). In Agent-Jobs, geplanten Tasks und
+             -NonInteractive-Sitzungen wird nicht geprueft.
+    Auto   = ohne Rueckfrage installieren (auch in Agent-Jobs).
+    Off    = nicht pruefen. Manuell jederzeit: Update-sqmModule
+    Loest -AutoUpdate ab; ein frueher gespeichertes AutoUpdate=$true gilt als 'Auto'.
+
 .PARAMETER InstallSourceType
     Typ der zuletzt verwendeten Installationsquelle fuer das Auto-Update:
     'PSGallery' | 'UNC' | 'GitHub' | 'LocalDir'. Wird normalerweise von Install.ps1
@@ -185,6 +194,9 @@ function Set-sqmConfig
 		[string[]]$TsmManagementClasses,
 		[Parameter(Mandatory = $false)]
 		[bool]$AutoUpdate,
+		[Parameter(Mandatory = $false)]
+		[ValidateSet('Prompt', 'Auto', 'Off')]
+		[string]$UpdateMode,
 		[Parameter(Mandatory = $false)]
 		[string]$UpdateRepository,
 		[Parameter(Mandatory = $false)]
@@ -417,6 +429,11 @@ function Set-sqmConfig
 	if ($PSBoundParameters.ContainsKey('AutoUpdate'))
 	{
 		$globalConfig['AutoUpdate'] = $AutoUpdate
+		$updated = $true
+	}
+	if ($PSBoundParameters.ContainsKey('UpdateMode'))
+	{
+		$globalConfig['UpdateMode'] = $UpdateMode
 		$updated = $true
 	}
 	if ($PSBoundParameters.ContainsKey('UpdateRepository'))

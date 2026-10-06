@@ -1,5 +1,45 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.158.0] - 2026-10-07
+
+### Update-Pruefung beim Start: neuere Version wird angeboten
+
+Beim ersten Aufruf einer sqmSQLTool-Funktion in einer Sitzung (PowerShell laedt das Modul dann
+automatisch) prueft das Modul die Installationsquelle auf eine neuere Version, hoechstens einmal
+je `UpdateCheckIntervalHours` (Standard 24). Wird eine gefunden, kommt die Rueckfrage:
+
+- **Ja**: Update sofort installieren. Die neue Version gilt ab der naechsten Sitzung oder nach
+  `Import-Module sqmSQLTool -Force`.
+- **Nein**: nach Ablauf des Intervalls erneut fragen.
+- **Ueberspringen**: diese Version nicht mehr anbieten (die naechste wieder).
+
+Steuerung ueber den neuen Konfigurationsschluessel `UpdateMode`:
+
+- `Set-sqmConfig -UpdateMode Prompt` (Standard): anbieten. In Agent-Jobs, geplanten Tasks und
+  `-NonInteractive`-Sitzungen wird nicht geprueft, damit kein Import an einer Rueckfrage haengt.
+- `Set-sqmConfig -UpdateMode Auto`: ohne Rueckfrage installieren (bisheriges `AutoUpdate=$true`,
+  ein gespeichertes `AutoUpdate=$true` gilt weiterhin als `Auto`).
+- `Set-sqmConfig -UpdateMode Off`: nicht pruefen.
+
+Weitere Aenderungen:
+
+- **`Update-sqmModule` ist jetzt exportiert** und manuell aufrufbar.
+- **GUI** (`Start-sqmToolGui`): Angebot als MessageBox; nach dem Update laedt die GUI die neue
+  Version direkt.
+- **Ohne Schreibrechte** auf den Modulordner (AllUsers-Installation ohne Admin) gibt es statt der
+  Rueckfrage den Hinweis, `Update-sqmModule` in einer Admin-PowerShell auszufuehren.
+- **Fix Versionsordner**: Liegt das Modul in `...\Modules\sqmSQLTool\<Version>\` (so legt
+  `Install-Module` es ab), kopierte das Datei-Update die neuen Dateien in den alten
+  Versionsordner. Ordnername und Manifestversion passten dann nicht mehr zusammen, PowerShell
+  fand das Modul nicht mehr. Die neue Version kommt jetzt in einen eigenen Versionsordner daneben.
+- **PSGallery-Check** fragt die Gallery-API direkt ab (5 s Timeout) statt ueber `Find-Module`,
+  das auf frischen Rechnern mitten im Import nach dem NuGet-Provider fragte. GitHub-Check mit
+  5 s Timeout.
+- **FI-TS**: `AutoUpdate` wird nicht mehr fest eingeschaltet, dort gilt jetzt ebenfalls
+  `Prompt`. Agent-Jobs aktualisieren das Modul damit nicht mehr selbst.
+- Tests: `TestHelpers.ps1` setzte die falsche Variable (`MSSQLTOOLS_SKIP_AUTO_UPDATE`), korrekt ist
+  `SQMSQLTOOL_SKIP_AUTO_UPDATE` (beide werden akzeptiert).
+
 ## [1.9.157.0] - 2026-10-06
 
 ### Get-sqmOperationStatus: laufende Operationen wurden nicht angezeigt

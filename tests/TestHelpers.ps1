@@ -13,7 +13,7 @@ $script:ModulePath = Join-Path $script:ModuleRoot 'sqmSQLTool.psd1'
 # Hilfsfunktion: Modul frisch laden (isoliert, ohne AutoUpdate)
 # ---------------------------------------------------------------------------
 function Import-sqmTestModule {
-    $env:MSSQLTOOLS_SKIP_AUTO_UPDATE = '1'
+    $env:SQMSQLTOOL_SKIP_AUTO_UPDATE = '1'
     if (Get-Module sqmSQLTool) { Remove-Module sqmSQLTool -Force }
     Import-Module $script:ModulePath -Force -ErrorAction Stop
 }

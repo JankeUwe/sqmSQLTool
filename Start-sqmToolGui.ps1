@@ -57,7 +57,17 @@ try
         })
 
     Write-sqmGuiLog "Starte sqmSQLTool GUI (PID $PID, PS $($PSVersionTable.PSVersion))..."
+    # Update-Angebot beim Import als MessageBox statt Konsolen-Rueckfrage
+    $env:SQMSQLTOOL_UPDATE_UI = 'MessageBox'
     Import-Module sqmSQLTool -ErrorAction Stop
+    if ($env:SQMSQLTOOL_UPDATED)
+    {
+        # Gerade aktualisiert: neue Version laden, damit die GUI nicht mit der alten startet
+        Write-sqmGuiLog "Modul auf $env:SQMSQLTOOL_UPDATED aktualisiert, lade neu..."
+        $env:SQMSQLTOOL_SKIP_AUTO_UPDATE = '1'
+        Remove-Module sqmSQLTool -Force
+        Import-Module sqmSQLTool -Force -ErrorAction Stop
+    }
     Show-sqmToolGui
     Write-sqmGuiLog "GUI beendet (normal)."
 }

@@ -51,6 +51,10 @@ $script:sqmModuleConfig = @{
 	# Freigabelaufwerk mit einer vorab gepackten dbatools + dbatools.library-Baseline, fuer
 	# Umgebungen ohne PSGallery-Zugriff (siehe Install.ps1 Schritt 5b). $null = PSGallery nutzen.
 	DbatoolsSharePath     = $null
+	# Update-Pruefung beim Modulstart: 'Prompt' = neuere Version anbieten (Standard),
+	# 'Auto' = ohne Rueckfrage installieren, 'Off' = nicht pruefen.
+	# AutoUpdate ist der Vorgaenger: ein persistiertes AutoUpdate=$true gilt als 'Auto'.
+	UpdateMode            = 'Prompt'
 	AutoUpdate            = $false
 	UpdateRepository      = ''
 	# Auto-Update-Quelle (zuletzt verwendete Installationsquelle - von Install.ps1 gesetzt
@@ -107,6 +111,12 @@ if (Test-Path $configFile)
 		{
 			$script:sqmModuleConfig[$key.Name] = $key.Value
 		}
+		# Altkonfiguration: wer AutoUpdate=$true gesetzt hat (vor UpdateMode), behaelt das
+		# Installieren ohne Rueckfrage.
+		if ($userConfig.AutoUpdate -eq $true -and -not $userConfig.PSObject.Properties['UpdateMode'])
+		{
+			$script:sqmModuleConfig['UpdateMode'] = 'Auto'
+		}
 	}
 	catch
 	{
@@ -144,7 +154,6 @@ if ($script:sqmIsFitsEnvironment)
 {
 	$script:sqmModuleConfig['LogPath']                = 'C:\System\WinSrvLog\MSSQL'
 	$script:sqmModuleConfig['OutputPath']             = 'C:\System\WinSrvLog\MSSQL'
-	$script:sqmModuleConfig['AutoUpdate']             = $true
 	$script:sqmModuleConfig['UpdateRepository']       = 'W:\75084-Datenbanken\MSSQL\CPM\sqmSQLTool'
 	$script:sqmModuleConfig['TsmManagementClasses']   = @('MC_B_NL.NL_35.35.NA')
 	$script:sqmModuleConfig['DefaultPolicy']          = 'New Login_Enforce Passwort Policy'
@@ -321,13 +330,18 @@ function Test-sqmUpdateViaPSGallery
 
 	try
 	{
-		$galleryModule = Find-Module -Name $ModuleName -Repository PSGallery -ErrorAction Stop
+		# Direkt ueber die Gallery-API statt Find-Module: Find-Module fragt auf frischen Rechnern
+		# nach dem NuGet-Provider (Rueckfrage mitten im Modulimport) und kennt keinen Timeout.
+		[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+		$uri = "https://www.powershellgallery.com/api/v2/FindPackagesById()?id='$ModuleName'&`$filter=IsLatestVersion"
+		$entry = Invoke-RestMethod -Uri $uri -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop | Select-Object -First 1
+		if (-not $entry) { return $null }
 		$currentVersion = [version]$script:sqmModuleConfig['ModuleVersion']
-		$galleryVersion = [version]$galleryModule.Version
+		$galleryVersion = [version]"$($entry.properties.Version)"
 
 		if ($galleryVersion -gt $currentVersion)
 		{
-			Write-Verbose "PSGallery: Neuere Version verfuegbar ($($galleryModule.Version))"
+			Write-Verbose "PSGallery: Neuere Version verfuegbar ($galleryVersion)"
 			return @{
 				Source = 'PSGallery'
 				Version = $galleryVersion
@@ -354,10 +368,12 @@ function Test-sqmUpdateViaGitHub
 	[CmdletBinding()]
 	param ([string]$GitHubRepo = 'JankeUwe/sqmSQLTool')
 
+	if (-not (Test-InternetConnectivity)) { return $null }
 	try
 	{
+		[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 		$latestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/$GitHubRepo/releases/latest" `
-			-Headers @{'Accept' = 'application/vnd.github+json'} `
+			-Headers @{'Accept' = 'application/vnd.github+json'} -TimeoutSec 5 `
 			-ErrorAction Stop
 
 		# Version aus Tag extrahieren (v1.4.0.0 -> 1.4.0.0)
@@ -572,6 +588,57 @@ function Copy-sqmModuleFiles
 
 <#
 .SYNOPSIS
+    Zielordner fuer ein Datei-Update (UNC, LocalDir, GitHub).
+.DESCRIPTION
+    Liegt das Modul in einem Versionsordner (...\Modules\sqmSQLTool\1.9.140.0, so legt
+    Install-Module es ab), darf die neue Version NICHT dort hinein: Ordnername und
+    ModuleVersion im Manifest passen dann nicht mehr zusammen und PowerShell findet das Modul
+    nicht mehr. Dann wird ein neuer Geschwisterordner mit der neuen Versionsnummer angelegt,
+    die alte Version bleibt unangetastet daneben liegen.
+#>
+function Get-sqmModuleUpdateTarget
+{
+	[CmdletBinding()]
+	param ([string]$NewVersion)
+
+	$leaf = Split-Path $PSScriptRoot -Leaf
+	$parsed = $null
+	if ([version]::TryParse($leaf, [ref]$parsed))
+	{
+		if (-not $NewVersion) { throw "Modul liegt im Versionsordner '$leaf', die neue Version ist aber unbekannt." }
+		return @{ Path = Join-Path (Split-Path $PSScriptRoot -Parent) $NewVersion; Versioned = $true }
+	}
+	return @{ Path = $PSScriptRoot; Versioned = $false }
+}
+
+<#
+.SYNOPSIS
+    Prueft, ob der aktuelle Benutzer in den Modulordner schreiben darf.
+.DESCRIPTION
+    Eine AllUsers-Installation unter Program Files braucht Adminrechte. Ohne die schlaegt das
+    Update erst mitten im Kopieren fehl - deshalb vor dem Angebot pruefen.
+#>
+function Test-sqmModuleUpdateWritable
+{
+	[CmdletBinding()]
+	[OutputType([bool])]
+	param ()
+
+	$dir = $PSScriptRoot
+	$parsed = $null
+	if ([version]::TryParse((Split-Path $dir -Leaf), [ref]$parsed)) { $dir = Split-Path $dir -Parent }
+	$probe = Join-Path $dir ".sqmwrite_$PID.tmp"
+	try
+	{
+		[System.IO.File]::WriteAllText($probe, '')
+		Remove-Item -Path $probe -Force -ErrorAction SilentlyContinue
+		return $true
+	}
+	catch { return $false }
+}
+
+<#
+.SYNOPSIS
     Aktualisiert das Modul aus einem GitHub-Release (laedt das ZIP-Asset, entpackt, kopiert).
 .PARAMETER Version
     Release-Version (z.B. 1.8.0.0). Ohne Angabe wird das latest-Release verwendet.
@@ -581,7 +648,6 @@ function Update-sqmFromGitHub
 	[CmdletBinding()]
 	param (
 		[string]$Version,
-		[Parameter(Mandatory)][string]$ModulePath,
 		[switch]$Backup = $true,
 		[string]$GitHubRepo = 'JankeUwe/sqmSQLTool'
 	)
@@ -589,6 +655,7 @@ function Update-sqmFromGitHub
 	New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 	try
 	{
+		[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 		if (-not $Version)
 		{
 			$latest = Invoke-RestMethod -Uri "https://api.github.com/repos/$GitHubRepo/releases/latest" `
@@ -597,16 +664,16 @@ function Update-sqmFromGitHub
 		}
 		$zipUrl  = "https://github.com/$GitHubRepo/releases/download/v$Version/sqmSQLTool-v$Version.zip"
 		$zipFile = Join-Path $tmp "sqmSQLTool-v$Version.zip"
-		[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 		Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile -UseBasicParsing -ErrorAction Stop
 		Expand-Archive -Path $zipFile -DestinationPath $tmp -Force -ErrorAction Stop
 
 		# Quelle = Ordner, der die sqmSQLTool.psd1 enthaelt (ZIP kann einen Wurzelordner haben)
 		$psd1 = Get-ChildItem -Path $tmp -Recurse -Filter 'sqmSQLTool.psd1' -ErrorAction Stop | Select-Object -First 1
 		if (-not $psd1) { throw "sqmSQLTool.psd1 im heruntergeladenen ZIP nicht gefunden." }
-		Copy-sqmModuleFiles -SourcePath $psd1.Directory.FullName -ModulePath $ModulePath -Backup:$Backup
+		$target = Get-sqmModuleUpdateTarget -NewVersion $Version
+		Copy-sqmModuleFiles -SourcePath $psd1.Directory.FullName -ModulePath $target.Path -Backup:($Backup -and -not $target.Versioned)
 		Write-Host "Modul aus GitHub-Release v$Version aktualisiert." -ForegroundColor Green
-		Write-Warning "Bitte Session neu starten oder 'Remove-Module sqmSQLTool; Import-Module sqmSQLTool'."
+		return $true
 	}
 	finally
 	{
@@ -620,12 +687,18 @@ function Update-sqmFromGitHub
 .DESCRIPTION
     Dispatcht nach Quelle: PSGallery (Install-Module), GitHub (Release-ZIP),
     UNC/LocalDir (Datei-Copy). Ohne -UpdateInfo wird Test-sqmModuleUpdate selbst aufgerufen.
+    Liegt das Modul in einem Versionsordner, wird die neue Version daneben installiert.
+    Die neue Version gilt ab dem naechsten Import (neue Sitzung oder Import-Module sqmSQLTool -Force).
 .PARAMETER UpdateInfo
     Optionales Ergebnis von Test-sqmModuleUpdate (Source/Version/Path).
 .PARAMETER Backup
-    Sicherung vor Datei-Update (Standard: $true).
+    Sicherung vor Datei-Update (Standard: $true). Entfaellt bei Versionsordnern, dort bleibt
+    die alte Version ohnehin erhalten.
 .PARAMETER Force
     Update auch ohne erkannte neuere Version erzwingen.
+.EXAMPLE
+    Update-sqmModule
+    Prueft die Installationsquelle und installiert eine neuere Version, falls vorhanden.
 #>
 function Update-sqmModule
 {
@@ -641,12 +714,18 @@ function Update-sqmModule
 	if (-not $UpdateInfo) { $UpdateInfo = Test-sqmModuleUpdate -Credential $Credential }
 	if (-not $UpdateInfo -and -not $Force)
 	{
-		Write-Host "Keine neuere Version verfuegbar." -ForegroundColor Green
+		Write-Host "Keine neuere Version verfuegbar (installiert: $($script:sqmModuleConfig['ModuleVersion']))." -ForegroundColor Green
+		return
+	}
+	if (-not (Test-sqmModuleUpdateWritable))
+	{
+		Write-Warning "Keine Schreibrechte auf '$currentModulePath'. PowerShell als Administrator starten und 'Update-sqmModule' erneut ausfuehren."
 		return
 	}
 
 	$source = if ($UpdateInfo -and $UpdateInfo.Source) { $UpdateInfo.Source } else { (Get-sqmInstallSource).Type }
 	$verTxt = if ($UpdateInfo -and $UpdateInfo.Version) { " auf $($UpdateInfo.Version)" } else { '' }
+	$done = $false
 
 	try
 	{
@@ -660,16 +739,16 @@ function Update-sqmModule
 					{
 						Install-Module -Name sqmSQLTool -Repository PSGallery -Force -AllowClobber -Scope $scope -ErrorAction Stop
 						Write-Host "sqmSQLTool via PSGallery aktualisiert (Scope $scope)." -ForegroundColor Green
-						Write-Warning "Bitte Session neu starten oder 'Remove-Module sqmSQLTool; Import-Module sqmSQLTool'."
+						$done = $true
 					}
-					catch { Write-Warning "PSGallery-Update fehlgeschlagen (Adminrechte fuer AllUsers noetig?): $($_.Exception.Message)" }
+					catch { Write-Warning "PSGallery-Update fehlgeschlagen: $($_.Exception.Message)" }
 				}
 			}
 			'GitHub' {
 				if ($PSCmdlet.ShouldProcess("sqmSQLTool$verTxt via GitHub-Release", "Download & Update"))
 				{
 					$v = if ($UpdateInfo) { "$($UpdateInfo.Version)" } else { $null }
-					Update-sqmFromGitHub -Version $v -ModulePath $currentModulePath -Backup:$Backup
+					$done = [bool](Update-sqmFromGitHub -Version $v -Backup:$Backup)
 				}
 			}
 			default {
@@ -687,11 +766,15 @@ function Update-sqmModule
 					Write-Warning "Quelle '$repo' nicht erreichbar."
 					return
 				}
-				if ($PSCmdlet.ShouldProcess("sqmSQLTool$verTxt aus '$repo'", "Datei-Update"))
+				# Version aus dem Quell-Manifest: bestimmt bei Versionsordnern den Zielordner
+				$newVersion = if ($UpdateInfo -and $UpdateInfo.Version) { "$($UpdateInfo.Version)" }
+							  else { (Import-PowerShellDataFile -Path (Join-Path $repo 'sqmSQLTool.psd1') -ErrorAction Stop).ModuleVersion }
+				$target = Get-sqmModuleUpdateTarget -NewVersion $newVersion
+				if ($PSCmdlet.ShouldProcess("sqmSQLTool$verTxt aus '$repo' nach '$($target.Path)'", "Datei-Update"))
 				{
-					Copy-sqmModuleFiles -SourcePath $repo -ModulePath $currentModulePath -Backup:$Backup
-					Write-Host "Modul wurde aktualisiert." -ForegroundColor Green
-					Write-Warning "Bitte Session neu starten oder 'Remove-Module sqmSQLTool; Import-Module sqmSQLTool'."
+					Copy-sqmModuleFiles -SourcePath $repo -ModulePath $target.Path -Backup:($Backup -and -not $target.Versioned)
+					Write-Host "Modul wurde aktualisiert: $($target.Path)" -ForegroundColor Green
+					$done = $true
 				}
 			}
 		}
@@ -700,56 +783,144 @@ function Update-sqmModule
 	{
 		Write-Error "Update fehlgeschlagen: $($_.Exception.Message)"
 	}
+
+	if ($done)
+	{
+		# Signal an Start-sqmToolGui.ps1 (laedt das Modul danach neu) und an den Start-Check
+		$env:SQMSQLTOOL_UPDATED = if ($UpdateInfo -and $UpdateInfo.Version) { "$($UpdateInfo.Version)" } else { 'unknown' }
+		Write-Host "Die neue Version gilt ab der naechsten PowerShell-Sitzung oder nach: Import-Module sqmSQLTool -Force" -ForegroundColor Yellow
+	}
 }
 
-# Auto-update on module import (only when AutoUpdate = $true)
-# === FLEXIBLE: Vollständige Fallback-Chain (PSGallery wird automat. übersprungen wenn offline) ===
-if ($script:sqmModuleConfig['AutoUpdate'])
+<#
+.SYNOPSIS
+    Bietet eine gefundene neuere Version an (Konsole oder MessageBox) und installiert sie auf Wunsch.
+.DESCRIPTION
+    Konsole: Ja / Nein (spaeter erneut fragen) / Ueberspringen (diese Version nicht mehr anbieten).
+    MessageBox (Start-sqmToolGui setzt SQMSQLTOOL_UPDATE_UI=MessageBox): Ja / Nein. Ohne
+    Schreibrechte auf den Modulordner gibt es nur einen Hinweis, keine Rueckfrage.
+#>
+function Invoke-sqmUpdateOffer
 {
-	$noUpdate = $env:SQMSQLTOOL_SKIP_AUTO_UPDATE -eq '1'
-	if (-not $noUpdate)
+	[CmdletBinding()]
+	param (
+		[Parameter(Mandatory)][hashtable]$UpdateInfo,
+		[Parameter(Mandatory)][string]$SkipFile,
+		[int]$IntervalHours = 24,
+		[switch]$MessageBox
+	)
+
+	$current = $script:sqmModuleConfig['ModuleVersion']
+	$text = "Fuer sqmSQLTool ist eine neuere Version verfuegbar: $current -> $($UpdateInfo.Version) (Quelle: $($UpdateInfo.Source))."
+
+	if (-not (Test-sqmModuleUpdateWritable))
 	{
-		try
+		$hint = "$text`nZum Aktualisieren PowerShell als Administrator starten und 'Update-sqmModule' ausfuehren."
+		if ($MessageBox)
 		{
-			# Vollständige Fallback-Chain: PSGallery (wenn online) -> GitHub -> UNC
-			# PSGallery wird automatisch übersprungen wenn kein Internet erkannt
-			# Throttle: nur pruefen wenn der letzte Check aelter als UpdateCheckIntervalHours ist
-			$intervalH = [int]($script:sqmModuleConfig['UpdateCheckIntervalHours'])
-			if ($intervalH -le 0) { $intervalH = 24 }
-			$markerDir  = Join-Path $env:LOCALAPPDATA 'sqmSQLTool'
-			$markerFile = Join-Path $markerDir 'lastUpdateCheck'
-			$dueCheck = $true
-			if (Test-Path $markerFile)
+			Add-Type -AssemblyName System.Windows.Forms
+			[System.Windows.Forms.MessageBox]::Show($hint, 'sqmSQLTool-Update', 'OK', 'Information') | Out-Null
+		}
+		else { Write-Host "`n[sqmSQLTool] $hint`n" -ForegroundColor Cyan }
+		return
+	}
+
+	if ($MessageBox)
+	{
+		Add-Type -AssemblyName System.Windows.Forms
+		$res = [System.Windows.Forms.MessageBox]::Show("$text`n`nJetzt aktualisieren?`n(Nein = in $IntervalHours Stunden erneut fragen)",
+			'sqmSQLTool-Update', 'YesNo', 'Information')
+		$answer = if ("$res" -eq 'Yes') { 0 } else { 1 }
+	}
+	else
+	{
+		$choices = [System.Management.Automation.Host.ChoiceDescription[]]@(
+			(New-Object System.Management.Automation.Host.ChoiceDescription '&Ja', 'Jetzt aktualisieren'),
+			(New-Object System.Management.Automation.Host.ChoiceDescription '&Nein', "Spaeter erneut fragen (in $IntervalHours Stunden)"),
+			(New-Object System.Management.Automation.Host.ChoiceDescription '&Ueberspringen', "Version $($UpdateInfo.Version) nicht mehr anbieten")
+		)
+		$answer = $Host.UI.PromptForChoice('sqmSQLTool-Update', "$text`nJetzt aktualisieren?", $choices, 0)
+	}
+
+	switch ($answer)
+	{
+		0 { Update-sqmModule -UpdateInfo $UpdateInfo -Force -Backup -Confirm:$false }
+		1 { Write-Host "[sqmSQLTool] Spaeter manuell moeglich mit: Update-sqmModule" -ForegroundColor Gray }
+		2 {
+			"$($UpdateInfo.Version)" | Set-Content -Path $SkipFile -Force -ErrorAction SilentlyContinue
+			Write-Host "[sqmSQLTool] Version $($UpdateInfo.Version) wird nicht mehr angeboten. Manuell: Update-sqmModule" -ForegroundColor Gray
+		}
+	}
+}
+
+# =============================================================================
+# Update-Pruefung beim Modulstart. PowerShell laedt das Modul beim ersten Aufruf einer
+# sqmSQLTool-Funktion automatisch - die Pruefung laeuft also vor der ersten Funktion einer
+# Sitzung, hoechstens einmal je UpdateCheckIntervalHours.
+#   UpdateMode 'Prompt' (Standard): neuere Version anbieten
+#   UpdateMode 'Auto'             : ohne Rueckfrage installieren
+#   UpdateMode 'Off'              : nicht pruefen
+# Ohne Benutzer (Agent-Job, geplanter Task, -NonInteractive) kann niemand antworten: dort
+# wird im Prompt-Modus nicht geprueft, sonst haengt der Import an der Rueckfrage.
+# Der Import darf an der Update-Pruefung nie scheitern.
+# =============================================================================
+$updateMode = "$($script:sqmModuleConfig['UpdateMode'])"
+if ($updateMode -notin 'Prompt', 'Auto', 'Off') { $updateMode = 'Prompt' }
+$useMessageBox = $env:SQMSQLTOOL_UPDATE_UI -eq 'MessageBox'
+$skipUpdateCheck = ($updateMode -eq 'Off') -or
+	($env:SQMSQLTOOL_SKIP_AUTO_UPDATE -eq '1') -or ($env:MSSQLTOOLS_SKIP_AUTO_UPDATE -eq '1') -or
+	($updateMode -eq 'Prompt' -and -not $useMessageBox -and -not (Test-sqmInteractiveSession))
+
+if (-not $skipUpdateCheck)
+{
+	try
+	{
+		$intervalH = [int]($script:sqmModuleConfig['UpdateCheckIntervalHours'])
+		if ($intervalH -le 0) { $intervalH = 24 }
+		$markerDir  = Join-Path $env:LOCALAPPDATA 'sqmSQLTool'
+		$markerFile = Join-Path $markerDir 'lastUpdateCheck'
+		$skipFile   = Join-Path $markerDir 'skippedVersion'
+		$dueCheck = $true
+		if (Test-Path $markerFile)
+		{
+			try
 			{
-				try
-				{
-					$last = [datetime]::Parse((Get-Content $markerFile -Raw -ErrorAction Stop).Trim())
-					if ((Get-Date) -lt $last.AddHours($intervalH)) { $dueCheck = $false }
-				}
-				catch { }
+				$last = [datetime]::Parse((Get-Content $markerFile -Raw -ErrorAction Stop).Trim())
+				if ((Get-Date) -lt $last.AddHours($intervalH)) { $dueCheck = $false }
+			}
+			catch { }
+		}
+
+		if ($dueCheck)
+		{
+			# Marker sofort schreiben (verhindert Doppel-Checks bei mehreren Importen)
+			if (-not (Test-Path $markerDir)) { New-Item -ItemType Directory -Path $markerDir -Force | Out-Null }
+			(Get-Date).ToString('o') | Set-Content -Path $markerFile -Force -ErrorAction SilentlyContinue
+
+			# Quellenbewusst: letzte Installationsquelle zuerst, sonst Fallback-Kette
+			$updateInfo = Test-sqmModuleUpdate
+			if ($updateInfo -and $updateMode -eq 'Prompt' -and (Test-Path $skipFile) -and
+				(Get-Content $skipFile -Raw -ErrorAction SilentlyContinue).Trim() -eq "$($updateInfo.Version)")
+			{
+				Write-Verbose "Version $($updateInfo.Version) wurde vom Benutzer uebersprungen."
+				$updateInfo = $null
 			}
 
-			if ($dueCheck)
+			if ($updateInfo -and $updateMode -eq 'Auto')
 			{
-				# Marker sofort schreiben (verhindert Doppel-Checks bei mehreren Importen)
-				if (-not (Test-Path $markerDir)) { New-Item -ItemType Directory -Path $markerDir -Force | Out-Null }
-				(Get-Date).ToString('o') | Set-Content -Path $markerFile -Force -ErrorAction SilentlyContinue
-
-				# Quellenbewusst: letzte Installationsquelle zuerst, sonst Fallback-Kette
-				$updateInfo = Test-sqmModuleUpdate
-				if ($updateInfo)
-				{
-					Write-Host "`n[sqmSQLTool] Neuere Version verfuegbar: $($updateInfo.Version) (Quelle: $($updateInfo.Source))" -ForegroundColor Cyan
-					Write-Host "[sqmSQLTool] Fuehre automatisches Update durch..." -ForegroundColor Cyan
-					# Quellenbewusstes Update (PSGallery/GitHub/UNC/LocalDir). Import darf nie brechen.
-					Update-sqmModule -UpdateInfo $updateInfo -Force -Backup -Confirm:$false
-				}
+				Write-Host "`n[sqmSQLTool] Neuere Version verfuegbar: $($updateInfo.Version) (Quelle: $($updateInfo.Source))" -ForegroundColor Cyan
+				Write-Host "[sqmSQLTool] Fuehre automatisches Update durch..." -ForegroundColor Cyan
+				Update-sqmModule -UpdateInfo $updateInfo -Force -Backup -Confirm:$false
+			}
+			elseif ($updateInfo)
+			{
+				Invoke-sqmUpdateOffer -UpdateInfo $updateInfo -SkipFile $skipFile -IntervalHours $intervalH -MessageBox:$useMessageBox
 			}
 		}
-		catch
-		{
-			Write-Verbose "Auto-update check failed: $($_.Exception.Message)"
-		}
+	}
+	catch
+	{
+		Write-Verbose "Update-Pruefung fehlgeschlagen: $($_.Exception.Message)"
 	}
 }
 

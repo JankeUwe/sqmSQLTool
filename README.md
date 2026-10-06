@@ -74,6 +74,19 @@ Get-Command -Module sqmSQLTool | Measure-Object
 # Output: 163 functions
 ```
 
+### Updates
+On the first sqmSQLTool command of a session (at most once every 24 hours) the module checks
+its install source (PSGallery, UNC share or local folder) for a newer version and offers to
+install it: Yes / No (ask again later) / Skip this version. SQL Agent jobs, scheduled tasks and
+`-NonInteractive` sessions are never prompted.
+
+```powershell
+Update-sqmModule                      # check and update manually
+Set-sqmConfig -UpdateMode Prompt      # default: offer newer versions
+Set-sqmConfig -UpdateMode Auto        # install without asking (also in Agent jobs)
+Set-sqmConfig -UpdateMode Off         # no check
+```
+
 ---
 
 ## 🚀 Key Features
