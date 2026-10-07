@@ -159,7 +159,7 @@ if ($script:sqmIsFitsEnvironment)
 	$script:sqmModuleConfig['DefaultPolicy']          = 'New Login_Enforce Passwort Policy'
 	$script:sqmModuleConfig['DefaultMonitoringUser']  = "$env:USERDOMAIN\izt0504"
 	$script:sqmModuleConfig['SsrsInstallerPath']      = 'W:\75084-Datenbanken\MSSQL\SQLSources\Reporting'
-	$script:sqmModuleConfig['DbatoolsSharePath']      = 'W:\75084-Datenbanken\MSSQL\SQLSources\Modules'
+	$script:sqmModuleConfig['DbatoolsSharePath']      = 'W:\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module'
 	$script:sqmModuleConfig['OlaJobNameFull']         = 'FITS Backup - USER_DATABASES - FULL'
 	$script:sqmModuleConfig['OlaJobNameDiff']         = 'FITS Backup - USER_DATABASES - DIFF'
 	$script:sqmModuleConfig['OlaJobNameLog']          = 'FITS Backup - USER_DATABASES - LOG'
@@ -202,27 +202,29 @@ else
 	catch
 	{
 		# dbatools nicht via PSModulePath gefunden - FITS-Fallback: lokaler Modulpfad
+		# Standardpfad seit v1.9.159.0: _SQLAdminTools\Other\Module; SQLSources\Modules nur noch Legacy
 		$fitsFallback = @(
+			'W:\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module',
+			'\\tsclient\W\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module',
 			'W:\75084-Datenbanken\MSSQL\SQLSources\Modules',
 			'\\tsclient\W\75084-Datenbanken\MSSQL\SQLSources\Modules'
-		) | Where-Object { Test-Path $_ } | Select-Object -First 1
+		) | Where-Object { [IO.Directory]::Exists([IO.Path]::Combine($_, 'dbatools')) } |
+			Select-Object -First 1
 
 		if ($fitsFallback)
 		{
-			$dbaDirs = @(Get-ChildItem -Path $fitsFallback -Directory -Filter 'dbatools*' -ErrorAction SilentlyContinue)
-			if ($dbaDirs.Count -gt 0)
+			# Freigabe nur fuer diese Sitzung vorne in PSModulePath, dann regulaer importieren:
+			# so loest dbatools auch sein RequiredModule dbatools.library von dort auf. (Frueher:
+			# 'dbatools*' absteigend sortiert -> erwischte dbatools.library statt dbatools.)
+			$env:PSModulePath = "$fitsFallback;$env:PSModulePath"
+			try
 			{
-				# Neueste Version bevorzugen (nach Name absteigend, bei semver-Verzeichnissen)
-				$dbaDir = ($dbaDirs | Sort-Object Name -Descending | Select-Object -First 1).FullName
-				try
-				{
-					Import-Module $dbaDir -ErrorAction Stop
-					$script:dbatoolsAvailable = $true
-				}
-				catch
-				{
-					$script:dbatoolsAvailable = $false
-				}
+				Import-Module dbatools -ErrorAction Stop
+				$script:dbatoolsAvailable = $true
+			}
+			catch
+			{
+				$script:dbatoolsAvailable = $false
 			}
 		}
 		if (-not $script:dbatoolsAvailable) { $script:dbatoolsAvailable = $false }

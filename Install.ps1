@@ -210,17 +210,34 @@ if (Test-Path $sqmConfigFile) {
         $dbatoolsSharePathFromConfig = (Get-Content $sqmConfigFile -Raw | ConvertFrom-Json).DbatoolsSharePath
     } catch { }
 }
+#     Seit v1.9.159.0: FI-TS-Standardpfad ist <W>\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module
+#     (vorher ...\SQLSources\Modules). Reihenfolge der Kandidaten: konfigurierter Pfad, neuer
+#     Standardpfad (W:\ und \\tsclient\W\), alter Pfad als Legacy-Fallback. Ein veralteter Wert in
+#     config.json wird dadurch nicht mehr zur Sackgasse - der gefundene Pfad wird in Schritt 6a
+#     zurueckgeschrieben und korrigiert den alten Eintrag.
+$fitsDbatoolsShareCandidates = @(
+    'W:\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module',
+    '\\tsclient\W\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module'
+)
 if ($isFitsInstall) {
-    $candidateShare = if (-not [string]::IsNullOrWhiteSpace($dbatoolsSharePathFromConfig)) {
-        $dbatoolsSharePathFromConfig
-    } else {
-        Join-Path (Split-Path (Split-Path $Source -Parent) -Parent) 'Modules'
+    $candidateShares = @()
+    if (-not [string]::IsNullOrWhiteSpace($dbatoolsSharePathFromConfig)) { $candidateShares += $dbatoolsSharePathFromConfig }
+    $candidateShares += $fitsDbatoolsShareCandidates
+    $candidateShares += Join-Path (Split-Path (Split-Path $Source -Parent) -Parent) 'Modules'   # Legacy: <SQLSources>\Modules
+    # [IO.Path]::Combine + [IO.Directory]::Exists statt Join-Path/Test-Path: Join-Path wirft, wenn
+    # das Laufwerk (z.B. W: in der Citrix-Sitzung, wo nur \\tsclient\W existiert) lokal fehlt, und
+    # Test-Path meldet unter PS 5.1 bei nicht erreichbarem UNC-Pfad trotz -ErrorAction einen Fehler.
+    foreach ($candidateShare in ($candidateShares | Select-Object -Unique)) {
+        if ([IO.Directory]::Exists([IO.Path]::Combine($candidateShare, 'dbatools')) -and
+            [IO.Directory]::Exists([IO.Path]::Combine($candidateShare, 'dbatools.library'))) {
+            $fitsModulesShare = $candidateShare
+            break
+        }
     }
-    if ((Test-Path (Join-Path $candidateShare 'dbatools') -PathType Container) -and
-        (Test-Path (Join-Path $candidateShare 'dbatools.library') -PathType Container)) {
-        $fitsModulesShare = $candidateShare
-    } elseif (-not [string]::IsNullOrWhiteSpace($dbatoolsSharePathFromConfig)) {
-        Write-Warning "  Konfigurierter DbatoolsSharePath '$dbatoolsSharePathFromConfig' enthaelt nicht beide erwarteten Ordner ('dbatools', 'dbatools.library') - wird ignoriert."
+    if ($fitsModulesShare -and $dbatoolsSharePathFromConfig -and $fitsModulesShare -ne $dbatoolsSharePathFromConfig) {
+        Write-Warning "  Konfigurierter DbatoolsSharePath '$dbatoolsSharePathFromConfig' enthaelt nicht beide erwarteten Ordner ('dbatools', 'dbatools.library') - verwende stattdessen '$fitsModulesShare'."
+    } elseif (-not $fitsModulesShare) {
+        Write-Warning "  Kein FI-TS-Freigabepfad mit 'dbatools' + 'dbatools.library' gefunden. Geprueft: $(($candidateShares | Select-Object -Unique) -join '; ')"
     }
 }
 

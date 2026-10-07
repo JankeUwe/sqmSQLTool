@@ -1,5 +1,33 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.159.0] - 2026-10-07
+
+### FI-TS: neuer Standardpfad fuer dbatools
+
+Der FI-TS-Ablageort fuer das vorbereitete Ordnerpaar `dbatools` + `dbatools.library` hat sich
+geaendert:
+
+- neu: `\\tsclient\W\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module`
+- bisher: `\\tsclient\W\75084-Datenbanken\MSSQL\SQLSources\Modules`
+
+Angepasst:
+
+- **`Install.ps1`**: prueft der Reihe nach den konfigurierten `DbatoolsSharePath`, den neuen
+  Standardpfad (`W:\` und `\\tsclient\W\`) und zuletzt den alten Pfad. Der erste Ordner mit
+  beiden Modulen gewinnt. Ein veralteter `DbatoolsSharePath` in `config.json` fuehrt nicht mehr
+  dazu, dass die Freigabe ignoriert wird: es kommt ein Hinweis, der gefundene Pfad wird verwendet
+  und in die Konfiguration zurueckgeschrieben. Wird gar nichts gefunden, nennt die Warnung alle
+  geprueften Pfade.
+- **Modul-Import** (`sqmSQLTool.psm1`): FI-TS-Vorgabe fuer `DbatoolsSharePath` und der
+  dbatools-Fallback beim Laden zeigen auf den neuen Pfad, der alte bleibt als Rueckfallebene.
+- **Fix im dbatools-Fallback beim Laden**: Der Fallback sortierte alle `dbatools*`-Ordner
+  absteigend und importierte den ersten, das war `dbatools.library` statt `dbatools`. Jetzt wird
+  die Freigabe fuer die Sitzung vorne in `PSModulePath` eingetragen und regulaer
+  `Import-Module dbatools` ausgefuehrt; `dbatools.library` wird dabei mit aufgeloest.
+- Pfadpruefung ueber `[IO.Directory]::Exists` statt `Join-Path`/`Test-Path`: ohne Laufwerk `W:`
+  bzw. ohne erreichbares `\\tsclient` gab es unter PS 5.1 sonst Fehlermeldungen.
+- **`Set-sqmConfig`**: Beispiele in der Hilfe aktualisiert.
+
 ## [1.9.158.0] - 2026-10-07
 
 ### Update-Pruefung beim Start: neuere Version wird angeboten

@@ -87,7 +87,7 @@
     instances without PSGallery access (e.g. FI-TS-hosted production servers) instead of
     deriving the path from -Source. See github.com/JankeUwe/dbatools-baseline for how such
     a share gets populated/kept in sync.
-    Example: 'W:\75084-Datenbanken\MSSQL\SQLSources\Modules'
+    Example: 'W:\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module'
 
 .PARAMETER UpdateMode
     Update-Pruefung beim Modulstart (erster Aufruf einer sqmSQLTool-Funktion in einer Sitzung,
@@ -155,7 +155,7 @@
     Set-sqmConfig -SsrsInstallerPath '\\srv-share\Software\SSRS2022\SQLServerReportingServices.exe'
 
 .EXAMPLE
-    Set-sqmConfig -DbatoolsSharePath 'W:\75084-Datenbanken\MSSQL\SQLSources\Modules'
+    Set-sqmConfig -DbatoolsSharePath 'W:\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module'
 
 .EXAMPLE
     Set-sqmConfig -MasterDbObjectWhitelist @('sp_Blitz*', 'sp_WhoIsActive', 'CommandExecute', 'CommandLog', 'usp_MyAdminTool')
