@@ -1,5 +1,18 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.160.0] - 2026-10-08
+
+### GUI: Wiederholmodus (`-Continuous`) von Get-sqmOperationStatus lief nicht
+
+- Mit angehaktem `Continuous` blieb das GUI haengen und zeigte nichts an: Der Run-Button ruft
+  die Funktion synchron auf und sammelt die Ausgabe ein, die Endlosschleife kam nie zurueck.
+- Jetzt uebernimmt das GUI die Wiederholung selbst: Ein Timer ruft die Funktion alle
+  `RefreshSeconds` Sekunden (Standard 5) einmal ohne `-Continuous` auf und ersetzt die Ausgabe.
+  Die Kopfzeile zeigt Intervall und Zeit der letzten Aktualisierung.
+- Waehrend der Wiederholung heisst der Run-Button "Stop repeat" und beendet sie. Wechsel der
+  Funktion oder Schliessen des Fensters beendet sie ebenfalls.
+- In der Konsole war `-Continuous` nicht betroffen.
+
 ## [1.9.159.0] - 2026-10-07
 
 ### FI-TS: neuer Standardpfad fuer dbatools

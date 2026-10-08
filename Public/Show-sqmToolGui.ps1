@@ -528,6 +528,8 @@
 		param ($fnName)
 		$cmd = Get-Command $fnName -ErrorAction SilentlyContinue
 		if (-not $cmd) { return }
+		# A running repeat belongs to the previous function - stop it before the panel is rebuilt
+		if ($script:guiState.Repeat) { & $stopRepeat }
 		$script:guiState.Command = $cmd
 		$script:guiState.Controls = @{ }
 		$script:guiState.Creds = @{ }
@@ -1002,6 +1004,7 @@
 	}
 
 	$btnRun.Add_Click({
+			if ($script:guiState.Repeat) { & $stopRepeat; return }
 			if (-not $script:guiState.Command) { return }
 			# Validate mandatory fields - per parameter set, see $isValueFilled above.
 			$paramSets = $script:guiState.Command.ParameterSets
@@ -1083,15 +1086,52 @@
 			if ($chkWhatIf.Visible -and $chkWhatIf.Checked) { $params['WhatIf'] = $true }
 
 			$fn = $script:guiState.Command.Name
-			$output.Text = ">> $(& $buildCommand)`r`n`r`n"
+			$cmdLine = & $buildCommand
+
+			# -Continuous (Get-sqmOperationStatus) loops until Ctrl+C. Called synchronously below it
+			# never returned: the form froze and the captured output was never shown. Instead run the
+			# command once per timer tick without -Continuous; the Run button turns into a Stop button.
+			if ($params.ContainsKey('Continuous') -and $params['Continuous'])
+			{
+				$params.Remove('Continuous')
+				$intervalSec = 5
+				if ($params.ContainsKey('RefreshSeconds')) { [void][int]::TryParse([string]$params['RefreshSeconds'], [ref]$intervalSec) }
+				if ($intervalSec -lt 1) { $intervalSec = 1 }
+				$script:guiState.Repeat = @{ Fn = $fn; Params = $params; CmdLine = $cmdLine; Interval = $intervalSec }
+				$btnRun.Text = 'Stop repeat'
+				& $runRepeatTick
+				# Tick handler may have been stopped meanwhile (function switched) - only arm if still active
+				if ($script:guiState.Repeat)
+				{
+					$repeatTimer.Interval = $intervalSec * 1000
+					$repeatTimer.Start()
+				}
+				return
+			}
+
+			$output.Text = ">> $cmdLine`r`n`r`n"
 			$form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
 			$btnRun.Enabled = $false
-			# Detect connection/network errors and report them clearly. SQL Server returns
-			# localized error text (e.g. German "Fehler bei der Anmeldung fuer den Benutzer"
-			# instead of "Login failed for user") when the instance's server locale isn't
-			# English, so the English-only patterns below silently missed those - the GUI fell
-			# through to the generic "ERROR: ..." line instead of the clearer connection message.
-			$connHint = '(?i)network-related|server was not found|login failed|certificate chain|untrusted|timeout|connect to|connection.*(fail|refused|reset)|sql server.*not (found|accessible)|named pipes|tcp provider|fehler bei der anmeldung|netzwerkbezogen|zertifikatkette|zeit.?ueberschreitung|keine verbindung'
+			try
+			{
+				& $invokeAndRender $fn $params
+			}
+			finally
+			{
+				$form.Cursor = [System.Windows.Forms.Cursors]::Default
+				$btnRun.Enabled = $true
+			}
+		})
+
+	# --- Invocation + output rendering (used by Run and by the repeat timer) --------
+	# Detect connection/network errors and report them clearly. SQL Server returns
+	# localized error text (e.g. German "Fehler bei der Anmeldung fuer den Benutzer"
+	# instead of "Login failed for user") when the instance's server locale isn't
+	# English, so the English-only patterns below silently missed those - the GUI fell
+	# through to the generic "ERROR: ..." line instead of the clearer connection message.
+	$connHint = '(?i)network-related|server was not found|login failed|certificate chain|untrusted|timeout|connect to|connection.*(fail|refused|reset)|sql server.*not (found|accessible)|named pipes|tcp provider|fehler bei der anmeldung|netzwerkbezogen|zertifikatkette|zeit.?ueberschreitung|keine verbindung'
+	$invokeAndRender = {
+		param ($fn, $params)
 			try
 			{
 				# Merge Warning/Verbose/Information into the captured stream alongside Error - a
@@ -1135,12 +1175,27 @@
 					$output.AppendText("ERROR ($($_.Exception.GetType().Name)): $($_.Exception.Message)`r`n")
 				}
 			}
-			finally
-			{
-				$form.Cursor = [System.Windows.Forms.Cursors]::Default
-				$btnRun.Enabled = $true
-			}
-		})
+	}
+
+	# Repeat mode: one run per tick. A Forms timer ticks on the UI thread and does not re-enter while
+	# a tick's query is still running, so a slow/unreachable server just stretches the interval.
+	$repeatTimer = New-Object System.Windows.Forms.Timer
+	$runRepeatTick = {
+		$r = $script:guiState.Repeat
+		if (-not $r) { return }
+		$output.Text = ">> $($r.CmdLine)`r`n" +
+		"Repeat every $($r.Interval) s, last refresh $(Get-Date -Format 'HH:mm:ss') - 'Stop repeat' ends it`r`n`r`n"
+		$form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+		try { & $invokeAndRender $r.Fn $r.Params }
+		finally { $form.Cursor = [System.Windows.Forms.Cursors]::Default }
+	}
+	$stopRepeat = {
+		$repeatTimer.Stop()
+		$script:guiState.Repeat = $null
+		$btnRun.Text = 'Run command'
+	}
+	$repeatTimer.Add_Tick({ & $runRepeatTick })
+	$form.Add_FormClosing({ & $stopRepeat })
 
 	# Keep the 33 / 66 split ratio on show and on resize
 	$applySplit = {
