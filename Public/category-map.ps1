@@ -108,6 +108,7 @@ $categoryMap = @{
     'Invoke-sqmSqlAlwaysOnAutoseeding'    = 'Always On & Availability Groups'
     'Invoke-sqmSsisCatalogMigration'      = 'SSIS Configuration'
     'Invoke-sqmSsisConfiguration'         = 'SSIS Configuration'
+    'Invoke-sqmSsrsMigration'             = 'SSRS Configuration'
     'Invoke-sqmTsmConfiguration'          = 'External Systems Integration'
     'Invoke-sqmUpdateStatistics'          = 'Database Maintenance'
     'Invoke-sqmUserDatabaseBackup'        = 'Backup & Recovery'

@@ -81,4 +81,12 @@ $sqmNlpSynonyms = @{
 	'target recovery'   = @('Invoke-sqmDatabaseStandardization')
 	'nach migration aufraeumen' = @('Invoke-sqmDatabaseStandardization')
 	'datenbank standardisieren' = @('Invoke-sqmDatabaseStandardization')
+	'ssrs umziehen'     = @('Invoke-sqmSsrsMigration')
+	'reports umziehen'  = @('Invoke-sqmSsrsMigration')
+	'berichte umziehen' = @('Invoke-sqmSsrsMigration')
+	'reportserver migration' = @('Invoke-sqmSsrsMigration')
+	'report server migrieren' = @('Invoke-sqmSsrsMigration')
+	'reporting services migration' = @('Invoke-sqmSsrsMigration', 'Install-sqmSsrsReportServer')
+	'datenquelle umhaengen' = @('Invoke-sqmSsrsMigration')
+	'rdl kopieren'      = @('Invoke-sqmSsrsMigration')
 }

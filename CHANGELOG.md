@@ -1,5 +1,60 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.162.0] - 2026-10-09
+
+### Neu: Invoke-sqmSsrsMigration, Reporting-Services-Projekte umziehen
+
+RDL-Dateien kopieren ist keine Migration. Ein Bericht haengt im Katalog an seinen freigegebenen
+Datenquellen und Datasets, nicht am Text in der RDL (Visual Studio deployt mit
+TargetDataSourceFolder, im Portal kann jeder umhaengen). Nur die RDL hochzuladen ergibt Berichte,
+die ins Leere zeigen, und gespeicherte Kennwoerter von Datenquellen lassen sich ueber keine API
+auslesen; sie gehen still verloren.
+
+Die Funktion arbeitet ueber die SSRS REST API v2.0 (SSRS 2017 und neuer, Power BI Report Server)
+und laeuft damit unter Windows PowerShell 5.1 und PowerShell 7 gleich:
+
+- **Inventar** eines oder mehrerer Ordner (rekursiv): Ordner, freigegebene Datenquellen,
+  freigegebene Datasets, Berichte, verknuepfte Berichte, Ressourcen, Power-BI-Berichte,
+  Excel-Arbeitsmappen.
+- **Abhaengigkeiten ausserhalb des Ordners** (typisch `/Data Sources`, `/Datasets`) werden erkannt
+  und am gleichen Pfad mitgenommen (`-SkipDependencies` schaltet das ab). Referenzen, die schon auf
+  der Quelle ins Leere zeigen, werden gemeldet.
+- **Plan gegen das Ziel** pro Element: Create, Overwrite, Skip, Typkonflikt. `-AssessOnly` hoert
+  hier auf und aendert nichts.
+- **Bindungen aus dem Quellkatalog**, nicht aus dem RDL-Text: Nach dem Hochladen werden die
+  Datenquellen jedes Berichts und Datasets neu gesetzt, mit auf das Ziel abgebildeten Pfaden.
+  Absolute Referenzen in RDL/RSD werden bei `-DestinationFolder` umgeschrieben.
+- **`-ConnectionStringMap 'ALT=>NEU'`** fuer freigegebene und eingebettete Datenquellen,
+  **`-DataSourceCredential`** liefert gespeicherte Kennwoerter (Zuordnung ueber den gespeicherten
+  Benutzernamen). Fehlt ein Kennwort, steht das als Warnung im Plan.
+- **Ueberschreiben** (`-Overwrite`) per PATCH auf die vorhandene ID: Abonnements und Verlauf auf
+  dem Ziel bleiben dran. Vorhandene Datenquellen bleiben ohne `-OverwriteDataSources` unberuehrt.
+  Jedes Ziel-Element wird vor dem Ueberschreiben gesichert (`DestinationBackup\`), der gesamte
+  Quellinhalt wird exportiert (`Source\`).
+- **`-IncludeSecurity`** uebernimmt die Rechte aller Elemente mit eigener Berechtigung.
+- **Pruefung**: Die Bindungen jedes Berichts werden vom Ziel zurueckgelesen und mit der Quelle
+  verglichen.
+- **Abonnements** werden aufgelistet, nicht kopiert (Besitzer, Zeitplan und Zustellung gehoeren
+  zum alten Server).
+- Kopie innerhalb eines Servers in einen anderen Ordner geht ebenfalls (`-DestinationFolder`).
+
+Beim Livetest gegen SSRS 2022 ermittelte Eigenheiten der API, die die Funktion abfaengt:
+
+- Eine Datenquelle ohne `IsConnectionStringOverridden = true` wird angelegt, die
+  Verbindungszeichenfolge aber kommentarlos verworfen (HTTP 201, Datenquelle danach leer).
+- `CredentialRetrieval` nur kleingeschrieben (`store`), sonst HTTP 400.
+- Verknuepfte Berichte nur ueber `/LinkedReports`, und dort ist `Path` der Elternordner, bei allen
+  anderen Typen der volle Pfad.
+- PowerShell 7 verweigert die Windows-Anmeldung ueber `http://` ohne
+  `-AllowUnencryptedAuthentication`; der neue REST-Helfer setzt das nur unter PS 7.
+
+Live getestet auf SSRS 2022 (16.0.9760, Katalog im SQL-2025-Container) unter PowerShell 5.1 und 7:
+Projekt mit freigegebener Datenquelle unter `/Data Sources`, freigegebenem Dataset, Bericht mit
+beiden Referenzen, Bericht mit eingebetteter Datenquelle und gespeichertem Kennwort, verknuepftem
+Bericht, Ressource und eigener Ordnerberechtigung, migriert nach `/Migriert/Finanz Ü`. Alle
+migrierten Berichte liefern auf dem Ziel Daten (Render als CSV). Dazu: Overwrite (ID bleibt),
+neue und ueberschriebene Datenquelle mit Mapping, fehlendes Kennwort, Fehlerpfade. 55 Unit-Tests.
+
 ## [1.9.161.0] - 2026-10-09
 
 ### Export-/Import-sqmDatabaseLogins: automatisierbar ueber ein Uebergabeverzeichnis
