@@ -39,7 +39,19 @@ Credential for -SqlInstance.
 
 .PARAMETER InputPath
 Path to the .sql file produced by Export-sqmDatabaseLogins (already transported here by an
-external process). Mandatory.
+external process), or a directory. Mandatory.
+
+With a directory, the newest export for -Database in it is used: all
+"DatabaseLogins_<Database>_*.sql" files whose header names exactly that database, newest by the
+timestamp in the file name (not by LastWriteTime, which copy jobs may change). The source instance
+in the name does not matter, so an export via the AG listener and one via a node name are treated
+alike. Unfinished "*.sql.tmp" files are ignored. The file actually used is the first entry
+(Action 'SelectFile') of the result.
+
+.PARAMETER KeepLatest
+Only with a directory as -InputPath: after the import, keep only this many of the newest exports
+for -Database in that directory and delete the older ones. 0 (default) deletes nothing - the
+destination-side directory is often owned by the transport job.
 
 .PARAMETER Database
 Database to run the final orphan-user repair against. Mandatory. Compared against the database
@@ -67,6 +79,12 @@ Import-sqmDatabaseLogins -SqlInstance 'TestSQL' -Database 'Frontarena' -InputPat
 
 Applies the previously exported Frontarena logins to TestSQL and repairs orphaned users afterwards.
 
+.EXAMPLE
+Import-sqmDatabaseLogins -SqlInstance 'TestSQL' -Database 'Frontarena' -InputPath 'D:\Handover' -KeepLatest 3
+
+For a scheduled job: applies the newest Frontarena export found in D:\Handover and then keeps only
+the three newest Frontarena exports there.
+
 .NOTES
 Prerequisites : dbatools, Invoke-sqmLogging, Set-sqmSqlPolicyState
 Counterpart   : Export-sqmDatabaseLogins (produces the file consumed here).
@@ -82,10 +100,13 @@ function Import-sqmDatabaseLogins
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
 		[Parameter(Mandatory = $true)]
-		[ValidateScript({ Test-Path $_ -PathType Leaf })]
+		[ValidateScript({ Test-Path -LiteralPath $_ })]
 		[string]$InputPath,
 		[Parameter(Mandatory = $true)]
 		[string]$Database,
+		[Parameter(Mandatory = $false)]
+		[ValidateRange(0, 1000)]
+		[int]$KeepLatest = 0,
 		[Parameter(Mandatory = $false)]
 		[bool]$DisablePolicy = $true,
 		[Parameter(Mandatory = $false)]
@@ -182,6 +203,28 @@ function Import-sqmDatabaseLogins
 	{
 		try
 		{
+			# ---- 0. Verzeichnis: neueste Export-Datei fuer -Database waehlen ----
+			$inputDirectory = $null
+			if (Test-Path -LiteralPath $InputPath -PathType Container)
+			{
+				$inputDirectory = $InputPath
+				$candidates = @(Get-sqmDatabaseLoginsFile -Directory $inputDirectory -Database $Database)
+				if ($candidates.Count -eq 0)
+				{
+					$msg = "Keine Export-Datei fuer Datenbank '$Database' in '$inputDirectory' gefunden (erwartet: DatabaseLogins_<Datenbank>_*.sql von Export-sqmDatabaseLogins)."
+					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'ERROR'
+					_AddResult 'SelectFile' '(Datei)' 'Failed' $msg
+					if ($EnableException) { throw $msg }
+					Write-Error $msg
+					return
+				}
+				$InputPath = $candidates[0].File
+				$selectMsg = "Neueste von $($candidates.Count) Datei(en): '$InputPath' (Export vom $($candidates[0].Timestamp.ToString('yyyy-MM-dd HH:mm:ss')), Quelle '$($candidates[0].SourceInstance)')."
+				Invoke-sqmLogging -Message $selectMsg -FunctionName $functionName -Level 'INFO'
+				Write-Host "Import-sqmDatabaseLogins: $selectMsg" -ForegroundColor Cyan
+				_AddResult 'SelectFile' '(Datei)' 'Success' $selectMsg
+			}
+
 			# ---- 1. Datei lesen, Header parsen, in Login-Bloecke zerlegen ----
 			$fullContent = [System.IO.File]::ReadAllText($InputPath)
 
@@ -223,6 +266,14 @@ function Import-sqmDatabaseLogins
 			$applyAction = "$($loginBlocks.Count) Login(s) aus '$InputPath' auf '$SqlInstance' anwenden"
 			if ($PSCmdlet.ShouldProcess($SqlInstance, $applyAction))
 			{
+				# Vorab einmal verbinden: ein falscher Name (z. B. AG- statt Listener-Name) soll sofort
+				# mit Hinweis abbrechen, nicht ~1500-mal pro Login-Block scheitern.
+				try { $null = Connect-DbaInstance @connParams }
+				catch
+				{
+					throw ("Verbindung zu '$SqlInstance' fehlgeschlagen: $($_.Exception.Message)" + (Get-sqmConnectionHint -Message $_.Exception.Message -SqlInstance $SqlInstance))
+				}
+
 				$policyWasDisabled = $false
 				try
 				{
@@ -282,6 +333,30 @@ function Import-sqmDatabaseLogins
 			{
 				_AddResult 'RepairOrphanUsers' "($Database)" 'WhatIf' 'WhatIf: Orphan-Repair wuerde ausgefuehrt.'
 			}
+
+			# ---- 5. Optional: aeltere Exporte im Eingangsverzeichnis entfernen ----
+			if ($inputDirectory -and $KeepLatest -gt 0)
+			{
+				try
+				{
+					$existing = @(Get-sqmDatabaseLoginsFile -Directory $inputDirectory -Database $Database)
+					foreach ($old in @($existing | Select-Object -Skip $KeepLatest))
+					{
+						if ($old.File -eq $InputPath) { continue }
+						if ($PSCmdlet.ShouldProcess($old.File, "Aelteren Login-Export loeschen (KeepLatest $KeepLatest)"))
+						{
+							Remove-Item -LiteralPath $old.File -Force -ErrorAction Stop
+							_AddResult 'RemoveOldFile' (Split-Path $old.File -Leaf) 'Success' "Geloescht (KeepLatest $KeepLatest)."
+						}
+					}
+				}
+				catch
+				{
+					$warnMsg = "Aeltere Exporte konnten nicht entfernt werden: $($_.Exception.Message)"
+					Invoke-sqmLogging -Message $warnMsg -FunctionName $functionName -Level 'WARNING'
+					_AddResult 'RemoveOldFile' '(Datei)' 'Warning' $warnMsg
+				}
+			}
 		}
 		catch
 		{
@@ -294,7 +369,7 @@ function Import-sqmDatabaseLogins
 
 	end
 	{
-		$successCount = @($results | Where-Object Status -eq 'Success').Count
+		$successCount = @($results | Where-Object { $_.Action -eq 'ApplyLogin' -and $_.Status -eq 'Success' }).Count
 		$failCount = @($results | Where-Object Status -eq 'Failed').Count
 		$skipCount = @($results | Where-Object Status -in @('SkippedSysadmin', 'SkippedSidCollision')).Count
 		$summaryMsg = "Import-sqmDatabaseLogins abgeschlossen - Erfolg: $successCount | Fehler: $failCount | Sicherheitsbedingt uebersprungen: $skipCount"

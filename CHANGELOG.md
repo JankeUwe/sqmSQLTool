@@ -1,5 +1,39 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.161.0] - 2026-10-09
+
+### Export-/Import-sqmDatabaseLogins: automatisierbar ueber ein Uebergabeverzeichnis
+
+Bisher legte jeder Export eine neue Datei mit Zeitstempel an, und der Import brauchte den genauen
+Dateinamen. Fuer einen geplanten Ablauf (Export auf Prod, Kopierjob, Import auf Test) musste man
+die passende Datei selbst suchen.
+
+- **`Import-sqmDatabaseLogins -InputPath <Verzeichnis>`**: nimmt die neueste Export-Datei fuer
+  `-Database`. Gesucht wird `DatabaseLogins_<Datenbank>_*.sql`, entscheidend ist aber der Header
+  der Datei (`-- Datenbank`), weil der Dateiname mehrdeutig sein kann. Sortiert wird nach dem
+  Zeitstempel im Dateinamen, nicht nach LastWriteTime (Kopierjobs koennen die aendern). Die
+  Quell-Instanz im Namen spielt keine Rolle, ein Export ueber den Listener und einer ueber den
+  Knotennamen werden gleich behandelt. Die verwendete Datei steht als erste Ergebniszeile
+  (`SelectFile`) im Ergebnis. Ein Dateipfad funktioniert weiter wie bisher.
+- **`Export-sqmDatabaseLogins -KeepLatest` (Standard 5)**: Nur beim Export in ein Verzeichnis.
+  Nach erfolgreichem Schreiben bleiben die neuesten n Exporte derselben Datenbank und Quelle
+  erhalten, aeltere werden geloescht (sie enthalten Passwort-Hashes). `0` behaelt alles.
+- **`Import-sqmDatabaseLogins -KeepLatest` (Standard 0)**: dasselbe fuer das Eingangsverzeichnis,
+  standardmaessig aus, weil das Verzeichnis meist dem Kopierjob gehoert.
+- **Atomares Schreiben**: Der Export schreibt erst `<name>.sql.tmp` und benennt erst danach um.
+  Ein parallel laufender Kopierjob oder Import sieht nie eine halbe Datei.
+- **Verbindungshinweis**: Bei "Netzwerkpfad nicht gefunden" (bzw. SqlClient-Fehler 40/26) nennen
+  Export und Import jetzt die haeufigste Ursache: AG-Name statt Listener-Name angegeben, oder
+  abweichender Port ohne `Name,Port`. Der Import verbindet sich vorab einmal und bricht dann sofort
+  ab, statt fuer jeden einzelnen Login-Block zu scheitern.
+- Zusammenfassung des Imports: "Erfolg" zaehlt nur noch angewendete Logins, nicht Policy-,
+  Dateiauswahl- oder Aufraeum-Schritte.
+- `Sync-sqmDatabaseLogins` ist unveraendert (arbeitet mit einer eigenen Temp-Datei).
+
+Live getestet auf DEV01 und SQL 2025 (Container) unter Windows PowerShell 5.1: vier Exporte mit
+`-KeepLatest 2`, Import aus dem Verzeichnis, Fremddatei mit aehnlichem Namen bleibt unberuehrt,
+falscher Instanzname, Sync.
+
 ## [1.9.160.0] - 2026-10-08
 
 ### GUI: Wiederholmodus (`-Continuous`) von Get-sqmOperationStatus lief nicht

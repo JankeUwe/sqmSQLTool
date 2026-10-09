@@ -15,6 +15,8 @@
       ConvertTo-sqmHtmlReport   - HTML-Geruest im sqmSQLTool-Theme
       Get-sqmDirectCpuMemory    - Momentaufnahme CPU% + Memory MB (ein DMV-Call)
       Get-sqmDatabaseTrustIsolationMap - TRUSTWORTHY + Isolation Level pro Datenbank (ein Call)
+      Get-sqmConnectionHint     - Klartext-Hinweis zu "Netzwerkpfad nicht gefunden" & Co.
+      Get-sqmDatabaseLoginsFile - Export-Dateien von Export-sqmDatabaseLogins finden (neueste zuerst)
     ===========================================================================
 #>
 
@@ -410,4 +412,66 @@ FROM sys.databases
 		}
 	}
 	return $map
+}
+
+# Liefert einen Klartext-Hinweis, wenn eine Verbindung schon an der Adressierung scheitert
+# ("Netzwerkpfad nicht gefunden", Named-Pipes-Fehler 40, Instanz nicht gefunden 26).
+# Haeufigster Fall in AG-Umgebungen: AG-Name statt Listener-Name angegeben.
+# Leerer String, wenn die Meldung nicht dazu passt.
+function Get-sqmConnectionHint
+{
+	[CmdletBinding()]
+	param (
+		[Parameter(Mandatory = $false)]
+		[string]$Message,
+		[Parameter(Mandatory = $true)]
+		[string]$SqlInstance
+	)
+	if ($Message -match 'network path was not found|Netzwerkpfad wurde nicht gefunden|error: 40|error: 26|Fehler: 40|Fehler: 26')
+	{
+		return " Hinweis: '$SqlInstance' ist unter diesem Namen nicht erreichbar. Bei AlwaysOn den Listener-Namen verwenden (nicht den AG-Namen, die koennen abweichen), bei abweichendem Port als 'Name,Port'."
+	}
+	return ''
+}
+
+# Findet die von Export-sqmDatabaseLogins in einem Verzeichnis abgelegten Dateien fuer eine
+# Datenbank, neueste zuerst. Massgeblich ist der Header der Datei (-- Datenbank / -- Quelle),
+# nicht der Dateiname: der bereinigte Name ist mehrdeutig (Datenbank 'A_B' vs. 'A' + Instanz 'B_...').
+# Sortiert wird nach dem Zeitstempel im Dateinamen, weil Kopierjobs LastWriteTime veraendern koennen.
+function Get-sqmDatabaseLoginsFile
+{
+	[CmdletBinding()]
+	param (
+		[Parameter(Mandatory = $true)]
+		[string]$Directory,
+		[Parameter(Mandatory = $true)]
+		[string]$Database,
+		[Parameter(Mandatory = $false)]
+		[string]$SqlInstance
+	)
+	$safeDb = ($Database -replace '[\/:*?"<>|]', '_')
+	$found = foreach ($file in @(Get-ChildItem -LiteralPath $Directory -Filter "DatabaseLogins_${safeDb}_*.sql" -File -ErrorAction Stop))
+	{
+		if ($file.Name -notmatch '_(\d{14})\.sql$') { continue }
+		$stamp = [datetime]::ParseExact($matches[1], 'yyyyMMddHHmmss', [System.Globalization.CultureInfo]::InvariantCulture)
+
+		$headerDb = $null; $headerSource = $null
+		$reader = [System.IO.StreamReader]::new($file.FullName)
+		try
+		{
+			for ($i = 0; $i -lt 15; $i++)
+			{
+				$line = $reader.ReadLine()
+				if ($null -eq $line) { break }
+				if ($line -match '^-- Datenbank\s*:\s*(.+)$') { $headerDb = $matches[1].Trim() }
+				elseif ($line -match '^-- Quelle\s*:\s*(.+)$') { $headerSource = $matches[1].Trim() }
+			}
+		}
+		finally { $reader.Dispose() }
+
+		if ($headerDb -ne $Database) { continue }
+		if ($SqlInstance -and $headerSource -ne $SqlInstance) { continue }
+		[PSCustomObject]@{ File = $file.FullName; Timestamp = $stamp; SourceInstance = $headerSource }
+	}
+	return @($found | Sort-Object Timestamp -Descending)
 }

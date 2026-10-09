@@ -60,6 +60,17 @@ Target path for the generated script. Either a full file path, or an existing/cr
 (local disk, UNC share, ...) - how the file subsequently reaches the destination side is outside
 this function's responsibility.
 
+The directory form is the one meant for automation: every run writes a new, timestamped file,
+Import-sqmDatabaseLogins -InputPath <directory> picks the newest one by itself, and -KeepLatest
+removes older exports. The file is first written as "<name>.tmp" and only renamed to ".sql" when
+complete, so a copy job or an import running at the same moment never sees a half-written file.
+
+.PARAMETER KeepLatest
+Only with a directory as -OutputPath: after a successful write, keep only this many of the newest
+exports for the same database and source instance in that directory and delete the older ones
+(they contain password hashes, so letting them pile up is not harmless). Which files belong
+together is decided by the file header, not the file name. 0 keeps everything. Default: 5.
+
 .PARAMETER Login
 Restricts the export to these login names (wildcards allowed). Without this, every SQL-auth login
 backing a user of -Database is exported (after the sysadmin/system exclusion above).
@@ -88,6 +99,13 @@ Export-sqmDatabaseLogins -SqlInstance 'ProdSQL' -Database 'Frontarena' -OutputPa
 
 Writes into an auto-named file inside C:\Temp, skipping any login starting with 'SvcAccount_'.
 
+.EXAMPLE
+Export-sqmDatabaseLogins -SqlInstance 'ProdAgListener' -Database 'Frontarena' -OutputPath '\\Share\Handover' -KeepLatest 3
+
+Scheduled export via the AG listener: writes a new timestamped file on every run and keeps only
+the three newest Frontarena exports from that source in \\Share\Handover. On the Test side,
+Import-sqmDatabaseLogins -InputPath <copied directory> picks the newest one.
+
 .NOTES
 Prerequisites : dbatools, Invoke-sqmLogging
 Counterpart   : Import-sqmDatabaseLogins (applies the generated file against the destination).
@@ -110,6 +128,9 @@ function Export-sqmDatabaseLogins
 		[string[]]$Login,
 		[Parameter(Mandatory = $false)]
 		[string[]]$ExcludeLogin,
+		[Parameter(Mandatory = $false)]
+		[ValidateRange(0, 1000)]
+		[int]$KeepLatest = 5,
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
@@ -332,9 +353,45 @@ END
 			$writeAction = "$($blocks.Count) Login(s) aus '$Database' auf '$SqlInstance' nach '$finalOutputFile' exportieren"
 			if ($PSCmdlet.ShouldProcess($finalOutputFile, $writeAction))
 			{
-				[System.IO.File]::WriteAllText($finalOutputFile, $fullContent, (New-Object System.Text.UTF8Encoding($false)))
+				# Erst als .tmp schreiben, dann umbenennen: ein Kopierjob oder Import, der parallel
+				# das Verzeichnis liest, sieht nie eine halb geschriebene .sql-Datei.
+				$tmpFile = "$finalOutputFile.tmp"
+				[System.IO.File]::WriteAllText($tmpFile, $fullContent, (New-Object System.Text.UTF8Encoding($false)))
+				if ([System.IO.File]::Exists($finalOutputFile)) { [System.IO.File]::Delete($finalOutputFile) }
+				[System.IO.File]::Move($tmpFile, $finalOutputFile)
 				Invoke-sqmLogging -Message "Export geschrieben: $finalOutputFile ($($blocks.Count) Login(s))." -FunctionName $functionName -Level 'INFO'
 				Write-Host "Export-sqmDatabaseLogins: $($blocks.Count) Login(s) nach '$finalOutputFile' geschrieben (sysadmin ausgeschlossen: $excludedSysadminCount)." -ForegroundColor Green
+
+				# ---- 8. Aeltere Exporte derselben Datenbank/Quelle entfernen ----
+				$removedFiles = @()
+				if ($isDirectory -and $KeepLatest -gt 0)
+				{
+					try
+					{
+						$existing = @(Get-sqmDatabaseLoginsFile -Directory $OutputPath -Database $Database -SqlInstance $SqlInstance)
+						foreach ($old in @($existing | Select-Object -Skip $KeepLatest))
+						{
+							if ($old.File -eq $finalOutputFile) { continue }
+							if ($PSCmdlet.ShouldProcess($old.File, "Aelteren Login-Export loeschen (KeepLatest $KeepLatest)"))
+							{
+								Remove-Item -LiteralPath $old.File -Force -ErrorAction Stop
+								$removedFiles += $old.File
+							}
+						}
+						if ($removedFiles.Count -gt 0)
+						{
+							Invoke-sqmLogging -Message "$($removedFiles.Count) aeltere(r) Export(e) entfernt (KeepLatest $KeepLatest): $($removedFiles -join ', ')" `
+											  -FunctionName $functionName -Level 'INFO'
+						}
+					}
+					catch
+					{
+						# Aufraeumen ist Nebensache: der Export selbst ist geschrieben und bleibt erfolgreich.
+						$warnMsg = "Aeltere Exporte konnten nicht entfernt werden: $($_.Exception.Message)"
+						Invoke-sqmLogging -Message $warnMsg -FunctionName $functionName -Level 'WARNING'
+						Write-Warning $warnMsg
+					}
+				}
 
 				return [PSCustomObject]@{
 					SourceInstance		  = $SqlInstance
@@ -342,6 +399,7 @@ END
 					OutputFile			  = $finalOutputFile
 					LoginCount		      = $blocks.Count
 					ExcludedSysadminCount = $excludedSysadminCount
+					RemovedOldFiles	      = $removedFiles
 					Status			      = 'Success'
 					Message			      = "Export erfolgreich."
 					Timestamp			  = Get-Date
@@ -363,7 +421,7 @@ END
 		}
 		catch
 		{
-			$errMsg = "Fehler in Export-sqmDatabaseLogins: $($_.Exception.Message)"
+			$errMsg = "Fehler in Export-sqmDatabaseLogins: $($_.Exception.Message)" + (Get-sqmConnectionHint -Message $_.Exception.Message -SqlInstance $SqlInstance)
 			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level 'ERROR'
 			if ($EnableException) { throw }
 			Write-Error $errMsg
