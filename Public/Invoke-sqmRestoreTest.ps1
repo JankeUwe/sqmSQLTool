@@ -416,42 +416,48 @@ function Invoke-sqmRestoreTest
 			$durationSeconds = $stopwatch.Elapsed.TotalSeconds
 
 			# --- Kennzahlen einsammeln -----------------------------------------------------
-			# Bei mehreren Backupdateien (Kette/Stripes) liefert Restore-DbaDatabase ein Objekt
-			# je Datei - Groessen summieren, Erfolg nur wenn ALLE Teile erfolgreich waren.
+			# Restore-DbaDatabase liefert ein Objekt je Sicherungssatz (Full/Diff/Log), nicht je
+			# Datei. Erfolg nur, wenn ALLE Saetze erfolgreich waren.
 			$resultRows = @($restoreResult)
 			$restoreComplete = ($resultRows.Count -gt 0) -and
 							   (@($resultRows | Where-Object { -not $_.RestoreComplete }).Count -eq 0)
 
-			$backupSizeBytes = 0L
-			$compressedSizeBytes = 0L
-			foreach ($row in $resultRows)
-			{
-				$backupSizeBytes	 += ConvertTo-sqmSizeBytes $row.BackupSize
-				$compressedSizeBytes += ConvertTo-sqmSizeBytes $row.CompressedBackupSize
-			}
+			# Groesse primaer aus dem Backup-Header. Restore-DbaDatabase meldet bei gestripten
+			# Backups nur den Anteil EINER Stripe-Datei (live DEV01, dbatools 2.9.0: 3 Stripes,
+			# 7,42 MB Backup -> BackupSize 2,47 MB) - Datenmenge und Durchsatz im Nachweis waren
+			# damit um den Faktor der Stripe-Anzahl zu klein. Der Header liefert die Groesse des
+			# Sicherungssatzes, Stripes werden ueber BackupSetGUID entdupliziert.
+			$sizeSource = 'BackupHeader'
+			$hdr = Get-sqmBackupHeaderSize -Server $server -Files $BackupFile -SqlCredential $SqlCredential `
+				-RestoreRows $resultRows -FunctionName $functionName
+			$backupSizeBytes	 = [long]$hdr.BackupSizeBytes
+			$compressedSizeBytes = [long]$hdr.CompressedBackupSizeBytes
 
-			# Fallback auf den Backup-Header, wenn das Restore-Ergebnis keine Groesse hergibt.
-			# "0 B" in einem Nachweis ist wertlos - dann lieber die Zahl aus dem Header holen.
-			$sizeSource = 'RestoreResult'
+			# Fallback auf das Restore-Ergebnis, wenn der Header nichts hergibt (z. B. Datei nach
+			# dem Restore nicht mehr lesbar). Bei Stripes ist dieser Wert zu klein - deshalb Warnung.
 			if ($backupSizeBytes -le 0)
 			{
-				Invoke-sqmLogging -Message "Restore-Ergebnis lieferte keine verwertbare Backupgroesse - lese RESTORE HEADERONLY." `
-					-FunctionName $functionName -Level "WARNING"
-				$hdr = Get-sqmBackupHeaderSize -Server $server -Files $BackupFile -SqlCredential $SqlCredential -FunctionName $functionName
-				if ($hdr.BackupSizeBytes -gt 0)
+				$sizeSource = 'RestoreResult'
+				$backupSizeBytes = 0L
+				$compressedSizeBytes = 0L
+				foreach ($row in $resultRows)
 				{
-					$backupSizeBytes	 = $hdr.BackupSizeBytes
-					$compressedSizeBytes = $hdr.CompressedBackupSizeBytes
-					$sizeSource		     = 'BackupHeader'
-					Invoke-sqmLogging -Message "Backupgroesse aus dem Header ermittelt: $(Format-sqmFileSize -Bytes $backupSizeBytes) ueber $($hdr.SetCount) Sicherungssatz/-saetze." `
-						-FunctionName $functionName -Level "INFO"
+					$backupSizeBytes	 += ConvertTo-sqmSizeBytes $row.BackupSize
+					$compressedSizeBytes += ConvertTo-sqmSizeBytes $row.CompressedBackupSize
 				}
-				else
+				Invoke-sqmLogging -Message "Backup-Header nicht auswertbar - Groesse aus dem Restore-Ergebnis (bei gestripten Backups nur der Anteil einer Datei)." `
+					-FunctionName $functionName -Level "WARNING"
+				if ($backupSizeBytes -le 0)
 				{
 					$sizeSource = 'Unknown'
 					Invoke-sqmLogging -Message "Backupgroesse konnte nicht ermittelt werden - Datenmenge und Durchsatz werden im Nachweis als 'nicht ermittelbar' ausgewiesen." `
 						-FunctionName $functionName -Level "ERROR"
 				}
+			}
+			else
+			{
+				Invoke-sqmLogging -Message "Backupgroesse aus dem Header ermittelt: $(Format-sqmFileSize -Bytes $backupSizeBytes) ueber $($hdr.SetCount) Sicherungssatz/-saetze." `
+					-FunctionName $functionName -Level "INFO"
 			}
 
 			# Durchsatz auf Basis der BackupSize (logische Datenmenge).
@@ -635,10 +641,63 @@ function Get-sqmBackupHeaderSize
 		[Parameter(Mandatory = $true)] $Server,
 		[Parameter(Mandatory = $true)] [string[]]$Files,
 		[Parameter(Mandatory = $false)] $SqlCredential,
+		[Parameter(Mandatory = $false)] $RestoreRows,
 		[Parameter(Mandatory = $false)] [string]$FunctionName = 'Invoke-sqmRestoreTest'
 	)
 
 	$sets = @{}
+
+	# Genau die restaurierten Saetze: Restore-DbaDatabase liefert je Satz das ausgefuehrte
+	# RESTORE-Skript mit "WITH FILE = n" (Position im Medium). Ohne diese Einschraenkung wuerden
+	# angehaengte Sicherungen (NOINIT, mehrere Saetze in derselben Datei) mitgezaehlt - live
+	# DEV01: zwei Saetze im selben 3-Stripe-Medium ergaben die doppelte Datenmenge.
+	$targets = @(foreach ($row in @($RestoreRows))
+		{
+			# Datei ebenfalls aus dem Skript: BackupFileRaw/BackupFile enthalten bei einer Kette auf
+			# JEDER Zeile alle Dateien aller Saetze (live geprueft), nur das Skript nennt die des Satzes.
+			$script = [string]$row.Script
+			if ($script -notmatch '(?i)\bFILE\s*=\s*(\d+)') { continue }
+			$pos = [int]$Matches[1]
+			if ($script -notmatch "(?i)\bDISK\s*=\s*N?'((?:[^']|'')+)'") { continue }
+			[PSCustomObject]@{ File = $Matches[1].Replace("''", "'"); Position = $pos }
+		})
+	if ($targets.Count -gt 0)
+	{
+		foreach ($t in $targets)
+		{
+			try
+			{
+				$safe = $t.File.Replace("'", "''")
+				$rows = @(Invoke-DbaQuery -SqlInstance $Server -SqlCredential $SqlCredential -Database 'master' `
+						-Query "RESTORE HEADERONLY FROM DISK = N'$safe'" -As PSObject -ErrorAction Stop |
+					Where-Object { [int]$_.Position -eq $t.Position })
+				foreach ($row in $rows)
+				{
+					$key = if ($row.BackupSetGUID) { [string]$row.BackupSetGUID } else { "$($t.File)|$($t.Position)" }
+					if (-not $sets.ContainsKey($key))
+					{
+						$sets[$key] = [PSCustomObject]@{
+							Backup	   = ConvertTo-sqmSizeBytes $row.BackupSize
+							Compressed = ConvertTo-sqmSizeBytes $row.CompressedBackupSize
+						}
+					}
+				}
+			}
+			catch
+			{
+				Invoke-sqmLogging -Message "RESTORE HEADERONLY fuer '$($t.File)' fehlgeschlagen: $($_.Exception.Message)" `
+					-FunctionName $FunctionName -Level "WARNING"
+			}
+		}
+		if ($sets.Count -gt 0)
+		{
+			$total = 0L; $comp = 0L
+			foreach ($s in $sets.Values) { $total += $s.Backup; $comp += $s.Compressed }
+			return [PSCustomObject]@{ BackupSizeBytes = $total; CompressedBackupSizeBytes = $comp; SetCount = $sets.Count }
+		}
+	}
+
+	# Ohne Positionsangabe: alle Saetze der Dateien (entdupliziert ueber BackupSetGUID)
 	foreach ($file in $Files)
 	{
 		try

@@ -1,5 +1,22 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.164.0] - 2026-10-11
+
+### Fix: Invoke-sqmRestoreTest meldet bei gestripten Backups falsche Datenmenge und Durchsatz
+
+Restore-DbaDatabase (dbatools 2.9.0) meldet `BackupSize`/`CompressedBackupSize` bei einem
+gestripten Backup nur als Anteil EINER Stripe-Datei. Live auf DEV01 gemessen: 3 Stripes, 7,42 MB
+Backup, gemeldet 2,47 MB. Der Nachweis zeigte Datenmenge und Durchsatz also um den Faktor der
+Stripe-Anzahl zu klein. Liegen mehrere Saetze im selben Medium (NOINIT), meldete dbatools sogar 0.
+
+- Die Groesse kommt jetzt immer aus dem Backup-Header (`RESTORE HEADERONLY`, `SizeSource =
+  BackupHeader`), das Restore-Ergebnis ist nur noch Fallback.
+- Gezaehlt werden genau die restaurierten Saetze: Position (`WITH FILE = n`) und Datei kommen aus
+  dem von dbatools ausgefuehrten RESTORE-Skript. Angehaengte Saetze im selben Medium zaehlen nicht
+  mehr mit, Stripes werden ueber `BackupSetGUID` einmal gezaehlt, eine Kette (Full + Diff + Log)
+  wird korrekt summiert.
+- Live verifiziert auf DEV01: Einzelsatz mit 3 Stripes, Medium mit 2 angehaengten Saetzen, Kette mit
+  3/2/1 Dateien (13,21 MB = Summe der Einzelsicherungen).
 ## [1.9.163.0] - 2026-10-11
 
 ### Fix: Invoke-sqmFailover haengt in der GUI, wirkt in der Konsole stumm

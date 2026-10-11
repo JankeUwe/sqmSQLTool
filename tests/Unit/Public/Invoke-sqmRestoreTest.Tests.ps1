@@ -81,3 +81,54 @@ Describe 'Invoke-sqmRestoreTest - DatabaseName-Aufloesung' {
         }
     }
 }
+
+Describe 'Get-sqmBackupHeaderSize - Stripes, angehaengte Saetze, Kette' {
+    # Hintergrund (v1.9.164.0): Restore-DbaDatabase meldet bei gestripten Backups nur den Anteil
+    # EINER Stripe-Datei; der Nachweis zeigte Datenmenge/Durchsatz um den Faktor der Stripe-Anzahl
+    # zu klein. Die Groesse kommt jetzt aus dem Header - und zwar nur fuer die restaurierten Saetze.
+
+    It 'zaehlt nur den restaurierten Satz (FILE = n) und je Satz nur einmal' {
+        InModuleScope sqmSQLTool {
+            Mock Invoke-sqmLogging { }
+            # Medium mit zwei angehaengten Saetzen (NOINIT); jede Stripe-Datei liefert beide
+            Mock Invoke-DbaQuery -ParameterFilter { $Query -match 'RESTORE HEADERONLY' } -MockWith {
+                [PSCustomObject]@{ Position = 1; BackupSetGUID = 'g1'; BackupSize = 7000; CompressedBackupSize = 600 }
+                [PSCustomObject]@{ Position = 2; BackupSetGUID = 'g2'; BackupSize = 8000; CompressedBackupSize = 700 }
+            }
+            $files = @('D:\B\db-1-of-3.bak', 'D:\B\db-2-of-3.bak', 'D:\B\db-3-of-3.bak')
+            $row = [PSCustomObject]@{
+                BackupFileRaw = $files
+                Script = "RESTORE DATABASE [x] FROM DISK = N'D:\B\db-1-of-3.bak', DISK = N'D:\B\db-2-of-3.bak', DISK = N'D:\B\db-3-of-3.bak' WITH FILE = 2, NOUNLOAD"
+            }
+
+            $r = Get-sqmBackupHeaderSize -Server 'SQL01' -Files $files -RestoreRows @($row)
+
+            $r.BackupSizeBytes | Should -Be 8000
+            $r.CompressedBackupSizeBytes | Should -Be 700
+            $r.SetCount | Should -Be 1
+        }
+    }
+
+    It 'summiert eine Kette ueber die Dateien aus dem jeweiligen Skript, nicht aus BackupFileRaw' {
+        InModuleScope sqmSQLTool {
+            Mock Invoke-sqmLogging { }
+            Mock Invoke-DbaQuery -ParameterFilter { $Query -match 'full-1' } -MockWith {
+                [PSCustomObject]@{ Position = 1; BackupSetGUID = 'full'; BackupSize = 7000; CompressedBackupSize = 600 } }
+            Mock Invoke-DbaQuery -ParameterFilter { $Query -match 'diff-1' } -MockWith {
+                [PSCustomObject]@{ Position = 1; BackupSetGUID = 'diff'; BackupSize = 2000; CompressedBackupSize = 100 } }
+            Mock Invoke-DbaQuery -ParameterFilter { $Query -match 'log\.trn' } -MockWith {
+                [PSCustomObject]@{ Position = 1; BackupSetGUID = 'log'; BackupSize = 1000; CompressedBackupSize = 50 } }
+            $all = @('D:\B\full-1.bak', 'D:\B\full-2.bak', 'D:\B\diff-1.bak', 'D:\B\diff-2.bak', 'D:\B\log.trn')
+            $rows = @(
+                [PSCustomObject]@{ BackupFileRaw = $all; Script = "RESTORE DATABASE [x] FROM DISK = N'D:\B\full-1.bak', DISK = N'D:\B\full-2.bak' WITH FILE = 1" }
+                [PSCustomObject]@{ BackupFileRaw = $all; Script = "RESTORE DATABASE [x] FROM DISK = N'D:\B\diff-1.bak', DISK = N'D:\B\diff-2.bak' WITH FILE = 1" }
+                [PSCustomObject]@{ BackupFileRaw = $all; Script = "RESTORE LOG [x] FROM DISK = N'D:\B\log.trn' WITH FILE = 1" }
+            )
+
+            $r = Get-sqmBackupHeaderSize -Server 'SQL01' -Files $all -RestoreRows $rows
+
+            $r.BackupSizeBytes | Should -Be 10000
+            $r.SetCount | Should -Be 3
+        }
+    }
+}
