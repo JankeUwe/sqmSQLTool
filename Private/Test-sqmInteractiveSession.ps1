@@ -17,6 +17,9 @@ function Test-sqmInteractiveSession
 
 	if (-not [Environment]::UserInteractive) { return $false }
 
+	# Show-sqmToolGui: the console sits behind the form, a Read-Host there hangs the GUI unseen
+	if ($script:sqmGuiActive) { return $false }
+
 	# -NonInteractive darf abgekuerzt werden (-noni, -NonI ...), -match ist case-insensitiv
 	$nonInteractive = [Environment]::GetCommandLineArgs() | Where-Object { $_ -match '^[-/]noni' }
 	return (-not $nonInteractive)

@@ -1,5 +1,20 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.163.0] - 2026-10-11
+
+### Fix: Invoke-sqmFailover haengt in der GUI, wirkt in der Konsole stumm
+
+- **GUI:** `Invoke-sqmFailover` hat `ConfirmImpact='High'`. `ShouldProcess` fragte deshalb im
+  Konsolenfenster *hinter* der GUI nach, der synchrone Run wartete dort unsichtbar und die GUI sah
+  eingefroren aus. Show-sqmToolGui fragt jetzt selbst per Dialog nach (gilt fuer alle Befehle mit
+  ConfirmImpact >= `$ConfirmPreference`) und uebergibt danach `-Confirm:$false`, das auch
+  verschachtelte dbatools-Rueckfragen unterdrueckt. Mit WhatIf kommt keine Rueckfrage.
+- **GUI:** `Test-sqmInteractiveSession` liefert bei offener GUI `$false`. Funktionen, die per
+  `Read-Host` nachfragen wuerden (z. B. AG-Auswahl bei mehreren AGs), brechen mit klarer Meldung ab,
+  statt in der versteckten Konsole zu warten.
+- **Konsole:** Failover-Ausfuehrung und Wartezeit standen nur in der Logdatei, die Konsole blieb
+  mindestens 30 s stumm. Jetzt Write-Host-Meldungen und ein Countdown (`Write-Progress`) bis zum
+  Post-Check.
 ## [1.9.162.0] - 2026-10-09
 
 ### Neu: Invoke-sqmSsrsMigration, Reporting-Services-Projekte umziehen

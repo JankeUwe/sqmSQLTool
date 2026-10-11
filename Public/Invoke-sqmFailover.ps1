@@ -367,7 +367,11 @@ WHERE ag.name = N'$agLiteral'
 			}
 
 			$stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-			Invoke-sqmLogging -Message (_s 'Failover_Executing' $target.ReplicaServer) -FunctionName $functionName -Level "INFO"
+			# Log und Konsole: bisher stand der Ablauf nur in der Logdatei, die Konsole blieb
+			# Failover + Wartezeit lang (>= 30 s) stumm und sah aus wie haengengeblieben.
+			$msg = _s 'Failover_Executing' $target.ReplicaServer
+			Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "INFO"
+			Write-Host $msg
 
 			$targetConn = @{ SqlInstance = $target.ReplicaServer }
 			if ($SqlCredential) { $targetConn['SqlCredential'] = $SqlCredential }
@@ -375,8 +379,16 @@ WHERE ag.name = N'$agLiteral'
 			$failoverSql = "ALTER AVAILABILITY GROUP [$($AvailabilityGroup -replace ']', ']]')] FAILOVER;"
 			Invoke-DbaQuery @targetConn -Database master -Query $failoverSql -EnableException
 
-			Invoke-sqmLogging -Message (_s 'Failover_Waiting' $WaitAfterFailoverSeconds) -FunctionName $functionName -Level "INFO"
-			Start-Sleep -Seconds $WaitAfterFailoverSeconds
+			$msg = _s 'Failover_Waiting' $WaitAfterFailoverSeconds
+			Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "INFO"
+			Write-Host $msg
+			for ($s = $WaitAfterFailoverSeconds; $s -gt 0; $s--)
+			{
+				Write-Progress -Activity "Failover '$AvailabilityGroup' -> '$($target.ReplicaServer)'" -Status "Post-check in $s s" `
+					-PercentComplete ([int](100 * ($WaitAfterFailoverSeconds - $s) / $WaitAfterFailoverSeconds))
+				Start-Sleep -Seconds 1
+			}
+			Write-Progress -Activity "Failover '$AvailabilityGroup' -> '$($target.ReplicaServer)'" -Completed
 
 			# POST-CHECK
 			try

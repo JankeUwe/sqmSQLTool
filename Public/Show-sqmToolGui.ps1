@@ -1088,6 +1088,26 @@
 			$fn = $script:guiState.Command.Name
 			$cmdLine = & $buildCommand
 
+			# ConfirmImpact >= $ConfirmPreference (e.g. Invoke-sqmFailover, 'High') makes ShouldProcess
+			# ask "Are you sure?" in the console window BEHIND the form - the synchronous Run then
+			# waited there unseen and the GUI looked frozen. Ask here instead, then suppress the
+			# console prompt (-Confirm:$false also covers nested dbatools ShouldProcess calls).
+			if ($script:guiState.Command.Parameters.ContainsKey('Confirm'))
+			{
+				if (-not $params.ContainsKey('WhatIf'))
+				{
+					$cba = $script:guiState.Command.ScriptBlock.Attributes |
+						Where-Object { $_ -is [System.Management.Automation.CmdletBindingAttribute] } | Select-Object -First 1
+					$impact = if ($cba) { $cba.ConfirmImpact } else { [System.Management.Automation.ConfirmImpact]::Medium }
+					if ($ConfirmPreference -ne 'None' -and $impact -ne 'None' -and $impact -ge $ConfirmPreference)
+					{
+						$answer = [System.Windows.Forms.MessageBox]::Show("Really run?`n`n$cmdLine", "Confirm: $fn", 'YesNo', 'Warning', 'Button2')
+						if ($answer -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+					}
+				}
+				$params['Confirm'] = $false
+			}
+
 			# -Continuous (Get-sqmOperationStatus) loops until Ctrl+C. Called synchronously below it
 			# never returned: the form froze and the captured output was never shown. Instead run the
 			# command once per timer tick without -Continuous; the Run button turns into a Stop button.
@@ -1219,7 +1239,12 @@
 	$searchBox.Text = if ($Filter -eq '*') { '' } else { $Filter }
 	& $populateTree $searchBox.Text
 
-	[void]$form.ShowDialog()
+	# While the form is open, Read-Host would ask in the console window BEHIND the form and the
+	# synchronous Run would hang there unseen. Test-sqmInteractiveSession reports $false for the
+	# GUI, so functions that would ask stop with a clear message (e.g. AG list) instead.
+	$script:sqmGuiActive = $true
+	try { [void]$form.ShowDialog() }
+	finally { $script:sqmGuiActive = $false }
 	$tip.Dispose()
 	$form.Dispose()
 }
