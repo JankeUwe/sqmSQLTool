@@ -781,7 +781,7 @@ function Copy-sqmLogins
 						Login		    = $loginNames
 						EnableException = $EnableException.IsPresent
 					}
-					if ($srcCred) { $copyParams['SqlCredential'] = $srcCred }
+					if ($srcCred) { $copyParams['SourceSqlCredential'] = $srcCred }
 					if ($dstCred) { $copyParams['DestinationSqlCredential'] = $dstCred }
 					if ($Force) { $copyParams['Force'] = $true }
 

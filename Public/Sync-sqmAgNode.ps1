@@ -179,7 +179,14 @@ function Sync-sqmAgNode
 					
 					$primaryConn = @{ SqlInstance = $primaryName }
 					if ($SqlCredential) { $primaryConn['SqlCredential'] = $SqlCredential }
-					
+					# Copy-Dba* kennt weder -SqlInstance noch -SqlCredential, nur -Source/-SourceSqlCredential
+					$copySource = @{ Source = $primaryName }
+					if ($SqlCredential)
+					{
+						$copySource['SourceSqlCredential'] = $SqlCredential
+						$copySource['DestinationSqlCredential'] = $SqlCredential
+					}
+
 					# Alle Secondary-Replikate
 					$allReplicas = Get-DbaAgReplica @primaryConn -AvailabilityGroup $agName -ErrorAction Stop
 					$secondaryReplicas = @($allReplicas | Where-Object { $_.Role -eq 'Secondary' } | Select-Object -ExpandProperty Name)
@@ -242,7 +249,7 @@ function Sync-sqmAgNode
 						}
 						if ($PSCmdlet.ShouldProcess($secInstance, "[$agName] Logins synchronisieren ($($sourceLogins.Count))"))
 						{
-							$copyResult = Copy-DbaLogin @primaryConn -Destination $secInstance -Login ($sourceLogins.Name) -DestinationSqlCredential $SqlCredential -Force -EnableException
+							$copyResult = Copy-DbaLogin @copySource -Destination $secInstance -Login ($sourceLogins.Name) -Force -EnableException
 							foreach ($item in $copyResult)
 							{
 								_AddResult $agName 'Logins' $primaryName $secInstance $item.Name $(if ($item.Status -eq 'Successful') { 'Success' }
@@ -287,7 +294,7 @@ function Sync-sqmAgNode
 						}
 						if ($PSCmdlet.ShouldProcess($secInstance, "[$agName] Jobs synchronisieren ($($sourceJobs.Count))"))
 						{
-							$copyResult = Copy-DbaAgentJob @primaryConn -Destination $secInstance -Job ($sourceJobs.Name) -DestinationSqlCredential $SqlCredential -Force -EnableException
+							$copyResult = Copy-DbaAgentJob @copySource -Destination $secInstance -Job ($sourceJobs.Name) -Force -EnableException
 							foreach ($item in $copyResult)
 							{
 								_AddResult $agName 'Jobs' $primaryName $secInstance $item.Name $(if ($item.Status -eq 'Successful') { 'Success' }
@@ -312,7 +319,7 @@ function Sync-sqmAgNode
 						}
 						if ($PSCmdlet.ShouldProcess($secInstance, "[$agName] Linked Server synchronisieren ($($sourceLinkedServers.Count))"))
 						{
-							$copyResult = Copy-DbaLinkedServer @primaryConn -Destination $secInstance -LinkedServer ($sourceLinkedServers.Name) -DestinationSqlCredential $SqlCredential -Force -EnableException
+							$copyResult = Copy-DbaLinkedServer @copySource -Destination $secInstance -LinkedServer ($sourceLinkedServers.Name) -Force -EnableException
 							foreach ($item in $copyResult)
 							{
 								_AddResult $agName 'LinkedServers' $primaryName $secInstance $item.Name $(if ($item.Status -eq 'Successful') { 'Success' }
@@ -337,7 +344,7 @@ function Sync-sqmAgNode
 						}
 						if ($PSCmdlet.ShouldProcess($secInstance, "[$agName] Operatoren synchronisieren ($($sourceOperators.Count))"))
 						{
-							$copyResult = Copy-DbaAgentOperator @primaryConn -Destination $secInstance -Operator ($sourceOperators.Name) -DestinationSqlCredential $SqlCredential -Force -EnableException
+							$copyResult = Copy-DbaAgentOperator @copySource -Destination $secInstance -Operator ($sourceOperators.Name) -Force -EnableException
 							foreach ($item in $copyResult)
 							{
 								_AddResult $agName 'Operators' $primaryName $secInstance $item.Name $(if ($item.Status -eq 'Successful') { 'Success' }
@@ -362,7 +369,7 @@ function Sync-sqmAgNode
 						}
 						if ($PSCmdlet.ShouldProcess($secInstance, "[$agName] Alerts synchronisieren ($($sourceAlerts.Count))"))
 						{
-							$copyResult = Copy-DbaAgentAlert @primaryConn -Destination $secInstance -Alert ($sourceAlerts.Name) -DestinationSqlCredential $SqlCredential -Force -EnableException
+							$copyResult = Copy-DbaAgentAlert @copySource -Destination $secInstance -Alert ($sourceAlerts.Name) -Force -EnableException
 							foreach ($item in $copyResult)
 							{
 								_AddResult $agName 'Alerts' $primaryName $secInstance $item.Name $(if ($item.Status -eq 'Successful') { 'Success' }

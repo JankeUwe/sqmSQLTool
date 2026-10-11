@@ -1,5 +1,22 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.165.0] - 2026-10-11
+
+### Fix: Sync-sqmAgNode bricht mit "Parameter 'SqlInstance' nicht gefunden" ab
+
+Alle fuenf Copy-Dba*-Aufrufe (Logins, Jobs, Linked Server, Operatoren, Alerts) wurden mit dem
+Verbindungs-Splat `@primaryConn` aufgerufen, also mit `-SqlInstance`/`-SqlCredential`. Die
+Copy-Dba*-Befehle kennen nur `-Source`/`-SourceSqlCredential`, deshalb brach schon der erste
+Sync-Typ ab und die Funktion hat nie etwas synchronisiert.
+
+- Copy-Dba* bekommt jetzt einen eigenen Splat mit `-Source` (aktueller Primary) und, falls
+  angegeben, `-SourceSqlCredential`/`-DestinationSqlCredential`.
+- Gleicher Fehler in `Copy-sqmLogins`: die Quell-Credential ging als `-SqlCredential` an
+  `Copy-DbaLogin` und brach ab, sobald `-SourceCredential` angegeben war. Jetzt `-SourceSqlCredential`.
+- Neuer Unit-Test `Sync-sqmAgNode.Tests.ps1`. Gegen den alten Code reproduziert er genau die
+  gemeldete ParameterBindingException, gegen den neuen laeuft er gruen. Parameterbindung aller
+  Copy-Dba*-Aufrufe zusaetzlich unter PowerShell 5.1 gegen dbatools 2.9.0 geprueft.
+
 ## [1.9.164.0] - 2026-10-11
 
 ### Fix: Invoke-sqmRestoreTest meldet bei gestripten Backups falsche Datenmenge und Durchsatz
