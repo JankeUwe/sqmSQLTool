@@ -23,23 +23,23 @@ $cats['deployment']          = @{ Title="$([char]::ConvertFromUtf32(0x1F680)) De
 $cats['sonstige']            = @{ Title="$([char]::ConvertFromUtf32(0x1F539)) Other";                  Badge='sonstige';      Text='Other' }
 
 $members = [ordered]@{}
-$members['alwayson'] = 'Add-sqmDatabaseToAG','Compare-sqmAlwaysOnLogins','Compare-sqmAlwaysOnRoles','Complete-sqmListenerMigration','Export-sqmAlwaysOnConfiguration','Get-sqmAlwaysOnFailoverHistory','Get-sqmAlwaysOnHealthReport','Invoke-sqmAlwaysOnSetup','Invoke-sqmFailover','Invoke-sqmSqlAlwaysOnAutoseeding','Move-sqmAlwaysOnListener','Install-sqmStandardJob','New-sqmAlwaysOnRepairJob','New-sqmAutoLoginSyncJob','New-sqmAvailabilityGroup','Remove-sqmDatabaseFromAG','Repair-sqmAlwaysOnDatabases','Sync-sqmAgNode','Sync-sqmLoginsToAlwaysOn'
+$members['alwayson'] = 'Add-sqmDatabaseToAG','Compare-sqmAlwaysOnLogins','Compare-sqmAlwaysOnRoles','Complete-sqmListenerMigration','Export-sqmAlwaysOnConfiguration','Get-sqmAlwaysOnFailoverHistory','Get-sqmAlwaysOnHealthReport','Invoke-sqmAlwaysOnSetup','Invoke-sqmFailover','Invoke-sqmSqlAlwaysOnAutoseeding','Move-sqmAlwaysOnListener','Install-sqmStandardJob','New-sqmAlwaysOnRepairJob','New-sqmAutoLoginSyncJob','New-sqmAvailabilityGroup','Remove-sqmDatabaseFromAG','Repair-sqmAlwaysOnDatabases','Sync-sqmAgNode','Sync-sqmLoginsToAlwaysOn','Get-sqmAlwaysOnQueueStatus','Invoke-sqmPreferredPrimaryCheck','New-sqmPreferredPrimaryJob'
 $members['distributed-ag'] = 'Add-sqmDatabaseToDistributedAg','Get-sqmDistributedAgHealth','Invoke-sqmDistributedFailover','New-sqmDistributedAvailabilityGroup','Test-sqmDistributedAgReadiness'
 $members['service-broker'] = 'Enable-sqmServiceBroker','Get-sqmServiceBrokerHealth','Invoke-sqmServiceBrokerAlwaysOn'
-$members['backup-&-restore'] = 'Get-sqmServersFromOU','Invoke-sqmLogShrink','Invoke-sqmRestoreDatabase','Invoke-sqmUserDatabaseBackup','New-sqmBackupMaintenanceJob','New-sqmOlaSysDbBackupJob','New-sqmOlaUsrDbBackupJob','Register-sqmBackupExcludeTrigger','Set-sqmBackupExcludePermission','Show-sqmBackupExcludeForm','Sync-sqmBackupExcludeTable','Test-sqmBackupIntegrity'
-$members['sicherheit'] = 'Enable-sqmMonitoringAccess','Find-sqmADUser','Get-sqmADAccountStatus','Get-sqmADGroupMembers','Get-sqmADGroupMembersRecursive','Get-sqmADMemberGroups','Get-sqmLoginSettings','Get-sqmSysadminAccounts','Grant-sqmTemporarySysadmin','Invoke-sqmLoginAudit','Invoke-sqmSaObfuscation','Invoke-sqmTempSysadminAction','Remove-sqmAdOrphanLogin','Set-sqmDatabaseOwner'
-$members['diagnose-&-health'] = 'Copy-sqmNTFSPermissions','Get-sqmAgentJobScheduleReport','Get-sqmConnectionStats','Get-sqmDatabaseHealth','Get-sqmDatabaseSpaceReport','Get-sqmDiskInfoByDriveLetter','Get-sqmDiskPartitionMap','Get-sqmDiskSpaceReport','Get-sqmOperationStatus','Get-sqmOrphanedFiles','Get-sqmSpnReport','Get-sqmSQLInstanceCheck','Get-sqmTempDbRecommendation','Invoke-sqmPatchAnalysis','Invoke-sqmSetupReport','New-sqmAgentCommandJob','New-sqmAgentProxy','New-sqmSetupReport','Test-sqmCostThreshold','Test-sqmTempDbFileCount'
-$members['performance'] = 'Get-sqmFileLatencyReport','Get-sqmIndexUsageReport','Get-sqmPlanCacheReport','Get-sqmAutoGrowthReport','Get-sqmBlockingReport','Get-sqmDeadlockReport','Get-sqmIndexFragmentation','Get-sqmLongRunningQueries','Get-sqmMissingIndexes','Get-sqmPerfCounters','Get-sqmServerUtilization','Get-sqmWaitStatistics','Invoke-sqmExtendedEvents','Invoke-sqmPerfBaseline','Invoke-sqmQueryStore','Invoke-sqmUpdateStatistics'
-$members['wartung'] = 'Invoke-sqmDatabaseStandardization','Invoke-sqmFormatDrive64k','Invoke-sqmNtfsSetup','Move-sqmDatabaseFile','Test-sqmOlaInstallation','Test-sqmSQLFirewall'
-$members['sql-konfiguration'] = 'Compare-sqmServerConfiguration','Get-sqmServerSetting','Invoke-sqmCollationChange','Invoke-sqmSetDatabaseRecoveryMode','Invoke-sqmSsisConfiguration','Repair-sqmServerName','Set-sqmMaxDop','Set-sqmMaxMemory','Set-sqmSsrsConfiguration','Set-sqmTcpPort','Test-sqmMaxDop','Test-sqmMaxMemory'
+$members['backup-&-restore'] = 'Get-sqmServersFromOU','Invoke-sqmLogShrink','Invoke-sqmRestoreDatabase','Invoke-sqmUserDatabaseBackup','New-sqmBackupMaintenanceJob','New-sqmOlaSysDbBackupJob','New-sqmOlaUsrDbBackupJob','Register-sqmBackupExcludeTrigger','Set-sqmBackupExcludePermission','Show-sqmBackupExcludeForm','Sync-sqmBackupExcludeTable','Test-sqmBackupIntegrity','Get-sqmDatabaseRestoreHistory','Invoke-sqmRestoreTest','New-sqmRestoreDatabaseJob','New-sqmRestoreTestJob'
+$members['sicherheit'] = 'Enable-sqmMonitoringAccess','Find-sqmADUser','Get-sqmADAccountStatus','Get-sqmADGroupMembers','Get-sqmADGroupMembersRecursive','Get-sqmADMemberGroups','Get-sqmLoginSettings','Get-sqmSysadminAccounts','Grant-sqmTemporarySysadmin','Invoke-sqmLoginAudit','Invoke-sqmSaObfuscation','Invoke-sqmTempSysadminAction','Remove-sqmAdOrphanLogin','Set-sqmDatabaseOwner','Export-sqmDatabaseLogins','Import-sqmDatabaseLogins','Sync-sqmDatabaseLogins','Get-sqmDbOwnerRisk','Repair-sqmDbOwnerRisk','Get-sqmLoginLastAccess','Get-sqmLoginPermissions','Register-sqmAuditSession','Restore-sqmSysadminAccess','Test-sqmDiscoveryAccess','Test-sqmLoginGroupAccess','Unlock-sqmSqlLogin'
+$members['diagnose-&-health'] = 'Copy-sqmNTFSPermissions','Get-sqmAgentJobScheduleReport','Get-sqmConnectionStats','Get-sqmDatabaseHealth','Get-sqmDatabaseSpaceReport','Get-sqmDiskInfoByDriveLetter','Get-sqmDiskPartitionMap','Get-sqmDiskSpaceReport','Get-sqmOperationStatus','Get-sqmOrphanedFiles','Get-sqmSpnReport','Get-sqmSQLInstanceCheck','Get-sqmTempDbRecommendation','Invoke-sqmPatchAnalysis','Invoke-sqmSetupReport','New-sqmAgentCommandJob','New-sqmAgentProxy','New-sqmSetupReport','Test-sqmCostThreshold','Test-sqmTempDbFileCount','Get-sqmErrorLog','Get-sqmFileGrowthHistory','Get-sqmWhoIsActive','Show-sqmWhoIsActiveMonitor','Stop-sqmSqlProcess','Get-sqmDatabaseCollationReport'
+$members['performance'] = 'Get-sqmFileLatencyReport','Get-sqmIndexUsageReport','Get-sqmPlanCacheReport','Get-sqmAutoGrowthReport','Get-sqmBlockingReport','Get-sqmDeadlockReport','Get-sqmIndexFragmentation','Get-sqmLongRunningQueries','Get-sqmMissingIndexes','Get-sqmPerfCounters','Get-sqmServerUtilization','Get-sqmWaitStatistics','Invoke-sqmExtendedEvents','Invoke-sqmPerfBaseline','Invoke-sqmQueryStore','Invoke-sqmUpdateStatistics','Get-sqmBlockingHistory','Register-sqmBlockedProcessMonitor','Get-sqmPlanInsights'
+$members['wartung'] = 'Invoke-sqmDatabaseStandardization','Invoke-sqmFormatDrive64k','Invoke-sqmNtfsSetup','Move-sqmDatabaseFile','Test-sqmOlaInstallation','Test-sqmSQLFirewall','Get-sqmMasterDbCustomObjects','Remove-sqmMasterDbCustomObjects'
+$members['sql-konfiguration'] = 'Compare-sqmServerConfiguration','Get-sqmServerSetting','Invoke-sqmCollationChange','Invoke-sqmSetDatabaseRecoveryMode','Invoke-sqmSsisConfiguration','Repair-sqmServerName','Set-sqmMaxDop','Set-sqmMaxMemory','Set-sqmSsrsConfiguration','Set-sqmTcpPort','Test-sqmMaxDop','Test-sqmMaxMemory','Export-sqmDatabaseSettings','Import-sqmDatabaseSettings','Import-sqmServerConfiguration','Get-sqmSupportedCollations'
 $members['sqmtool-config'] = 'Get-sqmConfig','Set-sqmConfig'
-$members['inventar-&-suche'] = 'Export-sqmDatabaseDocumentation','Export-sqmServerConfiguration','Find-sqmDatabaseObject','Get-sqmLinkedServerUsage','Invoke-sqmConfigRollback','Invoke-sqmInstanceInventory'
-$members['cluster-&-dienste'] = 'Get-sqmClusterInfo','Set-sqmSsasDeploymentMode','Test-sqmSsasDirectoryPermissions','Test-sqmSSISPackageCompatibility'
+$members['inventar-&-suche'] = 'Export-sqmDatabaseDocumentation','Export-sqmServerConfiguration','Find-sqmDatabaseObject','Get-sqmLinkedServerUsage','Invoke-sqmConfigRollback','Invoke-sqmInstanceInventory','Find-sqmAgentJobReference'
+$members['cluster-&-dienste'] = 'Get-sqmClusterInfo','Set-sqmSsasDeploymentMode','Test-sqmSsasDirectoryPermissions','Test-sqmSSISPackageCompatibility','Get-sqmSsasDeploymentMode','Repair-sqmSsasSerializeError'
 $members['tls-&-zertifikate'] = 'Get-sqmCertificateReport','Get-sqmTlsStatus','Install-sqmCertificate','Install-sqmCertificateToStore','New-sqmCertificateRequest','New-sqmSqlCertificate','Set-sqmSqlTlsCertificate','Set-sqmSsrsHttpsCertificate'
 $members['tsm-/-ibm-spectrum'] = 'Get-sqmTsmConfiguration','Invoke-sqmTsmConfiguration','Test-sqmTsmConnection'
 $members['driver'] = 'Install-sqmDb2Driver','Install-sqmJdbcDriver','Install-sqmOdbcDriver','Test-sqmDriverInstalled','Uninstall-sqmDb2Driver','Uninstall-sqmJdbcDriver','Uninstall-sqmOdbcDriver'
-$members['deployment'] = 'Invoke-sqmDeployScripts','Invoke-sqmSignModule'
-$members['sonstige'] = 'Copy-sqmLogins','Copy-sqmToCentralPath','Get-sqmAgentJobHistory','Get-sqmDiskBlockSize','Get-sqmHpuAllowGroup','Get-sqmServerHardwareReport','Install-sqmAdModule','Install-sqmOlaMaintenanceSolution','Install-sqmSsrsReportServer','Invoke-sqmMonitoringKey','New-sqmOlaMaintenanceJobs','New-sqmRandomSaPassword','Set-sqmSqlPolicyState','Show-sqmToolGui','Test-sqmSqlInstanceInstalled','Write-sqmSetupEvent'
+$members['deployment'] = 'Invoke-sqmDeployScripts','Invoke-sqmSignModule','Invoke-sqmSsrsMigration','Invoke-sqmSsisCatalogMigration'
+$members['sonstige'] = 'Copy-sqmLogins','Copy-sqmToCentralPath','Get-sqmAgentJobHistory','Get-sqmDiskBlockSize','Get-sqmHpuAllowGroup','Get-sqmServerHardwareReport','Install-sqmAdModule','Install-sqmOlaMaintenanceSolution','Install-sqmSsrsReportServer','Invoke-sqmMonitoringKey','Invoke-sqmSplunkConfiguration','New-sqmOlaMaintenanceJobs','New-sqmRandomSaPassword','Set-sqmSqlPolicyState','Show-sqmToolGui','Test-sqmSqlInstanceInstalled','Write-sqmSetupEvent'
 
 $deTrans = @{
   'Compare-sqmAlwaysOnLogins'    = 'Compares the logins of all replicas in an AlwaysOn availability group.'
@@ -63,17 +63,32 @@ $deTrans = @{
   'Uninstall-sqmJdbcDriver'      = 'Uninstalls the Microsoft JDBC Driver for SQL Server.'
   'Uninstall-sqmOdbcDriver'      = 'Uninstalls the Microsoft ODBC Driver for SQL Server.'
   'Repair-sqmServerName'         = 'Corrects the SQL Server registered server name (@@SERVERNAME) after a Windows hostname/FQDN rename, with guard checks for clustering, AlwaysOn AG membership and replication.'
+  'Restore-sqmSysadminAccess'    = 'Emergency recovery of sysadmin access when no working sysadmin login exists anymore (complete DBA lockout), via single-user mode.'
+  'Show-sqmWhoIsActiveMonitor'   = 'Live monitor for Get-sqmWhoIsActive: shows sessions in an auto-refreshing grid instead of console/CSV/HTML output.'
+  'Stop-sqmSqlProcess'           = 'Kills one or more SQL Server sessions (SPIDs) and optionally notifies the owner with a network message.'
+  'Unlock-sqmSqlLogin'           = 'Unlocks a SQL Server login locked out by CHECK_POLICY, optionally with a password reset, without permanently changing CHECK_POLICY/CHECK_EXPIRATION.'
+  'Get-sqmPlanInsights'          = 'Parses SQL Server ShowPlan XML (.sqlplan / .xml) and outputs advanced performance insights.'
+  'Compare-sqmAlwaysOnRoles'    = 'Compares the server role memberships of all replicas in an AlwaysOn availability group.'
+  'Get-sqmDiskBlockSize'        = 'Checks whether the NTFS block size (cluster size) of drives is 64 KB.'
+  'Get-sqmDiskPartitionMap'     = 'Shows the mapping of physical disks to logical drive letters.'
+  'Grant-sqmTemporarySysadmin'  = 'Grants an AD login temporary sysadmin rights for X days and revokes them automatically via a self-deleting SQL Agent job; failover-safe on all AlwaysOn replicas.'
+  'Invoke-sqmTempSysadminAction' = 'Performs the actual sysadmin grant or revoke on ONE instance, optionally creates/removes the AD login and deletes the calling self-deleting SQL Agent job on success.'
+  'Move-sqmDatabaseFile'        = 'Moves database files (MDF/NDF/LDF) to another drive or directory, including tempdb.'
+  'Test-sqmCostThreshold'       = 'Checks whether Cost Threshold for Parallelism is set to the recommended value.'
+  'Test-sqmTempDbFileCount'     = 'Checks whether the number of tempdb data files matches the recommended count for the CPU cores.'
 }
 
 $real = Get-ChildItem $pub -Filter *.ps1 | ForEach-Object {
   $n=$_.Name -replace '\.ps1$',''; $c=Get-Content $_.FullName -Raw
-  if($c -match '(?m)^\s*function\s+([A-Za-z0-9_-]+)' -and $matches[1] -eq $n){$n}
+  if($c -match "(?m)^\s*function\s+$([regex]::Escape($n))(\s|\{|\(|$)"){$n}
 }
 $all = $members.Values | ForEach-Object { $_ }
 $dupe = $all | Group-Object | Where-Object Count -gt 1 | ForEach-Object Name
 if($dupe){ throw "Doppelte Zuordnung: $($dupe -join ', ')" }
-if($real | Where-Object { $_ -notin $all }){ throw "Nicht zugeordnet" }
-if($all | Where-Object { $_ -notin $real }){ throw "Nicht real" }
+$unassigned = $real | Where-Object { $_ -notin $all }
+if($unassigned){ throw "Nicht zugeordnet: $($unassigned -join ', ')" }
+$notReal = $all | Where-Object { $_ -notin $real }
+if($notReal){ throw "Nicht real: $($notReal -join ', ')" }
 Write-Host "OK: $($all.Count) Funktionen."
 
 function Enc([string]$t){ $t -replace '&','&amp;' -replace '<','&lt;' -replace '>','&gt;' -replace '"','&quot;' -replace "'",'&#39;' }
