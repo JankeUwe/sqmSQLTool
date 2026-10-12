@@ -17,10 +17,9 @@ IsOrphaned=0 (IsActive=1 means "back this database up", the default for newly di
 databases - same semantics as New-sqmOlaUsrDbBackupJob -UseExcludeTable). If the table does
 not exist or contains no matching rows, all databases are backed up normally.
 
-When -CheckPreferredReplica is set, the function checks whether this SQL Server instance
-is the preferred backup replica for any Availability Group databases before starting any
-backups. If the instance is NOT the preferred replica, the job is aborted immediately and
-no backups are taken.
+Availability Group databases are backed up ONLY and ALWAYS on the current primary replica.
+On a secondary they are skipped (Status 'SkippedAgSecondary'), regardless of the AG backup
+preference; databases outside an AG are not affected.
 
 When -MailTo is specified, a backup report is sent via SQL Server Database Mail after all
 backups have completed. By default the mail is only sent when there are failures or the
@@ -55,9 +54,8 @@ and IsOrphaned=0 (IsActive=1, the default for newly discovered databases, means
 "back this database up").
 
 .PARAMETER CheckPreferredReplica
-When set, checks sys.fn_hadr_backup_is_preferred_replica() for all AG databases on
-this instance before starting any backups. If this instance is not the preferred backup
-node for any AG database, the entire job is aborted.
+Obsolete since 1.9.166.0, has no effect. AG databases are always backed up on the primary
+replica only (see description). Kept so existing scripts calling it keep working.
 
 .PARAMETER MailTo
 Recipient email address for the backup report. When specified, a mail is sent via SQL
@@ -114,10 +112,6 @@ Invoke-sqmUserDatabaseBackup -All -UseExcludeTable
 Invoke-sqmUserDatabaseBackup -SqlInstance "SQL01" -All -UseExcludeTable
 
 .EXAMPLE
-# Only run backup if this instance is the preferred AG backup replica
-Invoke-sqmUserDatabaseBackup -SqlInstance "SQL01" -All -CheckPreferredReplica
-
-.EXAMPLE
 # Back up all databases and send a mail report on errors (uses default mail profile)
 Invoke-sqmUserDatabaseBackup -All -MailTo "dba@example.com"
 
@@ -126,9 +120,9 @@ Invoke-sqmUserDatabaseBackup -All -MailTo "dba@example.com"
 Invoke-sqmUserDatabaseBackup -All -MailTo "dba@example.com" -MailProfile "SQLAlerts" -MailOnSuccess
 
 .EXAMPLE
-# Full pipeline: AG-aware backup with exclude table and mail notification
+# Full pipeline: backup with exclude table and mail notification
 Invoke-sqmUserDatabaseBackup -SqlInstance "SQL01" -All -UseExcludeTable `
-    -CheckPreferredReplica -MailTo "dba@example.com" -MailOnSuccess
+    -MailTo "dba@example.com" -MailOnSuccess
 
 .NOTES
 Requires the dbatools module and existing Invoke-sqmLogging, Get-sqmServerSetting (for the
@@ -292,54 +286,9 @@ function Invoke-sqmUserDatabaseBackup
 	{
 		try
 		{
-			# AG-Check: Pruefen ob diese Instanz der bevorzugte Backup-Node ist
 			if ($CheckPreferredReplica)
 			{
-				Invoke-sqmLogging -Message "AG-Check: Pruefe ob diese Instanz der bevorzugte Backup-Node ist." -FunctionName $functionName -Level "INFO"
-				$agCheckQuery = @"
-SELECT db.name AS DatabaseName,
-       sys.fn_hadr_backup_is_preferred_replica(db.name) AS IsPreferred,
-       ag.name AS AGName
-FROM   sys.databases db
-JOIN   sys.dm_hadr_database_replica_states rs ON db.database_id = rs.database_id
-JOIN   sys.availability_groups ag ON rs.group_id = ag.group_id
-WHERE  rs.is_local = 1
-"@
-				try
-				{
-					$agResult = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
-						-Database master -Query $agCheckQuery -ErrorAction Stop
-
-					if ($agResult)
-					{
-						$notPreferred = @($agResult | Where-Object { $_.IsPreferred -eq 0 })
-						if ($notPreferred.Count -gt 0)
-						{
-							$msg = "AG-Check: Diese Instanz ist nicht der bevorzugte Backup-Node. Job wird abgebrochen."
-							Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "WARNING"
-							$results += [PSCustomObject]@{
-								SqlInstance  = $SqlInstance
-								DatabaseName = $null
-								BackupFile   = $null
-								Status	     = "AbortedNotPreferredReplica"
-								Message	     = $msg
-							}
-							return
-						}
-						else
-						{
-							Invoke-sqmLogging -Message "AG-Check: Diese Instanz ist der bevorzugte Backup-Node. Fortfahren." -FunctionName $functionName -Level "INFO"
-						}
-					}
-					else
-					{
-						Invoke-sqmLogging -Message "AG-Check: Keine AG-Datenbanken gefunden. Standard-Backup." -FunctionName $functionName -Level "INFO"
-					}
-				}
-				catch
-				{
-					Invoke-sqmLogging -Message "AG-Check fehlgeschlagen: $($_.Exception.Message). Backup wird fortgesetzt." -FunctionName $functionName -Level "WARNING"
-				}
+				Invoke-sqmLogging -Message "-CheckPreferredReplica ist seit 1.9.166.0 ohne Wirkung: AG-Datenbanken werden immer nur auf dem Primary gesichert." -FunctionName $functionName -Level "WARNING"
 			}
 
 			# Datenbanken ermitteln
@@ -438,6 +387,44 @@ WHERE  rs.is_local = 1
 				{
 					Invoke-sqmLogging -Message "Konnte sqm_BackupExclude nicht auslesen: $($_.Exception.Message). Alle Datenbanken werden gesichert." -FunctionName $functionName -Level "WARNING"
 				}
+			}
+
+			# AG-Datenbanken nur und immer auf dem Primary sichern: auf einem Secondary
+			# ueberspringen, unabhaengig von der AG-Backup-Preference. Sonst sichern bei lesbarem
+			# Secondary beide Knoten, und bei gleichem Dateinamen in derselben Sekunde scheitert
+			# einer mit OS-Fehler 32.
+			$agSecondaryQuery = @"
+SELECT d.name AS DatabaseName
+FROM   sys.databases d
+JOIN   sys.dm_hadr_availability_replica_states ars ON ars.replica_id = d.replica_id
+WHERE  ars.is_local = 1 AND ars.role <> 1
+"@
+			try
+			{
+				$agSecondaryNames = @(Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
+						-Database master -Query $agSecondaryQuery -EnableException |
+					Select-Object -ExpandProperty DatabaseName)
+			}
+			catch
+			{
+				$agSecondaryNames = @()
+				Invoke-sqmLogging -Message "AG-Rollenpruefung fehlgeschlagen: $($_.Exception.Message). Es wird ohne AG-Filter gesichert." -FunctionName $functionName -Level "WARNING"
+			}
+			if ($agSecondaryNames.Count -gt 0)
+			{
+				foreach ($db in @($databases | Where-Object { $_.Name -in $agSecondaryNames }))
+				{
+					$skipMsg = "AG-Datenbank '$($db.Name)': lokales Replikat ist nicht Primary, kein Backup."
+					Invoke-sqmLogging -Message $skipMsg -FunctionName $functionName -Level "INFO"
+					$results += [PSCustomObject]@{
+						SqlInstance  = $SqlInstance
+						DatabaseName = $db.Name
+						BackupFile   = $null
+						Status	     = "SkippedAgSecondary"
+						Message	     = $skipMsg
+					}
+				}
+				$databases = @($databases | Where-Object { $_.Name -notin $agSecondaryNames })
 			}
 
 			# Backup fuer jede Datenbank
@@ -552,12 +539,11 @@ WHERE  rs.is_local = 1
 			$failedCount  = ($results | Where-Object { $_.Status -eq 'Failed' }).Count
 			$successCount = ($results | Where-Object { $_.Status -eq 'Success' }).Count
 			$skippedCount = ($results | Where-Object { $_.Status -notin 'Success', 'Failed' }).Count
-			$aborted      = ($results | Where-Object { $_.Status -eq 'AbortedNotPreferredReplica' }).Count -gt 0
 
-			$shouldSend = $failedCount -gt 0 -or $aborted -or $MailOnSuccess
+			$shouldSend = $failedCount -gt 0 -or $MailOnSuccess
 			if ($shouldSend)
 			{
-				$subject = if ($failedCount -gt 0 -or $aborted) {
+				$subject = if ($failedCount -gt 0) {
 					"[$SqlInstance] $BackupType Backup FEHLER - $failedCount fehlgeschlagen"
 				} else {
 					"[$SqlInstance] $BackupType Backup erfolgreich - $successCount Datenbanken"

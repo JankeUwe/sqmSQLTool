@@ -1,5 +1,45 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.166.0] - 2026-10-12
+
+### Fix: AG-Datenbanken werden nur und immer auf dem Primary gesichert
+
+Praxisfall: Der LOG-Job aus `New-sqmBackupMaintenanceJob` scheiterte sporadisch auf dem Primary mit
+`Operating system error 32` beim Anlegen der `.trn`. `RESTORE HEADERONLY` auf die angeblich belegte
+Datei zeigte als Schreiber den Secondary. Ursache: Die Funktion uebergab ohne `-CheckPreferredReplica`
+`@OverrideBackupPreference = 'Y'` und rollt den Job auch auf die Secondaries aus. Bei lesbarem
+Secondary sicherten deshalb beide Knoten alle 15 Minuten dieselben Datenbanken in denselben Ordner
+mit demselben Dateinamen (`Cluster$AG_DB_LOG_<Sekunde>.trn`). Erreichten beide eine Datenbank in
+derselben Sekunde, verlor einer.
+
+Neue Regel in allen drei Backup-Wegen, unabhaengig von der AG-Backup-Preference:
+
+- **`New-sqmBackupMaintenanceJob`**: `sqm_BackupUserDatabases` prueft je Datenbank die Rolle des
+  lokalen Replikats (`sys.dm_hadr_availability_replica_states`). Auf einem Secondary wird die
+  Datenbank vor dem Ola-Aufruf uebersprungen (Zaehler "AG secondary" in Ausgabe und Mail), auf dem
+  Primary sichert Ola mit `@OverrideBackupPreference = 'Y'`, eine Preference wie SECONDARY kann den
+  Primary also nicht mehr blockieren. Der Job bleibt auf allen Replikaten identisch, nach einem
+  Failover sichert automatisch der neue Primary. Alte Job-Steps, die noch
+  `@OverrideBackupPreference` uebergeben, laufen weiter, der Wert wird ignoriert.
+- **`New-sqmOlaUsrDbBackupJob`**: Die erzeugte Prozedur ruft Ola jetzt immer je Datenbank auf (nicht
+  nur mit `-UseExcludeTable`) und wendet dieselbe Rollenpruefung an. `-Databases` versteht dabei
+  Olas Syntax: `USER_DATABASES`, `SYSTEM_DATABASES`, `ALL_DATABASES`,
+  `AVAILABILITY_GROUP_DATABASES`, Namen, Muster mit `%` und Ausschluesse mit `-`. Kein
+  `STRING_SPLIT` mehr, also kein Kompatibilitaetslevel 130 fuer master noetig.
+- **`Invoke-sqmUserDatabaseBackup`**: AG-Datenbanken auf einem Secondary bekommen
+  `Status = SkippedAgSecondary`, statt dass der ganze Lauf abbricht. Scheitert die Rollenabfrage,
+  wird mit Warnung ohne AG-Filter gesichert.
+- `-CheckPreferredReplica` ist in beiden Funktionen ohne Wirkung und erzeugt nur eine Warnung. Der
+  Schalter bleibt, damit bestehende Skripte nicht brechen.
+
+Bestehende Jobs bekommen die neue Logik erst mit erneutem Aufruf und `-Update` (die Prozedur wird dabei
+neu angelegt, bei `New-sqmBackupMaintenanceJob` auch auf den Secondaries).
+
+Getestet live unter PowerShell 5.1 gegen SQL Server 2022 (Container, Ola 2026-09-12): Prozedur mit
+altem Step-Aufruf, Ola-Job-Prozedur mit `sqmT166%,-sqmT166_B` (nur `sqmT166_A` gesichert), Rollenabfrage
+ohne HADR (0 Zeilen). Ein echter AG-Secondary steht im Labor nicht zur Verfuegung. Neuer Unit-Test
+`Invoke-sqmUserDatabaseBackup.Tests.ps1` (4 Faelle, gruen).
+
 ## [1.9.165.0] - 2026-10-11
 
 ### Fix: Sync-sqmAgNode bricht mit "Parameter 'SqlInstance' nicht gefunden" ab

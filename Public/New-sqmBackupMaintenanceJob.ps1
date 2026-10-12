@@ -21,7 +21,6 @@
 	         @Verify                   = 'Y',
 	         @Compress                 = 'Y',
 	         @Checksum                 = 'Y',
-	         @OverrideBackupPreference = 'Y',
 	         @LogToTable               = 'Y',
 	         @MailTo                   = NULL,
 	         @MailProfile              = N'Default',
@@ -40,6 +39,12 @@
 	    IsOrphaned=0 in the exclude table.
 	  - Each call sits in its own TRY/CATCH, so one failing database is logged and the loop
 	    continues; the step fails only at the end, once at least one database actually failed.
+	  - Availability Group databases are backed up ONLY and ALWAYS on the current primary replica.
+	    On a secondary they are skipped before Ola is called; on the primary Ola is called with
+	    @OverrideBackupPreference = 'Y', so the AG's own backup preference (SECONDARY, ANY, ...)
+	    can never stop the primary from backing up. The job can therefore stay identical on all
+	    replicas: after a failover the new primary takes over automatically. Databases outside an
+	    AG are not affected.
 
 	Earlier versions ran this through the PowerShell subsystem, which reproducibly hung on real
 	instances: the job started, the first step never returned, so the backup step never ran at all
@@ -102,9 +107,8 @@
 	AND IsOrphaned=0 is skipped.
 
 .PARAMETER CheckPreferredReplica
-	When set, the job step passes @OverrideBackupPreference = 'N', so Ola honours the Availability
-	Group backup preference and only backs up where this replica is the preferred one. Without it,
-	'Y' is passed and databases are backed up regardless of the preference.
+	Obsolete since 1.9.166.0, has no effect. AG databases are now always backed up on the primary
+	replica only (see description). Kept so existing scripts calling it keep working.
 
 .PARAMETER IncludeSystemDatabases
 	When set, the job step passes @IncludeSystemDatabases = 1, so master, model and msdb are
@@ -150,7 +154,7 @@
 .EXAMPLE
 	# Daily FULL backup, default schedule: every day at 20:15
 	New-sqmBackupMaintenanceJob -SqlInstance "SQL01" -BackupType FULL `
-	    -UseExcludeTable -CheckPreferredReplica `
+	    -UseExcludeTable `
 	    -MailTo "dba@company.com" -MailProfile "DBA-Mail"
 
 .EXAMPLE
@@ -408,9 +412,15 @@ function New-sqmBackupMaintenanceJob
 			}
 			$result.BackupPath = $effBackupDir
 
-			# Ola beachtet die AG-Backup-Preference von sich aus. Ohne -CheckPreferredReplica soll
-			# unabhaengig davon gesichert werden, also Preference uebersteuern.
-			$overridePreference = if ($CheckPreferredReplica) { 'N' } else { 'Y' }
+			# AG-Datenbanken werden nur und immer auf dem Primary gesichert - das regelt die Prozedur
+			# selbst (Rollenpruefung je Datenbank), unabhaengig von der AG-Backup-Preference.
+			# Frueher lief der Job mit @OverrideBackupPreference='Y' auf JEDEM Replikat: bei lesbarem
+			# Secondary sicherten beide Knoten, und wenn sie dieselbe DB in derselben Sekunde
+			# erreichten, scheiterte einer mit OS-Fehler 32 (gleicher Dateiname Cluster$AG_DB_LOG_...).
+			if ($CheckPreferredReplica)
+			{
+				Invoke-sqmLogging -Message "-CheckPreferredReplica ist seit 1.9.166.0 ohne Wirkung: AG-Datenbanken werden immer nur auf dem Primary gesichert." -FunctionName $functionName -Level "WARNING"
+			}
 
 			# Innerhalb einer Prozedur greift Deferred Name Resolution: master.dbo.sqm_BackupExclude
 			# darf direkt referenziert werden, auch wenn die Tabelle beim Anlegen der Prozedur noch
@@ -426,7 +436,7 @@ CREATE PROCEDURE dbo.[sqm_BackupUserDatabases]
     @Verify                   nvarchar(1)   = 'Y',
     @Compress                 nvarchar(1)   = 'Y',
     @Checksum                 nvarchar(1)   = 'Y',
-    @OverrideBackupPreference nvarchar(1)   = 'Y',    -- 'N' = AG-Backup-Preference beachten
+    @OverrideBackupPreference nvarchar(1)   = NULL,   -- ohne Wirkung, nur fuer alte Job-Steps
     @LogToTable               nvarchar(1)   = 'Y',
     @MailTo                   nvarchar(500) = NULL,
     @MailProfile              sysname       = N'Default',
@@ -437,7 +447,9 @@ BEGIN
 
     /* Sichert jede Datenbank EINZELN ueber Olas master.dbo.DatabaseBackup.
        Jeder Einzelaufruf steckt in TRY/CATCH: eine fehlschlagende Datenbank stoppt den Lauf
-       nicht, die Prozedur faellt erst am Ende aus, wenn mindestens eine gescheitert ist. */
+       nicht, die Prozedur faellt erst am Ende aus, wenn mindestens eine gescheitert ist.
+       AG-Datenbanken werden nur und immer auf dem Primary gesichert: auf einem Secondary
+       uebersprungen, auf dem Primary ohne Ruecksicht auf die AG-Backup-Preference gesichert. */
 
     IF OBJECT_ID(N'master.dbo.DatabaseBackup', N'P') IS NULL
     BEGIN
@@ -455,6 +467,7 @@ BEGIN
     DECLARE @ErrorCount int = 0;
     DECLARE @OkCount    int = 0;
     DECLARE @SkipCount  int = 0;
+    DECLARE @AgSecondaryCount int = 0;
     DECLARE @IsExcluded bit;
     DECLARE @FailedList nvarchar(max) = N'';
     DECLARE @ErrMsg     nvarchar(2000);
@@ -522,6 +535,15 @@ BEGIN
             SET @SkipCount += 1;
             PRINT 'Skipping ' + @dbName + ' (sqm_BackupExclude: IsActive = 0).';
         END
+        ELSE IF EXISTS (SELECT 1
+                        FROM   sys.databases d
+                        JOIN   sys.dm_hadr_availability_replica_states ars ON ars.replica_id = d.replica_id
+                        WHERE  d.name = @dbName AND ars.is_local = 1 AND ars.role <> 1)
+        BEGIN
+            -- AG-Datenbank, lokales Replikat ist nicht Primary (role 1 = PRIMARY)
+            SET @AgSecondaryCount += 1;
+            PRINT 'Skipping ' + @dbName + ' (AG: local replica is not primary).';
+        END
         ELSE
         BEGIN
             BEGIN TRY
@@ -534,7 +556,7 @@ BEGIN
                     @CleanupTime              = @CleanupTime,
                     @Compress                 = @Compress,
                     @Checksum                 = @Checksum,
-                    @OverrideBackupPreference = @OverrideBackupPreference,
+                    @OverrideBackupPreference = N'Y',
                     @LogToTable               = @LogToTable;
                 SET @OkCount += 1;
             END TRY
@@ -552,7 +574,7 @@ BEGIN
     CLOSE dbCursor;
     DEALLOCATE dbCursor;
 
-    PRINT 'Done. OK: ' + CAST(@OkCount AS varchar(10)) + ', skipped: ' + CAST(@SkipCount AS varchar(10)) + ', failed: ' + CAST(@ErrorCount AS varchar(10)) + '.';
+    PRINT 'Done. OK: ' + CAST(@OkCount AS varchar(10)) + ', skipped: ' + CAST(@SkipCount AS varchar(10)) + ', AG secondary: ' + CAST(@AgSecondaryCount AS varchar(10)) + ', failed: ' + CAST(@ErrorCount AS varchar(10)) + '.';
 
     IF @MailTo IS NOT NULL AND (@ErrorCount > 0 OR @MailOnSuccess = 1)
     BEGIN
@@ -568,6 +590,7 @@ BEGIN
             N'Zeitpunkt: ' + CONVERT(nvarchar(19), SYSDATETIME(), 120) + CHAR(13) + CHAR(10) +
             N'Erfolgreich: ' + CAST(@OkCount AS nvarchar(10)) + CHAR(13) + CHAR(10) +
             N'Uebersprungen: ' + CAST(@SkipCount AS nvarchar(10)) + CHAR(13) + CHAR(10) +
+            N'AG-Secondary (nicht gesichert): ' + CAST(@AgSecondaryCount AS nvarchar(10)) + CHAR(13) + CHAR(10) +
             N'Fehlgeschlagen: ' + CAST(@ErrorCount AS nvarchar(10)) + CHAR(13) + CHAR(10) +
             ISNULL(@FailedList, N'');
         BEGIN TRY
@@ -604,7 +627,6 @@ EXEC master.dbo.[$procName]
      @Verify                   = 'Y',
      @Compress                 = 'Y',
      @Checksum                 = 'Y',
-     @OverrideBackupPreference = '$overridePreference',
      @LogToTable               = 'Y',
      @MailTo                   = $sqlMailTo,
      @MailProfile              = $sqlProfile,
@@ -765,7 +787,6 @@ EXEC master.dbo.[$procName]
 						if ($SqlCredential)          { $secParams['SqlCredential']          = $SqlCredential }
 						if ($BackupPath)             { $secParams['BackupPath']             = $BackupPath }
 						if ($UseExcludeTable)        { $secParams['UseExcludeTable']        = $true }
-						if ($CheckPreferredReplica)  { $secParams['CheckPreferredReplica']  = $true }
 						if ($IncludeSystemDatabases) { $secParams['IncludeSystemDatabases'] = $true }
 						if ($MailTo)                 { $secParams['MailTo']                 = $MailTo }
 						if ($MailOnSuccess)          { $secParams['MailOnSuccess']          = $true }

@@ -25,6 +25,14 @@
     Note: IsActive=1 means "back this database up" (the default for newly discovered
     databases); IsActive=0 means "exclude this database".
 
+    Availability Group databases are backed up ONLY and ALWAYS on the current primary replica.
+    The generated procedure calls Ola's DatabaseBackup once per database and skips every
+    database whose local replica is not the primary; on the primary it passes
+    @OverrideBackupPreference = 'Y', so the AG's backup preference can never stop the primary.
+    The same jobs can therefore run on every replica: after a failover the new primary takes
+    over automatically. -Databases accepts Ola's syntax (USER_DATABASES, SYSTEM_DATABASES,
+    ALL_DATABASES, AVAILABILITY_GROUP_DATABASES, names, % patterns, '-' exclusions).
+
 .PARAMETER SqlInstance
     SQL Server instance. Default: current computer name.
 
@@ -37,8 +45,9 @@
     used as-is (no '\Usr-db' is appended) — pass the full, final backup path.
 
 .PARAMETER Databases
-    Database filter for Ola. E.g. 'USER_DATABASES', 'ALL_DATABASES', or
-    comma-separated DB names like 'DB1,DB2'. Default: 'USER_DATABASES'.
+    Database filter in Ola's syntax. E.g. 'USER_DATABASES', 'ALL_DATABASES',
+    comma-separated DB names like 'DB1,DB2', patterns like 'Sales%', or exclusions like
+    'USER_DATABASES,-DB3'. Default: 'USER_DATABASES'.
 
 .PARAMETER Full
     Creates a FULL backup job.
@@ -565,36 +574,57 @@ function New-sqmOlaUsrDbBackupJob
 										# Hilfsprozedur in master anlegen — Job-Step enthaelt nur noch EXEC master.dbo.[proc]
 					$procName = 'sqm_Run_' + ($jobDef.JobName -replace '[\s\-]+', '_' -replace '[^a-zA-Z0-9_]', '')
 
-					if ($UseExcludeTable)
-					{
-						# Cursor statt einer einzigen langen '-DatabaseName,...'-Ausschlussliste:
-						# die Liste waechst mit jedem Ausschluss und wird auf Instanzen mit vielen
-						# Eintraegen (Praxisfall: ~90 Zeilen) unpraktikabel lang. Stattdessen wird
-						# jede Kandidaten-Datenbank einzeln gegen sqm_BackupExclude geprueft und nur
-						# bei Bedarf einzeln gesichert.
-						$procBody = @"
+					# Immer ein Cursor je Datenbank, damit AG-Datenbanken nur und immer auf dem Primary
+					# gesichert werden: auf einem Secondary wird die DB vor dem Ola-Aufruf uebersprungen,
+					# auf dem Primary sichert Ola mit @OverrideBackupPreference='Y' unabhaengig von der
+					# AG-Backup-Preference. Ola selbst kennt keine Option "nur Primary".
+					# -UseExcludeTable: statt einer einzigen langen '-DatabaseName,...'-Ausschlussliste
+					# (waechst mit jedem Ausschluss, Praxisfall ~90 Zeilen) wird jede Kandidaten-DB einzeln
+					# gegen sqm_BackupExclude geprueft.
+					$useExcludeBit = if ($UseExcludeTable) { 1 } else { 0 }
+					$procBody = @"
 CREATE PROCEDURE [$procName]
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    DECLARE @Databases NVARCHAR(MAX) = N'$Databases';
+    DECLARE @Databases NVARCHAR(MAX) = N'$($Databases.Replace("'", "''"))';
+    DECLARE @UseExcludeTable BIT = $useExcludeBit;
     DECLARE @dbName sysname;
     DECLARE @HasExcludeTable BIT = CASE WHEN OBJECT_ID(N'master.dbo.sqm_BackupExclude', N'U') IS NOT NULL THEN 1 ELSE 0 END;
 
-    DECLARE @DbList TABLE (DatabaseName sysname PRIMARY KEY);
+    -- @Databases in Olas Syntax zerlegen: USER_DATABASES, SYSTEM_DATABASES, ALL_DATABASES,
+    -- AVAILABILITY_GROUP_DATABASES, Namen, Muster mit %, Ausschluss mit vorangestelltem '-'.
+    -- Bewusst ohne STRING_SPLIT (braucht Kompatibilitaetslevel 130).
+    DECLARE @Tokens TABLE (Token nvarchar(256) NOT NULL);
+    DECLARE @rest NVARCHAR(MAX) = @Databases + N',';
+    DECLARE @pos INT;
+    DECLARE @tok NVARCHAR(256);
+    WHILE LEN(@rest) > 0
+    BEGIN
+        SET @pos = CHARINDEX(N',', @rest);
+        SET @tok = REPLACE(REPLACE(LTRIM(RTRIM(LEFT(@rest, @pos - 1))), N'[', N''), N']', N'');
+        IF LEN(@tok) > 0 INSERT INTO @Tokens (Token) VALUES (@tok);
+        SET @rest = STUFF(@rest, 1, @pos, N'');
+    END
 
-    IF @Databases = N'ALL_DATABASES'
-        INSERT INTO @DbList (DatabaseName)
-        SELECT name FROM sys.databases WHERE state = 0;
-    ELSE IF @Databases = N'USER_DATABASES'
-        INSERT INTO @DbList (DatabaseName)
-        SELECT name FROM sys.databases WHERE state = 0 AND database_id > 4 AND source_database_id IS NULL;
-    ELSE
-        INSERT INTO @DbList (DatabaseName)
-        SELECT d.name
-        FROM   STRING_SPLIT(@Databases, ',') s
-        JOIN   sys.databases d ON d.name = LTRIM(RTRIM(s.value)) AND d.state = 0;
+    DECLARE @DbList TABLE (DatabaseName sysname PRIMARY KEY);
+    INSERT INTO @DbList (DatabaseName)
+    SELECT d.name
+    FROM   sys.databases d
+    WHERE  d.state = 0 AND d.source_database_id IS NULL AND d.name <> N'tempdb'
+      AND  EXISTS (SELECT 1 FROM @Tokens t
+                   WHERE LEFT(t.Token, 1) <> N'-'
+                     AND (   t.Token = N'ALL_DATABASES'
+                          OR (t.Token = N'USER_DATABASES' AND d.database_id > 4)
+                          OR (t.Token = N'SYSTEM_DATABASES' AND d.database_id <= 4)
+                          OR (t.Token = N'AVAILABILITY_GROUP_DATABASES' AND d.replica_id IS NOT NULL)
+                          OR d.name = t.Token
+                          OR (CHARINDEX(N'%', t.Token) > 0 AND d.name LIKE t.Token)))
+      AND  NOT EXISTS (SELECT 1 FROM @Tokens t
+                       WHERE LEFT(t.Token, 1) = N'-'
+                         AND (   d.name = SUBSTRING(t.Token, 2, 255)
+                              OR (CHARINDEX(N'%', t.Token) > 0 AND d.name LIKE SUBSTRING(t.Token, 2, 255))));
 
     DECLARE dbCursor CURSOR LOCAL FAST_FORWARD FOR
         SELECT DatabaseName FROM @DbList ORDER BY DatabaseName;
@@ -604,10 +634,19 @@ BEGIN
 
     WHILE @@FETCH_STATUS = 0
     BEGIN
-        IF @HasExcludeTable = 0 OR NOT EXISTS (
+        IF @UseExcludeTable = 1 AND @HasExcludeTable = 1 AND EXISTS (
             SELECT 1 FROM master.dbo.sqm_BackupExclude e
             WHERE e.DatabaseName = @dbName AND e.IsActive = 0 AND e.IsOrphaned = 0
         )
+            PRINT 'Skipping ' + @dbName + ' (sqm_BackupExclude: IsActive = 0).';
+        ELSE IF EXISTS (
+            SELECT 1
+            FROM   sys.databases d
+            JOIN   sys.dm_hadr_availability_replica_states ars ON ars.replica_id = d.replica_id
+            WHERE  d.name = @dbName AND ars.is_local = 1 AND ars.role <> 1
+        )
+            PRINT 'Skipping ' + @dbName + ' (AG: local replica is not primary).';
+        ELSE
         BEGIN
             EXECUTE master.dbo.DatabaseBackup
                 @Databases  = @dbName,
@@ -617,6 +656,7 @@ BEGIN
                 $cleanupParam
                 @Compress   = '$Compress',
                 @CheckSum   = '$CheckSum',
+                @OverrideBackupPreference = 'Y',
                 @LogToTable = '$LogToTable';
         END
 
@@ -627,26 +667,6 @@ BEGIN
     DEALLOCATE dbCursor;
 END
 "@
-					}
-					else
-					{
-						$procBody = @"
-CREATE PROCEDURE [$procName]
-AS
-BEGIN
-    SET NOCOUNT ON;
-    EXECUTE master.dbo.DatabaseBackup
-        @Databases  = '$Databases',
-        @Directory  = N'$usrBackupDir',
-        @BackupType = '$($jobDef.BackupType)',
-        @Verify     = '$Verify',
-        $cleanupParam
-        @Compress   = '$Compress',
-        @CheckSum   = '$CheckSum',
-        @LogToTable = '$LogToTable';
-END
-"@
-					}
 
 					Invoke-DbaQuery @connParams -Database master -Query "IF OBJECT_ID(N'master.dbo.$procName', N'P') IS NOT NULL DROP PROCEDURE [$procName];" -ErrorAction Stop
 					Invoke-DbaQuery @connParams -Database master -Query $procBody -ErrorAction Stop
