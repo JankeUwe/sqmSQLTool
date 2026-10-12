@@ -114,6 +114,9 @@
                               If installation fails, the AD check is skipped with a warning.
         'Skip'              - AD check is skipped with a warning.
         'Abort'             - Function aborts with an error.
+    In an unattended session (SQL Agent job, scheduled task, -NonInteractive) the default
+    'Install' is treated as 'Skip': RSAT installation waits for Windows Update/WSUS and can hang
+    indefinitely on isolated servers. Pass -AdModuleAction 'Install' explicitly to force it.
 
 .PARAMETER ContinueOnError
     Continue with the next login on error.
@@ -422,10 +425,23 @@ function Copy-sqmLogins
 		#   'Skip'               ? wie bisher: Warnung, AD-Pruefung wird uebersprungen
 		#   'Abort'              ? Fehler wenn Modul nicht verfuegbar
 		$adModuleAvailable = [bool](Get-Module -ListAvailable -Name ActiveDirectory -ErrorAction SilentlyContinue)
-		
+
+		# Ohne Benutzer (Agent-Job, geplanter Task, -NonInteractive) keine RSAT-Installation:
+		# Add-WindowsCapability/DISM warten auf Windows Update bzw. WSUS und haengen auf
+		# abgeschotteten Servern unbegrenzt - der Job laeuft dann endlos. Nur wenn der Aufrufer
+		# -AdModuleAction ausdruecklich angibt, wird auch unbeaufsichtigt installiert.
+		$effectiveAdAction = $AdModuleAction
+		if (-not $adModuleAvailable -and $AdModuleAction -eq 'Install' -and
+			-not $PSBoundParameters.ContainsKey('AdModuleAction') -and -not (Test-sqmInteractiveSession))
+		{
+			$effectiveAdAction = 'Skip'
+			Invoke-sqmLogging -Message "Unbeaufsichtigte Sitzung: ActiveDirectory-Modul fehlt, RSAT-Installation wird NICHT versucht (haengt ohne Windows Update). AD-Pruefung entfaellt. Modul einmalig manuell installieren: Install-sqmAdModule" `
+							  -FunctionName $functionName -Level 'WARNING'
+		}
+
 		if (-not $adModuleAvailable)
 		{
-			switch ($AdModuleAction)
+			switch ($effectiveAdAction)
 			{
 				'Install'
 				{
@@ -448,7 +464,7 @@ function Copy-sqmLogins
 				}
 				'Skip'
 				{
-					$adWarnMsg = "ActiveDirectory-Modul nicht verfuegbar und -AdModuleAction 'Skip' gesetzt - AD-Pruefung wird uebersprungen."
+					$adWarnMsg = "ActiveDirectory-Modul nicht verfuegbar (AdModuleAction 'Skip') - AD-Pruefung wird uebersprungen."
 					Write-Warning $adWarnMsg
 					Invoke-sqmLogging -Message $adWarnMsg -FunctionName $functionName -Level 'WARNING'
 				}

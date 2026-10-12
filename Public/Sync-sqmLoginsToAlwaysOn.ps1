@@ -114,6 +114,11 @@
     DETECTION ONLY - logins are NEVER deleted automatically. Requires the RSAT ActiveDirectory
     module and AD read rights. Default: $false.
 
+.PARAMETER AdModuleAction
+    Passed to Copy-sqmLogins: what to do if the ActiveDirectory module is missing
+    (Install / Skip / Abort). Not set: Install interactively, Skip in an unattended session
+    (SQL Agent job), because the RSAT installation can hang there without Windows Update.
+
 .PARAMETER EnableException
     Throw exceptions immediately instead of returning error status.
 
@@ -207,6 +212,10 @@ function Sync-sqmLoginsToAlwaysOn
 
 		[Parameter(Mandatory = $false)]
 		[switch]$AuditAdOrphans,
+
+		[Parameter(Mandatory = $false)]
+		[ValidateSet('Install', 'Skip', 'Abort')]
+		[string]$AdModuleAction,
 
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException,
@@ -366,6 +375,9 @@ ORDER BY role_desc ASC
 						DisablePolicy           = $DisablePolicy
 						ErrorAction             = 'Stop'
 					}
+					# Nur durchreichen wenn angegeben: Copy-sqmLogins installiert RSAT dann auch
+					# unbeaufsichtigt; ohne Angabe ueberspringt es die Installation im Agent-Job.
+					if ($AdModuleAction) { $copyParams.AdModuleAction = $AdModuleAction }
 
 					# Handle -Force with SafeForceMode
 					if ($Force)

@@ -82,6 +82,10 @@
                      NuGet provider is installed automatically if missing.
                      In isolated environments this method will fail as expected.
     Restart        : None of the methods requires a restart.
+    Windows Server : Method 1 is skipped when Install-WindowsFeature exists - the feature payload
+                     is local, the capability would go to Windows Update/WSUS first.
+    Timeout        : Methods 1 and 3 are aborted after -TimeoutSeconds (default 300). Without a
+                     reachable update source they otherwise wait indefinitely.
 #>
 function Install-sqmAdModule
 {
@@ -93,7 +97,10 @@ function Install-sqmAdModule
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
-		[switch]$EnableException
+		[switch]$EnableException,
+		[Parameter(Mandatory = $false)]
+		[ValidateRange(30, 7200)]
+		[int]$TimeoutSeconds = 300
 	)
 	
 	begin
@@ -145,6 +152,17 @@ function Install-sqmAdModule
 		#            Windows 10/11 Clients und Windows Server 2019+
 		# ??????????????????????????????????????????????????????????????????????
 		$hasCapabilityCmd = [bool](Get-Command Add-WindowsCapability -ErrorAction SilentlyContinue)
+		$hasFeatureCmd = [bool](Get-Command Install-WindowsFeature -ErrorAction SilentlyContinue)
+		
+		# Windows Server: RSAT-AD-PowerShell ist ein Feature mit lokaler Payload (Methode 2).
+		# Die Capability laedt dagegen aus Windows Update/WSUS und haengt auf abgeschotteten
+		# Servern - daher dort direkt Methode 2.
+		if ($hasCapabilityCmd -and $hasFeatureCmd)
+		{
+			Invoke-sqmLogging -Message "Methode 1 (Capability): Windows Server erkannt (Install-WindowsFeature vorhanden) - uebersprungen, Methode 2 nutzt die lokale Payload." `
+							  -FunctionName $functionName -Level 'INFO'
+			$hasCapabilityCmd = $false
+		}
 		
 		if (-not $installed -and $hasCapabilityCmd)
 		{
@@ -167,7 +185,20 @@ function Install-sqmAdModule
 					}
 					else
 					{
-						$capResult = Add-WindowsCapability -Online -Name $adCapabilityName -ErrorAction Stop
+						# In einem Hintergrundjob mit Zeitlimit: ohne erreichbare Update-Quelle
+						# kehrt Add-WindowsCapability sonst nicht zurueck.
+						$capJob = Start-Job -ScriptBlock {
+							param ($Name)
+							Add-WindowsCapability -Online -Name $Name -ErrorAction Stop
+						} -ArgumentList $adCapabilityName
+						if (-not (Wait-Job -Job $capJob -Timeout $TimeoutSeconds))
+						{
+							Stop-Job -Job $capJob -ErrorAction SilentlyContinue
+							Remove-Job -Job $capJob -Force -ErrorAction SilentlyContinue
+							throw "Zeitlimit $TimeoutSeconds s ueberschritten (Windows Update/WSUS nicht erreichbar?)"
+						}
+						$capResult = Receive-Job -Job $capJob -ErrorAction Stop
+						Remove-Job -Job $capJob -Force -ErrorAction SilentlyContinue
 						if ($capResult.RestartNeeded -eq $false -or $null -eq $capResult.RestartNeeded)
 						{
 							Invoke-sqmLogging -Message "Methode 1 (Capability): Erfolgreich installiert." `
@@ -209,8 +240,6 @@ function Install-sqmAdModule
 		# Methode 2: Windows Feature (Install-WindowsFeature)
 		#            Windows Server (alle Versionen mit ServerManager)
 		# ??????????????????????????????????????????????????????????????????????
-		$hasFeatureCmd = [bool](Get-Command Install-WindowsFeature -ErrorAction SilentlyContinue)
-		
 		if (-not $installed -and $hasFeatureCmd)
 		{
 			$action = "RSAT AD-Modul via Install-WindowsFeature installieren ($adFeatureName)"
@@ -286,8 +315,14 @@ function Install-sqmAdModule
 					
 					$dismProcess = Start-Process -FilePath $dismPath `
 												 -ArgumentList $dismArgs `
-												 -Wait -PassThru -NoNewWindow `
+												 -PassThru -NoNewWindow `
 												 -ErrorAction Stop
+					
+						if (-not $dismProcess.WaitForExit($TimeoutSeconds * 1000))
+					{
+						try { $dismProcess.Kill() } catch { }
+						throw "Zeitlimit $TimeoutSeconds s ueberschritten (Windows Update/WSUS nicht erreichbar?) - dism.exe beendet."
+					}
 					
 					if ($dismProcess.ExitCode -eq 0)
 					{

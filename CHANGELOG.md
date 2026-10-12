@@ -1,5 +1,29 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.167.0] - 2026-10-12
+
+### Fix: Login-Sync als Agent-Job haengt nach dem Login-Backup
+
+Praxisfall: Ein mit `New-sqmAgentCommandJob` angelegter Job fuer `Sync-sqmLoginsToAlwaysOn`
+(`SafeForceMode = $true`) kam nie zum Ende, auch manuell endete das Log nach "Login-Backup erstellt".
+Das Log endet dort nur scheinbar: `Invoke-sqmLogging` schreibt je Funktion eine eigene Datei, ab
+dem Backup laeuft `Copy-sqmLogins` und loggt nach `sqmSQLTool_<Datum>_Copy-sqmLogins.log`. Dort
+startet bei fehlendem ActiveDirectory-Modul standardmaessig `Install-sqmAdModule`, dessen erste
+Methode `Add-WindowsCapability -Online` aus Windows Update/WSUS laedt und auf abgeschotteten
+Servern nicht zurueckkehrt.
+
+- **`Copy-sqmLogins`**: In einer unbeaufsichtigten Sitzung (Agent-Job, geplanter Task,
+  `-NonInteractive`) wird das fehlende AD-Modul nicht mehr installiert, die AD-Pruefung entfaellt
+  mit Warnung im Log. Wer `-AdModuleAction 'Install'` ausdruecklich angibt, installiert weiterhin.
+- **`Install-sqmAdModule`**: Auf Windows Server wird die Capability-Methode uebersprungen und direkt
+  `Install-WindowsFeature RSAT-AD-PowerShell` (lokale Payload) verwendet. Capability und DISM
+  laufen mit Zeitlimit (`-TimeoutSeconds`, Standard 300) statt unbegrenzt.
+- **`Sync-sqmLoginsToAlwaysOn`**: Neuer Parameter `-AdModuleAction` (Install/Skip/Abort), wird an
+  `Copy-sqmLogins` durchgereicht.
+
+Empfehlung: Auf den AG-Knoten das AD-Modul einmalig interaktiv installieren
+(`Install-sqmAdModule`), dann laeuft auch im Job die AD-Pruefung der Windows-Logins.
+
 ## [1.9.166.0] - 2026-10-12
 
 ### Fix: AG-Datenbanken werden nur und immer auf dem Primary gesichert
