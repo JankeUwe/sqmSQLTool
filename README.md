@@ -36,8 +36,11 @@ Pair it with the offline, self-contained **[Plan Visualizer](Tools/PlanVisualize
 Automatically synchronize SQL logins from primary to secondary replicas in AlwaysOn Availability Groups:
 
 ```powershell
-# Create daily scheduled job (2:00 AM)
-New-sqmAutoLoginSyncJob -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG"
+# Install the standard job on EVERY replica (daily 2:00 AM, only the primary works)
+Install-sqmStandardJob -Name AgLoginSync -AvailabilityGroupName "ProdAG"
+
+# All standard jobs with their defaults
+Install-sqmStandardJob -List
 
 # Run sync immediately with backup
 Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" `
@@ -93,7 +96,8 @@ Set-sqmConfig -UpdateMode Off         # no check
 
 ### AlwaysOn Availability Groups
 - `Sync-sqmLoginsToAlwaysOn` - Automated login synchronization
-- `New-sqmAutoLoginSyncJob` - Scheduled job creation
+- `Install-sqmStandardJob` - Standard Agent jobs (AgLoginSync, AgLoginCompare) in one call
+- `New-sqmAutoLoginSyncJob` - Shortcut for `Install-sqmStandardJob -Name AgLoginSync`
 - `Get-sqmDistributedAgHealth` - Distributed AG status
 - `Get-sqmSpnReport` - SPN validation including listeners
 - `Complete-sqmListenerMigration` - Listener migration workflow
@@ -156,7 +160,7 @@ A: Same command works for both: `Import-Module ./sqmSQLTool/sqmSQLTool.psd1`. Mo
 A: Use `-Force` flag to update existing logins. Use `-SafeForceMode` to auto-exclude system accounts. Run with `-WhatIf` first to preview changes.
 
 **Q: Can I schedule login sync across multiple AG instances?**  
-A: Yes. Use `New-sqmAutoLoginSyncJob` on the primary replica. It creates a SQL Agent job that runs daily at 2:00 AM.
+A: Yes. Run `Install-sqmStandardJob -Name AgLoginSync` on every replica. It creates a SQL Agent job that runs daily at 2:00 AM; on a secondary the step ends without doing anything, so after a failover the new primary takes over. The job only adds missing logins (`-Force:$false`), it never drops and recreates existing ones.
 
 **Q: How do I export AlwaysOn configuration for documentation?**  
 A: Use `Export-sqmAlwaysOnConfiguration -SqlInstance "SQL01" -OutputPath "C:\Exports"`. Generates HTML + CSV with replica status, listeners, and database sync state.

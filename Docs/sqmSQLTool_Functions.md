@@ -3817,20 +3817,62 @@ Creates a SQL Server Agent job that runs Repair-Job.ps1 (AutoRepair).
 ```powershell
 New-sqmAlwaysOnRepairJob -SqlInstance "SQL01"
 
+### Install-sqmStandardJob
+
+Installs a predefined sqmSQLTool standard job (e.g. the AlwaysOn login sync) as a SQL Agent job with tested defaults - one call, no parameter hashtables.
+
+    Catalog: AgLoginSync (Sync-sqmLoginsToAlwaysOn -Force:$false, daily 02:00, job 'sqmAutoLoginSync')
+    and AgLoginCompare (Compare-sqmAlwaysOnLogins -FailOnDrift -OnlyDifferences, daily 06:00,
+    job 'sqmAutoLoginCompare'). All AG standard jobs are PrimaryOnly: install them on every
+    replica, on a secondary the step ends with success without doing anything.
+
+**Parameters:**
+
+- **-Name** - Standard job from the catalog: AgLoginSync, AgLoginCompare.
+- **-List** - Shows the catalog with all defaults instead of installing anything.
+- **-SqlInstance** - Instance on which the job is created (default: computer name). Run this ON that server.
+- **-SqlCredential** - Only for the connection that creates the job.
+- **-AvailabilityGroupName** - AG for the AG standard jobs. Without it the first AG on the instance is used.
+- **-JobName** - Overrides the job name from the catalog.
+- **-Parameters** - Hashtable merged over the catalog parameters (your values win).
+- **-ScheduleType** - Overrides the schedule type: None, Daily, Weekly, Monthly.
+- **-ScheduleTime** - Overrides the start time, "HH:mm".
+- **-ScheduleDays** - Weekdays for -ScheduleType Weekly.
+- **-Force** - Replaces an existing job with the same name.
+- **-StartJob** - Starts the job right after it was created.
+- **-EnableException** - Throw exceptions immediately.
+
+**Examples (3):**
+
+```powershell
+Install-sqmStandardJob -List
+
+```powershell
+Install-sqmStandardJob -Name AgLoginSync -AvailabilityGroupName 'AG_Prod'
+
+```powershell
+Install-sqmStandardJob -Name AgLoginCompare -ScheduleTime '07:30'
+
 ### New-sqmAutoLoginSyncJob
 
-Creates a SQL Agent job that runs Sync-Job.ps1 (AutoSync).
+Creates the SQL Agent job for the automatic AlwaysOn login sync (shortcut for Install-sqmStandardJob -Name AgLoginSync).
 
 **Parameters:**
 
 - **-SqlInstance** - Target SQL instance (default: computer name).
+- **-AvailabilityGroupName** - AG to sync. Without it the first AG on the instance is used.
 - **-JobName** - Name of the Agent job. Default: 'sqmAutoLoginSync'.
+- **-AuditAdOrphans** - Reports Windows logins without an AD account after each run (detection only).
+- **-BackupRetentionDays** - Retention for login backups and audit reports in days.
 - **-Force** - Overwrites an existing job.
 
-**Examples (1):**
+**Examples (2):**
 
 ```powershell
 New-sqmAutoLoginSyncJob -SqlInstance "SQL01"
+
+```powershell
+New-sqmAutoLoginSyncJob -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -AuditAdOrphans -Force
 
 ### Get-sqmAgentJobScheduleReport
 

@@ -181,39 +181,46 @@ AD-Prüfung: das RSAT-ActiveDirectory-Modul und AD-Leserechte des ausführenden 
 
 | Funktion | Zweck |
 |---|---|
-| `New-sqmAutoLoginSyncJob` | Erstellt einen Agent-Job, der Logins regelmäßig automatisch synchronisiert. |
-| `New-sqmAutoLoginCompareJob` | Erstellt einen Agent-Job, der Logins regelmäßig vergleicht und bei Drift auf Fail geht. |
+| `Install-sqmStandardJob` | Installiert Standard-Jobs mit getesteten Defaults: `AgLoginSync` (Login-Sync) und `AgLoginCompare` (Vergleich, Fail bei Drift). `-List` zeigt den Katalog. |
+| `New-sqmAutoLoginSyncJob` | Kurzform für `Install-sqmStandardJob -Name AgLoginSync`. |
 | `New-sqmAlwaysOnRepairJob` | Erstellt einen Agent-Job, der `Repair-sqmAlwaysOnDatabases` regelmäßig ausführt (Auto-Repair). |
 | `New-sqmPreferredPrimaryJob` | Erstellt einen Agent-Job, der `Invoke-sqmPreferredPrimaryCheck` alle paar Minuten ausführt, damit die AG nach dem Patchwochenende von selbst auf den gewünschten Knoten zurückkehrt. |
 
 ### Praxisbeispiele: Login-Sync-Job
 
-`New-sqmAutoLoginSyncJob` legt den Sync als SQL Agent Job auf dem **Primary** an. Die Defaults
-sind für den Dauerbetrieb ausgelegt: ein laufender Job soll die Secondaries vollständig synchron
-halten, nicht nur neue Logins anlegen.
+`Install-sqmStandardJob -Name AgLoginSync` legt den Sync als SQL Agent Job an. Den Job auf
+**jedem** Replikat installieren: der Step prüft zuerst die lokale AG-Rolle (`PrimaryOnly`) und
+endet auf einem Secondary ohne Aktion mit Erfolg. Nach einem Failover übernimmt der neue Primary
+automatisch, kein Job wird rot.
+
+Der Job ruft `Sync-sqmLoginsToAlwaysOn -Force:$false` auf und legt nur **fehlende** Logins an.
+`-Force` ist im Job bewusst aus: es ersetzt bestehende Logins per DROP + CREATE, und scheitert das
+CREATE, ist der Login auf dem Secondary weg (unbeaufsichtigt real passiert, v1.8.19.0). Drift bei
+Passwort, Sprache oder Default-DB meldet der Vergleichs-Job `AgLoginCompare`, korrigiert wird sie
+bewusst manuell mit `Sync-sqmLoginsToAlwaysOn -Force -BackupLogins`.
 
 ```powershell
-# Täglicher Sync-Job um 02:00 Uhr (Standard).
-# Force und BackupLogins sind standardmässig AN -> Passwort-/Sprach-/Default-DB-Drift
-# wird mitkorrigiert, vorher Rollback-Backup je Secondary. SafeForceMode schützt
-# sysadmin-/Agent-/System-Konten vor dem Überschreiben.
-New-sqmAutoLoginSyncJob -SqlInstance "SQLPRIM01" -AvailabilityGroupName "ProdAG"
+# Katalog mit allen Defaults anzeigen
+Install-sqmStandardJob -List
+
+# Täglicher Sync-Job um 02:00 Uhr (auf jedem Replikat ausführen)
+Install-sqmStandardJob -Name AgLoginSync -AvailabilityGroupName "ProdAG"
 
 # Mit AD-Orphan-Meldung: meldet nach jedem Lauf verwaiste Windows-Logins
 # (Sync-Log + Event Log EventId 9003 für Splunk) - nur Erkennung, KEIN Auto-Delete.
-New-sqmAutoLoginSyncJob -SqlInstance "SQLPRIM01" -AvailabilityGroupName "ProdAG" -AuditAdOrphans
+Install-sqmStandardJob -Name AgLoginSync -AvailabilityGroupName "ProdAG" -Parameters @{ AuditAdOrphans = $true }
 
-# Legacy-Verhalten: nur neue Logins anlegen, keine Drift-Korrektur.
-New-sqmAutoLoginSyncJob -SqlInstance "SQLPRIM01" -AvailabilityGroupName "ProdAG" -Force:$false
+# Vergleichs-Job: täglich 06:00, schlägt bei Login-Drift fehl (Event 9001)
+Install-sqmStandardJob -Name AgLoginCompare -AvailabilityGroupName "ProdAG"
 
-# Aufbewahrung der Backups/Logs anpassen (Default 7 Tage, 0 = kein Aufräumen).
-New-sqmAutoLoginSyncJob -SqlInstance "SQLPRIM01" -AvailabilityGroupName "ProdAG" -BackupRetentionDays 14
+# Vorhandenen Job ersetzen, andere Uhrzeit
+Install-sqmStandardJob -Name AgLoginSync -ScheduleTime "04:30" -Force
 ```
 
-> Bestehende Sync-Jobs übernehmen die neuen Defaults **nicht** automatisch — der Job-Step ist
-> beim Anlegen fest eingebacken. Mit `-Overwrite` neu erstellen, um Force/Backup/Retention/Audit
-> zu aktivieren. Backups (`LoginBackup_*.sql`), Sync-Logs (`LoginSync_<AG>_*.log`) und ggf.
-> Audit-Reports werden nach `-BackupRetentionDays` Tagen automatisch aufgeräumt.
+> Jobs aus älteren Versionen (Step ruft `jobs\Sync-Job.ps1`) laufen weiter. Mit `-Force` neu
+> anlegen, um auf den Standard-Job umzustellen. Ohne RSAT-ActiveDirectory-Modul entfällt im Job
+> die AD-Prüfung der Windows-Logins (Warnung im Log); das Modul einmalig interaktiv mit
+> `Install-sqmAdModule` installieren.
 
 ### Praxisbeispiele: Auto-Repair AlwaysOn
 
@@ -266,7 +273,7 @@ New-sqmAlwaysOnRepairJob -SqlInstance "SQLPRIM01" -JobName "AO-AutoRepair" -Sche
    zur Kontrolle `Compare-sqmAlwaysOnLogins` (Login-Attribute) und `Compare-sqmAlwaysOnRoles`
    (Server-Rollen-Mitgliedschaft — wird von AlwaysOn nicht mitrepliziert).
 4. **Automatisieren** — wiederkehrende Aufgaben als Agent-Jobs einrichten
-   (`New-sqmAutoLoginSyncJob`, `New-sqmAutoLoginCompareJob`, `New-sqmAlwaysOnRepairJob`).
+   (`Install-sqmStandardJob -Name AgLoginSync` / `AgLoginCompare`, `New-sqmAlwaysOnRepairJob`).
    Der Compare-Job geht bei Login-Drift gezielt auf Fail und meldet dies (Operator + Windows Event Log
    für Splunk-Auswertung).
 5. **Dokumentieren** — Konfiguration mit `Export-sqmAlwaysOnConfiguration` sichern.

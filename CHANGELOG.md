@@ -1,5 +1,43 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.168.0] - 2026-10-12
+
+### Neu: Standard-Jobs mit einem Aufruf installieren (`Install-sqmStandardJob`)
+
+Wiederkehrende Aufgaben wie der AlwaysOn-Login-Sync lassen sich jetzt ohne Parameter-Hashtables als
+Agent-Job einrichten. Job-Name, Zeitplan und sichere Parameter stehen in einem Katalog,
+`Install-sqmStandardJob -List` zeigt ihn.
+
+| Name | Funktion | Defaults |
+|---|---|---|
+| `AgLoginSync` | `Sync-sqmLoginsToAlwaysOn` | `-Force:$false`, taeglich 02:00, Job `sqmAutoLoginSync` |
+| `AgLoginCompare` | `Compare-sqmAlwaysOnLogins` | `-FailOnDrift -OnlyDifferences`, taeglich 06:00, Job `sqmAutoLoginCompare` |
+
+```powershell
+Install-sqmStandardJob -Name AgLoginSync -AvailabilityGroupName 'AG_Prod'
+```
+
+- **Auf jedem Replikat installieren.** Beide AG-Jobs sind `PrimaryOnly`: der Step prueft zuerst die
+  lokale AG-Rolle und endet auf einem Secondary ohne Aktion mit Erfolg. Nach einem Failover
+  arbeitet automatisch der neue Primary, kein Job wird rot.
+- **Login-Sync ohne `-Force`.** `Sync-sqmLoginsToAlwaysOn` hat `-Force` standardmaessig an,
+  `Copy-DbaLogin -Force` ersetzt bestehende Logins per DROP + CREATE. Unbeaufsichtigt hat das
+  bereits Logins gekostet (v1.8.19.0). Der Standard-Job legt deshalb nur fehlende Logins an und
+  warnt, wenn man `Force = $true` ueber `-Parameters` erzwingt. Wer bisher einen Job mit
+  `New-sqmAgentCommandJob` und `Sync-sqmLoginsToAlwaysOn` ohne `Force = $false` angelegt hat,
+  laeuft mit DROP + CREATE und sollte auf den Standard-Job umstellen.
+- **`New-sqmAgentCommandJob`**: neue Option `PrimaryOnly = $true` je `-Command`-Eintrag (haengt
+  `-PrimaryOnly` an den Wrapper-Aufruf). Prueft das Replikat von `Parameters.AvailabilityGroupName`,
+  sonst jede AG.
+- **`New-sqmAutoLoginSyncJob`** ist jetzt die Kurzform fuer `Install-sqmStandardJob -Name AgLoginSync`
+  und kennt die in der Doku beschriebenen Parameter `-AvailabilityGroupName`, `-AuditAdOrphans` und
+  `-BackupRetentionDays`. Bisher legte es einen parameterlosen Step auf `jobs\Sync-Job.ps1` an; solche
+  Jobs laufen weiter, mit `-Force` neu anlegen zum Umstellen.
+
+Getestet: 10 Unit-Tests (Katalog, Defaults, Ueberschreiben, Force-Warnung, WhatIf, Kurzform). Der
+Wrapper-Pfad "nicht Primary" ist live gegen SQL Server 2025 (kein AG) geprueft, auch mit Hochkomma
+im AG-Namen. Der Primary-Pfad konnte mangels AG im Labor nicht live laufen.
+
 ## [1.9.167.0] - 2026-10-12
 
 ### Fix: Login-Sync als Agent-Job haengt nach dem Login-Backup

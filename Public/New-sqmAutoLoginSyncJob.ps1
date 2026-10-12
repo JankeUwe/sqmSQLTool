@@ -1,18 +1,39 @@
 ﻿<#
 .SYNOPSIS
-Creates a SQL Agent job that runs Sync-Job.ps1 (AutoSync).
+Creates the SQL Agent job for the automatic AlwaysOn login sync (standard job AgLoginSync).
+
+.DESCRIPTION
+Shortcut for Install-sqmStandardJob -Name AgLoginSync: Sync-sqmLoginsToAlwaysOn -Force:$false,
+daily at 02:00, PrimaryOnly. Install it on every AG replica; only the current primary works,
+after a failover the new primary takes over.
+
+Until v1.9.167.0 this function created a step that called jobs\Sync-Job.ps1 without any
+parameters. Existing jobs keep working; recreate them with -Force to switch to the new step.
 
 .PARAMETER SqlInstance
-Target SQL instance (default: computer name).
+Target SQL instance (default: computer name). Run this ON that server.
+
+.PARAMETER AvailabilityGroupName
+AG to sync. Without it Sync-sqmLoginsToAlwaysOn uses the first AG on the instance.
 
 .PARAMETER JobName
 Name of the Agent job. Default: 'sqmAutoLoginSync'.
+
+.PARAMETER AuditAdOrphans
+Additionally reports Windows logins without an AD account after each run (event 9003, detection
+only, nothing is deleted).
+
+.PARAMETER BackupRetentionDays
+Retention for login backups and audit reports in days (Sync default: 7, 0 = keep all).
 
 .PARAMETER Force
 Overwrites an existing job.
 
 .EXAMPLE
 New-sqmAutoLoginSyncJob -SqlInstance "SQL01"
+
+.EXAMPLE
+New-sqmAutoLoginSyncJob -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -AuditAdOrphans -Force
 #>
 function New-sqmAutoLoginSyncJob
 {
@@ -21,71 +42,33 @@ function New-sqmAutoLoginSyncJob
 		[Parameter(Mandatory = $false)]
 		[string]$SqlInstance = $env:COMPUTERNAME,
 		[Parameter(Mandatory = $false)]
+		[string]$AvailabilityGroupName,
+		[Parameter(Mandatory = $false)]
 		[string]$JobName = 'sqmAutoLoginSync',
+		[Parameter(Mandatory = $false)]
+		[switch]$AuditAdOrphans,
+		[Parameter(Mandatory = $false)]
+		[ValidateRange(0, 3650)]
+		[int]$BackupRetentionDays,
 		[Parameter(Mandatory = $false)]
 		[switch]$Force
 	)
 
 	process
 	{
-		# Setup output directory with proper permissions FIRST
-		$outputPath = "C:\System\WinSrvLog\MSSQL"
-		if (-not (Test-Path $outputPath)) {
-			New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
-		}
-		# Grant permissions to SQL Agent service accounts
-		@('NT SERVICE\MSSQLSERVER', 'NT SERVICE\SQLSERVERAGENT') | ForEach-Object {
-			$null = icacls $outputPath /grant "$_`:F" /T /C 2>&1
-		}
+		$syncParams = @{}
+		if ($AuditAdOrphans) { $syncParams['AuditAdOrphans'] = $true }
+		if ($PSBoundParameters.ContainsKey('BackupRetentionDays')) { $syncParams['BackupRetentionDays'] = $BackupRetentionDays }
 
-		# Check if job exists
-		$existingJob = Get-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -ErrorAction SilentlyContinue
-		if ($existingJob -and -not $Force)
-		{
-			throw "Job '$JobName' existiert bereits. -Force zum Ueberschreiben."
-		}
-		if ($existingJob -and $Force)
-		{
-			Remove-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -Confirm:$false -ErrorAction Stop
-		}
-
-		# Create job
-		$job = New-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName `
-			-Description "AutoSync: Synchronisiert Logins ueber AlwaysOn-Replicas" -ErrorAction Stop
-
-		# Create CmdExec job step (calls Sync-Job.ps1)
-		$psExePath = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
-		$syncScriptPath = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs\Sync-Job.ps1'
-		$command = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$syncScriptPath`""
-
-		$jobStep = New-DbaAgentJobStep -SqlInstance $SqlInstance -Job $JobName `
-			-StepName "RunSync" -Subsystem 'CmdExec' -Command $command -ErrorAction Stop
-
-		# Add daily schedule (2:00 AM)
-		$schedName = "sch_$JobName"
-		$schedSql = @"
-DECLARE @sid INT;
-WHILE EXISTS (SELECT 1 FROM msdb.dbo.sysschedules WHERE name = N'$schedName')
-BEGIN
-    SELECT TOP (1) @sid = schedule_id FROM msdb.dbo.sysschedules WHERE name = N'$schedName';
-    EXEC msdb.dbo.sp_delete_schedule @schedule_id = @sid, @force_delete = 1;
-END
-EXEC msdb.dbo.sp_add_schedule
-    @schedule_name          = N'$schedName',
-    @enabled                = 1,
-    @freq_type              = 4,
-    @freq_interval          = 1,
-    @active_start_time      = 020000;
-EXEC msdb.dbo.sp_attach_schedule @job_name = N'$JobName', @schedule_name = N'$schedName';
-"@
-		$null = Invoke-DbaQuery -SqlInstance $SqlInstance -Database msdb -Query $schedSql -ErrorAction Stop
-
-		[PSCustomObject]@{
+		$installParams = @{
+			Name        = 'AgLoginSync'
 			SqlInstance = $SqlInstance
 			JobName     = $JobName
-			Status      = "Success"
-			Message     = "Job created"
-			Timestamp   = Get-Date
+			Parameters  = $syncParams
+			Force       = $Force
 		}
+		if ($AvailabilityGroupName) { $installParams['AvailabilityGroupName'] = $AvailabilityGroupName }
+
+		Install-sqmStandardJob @installParams -WhatIf:$WhatIfPreference -Confirm:$false
 	}
 }

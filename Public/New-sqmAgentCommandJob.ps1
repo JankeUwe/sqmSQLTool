@@ -47,6 +47,10 @@ One or more hashtables describing a step, in execution order. Each entry:
     Parameters    - optional hashtable forwarded to the function via splatting. Default: @{}.
     StepName      - optional. Default: the function name (de-duplicated with a counter if the
                     same function appears more than once in -Command).
+    PrimaryOnly   - optional $true: the step only works on the AG primary. On a secondary it
+                    ends with success without calling the function, so the same job can be
+                    installed on every replica and follows a failover. Checks the replica of
+                    Parameters.AvailabilityGroupName, or any AG if that is not set.
 
 .PARAMETER AppendStep
 Add the -Command step(s) to an EXISTING job instead of creating a new one. Requires the job to
@@ -239,6 +243,7 @@ function New-sqmAgentCommandJob
 					FunctionName = $fn
 					Parameters   = $stepParams
 					StepName     = $stepName
+					PrimaryOnly  = ($entry.ContainsKey('PrimaryOnly') -and [bool]$entry['PrimaryOnly'])
 				})
 			}
 
@@ -258,13 +263,29 @@ function New-sqmAgentCommandJob
 			$genericInvoke = @'
 param(
     [Parameter(Mandatory)][string]$FunctionName,
-    [Parameter(Mandatory)][string]$ParamsPath
+    [Parameter(Mandatory)][string]$ParamsPath,
+    [switch]$PrimaryOnly
 )
 $ErrorActionPreference = 'Stop'
 Import-Module sqmSQLTool -Force
 
 $cmd = Get-Command -Name $FunctionName -Module sqmSQLTool -ErrorAction Stop
 $params = Import-Clixml -Path $ParamsPath
+
+# -PrimaryOnly: derselbe Job liegt auf allen AG-Knoten, arbeitet aber nur auf dem Primary.
+# Auf einem Secondary endet der Step mit Erfolg, damit der Job nach einem Failover nicht rot wird.
+if ($PrimaryOnly) {
+    $inst = if ($params.ContainsKey('SqlInstance') -and $params['SqlInstance']) { [string]$params['SqlInstance'] } else { $env:COMPUTERNAME }
+    $q = "SELECT COUNT(*) AS n FROM sys.dm_hadr_availability_replica_states ars JOIN sys.availability_groups ag ON ag.group_id = ars.group_id WHERE ars.is_local = 1 AND ars.role = 1"
+    if ($params.ContainsKey('AvailabilityGroupName') -and $params['AvailabilityGroupName']) {
+        $q += " AND ag.name = N'" + ([string]$params['AvailabilityGroupName'] -replace "'", "''") + "'"
+    }
+    $n = (Invoke-DbaQuery -SqlInstance $inst -Query $q -EnableException).n
+    if ($n -eq 0) {
+        Write-Output "PrimaryOnly: '$inst' ist hier nicht Primary - $FunctionName uebersprungen."
+        exit 0
+    }
+}
 
 foreach ($opt in 'EnableException', 'Confirm') {
     if ($cmd.Parameters.ContainsKey($opt) -and -not $params.ContainsKey($opt)) {
@@ -361,6 +382,7 @@ exit 0
 				# Zuweisung an eine parametertypisierte Variable weiterhin deren Typ; ein String
 				# wuerde hier mit "Cannot convert ... to Hashtable[]" abbrechen.
 				$stepCommand = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$genericInvokePath`" -FunctionName `"$($entry.FunctionName)`" -ParamsPath `"$paramsPath`""
+				if ($entry.PrimaryOnly) { $stepCommand += ' -PrimaryOnly' }
 				$onSuccess = if ($isLast) { 'QuitWithSuccess' } else { 'GoToNextStep' }
 
 				if ($PSCmdlet.ShouldProcess("$SqlInstance / $JobName", "Step '$($entry.StepName)' (StepId $stepId) anlegen"))
