@@ -106,6 +106,7 @@ Set-sqmConfig -UpdateMode Off         # no check
 - `Complete-sqmListenerMigration` - Listener migration workflow
 
 ### Performance & Health
+- `Invoke-sqmHealthReport` - All checks in one call: one HTML report with prioritized findings, linked detail reports, optional ZIP
 - `Get-sqmPlanCacheReport` - Top N plan cache statements by CPU, duration, reads, grants, spills, with .sqlplan export
 - `Get-sqmPlanInsights` - Execution plan analysis: CE mismatches, SARGability, spills, missing indexes
 - `Get-sqmIndexUsageReport` - Unused, duplicate and overlapping indexes, heaps (read-only, DROP script commented out)

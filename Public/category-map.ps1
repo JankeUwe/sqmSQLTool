@@ -48,6 +48,7 @@ $categoryMap = @{
     'Get-sqmIndexFragmentation'           = 'Performance Analysis & Optimization'
     'Get-sqmIndexUsageReport'             = 'Performance Analysis & Optimization'
     'Get-sqmPlanCacheReport'              = 'Performance Analysis & Optimization'
+    'Invoke-sqmHealthReport'              = 'Monitoring & Health Checks'
     'Get-sqmFileLatencyReport'            = 'Performance Analysis & Optimization'
     'Get-sqmLinkedServerUsage'            = 'Reporting & Analysis'
     'Get-sqmLoginLastAccess'              = 'Login & User Security'

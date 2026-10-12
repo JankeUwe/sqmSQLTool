@@ -95,7 +95,7 @@ function Get-sqmSQLInstanceCheck
 			
 			# 2. Max Server Memory (synchronisiert mit Test-sqmMaxMemory Logik)
 			$maxMem = $server.Configuration.MaxServerMemory.ConfigValue
-			$totalMem = [math]::Round($server.PhysicalMemory / 1024, 0) # in MB
+			$totalMem = [math]::Round($server.PhysicalMemory, 0) # SMO liefert bereits MB (frueher /1024 -> Empfehlung um Faktor 1024 zu klein)
 			$recommendedMem = [math]::Round($totalMem * 0.90)  # 90% empfohlen
 			$lowerBound = [math]::Round($totalMem * 0.85)      # 85% Untergrenze
 			$upperBound = [math]::Round($totalMem * 0.95)      # 95% Obergrenze
@@ -133,7 +133,7 @@ function Get-sqmSQLInstanceCheck
 			$results += [PSCustomObject]@{
 				Check	     = "Cost Threshold for Parallelism"
 				CurrentValue = $ctp
-				Recommended  = "? 50"
+				Recommended  = ">= 50"
 				Status	     = if ($ctpOk) { "OK" } else { "Failed" }
 				Message	     = if ($ctpOk) { "OK." } else { "Wert zu niedrig ($ctp). Empfohlen mindestens 50." }
 			}

@@ -1,5 +1,45 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.170.0] - 2026-10-12
+
+### Neu: `Invoke-sqmHealthReport` - alle Pruefungen, ein Bericht
+
+Ein Aufruf, ein Ordner `HealthReport_<Instanz>_<Zeit>`: `index.html` mit einer nach Schwere sortierten
+Befundliste (Critical, Warning, Info) und einer kompakten Tabelle je Abschnitt, darunter `Details\` mit
+allen Einzelberichten (verlinkt), `Findings.csv`, auf Wunsch `.sqlplan`-Dateien und ein ZIP fuers Ticket.
+Vorbild ist PSBlitz; gebaut aus den eigenen Funktionen, auf der Instanz wird nichts installiert.
+
+| Abschnitt | Quelle |
+|---|---|
+| Instance | Eckdaten + `Get-sqmSQLInstanceCheck` |
+| Waits | `Get-sqmWaitStatistics` |
+| Activity | `Get-sqmWhoIsActive` (ein Snapshot, Blockierungen) |
+| OpenTransactions | neu: Benutzertransaktionen ab `-OpenTranMinutes`, mit Log-Verbrauch; `sleeping` + > 10 min = Critical |
+| TempDb | `Get-sqmTempDbRecommendation` + groesste TempDB-Verbraucher |
+| Databases | `Get-sqmDatabaseHealth` |
+| PlanCache | `Get-sqmPlanCacheReport` |
+| Indexes | `Get-sqmIndexUsageReport` + `Get-sqmMissingIndexes` |
+| FileLatency | `Get-sqmFileLatencyReport` |
+| Deadlocks | `Get-sqmDeadlockReport` (`-DeadlockDays`, Standard 15) |
+| Security | `Get-sqmSysadminAccounts` |
+| Disk | `Get-sqmDiskSpaceReport` (Historie am Standardort, die Prognose laeuft weiter) |
+
+- Jeder Abschnitt laeuft fuer sich: scheitert einer (Rechte, alte Version), steht das im Bericht und
+  die anderen laufen weiter. Nur eine unerreichbare Instanz bricht ab (mit `-EnableException` als Ausnahme).
+- `-SampleSeconds N` misst Waits und Datei-Latenz live im selben Zeitfenster. `-InDepth` = alle sieben
+  Plan-Cache-Metriken und 30 s Messfenster. `-Section`/`-SkipSection`, `-Database`, `-ExportPlans`, `-Zip`.
+
+### Fix: `Get-sqmSQLInstanceCheck` - Max-Server-Memory-Empfehlung um Faktor 1024 zu klein
+
+SMO liefert `Server.PhysicalMemory` bereits in MB, die Funktion teilte nochmals durch 1024. Auf einem
+Server mit 64 GB RAM lautete die Empfehlung "58 MB (90% von 64 MB RAM)", und die Toleranzpruefung schlug
+bei jedem konfigurierten Wert an. Ausserdem stand bei Cost Threshold for Parallelism "? 50" statt ">= 50".
+
+Getestet: 8 Unit-Tests fuer die Orchestrierung (alle Teilfunktionen gemockt). Live gegen SQL Server 2025
+(Container) unter PowerShell 5.1: alle 12 Abschnitte in 17 s mit 5-s-Messfenster, Plan-Export und ZIP;
+eine absichtlich offen gehaltene Transaktion wurde erfasst; ein Abschnitt mit ungueltigem Filter schlug
+einzeln fehl, der Rest lief weiter; unerreichbare Instanz bricht sauber ab.
+
 ## [1.9.169.0] - 2026-10-12
 
 ### Neu: Plan-Cache, Index-Nutzung und Datei-Latenz (Luecken gegenueber PSBlitz geschlossen)

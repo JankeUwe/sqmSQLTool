@@ -2473,6 +2473,43 @@ if ((Test-sqmSqlInstanceInstalled).IsInstalled) { Write-Host "SQL installiert" }
 
 ## 4. Monitoring & Health Checks
 
+### Invoke-sqmHealthReport
+
+Runs all sqmSQLTool health and performance checks against one instance and writes one consolidated HTML report with a prioritized findings list, plus every detail report.
+
+    Sections: Instance, Waits, Activity, OpenTransactions, TempDb, Databases, PlanCache, Indexes,
+    FileLatency, Deadlocks, Security, Disk. Every section runs on its own; a failing section is
+    reported and the others still run.
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance (default: current computer name).
+- **-SqlCredential** - PSCredential for all connections.
+- **-Section** - Sections to run. Default: all.
+- **-SkipSection** - Sections to leave out.
+- **-Database** - Restricts PlanCache and Indexes to these databases (wildcards allowed).
+- **-SampleSeconds** - 0 = cumulative; 1-600 = waits and file latency measured live in the same window.
+- **-InDepth** - All plan cache metrics and a 30 s window.
+- **-ExportPlans** - Saves plan cache plans as .sqlplan to Details\Plans.
+- **-DeadlockDays** - Days of deadlock history. Default: 15.
+- **-OpenTranMinutes** - Minimum age of listed open transactions. Default: 1.
+- **-Top** - Rows per section table. Default: 10.
+- **-OutputPath** - Parent directory. Default: <OutputPath config>\HealthReport.
+- **-Zip** - Packs the report folder into a .zip.
+- **-NoOpen** - Do not open the report.
+- **-EnableException** - Throw if the instance cannot be reached.
+
+**Examples (3):**
+
+```powershell
+Invoke-sqmHealthReport -SqlInstance "SQL01"
+
+```powershell
+Invoke-sqmHealthReport -SqlInstance "SQL01" -InDepth -ExportPlans -Zip
+
+```powershell
+Invoke-sqmHealthReport -SqlInstance "SQL01" -SkipSection Indexes, Deadlocks, PlanCache
+
 ### Get-sqmBlockingReport
 
 Retrieves current blocking chains on a SQL Server instance.

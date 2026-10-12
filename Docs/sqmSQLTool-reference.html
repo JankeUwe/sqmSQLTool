@@ -146,7 +146,7 @@
 	<!-- SIDEBAR -->
 	<div class="psdb-st-sidebar">
 	<input class="psdb-st-sidebar-search" type="text" placeholder="Funktion suchen…" oninput="psstSearch(this.value)">
-									<div class="psdb-st-nav-group" id="nav-alwayson">
+										<div class="psdb-st-nav-group" id="nav-alwayson">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-alwayson-list')">
 	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">22</span>
 	</div>
@@ -250,7 +250,7 @@
 
 	<div class="psdb-st-nav-group" id="nav-diagnose-&-health">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-diagnose-&-health-list')">
-	<span>🩺 Diagnostics & Health</span><span class="psdb-st-nav-count">26</span>
+	<span>🩺 Diagnostics & Health</span><span class="psdb-st-nav-count">27</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-diagnose-&-health-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-copysqmntfspermissions')">Copy-sqmNTFSPermissions</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmagentjobschedulereport')">Get-sqmAgentJobScheduleReport</span></li>
@@ -269,6 +269,7 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmsqlinstancecheck')">Get-sqmSQLInstanceCheck</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmtempdbrecommendation')">Get-sqmTempDbRecommendation</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmwhoisactive')">Get-sqmWhoIsActive</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmhealthreport')">Invoke-sqmHealthReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmpatchanalysis')">Invoke-sqmPatchAnalysis</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmsetupreport')">Invoke-sqmSetupReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmagentcommandjob')">New-sqmAgentCommandJob</span></li>
@@ -447,7 +448,7 @@
 
 	<!-- CONTENT -->
 	<div class="psdb-st-content" id="psdb-st-content">
-									<section class="psdb-st-section" id="cat-alwayson">
+										<section class="psdb-st-section" id="cat-alwayson">
 	<h2 class="psdb-st-section-title">🔄 AlwaysOn</h2>
 
 	<div class="psdb-st-func-card" id="f-addsqmdatabasetoag">
@@ -2772,6 +2773,36 @@ Get-sqmOperationStatus -Continuous -RefreshSeconds 10</pre><button class="psdb-s
 	<div class="psdb-st-example-label">Get-sqmWhoIsActive -SqlInstance &quot;SQL01&quot; -RepeatIntervalSeconds 30 -DurationMinutes 60 -NoConsoleOutput</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmWhoIsActive -SqlInstance &quot;SQL01&quot; -RepeatIntervalSeconds 30 -DurationMinutes 60 -NoConsoleOutput
     # Unattended capture for an Agent job: 30-second snapshots for one hour, no console output.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-invokesqmhealthreport">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Invoke-sqmHealthReport</span>
+	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnostics</span>
+	</div>
+	<div class="psdb-st-func-desc">Runs all sqmSQLTool health and performance checks against one instance and writes one consolidated HTML report with a prioritized findings list, plus every detail report.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Invoke-sqmHealthReport -SqlInstance &quot;SQL01&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmHealthReport -SqlInstance &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># In-depth, with a 30 s live window, plans exported, zipped for the ticket</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # In-depth, with a 30 s live window, plans exported, zipped for the ticket
+    Invoke-sqmHealthReport -SqlInstance &quot;SQL01&quot; -InDepth -ExportPlans -Zip</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Quick look without the expensive parts</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Quick look without the expensive parts
+    Invoke-sqmHealthReport -SqlInstance &quot;SQL01&quot; -SkipSection Indexes, Deadlocks, PlanCache</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Only what matters for one application database</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Only what matters for one application database
+    Invoke-sqmHealthReport -SqlInstance &quot;SQL01&quot; -Database &quot;Shop&quot; -Section Instance, Waits, PlanCache, Indexes</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -5769,6 +5800,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmExtendedEvents</td><td>Manages Extended Events sessions for performance analysis on SQL Server.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmFailover</td><td>Performs a controlled AlwaysOn AG failover with pre- and post-checks.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmFormatDrive64k</td><td>Formats a drive with 64K allocation unit size for optimal SQL Server performance.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Invoke-sqmHealthReport</td><td>Runs all sqmSQLTool health and performance checks against one instance and writes one consolidated HTML report with a prioritized findings list, plus every detail report.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmInstanceInventory</td><td>Creates a complete inventory of a SQL Server instance as a structured report (TXT + CSV).</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmLoginAudit</td><td>Comprehensive audit of all SQL Server logins on one or more instances.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmLogShrink</td><td>Shrinks the transaction log file (LDF) of one or more databases.</td></tr>
