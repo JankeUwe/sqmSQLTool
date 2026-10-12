@@ -4463,7 +4463,7 @@ New-sqmDistributedAvailabilityGroup `
         -ServiceAccount    "DOMAIN\SqlServiceAccount" `
         -SeedingMode       Automatic
 
-### Prepare-sqmListenerForMigration
+### Invoke-sqmListenerMigrationPrep
 
 Prepares an AG listener for cluster-level migration without downtime.
 

@@ -146,9 +146,9 @@
 	<!-- SIDEBAR -->
 	<div class="psdb-st-sidebar">
 	<input class="psdb-st-sidebar-search" type="text" placeholder="Funktion suchen…" oninput="psstSearch(this.value)">
-										<div class="psdb-st-nav-group" id="nav-alwayson">
+											<div class="psdb-st-nav-group" id="nav-alwayson">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-alwayson-list')">
-	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">22</span>
+	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">23</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-alwayson-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-addsqmdatabasetoag')">Add-sqmDatabaseToAG</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-comparesqmalwaysonlogins')">Compare-sqmAlwaysOnLogins</span></li>
@@ -161,6 +161,7 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-installsqmstandardjob')">Install-sqmStandardJob</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmalwaysonsetup')">Invoke-sqmAlwaysOnSetup</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmfailover')">Invoke-sqmFailover</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmlistenermigrationprep')">Invoke-sqmListenerMigrationPrep</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmpreferredprimarycheck')">Invoke-sqmPreferredPrimaryCheck</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmsqlalwaysonautoseeding')">Invoke-sqmSqlAlwaysOnAutoseeding</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-movesqmalwaysonlistener')">Move-sqmAlwaysOnListener</span></li>
@@ -448,7 +449,7 @@
 
 	<!-- CONTENT -->
 	<div class="psdb-st-content" id="psdb-st-content">
-										<section class="psdb-st-section" id="cat-alwayson">
+											<section class="psdb-st-section" id="cat-alwayson">
 	<h2 class="psdb-st-section-title">🔄 AlwaysOn</h2>
 
 	<div class="psdb-st-func-card" id="f-addsqmdatabasetoag">
@@ -718,6 +719,28 @@ Install-sqmStandardJob -Name AgLoginSync</pre><button class="psdb-st-copy-btn" o
 	<div class="psdb-st-example-label">Invoke-sqmFailover -SqlInstance &quot;SQL01&quot; -AvailabilityGroup &quot;AG_Prod&quot; `</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmFailover -SqlInstance &quot;SQL01&quot; -AvailabilityGroup &quot;AG_Prod&quot; `
         -TargetReplica &quot;SQL02&quot; -MaxRedoQueueMB 10</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-invokesqmlistenermigrationprep">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Invoke-sqmListenerMigrationPrep</span>
+	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
+	</div>
+	<div class="psdb-st-func-desc">Prepares an AG listener for cluster-level migration without downtime.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 1 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># STEP 1: Prepare listener before AD team deletes it</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # STEP 1: Prepare listener before AD team deletes it
+    Invoke-sqmListenerMigrationPrep -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot;
+
+    # STEP 2: Wait 15 minutes for DNS/application timeout
+
+    # STEP 3: AD team deletes old listener role and creates new one
+
+    # STEP 4: You run Complete-sqmListenerMigration</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -5802,6 +5825,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmFormatDrive64k</td><td>Formats a drive with 64K allocation unit size for optimal SQL Server performance.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmHealthReport</td><td>Runs all sqmSQLTool health and performance checks against one instance and writes one consolidated HTML report with a prioritized findings list, plus every detail report.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmInstanceInventory</td><td>Creates a complete inventory of a SQL Server instance as a structured report (TXT + CSV).</td></tr>
+	<tr><td class="psdb-st-ov-fn">Invoke-sqmListenerMigrationPrep</td><td>Prepares an AG listener for cluster-level migration without downtime.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmLoginAudit</td><td>Comprehensive audit of all SQL Server logins on one or more instances.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmLogShrink</td><td>Shrinks the transaction log file (LDF) of one or more databases.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmMonitoringKey</td><td>Gets or sets monitoring registry values for the sqmSQLTool on one or more computers.</td></tr>
