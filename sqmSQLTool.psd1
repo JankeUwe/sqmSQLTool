@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.9.168.0'
+	ModuleVersion		   = '1.9.169.0'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
@@ -125,8 +125,10 @@
 		'Get-sqmDiskSpaceReport',
 		'Get-sqmErrorLog',
 		'Get-sqmFileGrowthHistory',
+		'Get-sqmFileLatencyReport',
 		'Get-sqmHpuAllowGroup',
 		'Get-sqmIndexFragmentation',
+		'Get-sqmIndexUsageReport',
 		'Get-sqmLinkedServerUsage',
 		'Get-sqmLoginLastAccess',
 		'Get-sqmLoginPermissions',
@@ -137,6 +139,7 @@
 		'Get-sqmOperationStatus',
 		'Get-sqmOrphanedFiles',
 		'Get-sqmPerfCounters',
+		'Get-sqmPlanCacheReport',
 		'Get-sqmPlanInsights',
 		'Get-sqmServerHardwareReport',
 		'Get-sqmSaLogin',

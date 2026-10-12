@@ -1,5 +1,48 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.169.0] - 2026-10-12
+
+### Neu: Plan-Cache, Index-Nutzung und Datei-Latenz (Luecken gegenueber PSBlitz geschlossen)
+
+Abgleich mit PSBlitz (VladDBA, baut auf Brent Ozars First Responder Kit auf): drei Diagnosen fehlten
+in sqmSQLTool ganz, eine war unvollstaendig. Alle neuen Funktionen lesen nur DMVs, auf der
+Zielinstanz wird nichts installiert. Rechte: VIEW SERVER STATE.
+
+- **`Get-sqmPlanCacheReport`** (Gegenstueck zu sp_BlitzCache): teuerste Statements im Plan-Cache,
+  Top N je Metrik (`-SortBy` CPU, Duration, Reads, Writes, Executions, MemoryGrant, Spills, All).
+  Ein Statement, das in mehreren Listen steht, kommt einmal mit allen Raengen (`Ranks`). Dazu Anteil
+  am Gesamtverbrauch in Prozent und Befunde aus dem Plan-XML: ImplicitConversion, MissingIndex,
+  Spill, KeyLookup, NoJoinPredicate, ParallelPlan. `-ExportPlans` speichert die Plaene als
+  `.sqlplan`, die direkt in `Get-sqmPlanInsights -Path` gehen. MemoryGrant/Spills werden auf
+  Versionen ohne `total_grant_kb`/`total_spills` mit Warnung uebersprungen. Nur Werte ueber 0
+  bekommen einen Rang.
+- **`Get-sqmIndexUsageReport`** (Gegenstueck zu sp_BlitzIndex): ungenutzte, doppelte und
+  ueberlappende Indizes, Heaps, deaktivierte und hypothetische Indizes. Bei Ueberlappung wird
+  geprueft, ob die Include-Spalten im breiteren Index enthalten sind. Unique-Indizes und PKs gelten
+  nie als ungenutzt. Laeuft die Instanz kuerzer als `-MinUptimeDays` (7), warnt die Funktion und
+  markiert "Unused" als unzuverlaessig. DROP-Vorschlaege stehen ausschliesslich auskommentiert in
+  einer `_DropCandidates.sql`; die Funktion aendert nie einen Index.
+- **`Get-sqmFileLatencyReport`**: Lese-/Schreiblatenz je Datenbankdatei aus
+  `sys.dm_io_virtual_file_stats`, kumuliert seit Start oder als Messung ueber `-SampleSeconds`.
+  Bewertung Daten <= 20 ms OK, <= 50 ms Warnung; Log-Schreiben <= 5 ms OK, <= 15 ms Warnung.
+  Zusammenfassung je Laufwerk.
+
+### Fix: `Get-sqmDeadlockReport` liest jetzt auch die system_health-.xel-Dateien
+
+Die Hilfe versprach es schon, abgefragt wurde aber nur der Ring-Buffer (wenige MB, oft nur Stunden).
+Neuer Parameter `-Source Both|RingBuffer|EventFile`, Standard `Both` mit Entdopplung. Der Pfad kommt
+aus dem event_file-Target, funktioniert also auch mit verlegtem LOG-Ordner und unter Linux. Ist die
+Datei nicht lesbar, faellt `Both` mit Warnung auf den Ring-Buffer zurueck.
+
+Zweiter Fehler: XEvent-Zeitstempel sind UTC, `-StartTime`/`-EndTime` wurden aber als Ortszeit
+verglichen. In Deutschland fehlten dadurch die Deadlocks der letzten ein bis zwei Stunden. Die
+Grenzen werden jetzt umgerechnet; `Timestamp` ist Ortszeit, neu `TimestampUtc` der Originalwert.
+
+Getestet: 13 Unit-Tests (Befundlogik, Bewertung, Versionspruefung). Live gegen SQL Server 2025
+(Container): alle Index-Befunde an eigens angelegten Testindizes, Plan-Cache mit Plan-Export und
+`Get-sqmPlanInsights`, Latenz kumuliert und als 5-s-Messung, ein erzeugter Deadlock. Dabei fand der
+Ring-Buffer den Deadlock nicht, die .xel-Datei schon.
+
 ## [1.9.168.0] - 2026-10-12
 
 ### Neu: Standard-Jobs mit einem Aufruf installieren (`Install-sqmStandardJob`)

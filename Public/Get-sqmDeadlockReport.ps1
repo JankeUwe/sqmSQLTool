@@ -4,8 +4,10 @@
 
 .DESCRIPTION
     The System Health session (always active since SQL Server 2008) logs all
-    deadlocks as XML in the ring buffer. This function reads that buffer,
-    parses the deadlock graphs and returns for each deadlock:
+    deadlocks as XML, both in its ring buffer (in memory, a few MB, often only
+    hours or days) and in its event_file target (system_health*.xel in the LOG
+    folder, usually weeks). This function reads both by default, removes the
+    duplicates, parses the deadlock graphs and returns for each deadlock:
 
       - Timestamp of the deadlock
       - Victim session with login, host, program, statement
@@ -16,8 +18,8 @@
     Optionally, deadlock graphs can be saved as .xdl files
     (openable directly in SSMS by double-click).
 
-    Additionally, the System Health .xel ring buffer is read when available
-    (SQL Server 2012+, provides more history than the ring buffer).
+    Timestamps: XEvents store UTC. -StartTime/-EndTime are local times and are converted;
+    Timestamp in the result is local time, TimestampUtc the original value.
 
 .PARAMETER SqlInstance
     SQL Server instance (default: current computer name).
@@ -30,6 +32,11 @@
 
 .PARAMETER EndTime
     Return only deadlocks up to this point in time. Default: now.
+
+.PARAMETER Source
+    Where to read from: Both (default), RingBuffer, EventFile. EventFile needs
+    SQL Server 2012 or later; if it cannot be read, Both falls back to the ring buffer
+    with a warning.
 
 .PARAMETER MaxDeadlocks
     Maximum number of deadlocks returned (newest first). Default: 100.
@@ -51,6 +58,10 @@
     Get-sqmDeadlockReport -SqlInstance "SQL01" -StartTime (Get-Date).AddDays(-7)
 
 .EXAMPLE
+    # Last 15 days from the .xel files only
+    Get-sqmDeadlockReport -SqlInstance "SQL01" -StartTime (Get-Date).AddDays(-15) -Source EventFile
+
+.EXAMPLE
     # Save deadlocks as XDL files for SSMS
     Get-sqmDeadlockReport -SqlInstance "SQL01" -OutputPath "$env:ProgramData\sqmSQLTool\Logs\Deadlocks"
 
@@ -64,7 +75,8 @@
     Needs VIEW SERVER STATE on the instance.
     The System Health session runs at all times - no configuration required.
     XDL files can be opened directly in SSMS via File > Open as a deadlock graph.
-    Ring buffer capacity: 4 MB by default - export early at high deadlock frequency.
+    Ring buffer capacity: 4 MB by default. The event_file keeps more history (SQL Server 2019+:
+    4 files x 100 MB by default, older versions 4 x 5 MB); export early at high deadlock frequency.
 #>
 function Get-sqmDeadlockReport
 {
@@ -79,6 +91,9 @@ function Get-sqmDeadlockReport
 		[datetime]$StartTime = (Get-Date).AddHours(-24),
 		[Parameter(Mandatory = $false)]
 		[datetime]$EndTime = (Get-Date),
+		[Parameter(Mandatory = $false)]
+		[ValidateSet('Both', 'RingBuffer', 'EventFile')]
+		[string]$Source = 'Both',
 		[Parameter(Mandatory = $false)]
 		[int]$MaxDeadlocks = 100,
 		[Parameter(Mandatory = $false)]
@@ -115,11 +130,17 @@ function Get-sqmDeadlockReport
 			$connParams = @{ SqlInstance = $SqlInstance }
 			if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
 			
+			# XEvent-Zeitstempel sind UTC - Filtergrenzen umrechnen
+			$fromUtc = $StartTime.ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss')
+			$toUtc = $EndTime.ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss')
+			$collected = [System.Collections.Generic.List[object]]::new()
+
 			# -----------------------------------------------------------------------
-			# Deadlock-XML aus System Health Ring Buffer lesen
-			# Funktioniert auf allen Versionen ab SQL Server 2008
+			# a) Ring Buffer (alle Versionen ab SQL Server 2008)
 			# -----------------------------------------------------------------------
-			$ringBufferQuery = @"
+			if ($Source -in 'Both', 'RingBuffer')
+			{
+				$ringBufferQuery = @"
 SELECT
     xdr.value('@timestamp', 'datetime2')             AS EventTime,
     xdr.query('(data/value/deadlock)[1]')            AS DeadlockGraph
@@ -131,15 +152,62 @@ FROM (
       AND t.target_name = 'ring_buffer'
 ) AS data
 CROSS APPLY target_data.nodes('//RingBufferTarget/event[@name="xml_deadlock_report"]') AS XEventData(xdr)
-WHERE xdr.value('@timestamp', 'datetime2') >= '$($StartTime.ToString('yyyy-MM-dd HH:mm:ss'))'
-  AND xdr.value('@timestamp', 'datetime2') <= '$($EndTime.ToString('yyyy-MM-dd HH:mm:ss'))'
-ORDER BY EventTime DESC
+WHERE xdr.value('@timestamp', 'datetime2') >= '$fromUtc'
+  AND xdr.value('@timestamp', 'datetime2') <= '$toUtc'
 "@
-			
-			$rawDeadlocks = Invoke-DbaQuery @connParams -Database master -Query $ringBufferQuery -ErrorAction Stop
-			
-			Invoke-sqmLogging -Message "$(@($rawDeadlocks).Count) Deadlock-Ereignis(se) im Ring Buffer gefunden." -FunctionName $functionName -Level "INFO"
-			
+				$rb = @(Invoke-DbaQuery @connParams -Database master -Query $ringBufferQuery -EnableException)
+				foreach ($r in $rb) { $collected.Add($r) }
+				Invoke-sqmLogging -Message "$($rb.Count) Deadlock-Ereignis(se) im Ring Buffer gefunden." -FunctionName $functionName -Level "INFO"
+			}
+
+			# -----------------------------------------------------------------------
+			# b) event_file (system_health*.xel, SQL Server 2012+). Pfad aus dem Target,
+			#    damit auch ein verlegter LOG-Ordner und Linux-Pfade funktionieren.
+			# -----------------------------------------------------------------------
+			if ($Source -in 'Both', 'EventFile')
+			{
+				try
+				{
+					$fileName = (Invoke-DbaQuery @connParams -Database master -EnableException -Query @"
+SELECT CAST(t.target_data AS xml).value('(EventFileTarget/File/@name)[1]', 'nvarchar(4000)') AS FileName
+FROM sys.dm_xe_session_targets t
+INNER JOIN sys.dm_xe_sessions s ON t.event_session_address = s.address
+WHERE s.name = 'system_health' AND t.target_name = 'event_file'
+"@).FileName
+					if ($null -eq $fileName -or $fileName -is [DBNull] -or [string]::IsNullOrWhiteSpace([string]$fileName))
+					{
+						throw "system_health hat kein aktives event_file-Target."
+					}
+					$pattern = ([regex]::Match([string]$fileName, '^.*[\\/]').Value) + 'system_health*.xel'
+					$patternSql = $pattern -replace "'", "''"
+					$fileQuery = @"
+SELECT x.EventTime, x.ev.query('(event/data/value/deadlock)[1]') AS DeadlockGraph
+FROM sys.fn_xe_file_target_read_file(N'$patternSql', NULL, NULL, NULL) f
+CROSS APPLY (SELECT CAST(f.event_data AS xml) AS ev) e
+CROSS APPLY (SELECT e.ev, e.ev.value('(event/@timestamp)[1]', 'datetime2') AS EventTime) x
+WHERE f.object_name = N'xml_deadlock_report'
+  AND x.EventTime >= '$fromUtc'
+  AND x.EventTime <= '$toUtc'
+"@
+					$ef = @(Invoke-DbaQuery @connParams -Database master -Query $fileQuery -QueryTimeout 600 -EnableException)
+					foreach ($r in $ef) { $collected.Add($r) }
+					Invoke-sqmLogging -Message "$($ef.Count) Deadlock-Ereignis(se) in $pattern gefunden." -FunctionName $functionName -Level "INFO"
+				}
+				catch
+				{
+					$msg = "system_health event_file nicht lesbar: $($_.Exception.Message)"
+					if ($Source -eq 'EventFile') { throw $msg }
+					Write-Warning "$msg - nur Ring Buffer ausgewertet."
+					Invoke-sqmLogging -Message "$msg - nur Ring Buffer ausgewertet." -FunctionName $functionName -Level "WARNING"
+				}
+			}
+
+			# Gleicher Deadlock steht in beiden Quellen: ueber Zeitstempel + Graph entdoppeln
+			$seen = New-Object 'System.Collections.Generic.HashSet[string]'
+			$rawDeadlocks = @($collected | Sort-Object -Property EventTime -Descending | Where-Object {
+				$seen.Add(([datetime]$_.EventTime).Ticks.ToString() + '|' + $_.DeadlockGraph.ToString())
+			})
+
 			$results = [System.Collections.Generic.List[PSCustomObject]]::new()
 			$index = 0
 			
@@ -217,8 +285,10 @@ ORDER BY EventTime DESC
 					# Deadlock-Graph als sauberes XML fuer XDL-Export
 					$graphXml = $deadlockNode.OuterXml
 					
+					$eventUtc = [datetime]::SpecifyKind([datetime]$dl.EventTime, [System.DateTimeKind]::Utc)
 					$result = [PSCustomObject]@{
-						Timestamp = $dl.EventTime
+						Timestamp = $eventUtc.ToLocalTime()
+						TimestampUtc = $eventUtc
 						DeadlockIndex = $index
 						VictimSpid = $victimProcess.spid
 						VictimLogin = $victimProcess.loginname
@@ -242,8 +312,8 @@ ORDER BY EventTime DESC
 						{
 							New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
 						}
-						$timestamp = $dl.EventTime.ToString('yyyyMMdd_HHmmss')
-						$xdlFile = Join-Path $OutputPath "Deadlock_$(($SqlInstance -replace '\\', '_'))_${timestamp}_${index}.xdl"
+						$timestamp = $eventUtc.ToLocalTime().ToString('yyyyMMdd_HHmmss')
+						$xdlFile = Join-Path $OutputPath "Deadlock_$(($SqlInstance -replace '[\\/:*?"<>|,]', '_'))_${timestamp}_${index}.xdl"
 						# XDL braucht den reinen deadlock-Knoten ohne Event-Wrapper
 						$graphXml | Set-Content -Path $xdlFile -Encoding UTF8 -Force
 						$result | Add-Member -NotePropertyName XdlFile -NotePropertyValue $xdlFile -Force
@@ -270,7 +340,7 @@ ORDER BY EventTime DESC
 					($rowsHtml -join '') + "</table>"
 				$html = ConvertTo-sqmHtmlReport -Title "Deadlock Report - $SqlInstance" -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -BodyHtml $bodyHtml
 
-				$safeInst = $SqlInstance -replace '\\', '_'
+				$safeInst = $SqlInstance -replace '[\\/:*?"<>|,]', '_'
 				$htmlFile = Join-Path $OutputPath "DeadlockReport_${safeInst}_$(Get-Date -Format 'yyyyMMdd_HHmmss').html"
 				$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
 				Invoke-sqmLogging -Message "HTML-Bericht gespeichert: $htmlFile" -FunctionName $functionName -Level "INFO"

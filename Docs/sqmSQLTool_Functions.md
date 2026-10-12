@@ -2590,8 +2590,9 @@ Get-sqmDatabaseHealth -SqlInstance "SQL01" -IncludeSystemDatabases -OutputPath "
 Reads and analyzes deadlock events from the System Health Extended Event session.
 
 The System Health session (always active since SQL Server 2008) logs all
-    deadlocks as XML in the ring buffer. This function reads that buffer,
-    parses the deadlock graphs and returns for each deadlock:
+    deadlocks as XML in its ring buffer and in its event_file target (system_health*.xel).
+    This function reads both by default (-Source), removes duplicates, parses the deadlock
+    graphs and returns for each deadlock:
 
       - Timestamp of the deadlock
       - Victim session with login, host, program, statement
@@ -2602,8 +2603,8 @@ The System Health session (always active since SQL Server 2008) logs all
     Optionally, deadlock graphs can be saved as .xdl files
     (openable directly in SSMS by double-click).
 
-    Additionally, the System Health .xel ring buffer is read when available
-    (SQL Server 2012+, provides more history than the ring buffer).
+    Timestamps: XEvents store UTC. -StartTime/-EndTime are local times and are converted;
+    Timestamp in the result is local time, TimestampUtc the original value.
 
 **Parameters:**
 
@@ -2611,6 +2612,7 @@ The System Health session (always active since SQL Server 2008) logs all
 - **-SqlCredential** - PSCredential for the connection.
 - **-StartTime** - Return only deadlocks from this point in time. Default: last 24 hours.
 - **-EndTime** - Return only deadlocks up to this point in time. Default: now.
+- **-Source** - Both (default), RingBuffer or EventFile (system_health*.xel, SQL Server 2012+).
 - **-MaxDeadlocks** - Maximum number of deadlocks returned (newest first). Default: 100.
 - **-OutputPath** - If specified, deadlock graphs are saved as .xdl files in this directory (format: Deadlock_<Instance>_<Timestamp>.xdl).
 - **-EnableException** - Throw exceptions immediately instead of returning as errors.
@@ -4914,6 +4916,81 @@ Test-sqmSsasDirectoryPermissions -InstanceName "SSAS2019" -WhatIf
 
 ## 2. Performance Analysis & Optimization
 
+### Get-sqmPlanCacheReport
+
+Lists the most expensive queries in the plan cache (top N by CPU, duration, reads and more), flags typical plan problems and optionally exports the execution plans as .sqlplan files.
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance (default: current computer name).
+- **-SqlCredential** - PSCredential for the connection.
+- **-Database** - Only statements of these databases (wildcards allowed). Costs more CPU on large plan caches.
+- **-SortBy** - CPU, Duration, Reads, Writes, Executions, MemoryGrant, Spills, All. Default: CPU, Duration, Reads.
+- **-Top** - Number of statements per metric. Default: 10.
+- **-MinutesBack** - Only statements executed within the last N minutes. Default: 0 (whole cache).
+- **-ExportPlans** - Saves the statement plans as .sqlplan files to <OutputPath>\Plans.
+- **-OutputPath** - Directory for the CSV/HTML report. Default: <OutputPath config>\PlanCacheReport.
+- **-NoReport** - Do not write CSV/HTML.
+- **-NoOpen** - Do not open the HTML report.
+- **-EnableException** - Throw exceptions immediately.
+
+**Examples (2):**
+
+```powershell
+Get-sqmPlanCacheReport -SqlInstance "SQL01" -SortBy All -Top 5 -ExportPlans
+
+```powershell
+Get-sqmPlanCacheReport -SqlInstance "SQL01" -Database "Shop*" -MinutesBack 60 -SortBy CPU,Reads
+
+### Get-sqmIndexUsageReport
+
+Finds unused, duplicate and overlapping indexes, heaps and disabled or hypothetical indexes in one or more databases. Read-only; DROP suggestions are written commented out to a .sql file.
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance (default: current computer name).
+- **-SqlCredential** - PSCredential for the connection.
+- **-Database** - Database name(s), wildcards allowed. Default: all online user databases.
+- **-Finding** - Unused, Duplicate, Overlapping, Heap, Disabled, Hypothetical. Default: all.
+- **-MinUptimeDays** - Below this uptime 'Unused' is flagged as unreliable. Default: 7.
+- **-MinSizeMB** - Ignore findings below this size. Default: 0.
+- **-OutputPath** - Directory for the report. Default: <OutputPath config>\IndexUsageReport.
+- **-NoReport** - Do not write files.
+- **-NoOpen** - Do not open the HTML report.
+- **-EnableException** - Throw exceptions immediately.
+
+**Examples (2):**
+
+```powershell
+Get-sqmIndexUsageReport -SqlInstance "SQL01"
+
+```powershell
+Get-sqmIndexUsageReport -SqlInstance "SQL01" -Finding Unused -MinSizeMB 500 -NoReport
+
+### Get-sqmFileLatencyReport
+
+Measures read and write latency per database file (sys.dm_io_virtual_file_stats), either since the last restart or as a live sample over a few seconds.
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance (default: current computer name).
+- **-SqlCredential** - PSCredential for the connection.
+- **-Database** - Only files of these databases (wildcards allowed).
+- **-SampleSeconds** - 0 = cumulative since start, 1-3600 = live sample.
+- **-MinIo** - Minimum I/Os before a file is rated. Default: 1000 cumulative, 10 in sample mode.
+- **-OutputPath** - Directory for the report. Default: <OutputPath config>\FileLatencyReport.
+- **-NoReport** - Do not write files.
+- **-NoOpen** - Do not open the HTML report.
+- **-EnableException** - Throw exceptions immediately.
+
+**Examples (2):**
+
+```powershell
+Get-sqmFileLatencyReport -SqlInstance "SQL01"
+
+```powershell
+Get-sqmFileLatencyReport -SqlInstance "SQL01" -SampleSeconds 60
+
 ### Get-sqmIndexFragmentation
 
 Analyzes index fragmentation in one or more databases.
@@ -5744,8 +5821,9 @@ $cred = Get-Credential
 Reads and analyzes deadlock events from the System Health Extended Event session.
 
 The System Health session (always active since SQL Server 2008) logs all
-    deadlocks as XML in the ring buffer. This function reads that buffer,
-    parses the deadlock graphs and returns for each deadlock:
+    deadlocks as XML in its ring buffer and in its event_file target (system_health*.xel).
+    This function reads both by default (-Source), removes duplicates, parses the deadlock
+    graphs and returns for each deadlock:
 
       - Timestamp of the deadlock
       - Victim session with login, host, program, statement
@@ -5756,8 +5834,8 @@ The System Health session (always active since SQL Server 2008) logs all
     Optionally, deadlock graphs can be saved as .xdl files
     (openable directly in SSMS by double-click).
 
-    Additionally, the System Health .xel ring buffer is read when available
-    (SQL Server 2012+, provides more history than the ring buffer).
+    Timestamps: XEvents store UTC. -StartTime/-EndTime are local times and are converted;
+    Timestamp in the result is local time, TimestampUtc the original value.
 
 **Parameters:**
 
@@ -5765,6 +5843,7 @@ The System Health session (always active since SQL Server 2008) logs all
 - **-SqlCredential** - PSCredential for the connection.
 - **-StartTime** - Return only deadlocks from this point in time. Default: last 24 hours.
 - **-EndTime** - Return only deadlocks up to this point in time. Default: now.
+- **-Source** - Both (default), RingBuffer or EventFile (system_health*.xel, SQL Server 2012+).
 - **-MaxDeadlocks** - Maximum number of deadlocks returned (newest first). Default: 100.
 - **-OutputPath** - If specified, deadlock graphs are saved as .xdl files in this directory (format: Deadlock_<Instance>_<Timestamp>.xdl).
 - **-EnableException** - Throw exceptions immediately instead of returning as errors.

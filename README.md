@@ -22,8 +22,11 @@ A comprehensive PowerShell module for SQL Server 2016+ administration, with spec
 `Get-sqmPlanInsights` parses ShowPlan XML (.sqlplan/.xml) and reports cardinality-estimate mismatches, SARGability violations, parameter-sniffing risk, tempdb spills, and missing-index suggestions — with runtime-evidence-based severity scoring instead of relying on optimizer cost estimates:
 
 ```powershell
+# Find the most expensive statements in the plan cache and export their plans
+$top = Get-sqmPlanCacheReport -SqlInstance "SQL01" -SortBy CPU -Top 5 -ExportPlans
+
 # Offline analysis of a saved plan
-Get-sqmPlanInsights -Path ".\slow-query.sqlplan"
+Get-sqmPlanInsights -Path $top[0].PlanFile
 
 # With live Query Store telemetry and a JSON bundle for the visualizer
 Get-sqmPlanInsights -Path ".\slow-query.sqlplan" -ServerInstance "SQL01" `
@@ -103,7 +106,10 @@ Set-sqmConfig -UpdateMode Off         # no check
 - `Complete-sqmListenerMigration` - Listener migration workflow
 
 ### Performance & Health
+- `Get-sqmPlanCacheReport` - Top N plan cache statements by CPU, duration, reads, grants, spills, with .sqlplan export
 - `Get-sqmPlanInsights` - Execution plan analysis: CE mismatches, SARGability, spills, missing indexes
+- `Get-sqmIndexUsageReport` - Unused, duplicate and overlapping indexes, heaps (read-only, DROP script commented out)
+- `Get-sqmFileLatencyReport` - Read/write latency per database file, cumulative or live sample
 - `Get-sqmWaitStatistics` - SQL Server wait statistics
 - `Get-sqmDiskSpaceReport` - Disk utilization and growth trends
 - `Get-sqmDatabaseRestoreHistory` - Last restore date per database, flags never-restored databases
