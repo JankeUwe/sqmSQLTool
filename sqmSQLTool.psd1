@@ -288,7 +288,7 @@
 	# Ausnahme: Set-sqmSqlDirectoryPermissions -> Invoke-sqmNtfsSetup (Alias fuer bessere
 	# Auffindbarkeit unter Get-Command -Noun *DirectoryPermissions* / *Permission*; siehe
 	# Set-Alias am Ende von Public\Invoke-sqmNtfsSetup.ps1)
-	AliasesToExport	       = @('Set-sqmSqlDirectoryPermissions')
+	AliasesToExport	       = @('Set-sqmSqlDirectoryPermissions', 'Prepare-sqmListenerForMigration')
 	
 	# List of all modules packaged with this module
 	ModuleList			   = @()
