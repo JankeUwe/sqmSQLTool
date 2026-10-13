@@ -1,5 +1,33 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.173.0] - 2026-10-13
+
+### Neu: `Get-sqmBackupExcludeReport` - Bericht der Ausschlusstabelle
+
+Liest `master.dbo.sqm_BackupExclude` (und `sqm_BackupExclude_History`) und verbindet sie mit
+`sys.databases` und der msdb-Historie. Nur lesend, Bericht als TXT, CSV (`;`) und HTML.
+
+| Status | Bedeutung |
+|---|---|
+| Excluded | `IsActive = 0 AND IsOrphaned = 0` - wird von den Jobs mit `-UseExcludeTable` uebersprungen |
+| Active | `IsActive = 1` - wird gesichert |
+| Orphaned | Datenbank existiert nicht mehr, Zeile bleibt |
+| NotInTable | Datenbank existiert, aber noch keine Zeile - wird gesichert, naechster Sync oder DDL-Trigger traegt sie ein |
+
+- **"Ausgeschlossen von / am" kommt aus der History** (letzte Aenderung `IsActive` -> 0). `ExcludedBy`/
+  `ExcludedAt` der Haupttabelle halten nur den INSERT fest (Sync-Job, DDL-Trigger), nicht den Ausschluss
+  ueber die GUI. Ohne History-Tabelle sagt der Bericht das, statt ein falsches Datum zu zeigen.
+- Hinweise je ausgeschlossener Datenbank: kein Grund eingetragen; Recovery FULL/BULK_LOGGED (ohne Log-Backups
+  waechst das Log bis die Platte voll ist); trotz Ausschluss ein Full nach dem Ausschluss vorhanden.
+- `-Status` filtert die Zeilen (die Zaehler bleiben vollstaendig), `-IncludeHistory` haengt das
+  Aenderungsprotokoll der letzten `-HistoryDays` (Standard 90) Tage an.
+- Fehlt die Tabelle: Status `NoTable` - es gibt keine Ausschluesse, alle Datenbanken werden gesichert.
+
+### Fehler: `Test-sqmBackupStatus` - "von ... seit ..." beim Ausschluss
+
+Zeigte `ExcludedBy`/`ExcludedAt` der Haupttabelle, also wann die Zeile eingefuegt wurde (meist vom Sync-Job),
+nicht wann und von wem ausgeschlossen wurde. Liest das jetzt aus `sqm_BackupExclude_History`; ohne
+History steht "Zeitpunkt unbekannt".
 ## [1.9.172.0] - 2026-10-13
 
 ### Neu: `Test-sqmBackupStatus` - Backup-Kontrolle mit Ausschlusstabelle

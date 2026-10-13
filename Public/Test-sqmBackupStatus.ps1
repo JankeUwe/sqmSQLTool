@@ -230,6 +230,8 @@ WHERE d.database_id <> 2
 
 				# Ausschlusstabelle: dieselbe Bedingung wie die Backup-Jobs (IsActive=0 AND IsOrphaned=0).
 				# Fehlt die Tabelle, gibt es keine Ausschluesse - gleicher Fallback wie im Job.
+				# "Von/seit" aus der History (letzte Aenderung IsActive -> 0): ExcludedBy/ExcludedAt der
+				# Haupttabelle halten nur den INSERT fest (Sync-Job, DDL-Trigger), nicht den Ausschluss.
 				$excludeLookup = @{ }
 				$hasExcludeTable = $false
 				if (-not $IgnoreExcludeTable)
@@ -237,8 +239,16 @@ WHERE d.database_id <> 2
 					try
 					{
 						$exRows = @(Invoke-DbaQuery @connParams -Database master -EnableException -Query @"
-IF OBJECT_ID(N'master.dbo.sqm_BackupExclude', N'U') IS NOT NULL
-    SELECT DatabaseName, Reason, ExcludedBy, ExcludedAt, IsActive, IsOrphaned FROM master.dbo.sqm_BackupExclude;
+IF OBJECT_ID(N'master.dbo.sqm_BackupExclude_History', N'U') IS NOT NULL AND OBJECT_ID(N'master.dbo.sqm_BackupExclude', N'U') IS NOT NULL
+    EXEC sp_executesql N'
+    SELECT e.DatabaseName, e.Reason, hx.ChangedBy AS ExcludedBy, hx.ChangedAt AS ExcludedAt, e.IsActive, e.IsOrphaned
+    FROM master.dbo.sqm_BackupExclude e
+    OUTER APPLY (SELECT TOP (1) h.ChangedBy, h.ChangedAt FROM master.dbo.sqm_BackupExclude_History h
+                 WHERE h.DatabaseName = e.DatabaseName AND h.ChangedField = N''IsActive'' AND h.NewValue = N''0''
+                 ORDER BY h.ChangedAt DESC, h.HistoryId DESC) hx;';
+ELSE IF OBJECT_ID(N'master.dbo.sqm_BackupExclude', N'U') IS NOT NULL
+    SELECT DatabaseName, Reason, CAST(NULL AS sysname) AS ExcludedBy, CAST(NULL AS datetime2) AS ExcludedAt, IsActive, IsOrphaned
+    FROM master.dbo.sqm_BackupExclude;
 "@)
 						if ($exRows.Count -gt 0) { $hasExcludeTable = $true }
 						foreach ($r in $exRows)
@@ -348,7 +358,8 @@ IF OBJECT_ID(N'master.dbo.sqm_BackupExclude', N'U') IS NOT NULL
 						$st = 'Excluded'
 						$reason = if ($ex.Reason -is [DBNull] -or -not $ex.Reason) { '(kein Grund angegeben)' } else { [string]$ex.Reason }
 						$since = _ToDate $ex.ExcludedAt
-						$notes.Add("Ausgeschlossen (sqm_BackupExclude): $reason - von $($ex.ExcludedBy) seit $(_Fmt $since)")
+						$who = if ($since) { " - von $($ex.ExcludedBy) seit $(_Fmt $since)" } else { ' - Zeitpunkt unbekannt (keine History)' }
+						$notes.Add("Ausgeschlossen (sqm_BackupExclude): $reason$who")
 					}
 					elseif ([string]$r.State -ne 'ONLINE')
 					{

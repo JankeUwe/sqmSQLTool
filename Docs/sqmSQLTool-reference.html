@@ -146,7 +146,7 @@
 	<!-- SIDEBAR -->
 	<div class="psdb-st-sidebar">
 	<input class="psdb-st-sidebar-search" type="text" placeholder="Funktion suchen…" oninput="psstSearch(this.value)">
-													<div class="psdb-st-nav-group" id="nav-alwayson">
+														<div class="psdb-st-nav-group" id="nav-alwayson">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-alwayson-list')">
 	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">23</span>
 	</div>
@@ -197,9 +197,10 @@
 
 	<div class="psdb-st-nav-group" id="nav-backup-&-restore">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-backup-&-restore-list')">
-	<span>💾 Backup & Restore</span><span class="psdb-st-nav-count">17</span>
+	<span>💾 Backup & Restore</span><span class="psdb-st-nav-count">18</span>
 	</div>
-	<ul class="psdb-st-nav-funcs" id="nav-backup-&-restore-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmdatabaserestorehistory')">Get-sqmDatabaseRestoreHistory</span></li>
+	<ul class="psdb-st-nav-funcs" id="nav-backup-&-restore-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmbackupexcludereport')">Get-sqmBackupExcludeReport</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmdatabaserestorehistory')">Get-sqmDatabaseRestoreHistory</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmserversfromou')">Get-sqmServersFromOU</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmlogshrink')">Invoke-sqmLogShrink</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmrestoredatabase')">Invoke-sqmRestoreDatabase</span></li>
@@ -450,7 +451,7 @@
 
 	<!-- CONTENT -->
 	<div class="psdb-st-content" id="psdb-st-content">
-													<section class="psdb-st-section" id="cat-alwayson">
+														<section class="psdb-st-section" id="cat-alwayson">
 	<h2 class="psdb-st-section-title">🔄 AlwaysOn</h2>
 
 	<div class="psdb-st-func-card" id="f-addsqmdatabasetoag">
@@ -1169,6 +1170,31 @@ Repair-sqmAlwaysOnDatabases -Force</pre><button class="psdb-st-copy-btn" onclick
 
 	<section class="psdb-st-section" id="cat-backup-&-restore">
 	<h2 class="psdb-st-section-title">💾 Backup & Restore</h2>
+
+	<div class="psdb-st-func-card" id="f-getsqmbackupexcludereport">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Get-sqmBackupExcludeReport</span>
+	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
+	</div>
+	<div class="psdb-st-func-desc">Report of the backup exclusion table master.dbo.sqm_BackupExclude: what is excluded, why, by whom and since when, plus the databases the table does not know.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 3 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmBackupExcludeReport -SqlInstance &quot;SQL01&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmBackupExcludeReport -SqlInstance &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Only the excluded databases, with change log of the last 180 days</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Only the excluded databases, with change log of the last 180 days
+    Get-sqmBackupExcludeReport -SqlInstance &quot;SQL01&quot; -Status Excluded -IncludeHistory -HistoryDays 180</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># All AG replicas: the table is propagated, the report shows whether they agree</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # All AG replicas: the table is propagated, the report shows whether they agree
+    Get-sqmBackupExcludeReport -SqlInstance &quot;SQLNODE1&quot;, &quot;SQLNODE2&quot; -Status Excluded -NoOpen</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
 
 	<div class="psdb-st-func-card" id="f-getsqmdatabaserestorehistory">
 	<div class="psdb-st-func-header">
@@ -5777,6 +5803,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Get-sqmAlwaysOnHealthReport</td><td>Creates a detailed health report for all Always On availability groups on an instance.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmAlwaysOnQueueStatus</td><td>Returns the current redo queue / send queue status for all Always On availability groups on an instance - no files written.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmAutoGrowthReport</td><td>Creates an AutoGrowth configuration report for all database files on a SQL Server instance.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Get-sqmBackupExcludeReport</td><td>Report of the backup exclusion table master.dbo.sqm_BackupExclude: what is excluded, why, by whom and since when, plus the databases the table does not know.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmBlockingHistory</td><td>Retrieves past blocking incidents (blocked_process_report events) from Extended Events ring buffers - both the dedicated sqm_BlockedProcessMonitor session this function ensures exists, and system_health if it happens to capture the event too.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmBlockingReport</td><td>Retrieves current blocking chains on a SQL Server instance.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmCertificateReport</td><td>Creates a comprehensive report on SQL Server certificates and their expiration dates.</td></tr>

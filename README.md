@@ -114,6 +114,7 @@ Set-sqmConfig -UpdateMode Off         # no check
 - `Get-sqmWaitStatistics` - SQL Server wait statistics
 - `Get-sqmDiskSpaceReport` - Disk utilization and growth trends
 - `Test-sqmBackupStatus` - Backup control: Full/Diff/Log age per database against thresholds, honours sqm_BackupExclude, flags databases created after the last backup run
+- `Get-sqmBackupExcludeReport` - Report of sqm_BackupExclude: excluded databases with reason, who and since when (from the change log), orphaned and not yet registered databases, risk hints
 - `Get-sqmDatabaseRestoreHistory` - Last restore date per database, flags never-restored databases
 - `Get-sqmMissingIndexes` - Index recommendations with CREATE statements
 - `Get-sqmAutoGrowthReport` - Database autogrowth tracking

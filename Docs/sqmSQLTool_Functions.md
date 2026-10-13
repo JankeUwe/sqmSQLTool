@@ -1104,6 +1104,38 @@ Sync-sqmBackupExcludeTable -SqlInstance "SQL01" -WhatIf
 # Synchronise and verify that the audit history table and trigger are in place
 Sync-sqmBackupExcludeTable -SqlInstance "SQL01\INST1"
 
+### Get-sqmBackupExcludeReport
+
+Report of the backup exclusion table master.dbo.sqm_BackupExclude: what is excluded, why, by whom and since when, plus the databases the table does not know.
+
+    Status per row: Excluded (IsActive=0 AND IsOrphaned=0), Active, Orphaned (database gone),
+    NotInTable (database exists, no row yet - backed up). "Excluded by/since" comes from
+    sqm_BackupExclude_History (last change IsActive -> 0); ExcludedBy/ExcludedAt of the main table
+    only record the INSERT. Hints: no reason, FULL/BULK_LOGGED recovery without log backups (log
+    grows), backed up despite exclusion. Read-only.
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance(s) (default: current computer name).
+- **-SqlCredential** - PSCredential for the connection.
+- **-Status** - All (default), Excluded, Active, Orphaned, NotInTable.
+- **-IncludeHistory** - Add the change log of the last -HistoryDays days.
+- **-HistoryDays** - Default: 90.
+- **-OutputPath** - Report directory. Default: <OutputPath config>\BackupExclude.
+- **-NoOpen** - Do not open the report.
+- **-ContinueOnError** / **-EnableException** - Error handling.
+
+**Examples (3):**
+
+```powershell
+Get-sqmBackupExcludeReport -SqlInstance "SQL01"
+
+```powershell
+Get-sqmBackupExcludeReport -SqlInstance "SQL01" -Status Excluded -IncludeHistory -HistoryDays 180
+
+```powershell
+Get-sqmBackupExcludeReport -SqlInstance "SQLNODE1", "SQLNODE2" -Status Excluded -NoOpen
+
 ### Test-sqmBackupStatus
 
 Backup control: checks per database whether the last Full/Diff/Log backups are recent enough, honouring the exclusions in master.dbo.sqm_BackupExclude.
