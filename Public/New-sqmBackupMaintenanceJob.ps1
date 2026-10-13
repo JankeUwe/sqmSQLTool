@@ -82,7 +82,8 @@
 
 .PARAMETER BackupPath
 	Backup target directory, passed to the job step as @Directory. When not specified, the
-	instance's configured BackupDirectory plus '\Usr-db' is resolved at job-creation time and
+	instance's configured BackupDirectory plus '\Usr-db' (not appended when it already ends
+	with '\Usr-db') is resolved at job-creation time and
 	baked into the step, where it stays visible and editable.
 
 .PARAMETER ScheduleTime
@@ -401,10 +402,17 @@ function New-sqmBackupMaintenanceJob
 				{
 					$regQuery = "DECLARE @BackupDirectory NVARCHAR(4000); EXEC master.dbo.xp_instance_regread N'HKEY_LOCAL_MACHINE', N'SOFTWARE\Microsoft\MSSQLServer\MSSQLServer', N'BackupDirectory', @BackupDirectory OUTPUT; SELECT @BackupDirectory AS BackupDirectory;"
 					$regResult = Invoke-DbaQuery @connParams -Query $regQuery -ErrorAction Stop
-					if ($regResult.BackupDirectory) { $effBackupDir = "$($regResult.BackupDirectory)\Usr-db" }
+					if ($regResult.BackupDirectory) { $effBackupDir = $regResult.BackupDirectory }
 				}
 				catch { }
-				if (-not $effBackupDir -and $sqlSrv.BackupDirectory) { $effBackupDir = "$($sqlSrv.BackupDirectory)\Usr-db" }
+				if (-not $effBackupDir -and $sqlSrv.BackupDirectory) { $effBackupDir = $sqlSrv.BackupDirectory }
+				# \Usr-db nur anhaengen, wenn das Server-BackupDirectory nicht schon darauf endet
+				# (Konvention von Invoke-sqmUserDatabaseBackup) - sonst Usr-db\Usr-db.
+				if ($effBackupDir)
+				{
+					$effBackupDir = $effBackupDir.TrimEnd('\')
+					if ($effBackupDir -notmatch '\\Usr-db$') { $effBackupDir = "$effBackupDir\Usr-db" }
+				}
 			}
 			if (-not $effBackupDir)
 			{

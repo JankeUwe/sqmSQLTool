@@ -18,6 +18,7 @@
 
 .PARAMETER BackupDirectory
     Backup base directory. System databases are backed up to <BackupDirectory>\Sys-db.
+    A trailing '\Usr-db' is removed first, so '...\Usr-db' becomes '...\Sys-db'.
     Default: automatically determined from SQL Server.
 
 .PARAMETER JobName
@@ -188,7 +189,10 @@ function New-sqmOlaSysDbBackupJob
 				if (-not $effBackupDir) { $effBackupDir = $sqlSrv.BackupDirectory }
 			}
 			if (-not $effBackupDir) { $effBackupDir = 'C:\Program Files\Microsoft SQL Server\MSSQL\Backup' }
-			$sysBackupDir = "$effBackupDir\Sys-db"
+			# Basis ohne Usr-db/Sys-db-Endung: zeigt das Server-BackupDirectory schon auf \Usr-db
+			# (Konvention von Invoke-sqmUserDatabaseBackup), entstuende sonst Usr-db\Sys-db.
+			$baseDir = $effBackupDir.TrimEnd('\') -replace '\\Usr-db$', ''
+			$sysBackupDir = if ($baseDir -match '\\Sys-db$') { $baseDir } else { "$baseDir\Sys-db" }
 			$result.BackupDirectory = $sysBackupDir
 			Invoke-sqmLogging -Message "Backup-Verzeichnis fuer System-Datenbanken: $sysBackupDir" -FunctionName $functionName -Level "INFO"
 			

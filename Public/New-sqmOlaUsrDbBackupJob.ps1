@@ -41,7 +41,7 @@
 
 .PARAMETER BackupDirectory
     Backup target directory. When omitted, the base directory is automatically determined
-    from SQL Server and '\Usr-db' is appended. When explicitly specified, the given path is
+    from SQL Server and '\Usr-db' is appended (unless it already ends with '\Usr-db'). When explicitly specified, the given path is
     used as-is (no '\Usr-db' is appended) — pass the full, final backup path.
 
 .PARAMETER Databases
@@ -352,7 +352,7 @@ function New-sqmOlaUsrDbBackupJob
 					$existStep = $existingFullJob.JobSteps | Select-Object -First 1
 					if ($existStep -and $existStep.Command -match "@Directory\s*=\s*N?'{1,2}([^']+)'{1,2}")
 					{
-						$BackupDirectory = $Matches[1] -replace '\\Usr-db$', ''
+						$BackupDirectory = $Matches[1].TrimEnd('\') -replace '\\Usr-db$', ''
 						Invoke-sqmLogging -Message "BackupDirectory aus vorhandenem Job: $BackupDirectory" -FunctionName $functionName -Level "INFO"
 					}
 				}
@@ -457,7 +457,10 @@ function New-sqmOlaUsrDbBackupJob
 			}
 			else
 			{
-				$usrBackupDir = "$effBackupDir\Usr-db"
+				# Endet das Server-BackupDirectory schon auf \Usr-db (Konvention von
+				# Invoke-sqmUserDatabaseBackup), nicht nochmal anhaengen - sonst Usr-db\Usr-db.
+				$baseDir = $effBackupDir.TrimEnd('\')
+				$usrBackupDir = if ($baseDir -match '\\Usr-db$') { $baseDir } else { "$baseDir\Usr-db" }
 			}
 			Invoke-sqmLogging -Message "Backup-Verzeichnis fuer User-Datenbanken: $usrBackupDir" -FunctionName $functionName -Level "INFO"
 			

@@ -1,5 +1,19 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.171.0] - 2026-10-13
+
+### Fehler: Backup-Pfad `Usr-db\Usr-db` bei automatisch ermitteltem Verzeichnis
+
+`Invoke-sqmUserDatabaseBackup` verlangt, dass die Server-Eigenschaft `BackupDirectory` auf `\Usr-db`
+endet. Die Job-Funktionen haengen bei automatisch ermitteltem Pfad aber immer `\Usr-db` (bzw. `\Sys-db`)
+an. Auf so konfigurierten Servern entstand `...\Usr-db\Usr-db` bzw. `...\Usr-db\Sys-db`.
+
+- `New-sqmOlaUsrDbBackupJob`, `New-sqmBackupMaintenanceJob`: `\Usr-db` wird nur noch angehaengt, wenn das
+  Verzeichnis nicht schon darauf endet (Gross-/Kleinschreibung egal, abschliessender `\` wird entfernt).
+- `New-sqmOlaSysDbBackupJob`: ein abschliessendes `\Usr-db` wird vor dem Anhaengen von `\Sys-db` entfernt.
+- `-UseExcludeTable`: der aus dem bestehenden Job gelesene Pfad wird auch mit abschliessendem `\` korrekt
+  von `\Usr-db` befreit.
+- Explizit uebergebene Pfade (`-BackupDirectory`, `-BackupPath`) werden wie bisher unveraendert verwendet.
 ## [1.9.170.0] - 2026-10-12
 
 ### Neu: `Invoke-sqmHealthReport` - alle Pruefungen, ein Bericht
