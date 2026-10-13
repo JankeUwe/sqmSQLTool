@@ -1104,6 +1104,42 @@ Sync-sqmBackupExcludeTable -SqlInstance "SQL01" -WhatIf
 # Synchronise and verify that the audit history table and trigger are in place
 Sync-sqmBackupExcludeTable -SqlInstance "SQL01\INST1"
 
+### Test-sqmBackupStatus
+
+Backup control: checks per database whether the last Full/Diff/Log backups are recent enough, honouring the exclusions in master.dbo.sqm_BackupExclude.
+
+    Status per database: OK, Warning (log overdue; or no full yet but younger than -MaxFullAgeHours),
+    Critical (full/diff too old; no full and older than -MaxFullAgeHours), Excluded (IsActive=0 AND
+    IsOrphaned=0 in sqm_BackupExclude, same condition as the backup jobs), Skipped (offline, AG
+    primary unreachable). Databases created after the last backup run are flagged
+    (NewSinceLastBackup). Only backups after create_date count; COPY_ONLY fulls do not count.
+    AG databases on a secondary are checked against the primary's msdb. Ages use the server clock.
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance(s) (default: current computer name).
+- **-SqlCredential** - PSCredential, also used for the AG primary.
+- **-MaxFullAgeHours** - Maximum age of the newest full or diff. Default: 26.
+- **-MaxFullOnlyAgeDays** - Maximum age of the newest full alone. Default: 8.
+- **-MaxLogAgeMinutes** - Maximum log backup age (FULL/BULK_LOGGED). Default: 60, 0 = not checked.
+- **-ExcludeDatabase** - Databases not to check (wildcards).
+- **-IgnoreExcludeTable** - Evaluate databases excluded in sqm_BackupExclude like all others.
+- **-IncludeSystemDatabases** - Also check master, model, msdb.
+- **-OutputPath** - Report directory. Default: <OutputPath config>\BackupStatus.
+- **-NoOpen** - Do not open the report.
+- **-ContinueOnError** / **-EnableException** - Error handling.
+
+**Examples (3):**
+
+```powershell
+Test-sqmBackupStatus -SqlInstance "SQL01"
+
+```powershell
+Test-sqmBackupStatus -SqlInstance "SQL01" -MaxFullOnlyAgeDays 8 -MaxFullAgeHours 26 -MaxLogAgeMinutes 30
+
+```powershell
+(Test-sqmBackupStatus -SqlInstance "SQL01" -NoOpen).DetailRows | Where-Object Status -in 'Warning','Critical'
+
 ### Test-sqmBackupIntegrity
 
 Verifies one or more backup files using RESTORE VERIFYONLY.
@@ -2477,7 +2513,7 @@ if ((Test-sqmSqlInstanceInstalled).IsInstalled) { Write-Host "SQL installiert" }
 
 Runs all sqmSQLTool health and performance checks against one instance and writes one consolidated HTML report with a prioritized findings list, plus every detail report.
 
-    Sections: Instance, Waits, Activity, OpenTransactions, TempDb, Databases, PlanCache, Indexes,
+    Sections: Instance, Waits, Activity, OpenTransactions, TempDb, Databases, Backups, PlanCache, Indexes,
     FileLatency, Deadlocks, Security, Disk. Every section runs on its own; a failing section is
     reported and the others still run.
 

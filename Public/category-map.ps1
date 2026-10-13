@@ -161,6 +161,7 @@ $categoryMap = @{
     'Sync-sqmLoginsToAlwaysOn'            = 'Always On & Availability Groups'
     'Test-InternetConnectivity'           = 'Module & Update Management'
     'Test-sqmBackupIntegrity'             = 'Backup & Recovery'
+    'Test-sqmBackupStatus'                = 'Backup & Recovery'
     'Test-sqmCostThreshold'               = 'Performance Analysis & Optimization'
     'Test-sqmDistributedAgReadiness'      = 'Always On & Availability Groups'
     'Test-sqmDriverInstalled'             = 'SQL Drivers & Tools Installation'

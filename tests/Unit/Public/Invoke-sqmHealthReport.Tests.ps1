@@ -40,6 +40,7 @@ Describe 'Invoke-sqmHealthReport' {
         Mock -ModuleName sqmSQLTool Get-sqmWhoIsActive { [PSCustomObject]@{ LastSnapshot = @([PSCustomObject]@{ SessionId = 60; BlockingSessionId = 55; ElapsedSeconds = 30 }) } }
         Mock -ModuleName sqmSQLTool Get-sqmTempDbRecommendation { [PSCustomObject]@{ Status = 'OK'; FileCount = 8; RecommendedCount = 8; FileSizesMB = 8; GrowthMB = 64; Recommendations = @() } }
         Mock -ModuleName sqmSQLTool Get-sqmDatabaseHealth { [PSCustomObject]@{ DetailRows = @([PSCustomObject]@{ Database = 'Shop'; OverallStatus = 'Critical'; CheckDbStatus = 'Critical'; VlfStatus = 'OK'; LastCheckDb = 'never'; LastFullBackup = '(keins)' }) } }
+        Mock -ModuleName sqmSQLTool Test-sqmBackupStatus { [PSCustomObject]@{ LastBackupRun = (Get-Date).AddHours(-3); ExcludedCount = 1; NewSinceLastBackup = @('NeuDb'); DetailRows = @([PSCustomObject]@{ Database = 'Shop'; Status = 'Critical'; Notes = 'Letztes Full/Diff vor 50 h' }, [PSCustomObject]@{ Database = 'Arch'; Status = 'Excluded'; Notes = 'Ausgeschlossen' }) } }
         Mock -ModuleName sqmSQLTool Get-sqmPlanCacheReport { [PSCustomObject]@{ Ranks = 'CPU#1'; DatabaseName = 'Shop'; ObjectName = 'dbo.P'; CpuPercent = 60; Findings = 'ImplicitConversion'; StatementText = 'SELECT 1' } }
         Mock -ModuleName sqmSQLTool Get-sqmIndexUsageReport { [PSCustomObject]@{ Finding = 'Unused'; SizeMB = 2048; DatabaseName = 'Shop' } }
         Mock -ModuleName sqmSQLTool Get-sqmMissingIndexes { }
@@ -49,9 +50,9 @@ Describe 'Invoke-sqmHealthReport' {
         Mock -ModuleName sqmSQLTool Get-sqmDiskSpaceReport { [PSCustomObject]@{ DetailRows = @([PSCustomObject]@{ MountPoint = 'E:\'; FreePct = 4; Status = 'Critical'; Message = 'voll' }) } }
     }
 
-    It 'Fuehrt alle 12 Abschnitte aus und schreibt index.html' {
+    It 'Fuehrt alle 13 Abschnitte aus und schreibt index.html' {
         $r = Invoke-sqmHealthReport -SqlInstance 'SQL01' -OutputPath $script:out -NoOpen
-        $r.Sections.Count | Should -Be 12
+        $r.Sections.Count | Should -Be 13
         Test-Path $r.HtmlFile | Should -Be $true
         (Get-Content $r.HtmlFile -Raw) | Should -Match "id='s-OpenTransactions'"
     }
@@ -61,13 +62,14 @@ Describe 'Invoke-sqmHealthReport' {
         $r.Status | Should -Be 'Critical'
         $r.Findings[0].Severity | Should -Be 'Critical'
         $sections = $r.Findings.Section | Sort-Object -Unique
-        foreach ($s in 'Instance', 'Waits', 'Activity', 'OpenTransactions', 'Databases', 'PlanCache', 'Indexes', 'FileLatency', 'Disk') { $sections | Should -Contain $s }
+        foreach ($s in 'Instance', 'Waits', 'Activity', 'OpenTransactions', 'Databases', 'Backups', 'PlanCache', 'Indexes', 'FileLatency', 'Disk') { $sections | Should -Contain $s }
         ($r.Findings | Where-Object Section -eq 'OpenTransactions').Severity | Should -Be 'Critical'
         ($r.Findings | Where-Object { $_.Section -eq 'Instance' -and $_.Finding -like 'MAXDOP*' }).Severity | Should -Be 'Warning'
         ($r.Findings | Where-Object { $_.Section -eq 'Indexes' }).Severity | Should -Be 'Warning'
     }
 
     It 'Ein fehlschlagender Abschnitt stoppt die anderen nicht' {
+        Mock -ModuleName sqmSQLTool Test-sqmBackupStatus { [PSCustomObject]@{ LastBackupRun = (Get-Date).AddHours(-3); ExcludedCount = 1; NewSinceLastBackup = @('NeuDb'); DetailRows = @([PSCustomObject]@{ Database = 'Shop'; Status = 'Critical'; Notes = 'Letztes Full/Diff vor 50 h' }, [PSCustomObject]@{ Database = 'Arch'; Status = 'Excluded'; Notes = 'Ausgeschlossen' }) } }
         Mock -ModuleName sqmSQLTool Get-sqmPlanCacheReport { throw 'VIEW SERVER STATE fehlt' }
         $r = Invoke-sqmHealthReport -SqlInstance 'SQL01' -OutputPath $script:out -NoOpen
         ($r.Sections | Where-Object Section -eq 'PlanCache').Status | Should -Be 'Failed'
@@ -103,5 +105,12 @@ Describe 'Invoke-sqmHealthReport' {
     It '-Zip packt den Berichtsordner' {
         $r = Invoke-sqmHealthReport -SqlInstance 'SQL01' -Section Instance -Zip -OutputPath $script:out -NoOpen
         Test-Path $r.ZipFile | Should -Be $true
+    }
+    It 'Backups: Befunde nur fuer Warning/Critical, ausgeschlossene DBs nicht, neue DBs als Info' {
+        $r = Invoke-sqmHealthReport -SqlInstance 'SQL01' -Section Backups -OutputPath $script:out -NoOpen
+        $b = @($r.Findings | Where-Object Section -eq 'Backups')
+        ($b | Where-Object Finding -eq 'Backup Shop').Severity | Should -Be 'Critical'
+        $b | Where-Object Finding -like '*Arch*' | Should -BeNullOrEmpty
+        ($b | Where-Object Finding -like '*NeuDb*').Severity | Should -Be 'Info'
     }
 }

@@ -1,5 +1,36 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.172.0] - 2026-10-13
+
+### Neu: `Test-sqmBackupStatus` - Backup-Kontrolle mit Ausschlusstabelle
+
+Ein Status je Datenbank, gemessen an Grenzwerten: neuestes Full oder Diff (`-MaxFullAgeHours`, Standard 26),
+neuestes Full allein (`-MaxFullOnlyAgeDays`, Standard 8), neuestes Log bei FULL/BULK_LOGGED
+(`-MaxLogAgeMinutes`, Standard 60, 0 = aus). Bericht als TXT, CSV (`;`) und HTML.
+
+| Status | Bedeutung |
+|---|---|
+| OK | alle Sicherungen innerhalb der Grenzen |
+| Warning | Log ueberfaellig, oder noch kein Full, aber juenger als `-MaxFullAgeHours` |
+| Critical | Full/Diff zu alt, oder kein Full und aelter als `-MaxFullAgeHours` |
+| Excluded | in `master.dbo.sqm_BackupExclude` mit `IsActive = 0 AND IsOrphaned = 0` (gleiche Bedingung wie die Backup-Jobs), mit Grund, von wem, seit wann |
+| Skipped | offline/restoring, oder AG-Primary nicht erreichbar |
+
+- **Nach dem letzten Backup-Lauf angelegte Datenbanken** werden vermerkt (`NewSinceLastBackup`, im
+  Berichtskopf aufgelistet). Letzter Lauf = neuestes regulaeres Full irgendeiner nicht ausgeschlossenen
+  Benutzerdatenbank; `-ExcludeDatabase` verschiebt ihn nicht.
+- Es zaehlen nur Sicherungen ab `create_date`: eine neu angelegte oder per Restore ersetzte Datenbank erbt
+  nicht die Historie ihrer gleichnamigen Vorgaengerin (wird als Hinweis gemeldet). COPY_ONLY-Fulls zaehlen nicht.
+- AG-Datenbanken auf einem Secondary werden gegen die msdb des aktuellen Primary geprueft, denn die Jobs
+  sichern sie seit 1.9.166.0 nur dort.
+- Alle Alter werden gegen die Serveruhr (`GETDATE()`) gerechnet, nicht gegen die des Clients.
+- `-IgnoreExcludeTable` bewertet ausgeschlossene Datenbanken wie alle anderen.
+- `msdb.dbo.backupset` wird je Instanz nur einmal gelesen (ein `GROUP BY`).
+
+### Erweiterung: `Invoke-sqmHealthReport` - Abschnitt `Backups`
+
+Neuer Abschnitt mit `Test-sqmBackupStatus`: Befunde fuer Warning/Critical, ausgeschlossene Datenbanken
+erzeugen keinen Befund, nach dem letzten Lauf angelegte Datenbanken einen Info-Befund.
 ## [1.9.171.0] - 2026-10-13
 
 ### Fehler: Backup-Pfad `Usr-db\Usr-db` bei automatisch ermitteltem Verzeichnis

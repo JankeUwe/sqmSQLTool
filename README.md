@@ -113,6 +113,7 @@ Set-sqmConfig -UpdateMode Off         # no check
 - `Get-sqmFileLatencyReport` - Read/write latency per database file, cumulative or live sample
 - `Get-sqmWaitStatistics` - SQL Server wait statistics
 - `Get-sqmDiskSpaceReport` - Disk utilization and growth trends
+- `Test-sqmBackupStatus` - Backup control: Full/Diff/Log age per database against thresholds, honours sqm_BackupExclude, flags databases created after the last backup run
 - `Get-sqmDatabaseRestoreHistory` - Last restore date per database, flags never-restored databases
 - `Get-sqmMissingIndexes` - Index recommendations with CREATE statements
 - `Get-sqmAutoGrowthReport` - Database autogrowth tracking

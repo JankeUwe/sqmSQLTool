@@ -17,6 +17,8 @@
       OpenTransactions  Transactions open longer than -OpenTranMinutes, with log usage
       TempDb            Configuration (Get-sqmTempDbRecommendation) + top tempdb consumers
       Databases         CHECKDB, backups, VLFs, auto growth (Get-sqmDatabaseHealth)
+      Backups           Backup control against thresholds, honours sqm_BackupExclude, flags
+                        databases created after the last backup run (Test-sqmBackupStatus)
       PlanCache         Most expensive statements (Get-sqmPlanCacheReport)
       Indexes           Unused/duplicate/overlapping indexes, heaps (Get-sqmIndexUsageReport)
                         + missing indexes (Get-sqmMissingIndexes)
@@ -112,10 +114,10 @@ function Invoke-sqmHealthReport
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
 		[Parameter(Mandatory = $false)]
-		[ValidateSet('Instance', 'Waits', 'Activity', 'OpenTransactions', 'TempDb', 'Databases', 'PlanCache', 'Indexes', 'FileLatency', 'Deadlocks', 'Security', 'Disk')]
-		[string[]]$Section = @('Instance', 'Waits', 'Activity', 'OpenTransactions', 'TempDb', 'Databases', 'PlanCache', 'Indexes', 'FileLatency', 'Deadlocks', 'Security', 'Disk'),
+		[ValidateSet('Instance', 'Waits', 'Activity', 'OpenTransactions', 'TempDb', 'Databases', 'Backups', 'PlanCache', 'Indexes', 'FileLatency', 'Deadlocks', 'Security', 'Disk')]
+		[string[]]$Section = @('Instance', 'Waits', 'Activity', 'OpenTransactions', 'TempDb', 'Databases', 'Backups', 'PlanCache', 'Indexes', 'FileLatency', 'Deadlocks', 'Security', 'Disk'),
 		[Parameter(Mandatory = $false)]
-		[ValidateSet('Instance', 'Waits', 'Activity', 'OpenTransactions', 'TempDb', 'Databases', 'PlanCache', 'Indexes', 'FileLatency', 'Deadlocks', 'Security', 'Disk')]
+		[ValidateSet('Instance', 'Waits', 'Activity', 'OpenTransactions', 'TempDb', 'Databases', 'Backups', 'PlanCache', 'Indexes', 'FileLatency', 'Deadlocks', 'Security', 'Disk')]
 		[string[]]$SkipSection = @(),
 		[Parameter(Mandatory = $false)]
 		[string[]]$Database = @(),
@@ -169,7 +171,7 @@ function Invoke-sqmHealthReport
 	process
 	{
 		$runStart = Get-Date
-		$order = @('Instance', 'Waits', 'Activity', 'OpenTransactions', 'TempDb', 'Databases', 'PlanCache', 'Indexes', 'FileLatency', 'Deadlocks', 'Security', 'Disk')
+		$order = @('Instance', 'Waits', 'Activity', 'OpenTransactions', 'TempDb', 'Databases', 'Backups', 'PlanCache', 'Indexes', 'FileLatency', 'Deadlocks', 'Security', 'Disk')
 		$todo = @($order | Where-Object { $_ -in $Section -and $_ -notin $SkipSection })
 
 		$conn = @{ SqlInstance = $SqlInstance }
@@ -407,6 +409,21 @@ ORDER BY (su.user_objects_alloc_page_count + su.internal_objects_alloc_page_coun
 							$why = @($d.PSObject.Properties | Where-Object { $_.Name -like '*Status' -and $_.Name -notin 'OverallStatus', 'DatabaseStatus' -and [string]$_.Value -in 'Warning', 'Critical' } | ForEach-Object { $_.Name -replace 'Status$', '' })
 							if ([string]$d.LastFullBackup -eq '(keins)') { $why += 'kein Full-Backup' }
 							& $addFinding $d.OverallStatus 'Databases' "Datenbank $($d.Database): $($why -join ', ')" "Letztes CHECKDB: $($d.LastCheckDb), letztes Full-Backup: $($d.LastFullBackup)"
+						}
+					}
+					'Backups'
+					{
+						$bs = Test-sqmBackupStatus @conn -OutputPath $details -NoOpen -EnableException 3>$null 6>$null
+						$rows = @($bs.DetailRows)
+						$html = "<p>Letzter Backup-Lauf: $(if ($bs.LastBackupRun) { ([datetime]$bs.LastBackupRun).ToString('yyyy-MM-dd HH:mm') } else { '(keiner gefunden)' }) | Ausgeschlossen (sqm_BackupExclude): $($bs.ExcludedCount)</p>"
+						$html += & $table ($rows | Where-Object Status -ne 'OK' | Sort-Object @{ e = { switch ($_.Status) { 'Critical' { 0 } 'Warning' { 1 } 'Skipped' { 2 } default { 3 } } } }, Database) @('Database', 'Status', 'RecoveryModel', 'CreateDate', 'LastFullBackup', 'LastLogBackup', 'Notes') ([math]::Max($Top, 25))
+						foreach ($d in ($rows | Where-Object { $_.Status -in 'Warning', 'Critical' }))
+						{
+							& $addFinding $d.Status 'Backups' "Backup $($d.Database)" $d.Notes
+						}
+						if (@($bs.NewSinceLastBackup).Count -gt 0)
+						{
+							& $addFinding 'Info' 'Backups' "Nach dem letzten Backup-Lauf angelegt: $(@($bs.NewSinceLastBackup) -join ', ')" 'Werden vom naechsten Lauf erfasst, sofern nicht in sqm_BackupExclude ausgeschlossen.'
 						}
 					}
 					'PlanCache'
