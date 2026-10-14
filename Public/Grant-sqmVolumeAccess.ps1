@@ -9,6 +9,9 @@
     switched off (protected DACL) do not receive it that way; the function finds them and sets the
     same ACE on each of them explicitly, which in turn reaches everything below them.
 
+    With -Inheritance Off the ACE is set without inheritance flags and applies to the target
+    folder itself only; nothing below it is changed.
+
     Compared with "icacls <root> /grant ... /T" this
       - leaves no duplicate ACE (explicit + inherited) on every folder,
       - does not re-propagate the whole subtree once per folder (hours on large volumes),
@@ -50,9 +53,17 @@
 .PARAMETER ExcludeDrive
     Drives that are never touched. Default: C, S. The system drive is always excluded.
 
+.PARAMETER Inheritance
+    On (default): the ACE is inheritable ((OI)(CI)) and reaches all subfolders and files, folders
+    with broken inheritance are found and granted explicitly.
+    Off: the ACE applies to the target folder itself only (no (OI)(CI)); nothing below is changed
+    and no subfolder scan takes place. Typical use: let a group list/open a drive root or a
+    folder without access to its contents.
+
 .PARAMETER IncludeFiles
     Also check every file for broken inheritance and grant on those. Files rarely have a
     protected DACL; this reads the ACL of every file and takes correspondingly long.
+    Ignored with -Inheritance Off.
 
 .PARAMETER EnableException
     Throw exceptions immediately instead of reporting them as Failed.
@@ -78,10 +89,15 @@
 
     Two principals at once, without prompting, shows only what changed or failed.
 
+.EXAMPLE
+    Grant-sqmVolumeAccess -Account 'DOMAIN\SQL-Monitoring' -Path 'H:\' -Inheritance Off
+
+    The group may open the root of H: itself, but gets nothing on the folders and files below.
+
 .OUTPUTS
     One object per target and principal: ComputerName, Path, Scope (Root/ProtectedFolder/
-    ProtectedFile), Principal, Sid, Rights, Action (Granted/AlreadyPresent/WhatIf/Failed/Skipped),
-    Message.
+    ProtectedFile), Principal, Sid, Rights, Inheritance (On/Off), Action (Granted/AlreadyPresent/
+    WhatIf/Failed/Skipped), Message.
 
 .NOTES
     Author:        MSSQLTools
@@ -109,6 +125,9 @@ function Grant-sqmVolumeAccess
 		[string[]]$Path,
 		[Parameter(Mandatory = $false)]
 		[string[]]$ExcludeDrive = @('C', 'S'),
+		[Parameter(Mandatory = $false)]
+		[ValidateSet('On', 'Off')]
+		[string]$Inheritance = 'On',
 		[Parameter(Mandatory = $false)]
 		[switch]$IncludeFiles,
 		[Parameter(Mandatory = $false)]
@@ -180,8 +199,14 @@ function Grant-sqmVolumeAccess
 			Write-Warning "Keine erhoehte Sitzung: Aenderungen an Volume-Wurzeln und fremden Ordnern werden fehlschlagen."
 		}
 
-		Invoke-sqmLogging -Message ("Starte $functionName (Principals: {0}; Rechte: {1}; ausgeschlossen: {2})" -f
-			(($principals | ForEach-Object { "$($_.Name) [$($_.Sid)]" }) -join ', '), $Rights, ($exclude -join ', ')) -FunctionName $functionName -Level "INFO"
+		$inherit = $Inheritance -eq 'On'
+		if (-not $inherit -and $IncludeFiles)
+		{
+			Write-Warning "-IncludeFiles wird bei -Inheritance Off ignoriert: unterhalb des Ziels wird nichts geaendert."
+		}
+
+		Invoke-sqmLogging -Message ("Starte $functionName (Principals: {0}; Rechte: {1}; Vererbung: {2}; ausgeschlossen: {3})" -f
+			(($principals | ForEach-Object { "$($_.Name) [$($_.Sid)]" }) -join ', '), $Rights, $Inheritance, ($exclude -join ', ')) -FunctionName $functionName -Level "INFO"
 
 		$skipNames = @('System Volume Information', '$RECYCLE.BIN')
 
@@ -210,7 +235,9 @@ function Grant-sqmVolumeAccess
 				if ($ace.IdentityReference.Value -ne $Sid) { continue }
 				if ($ace.AccessControlType -ne 'Allow') { continue }
 				if (((_AceRights $ace) -band $need) -ne $need) { continue }
-				if ($IsContainer)
+				# Inherit-only-ACEs gelten nicht fuer das Objekt selbst
+				if ($ace.PropagationFlags -band [System.Security.AccessControl.PropagationFlags]::InheritOnly) { continue }
+				if ($IsContainer -and $inherit)
 				{
 					$flags = $ace.InheritanceFlags
 					if (-not ($flags -band [System.Security.AccessControl.InheritanceFlags]::ContainerInherit)) { continue }
@@ -312,6 +339,7 @@ function Grant-sqmVolumeAccess
 				Principal    = $(if ($Pr) { $Pr.Name } else { '' })
 				Sid          = $(if ($Pr) { $Pr.Sid } else { '' })
 				Rights       = $Rights
+				Inheritance  = $Inheritance
 				Action       = $Action
 				Message      = $Message
 			}
@@ -327,8 +355,9 @@ function Grant-sqmVolumeAccess
 				{
 					return (_NewResult $TargetPath $Scope $Pr 'AlreadyPresent' 'Recht bereits vorhanden, nichts geaendert.')
 				}
-				$spec = if ($IsContainer) { "*$($Pr.Sid):(OI)(CI)$($icaclsCode[$Rights])" } else { "*$($Pr.Sid):$($icaclsCode[$Rights])" }
-				if (-not $PSCmdlet.ShouldProcess($TargetPath, "Allow $($Pr.Name) = $Rights ($Scope)"))
+				$spec = if ($IsContainer -and $inherit) { "*$($Pr.Sid):(OI)(CI)$($icaclsCode[$Rights])" } else { "*$($Pr.Sid):$($icaclsCode[$Rights])" }
+				$what = if ($inherit) { $Scope } else { "$Scope, nur dieser Ordner" }
+				if (-not $PSCmdlet.ShouldProcess($TargetPath, "Allow $($Pr.Name) = $Rights ($what)"))
 				{
 					return (_NewResult $TargetPath $Scope $Pr 'WhatIf' "icacls `"$TargetPath`" /grant $spec")
 				}
@@ -410,11 +439,14 @@ function Grant-sqmVolumeAccess
 			Invoke-sqmLogging -Message "Bearbeite '$target'" -FunctionName $functionName -Level "INFO"
 
 			# 1) Wurzel: vererbbare ACE, Windows gibt sie an alles mit aktiver Vererbung weiter
+			#    (bei -Inheritance Off nur fuer den Ordner selbst)
 			foreach ($pr in $principals)
 			{
 				Write-Progress -Activity $functionName -Status "$target - $($pr.Name)"
 				$results.Add((_GrantOne -TargetPath $target -IsContainer $true -Scope 'Root' -Pr $pr))
 			}
+			# Ohne Vererbung erreicht nichts die Unterordner - keine Suche
+			if (-not $inherit) { continue }
 
 			# 2) Ordner/Dateien mit unterbrochener Vererbung explizit nachziehen
 			Write-Progress -Activity $functionName -Status "$target - suche unterbrochene Vererbung"

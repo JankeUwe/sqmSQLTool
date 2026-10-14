@@ -128,6 +128,45 @@ Describe 'Grant-sqmVolumeAccess' {
         }
     }
 
+    Context 'Vererbung aus' {
+        BeforeAll {
+            $env:SystemDrive = 'Z:'
+            $script:o = New-Tree
+            Mock -ModuleName sqmSQLTool Invoke-sqmLogging { }
+            $script:off = Grant-sqmVolumeAccess -Path $script:o.Tree -Principal AuthenticatedUsers -Inheritance Off -IncludeFiles -ExcludeDrive @() -Confirm:$false -WarningAction SilentlyContinue
+            $env:SystemDrive = $script:realSystemDrive
+        }
+
+        It 'setzt nur die Wurzel, sucht keine Unterordner' {
+            @($script:off).Count | Should -Be 1
+            $script:off.Scope | Should -Be 'Root'
+            $script:off.Action | Should -Be 'Granted'
+            $script:off.Inheritance | Should -Be 'Off'
+        }
+        It 'setzt die ACE ohne Vererbungsflags' {
+            $aces = Get-SidAces $script:o.Tree 'S-1-5-11'
+            $aces.Count | Should -Be 1
+            $aces[0].InheritanceFlags | Should -Be ([System.Security.AccessControl.InheritanceFlags]::None)
+        }
+        It 'aendert nichts unterhalb' {
+            foreach ($p in 'A', 'A\B\x.bak', 'Prot', 'Prot\Sub')
+            {
+                (Get-SidAces (Join-Path $script:o.Tree $p) 'S-1-5-11').Count | Should -Be 0 -Because $p
+            }
+        }
+        It 'zaehlt eine nicht vererbbare ACE bei -Inheritance On nicht als vorhanden' {
+            $env:SystemDrive = 'Z:'
+            $r = Grant-sqmVolumeAccess -Path $script:o.Tree -Principal AuthenticatedUsers -ExcludeDrive @() -Confirm:$false
+            ($r | Where-Object Scope -eq 'Root').Action | Should -Be 'Granted'
+            (Get-SidAces (Join-Path $script:o.Tree 'A\B') 'S-1-5-11').Count | Should -Be 1
+        }
+        It 'meldet AlreadyPresent fuer Off, wenn eine vererbbare ACE schon da ist' {
+            $env:SystemDrive = 'Z:'
+            $r = Grant-sqmVolumeAccess -Path $script:o.Tree -Principal AuthenticatedUsers -Inheritance Off -ExcludeDrive @() -Confirm:$false
+            $r.Action | Should -Be 'AlreadyPresent'
+        }
+    }
+
     Context 'Fehler' {
         It 'meldet Failed, wenn icacls trotz Exitcode 0 nicht setzen durfte' {
             $env:SystemDrive = 'Z:'

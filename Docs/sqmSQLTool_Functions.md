@@ -2948,6 +2948,7 @@ Grants a group or account NTFS rights on whole data volumes or folders, includin
 - **-DriveLetter** - Default: F, G, H, I. Ignored when -Path is given.
 - **-Path** - Folders or drive roots instead of -DriveLetter.
 - **-ExcludeDrive** - Default: C, S. The system drive is always excluded.
+- **-Inheritance** - On (default): inheritable (OI)(CI), protected subfolders granted explicitly. Off: target folder itself only, nothing below changed.
 - **-IncludeFiles** - Also files with broken inheritance (reads the ACL of every file).
 - **-EnableException** - Throw instead of reporting Failed.
 

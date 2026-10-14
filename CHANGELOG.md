@@ -1,5 +1,18 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.175.0] - 2026-10-14
+
+### Erweiterung: `Grant-sqmVolumeAccess -Inheritance On|Off`
+
+- `On` (Standard, wie bisher): vererbbare ACE `(OI)(CI)`, erreicht alle Unterordner und Dateien; Ordner mit
+  unterbrochener Vererbung werden gesucht und explizit berechtigt.
+- `Off`: ACE ohne Vererbungsflags, gilt nur fuer den Zielordner selbst. Unterhalb wird nichts geaendert und
+  nichts durchsucht (`-IncludeFiles` wird mit Warnung ignoriert). Beispiel: eine Gruppe darf die Wurzel von
+  `H:\` oeffnen, bekommt aber nichts auf die Ordner darin.
+- Eine vorhandene nicht vererbbare ACE zaehlt bei `On` nicht als vorhanden (es wird nachgezogen); eine
+  vorhandene vererbbare ACE deckt `Off` ab (`AlreadyPresent`). Inherit-only-ACEs zaehlen nie, sie gelten
+  nicht fuer den Ordner selbst.
+- Neue Ergebnisspalte `Inheritance`.
 ## [1.9.174.0] - 2026-10-14
 
 ### Neu: `Grant-sqmVolumeAccess` - Gruppe/Konto auf Datenvolumes berechtigen, auch bei unterbrochener Vererbung

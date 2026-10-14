@@ -113,7 +113,7 @@ Set-sqmConfig -UpdateMode Off         # no check
 - `Get-sqmFileLatencyReport` - Read/write latency per database file, cumulative or live sample
 - `Get-sqmWaitStatistics` - SQL Server wait statistics
 - `Get-sqmDiskSpaceReport` - Disk utilization and growth trends
-- `Grant-sqmVolumeAccess` - Grants Authenticated Users, Administrators or any group NTFS rights on data volumes/folders, including folders with broken inheritance; verifies every change
+- `Grant-sqmVolumeAccess` - Grants Authenticated Users, Administrators or any group NTFS rights on data volumes/folders, including folders with broken inheritance, inheritance downwards on/off; verifies every change
 - `Test-sqmBackupStatus` - Backup control: Full/Diff/Log age per database against thresholds, honours sqm_BackupExclude, flags databases created after the last backup run
 - `Get-sqmBackupExcludeReport` - Report of sqm_BackupExclude: excluded databases with reason, who and since when (from the change log), orphaned and not yet registered databases, risk hints
 - `Get-sqmDatabaseRestoreHistory` - Last restore date per database, flags never-restored databases
