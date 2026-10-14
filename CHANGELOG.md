@@ -1,5 +1,40 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.174.0] - 2026-10-14
+
+### Neu: `Grant-sqmVolumeAccess` - Gruppe/Konto auf Datenvolumes berechtigen, auch bei unterbrochener Vererbung
+
+Setzt fuer die gewaehlten Principals eine vererbbare Allow-ACE `(OI)(CI)` auf die Wurzel jedes Ziels
+(Standard F:, G:, H:, I:) und zusaetzlich explizit auf jeden Ordner, dessen Vererbung abgeschaltet ist.
+Von dort erreicht sie alles darunter.
+
+| Parameter | Bedeutung |
+|---|---|
+| `-Principal` | `AuthenticatedUsers` (S-1-5-11), `Administrators` (S-1-5-32-544), auch beide; ueber die SID, unabhaengig von der Sprache |
+| `-Account` | weitere Gruppen/Konten (`DOMAIN\SQL-Readers`) oder SIDs |
+| `-Rights` | `ReadAndExecute` (Standard), `Read`, `Modify`, `FullControl` |
+| `-DriveLetter` / `-Path` | ganze Laufwerke oder einzelne Ordner |
+| `-ExcludeDrive` | Standard C, S; das Systemlaufwerk ist immer ausgeschlossen |
+| `-IncludeFiles` | auch Dateien mit unterbrochener Vererbung (liest die ACL jeder Datei) |
+
+Gegenueber `icacls <Wurzel> /grant ... /T`:
+- keine doppelte ACE (explizit + geerbt) auf jedem Ordner und keine erneute Weitergabe des ganzen
+  Teilbaums je Ordner (auf grossen Volumes Stunden);
+- `System Volume Information` und `$RECYCLE.BIN` werden uebersprungen (dort ist auch Administratoren
+  der Zugriff verweigert, jeder Lauf endete mit Fehler);
+- Junctions, Symlinks und Mountpoints werden nicht betreten, ein fremdes Volume wird nie geaendert;
+- vorhandene Rechte werden erkannt (`AlreadyPresent`), ein zweiter Lauf aendert nichts;
+- **nach jeder Aenderung wird die ACL nachgelesen.** `icacls /C` liefert auch bei "Zugriff verweigert"
+  Exitcode 0, und die Summenzeile ("... 0 Dateien ist ein Verarbeitungsfehler aufgetreten" /
+  "Failed processing 0 files") ist kein Fehler. Weder Exitcode noch Textsuche sind verlaesslich.
+
+Rueckgabe je Ziel und Principal: `Path`, `Scope` (Root/ProtectedFolder/ProtectedFile), `Principal`, `Sid`,
+`Rights`, `Action` (Granted/AlreadyPresent/WhatIf/Failed/Skipped), `Message`. Nur lokal, erhoehte Sitzung.
+Es werden nur Rechte hinzugefuegt, nie entfernt.
+
+**Sicherheitshinweis:** "Authenticated Users" mit Lesen auf Daten-, Log- und Backup-Volumes heisst, dass
+jeder angemeldete Benutzer jede `.bak`-Datei lesen kann. Wo moeglich eine eigene Gruppe (`-Account`) und
+einen engen `-Path` verwenden.
 ## [1.9.173.0] - 2026-10-13
 
 ### Neu: `Get-sqmBackupExcludeReport` - Bericht der Ausschlusstabelle

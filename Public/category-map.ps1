@@ -69,6 +69,7 @@ $categoryMap = @{
     'Get-sqmSsasDeploymentMode'           = 'Analysis Services (SSAS)'
     'Get-sqmSysadminAccounts'             = 'Login & User Security'
     'Grant-sqmTemporarySysadmin'          = 'Login & User Security'
+    'Grant-sqmVolumeAccess'               = 'Storage & Disk Management'
     'Invoke-sqmTempSysadminAction'        = 'Login & User Security'
     'Get-sqmTempDbRecommendation'         = 'Performance Analysis & Optimization'
     'Get-sqmTlsStatus'                    = 'Certificates & TLS Security'

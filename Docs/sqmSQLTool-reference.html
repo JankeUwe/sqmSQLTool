@@ -146,7 +146,7 @@
 	<!-- SIDEBAR -->
 	<div class="psdb-st-sidebar">
 	<input class="psdb-st-sidebar-search" type="text" placeholder="Funktion suchen…" oninput="psstSearch(this.value)">
-														<div class="psdb-st-nav-group" id="nav-alwayson">
+															<div class="psdb-st-nav-group" id="nav-alwayson">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-alwayson-list')">
 	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">23</span>
 	</div>
@@ -253,7 +253,7 @@
 
 	<div class="psdb-st-nav-group" id="nav-diagnose-&-health">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-diagnose-&-health-list')">
-	<span>🩺 Diagnostics & Health</span><span class="psdb-st-nav-count">27</span>
+	<span>🩺 Diagnostics & Health</span><span class="psdb-st-nav-count">28</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-diagnose-&-health-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-copysqmntfspermissions')">Copy-sqmNTFSPermissions</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmagentjobschedulereport')">Get-sqmAgentJobScheduleReport</span></li>
@@ -272,6 +272,7 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmsqlinstancecheck')">Get-sqmSQLInstanceCheck</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmtempdbrecommendation')">Get-sqmTempDbRecommendation</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmwhoisactive')">Get-sqmWhoIsActive</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-grantsqmvolumeaccess')">Grant-sqmVolumeAccess</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmhealthreport')">Invoke-sqmHealthReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmpatchanalysis')">Invoke-sqmPatchAnalysis</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmsetupreport')">Invoke-sqmSetupReport</span></li>
@@ -451,7 +452,7 @@
 
 	<!-- CONTENT -->
 	<div class="psdb-st-content" id="psdb-st-content">
-														<section class="psdb-st-section" id="cat-alwayson">
+															<section class="psdb-st-section" id="cat-alwayson">
 	<h2 class="psdb-st-section-title">🔄 AlwaysOn</h2>
 
 	<div class="psdb-st-func-card" id="f-addsqmdatabasetoag">
@@ -2848,6 +2849,42 @@ Get-sqmOperationStatus -Continuous -RefreshSeconds 10</pre><button class="psdb-s
 	<div class="psdb-st-example-label">Get-sqmWhoIsActive -SqlInstance &quot;SQL01&quot; -RepeatIntervalSeconds 30 -DurationMinutes 60 -NoConsoleOutput</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmWhoIsActive -SqlInstance &quot;SQL01&quot; -RepeatIntervalSeconds 30 -DurationMinutes 60 -NoConsoleOutput
     # Unattended capture for an Agent job: 30-second snapshots for one hour, no console output.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-grantsqmvolumeaccess">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Grant-sqmVolumeAccess</span>
+	<span class="psdb-st-badge psdb-st-badge-diagnose">Diagnostics</span>
+	</div>
+	<div class="psdb-st-func-desc">Grants a group or account NTFS rights on whole data volumes or folders, including all subfolders whose inheritance is broken.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Grant-sqmVolumeAccess -Principal AuthenticatedUsers -WhatIf</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Grant-sqmVolumeAccess -Principal AuthenticatedUsers -WhatIf
+
+    Shows for F:, G:, H:, I: what would be granted, including the folders with broken inheritance.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Grant-sqmVolumeAccess -Principal Administrators -Rights FullControl -DriveLetter F, G, H, I</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Grant-sqmVolumeAccess -Principal Administrators -Rights FullControl -DriveLetter F, G, H, I
+
+    Gives the local Administrators full control on the four data volumes.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Grant-sqmVolumeAccess -Account &#39;DOMAIN\SQL-Monitoring&#39; -Path &#39;F:\MSSQL\Log&#39;, &#39;H:\MSSQL\Log&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Grant-sqmVolumeAccess -Account &#39;DOMAIN\SQL-Monitoring&#39; -Path &#39;F:\MSSQL\Log&#39;, &#39;H:\MSSQL\Log&#39;
+
+    Read &amp; Execute for one domain group, only on the two log folders.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Grant-sqmVolumeAccess -Principal AuthenticatedUsers, Administrators -Rights Read -Confirm:$false |</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Grant-sqmVolumeAccess -Principal AuthenticatedUsers, Administrators -Rights Read -Confirm:$false |
+        Where-Object Action -ne &#39;AlreadyPresent&#39;
+
+    Two principals at once, without prompting, shows only what changed or failed.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -5855,6 +5892,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Get-sqmWaitStatistics</td><td>Reads and analyzes SQL Server wait statistics from sys.dm_os_wait_stats.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmWhoIsActive</td><td>Shows currently active/blocked SQL Server sessions, similar to Adam Machanic&#39;s sp_whoisactive - optionally repeated every X seconds like a live monitor.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Grant-sqmTemporarySysadmin</td><td>Grants an AD login temporary sysadmin rights for X days and revokes them automatically via a self-deleting SQL Agent job; failover-safe on all AlwaysOn replicas.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Grant-sqmVolumeAccess</td><td>Grants a group or account NTFS rights on whole data volumes or folders, including all subfolders whose inheritance is broken.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Import-sqmDatabaseLogins</td><td>Applies a login-password/SID export produced by Export-sqmDatabaseLogins against a destination instance, then repairs any remaining orphaned database users.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Import-sqmDatabaseSettings</td><td>Applies a database &quot;Options&quot; snapshot produced by Export-sqmDatabaseSettings against a target instance, via ALTER DATABASE.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Import-sqmServerConfiguration</td><td>Applies a JSON snapshot produced by Export-sqmServerConfiguration against a target SQL Server instance.</td></tr>

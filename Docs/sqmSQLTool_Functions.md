@@ -2931,6 +2931,36 @@ Copy-sqmNTFSPermissions -SourcePath "D:\" -DestinationPath "E:\" -Recurse
 Copy-sqmNTFSPermissions -SourcePath "D:\Daten" -DestinationPath "E:\Daten" -Recurse -CreateMissingFolders
     Copies permissions and creates missing target folders.
 
+### Grant-sqmVolumeAccess
+
+Grants a group or account NTFS rights on whole data volumes or folders, including all subfolders whose inheritance is broken.
+
+    Inheritable Allow ACE (OI)(CI) on the root of each target, plus explicitly on every folder with
+    a protected DACL. Skips System Volume Information / $RECYCLE.BIN, never enters junctions,
+    symlinks or mount points, recognises existing rights (AlreadyPresent) and reads every ACL back
+    after the change (icacls /C returns exit code 0 even on "access denied"). Adds rights only.
+
+**Parameters:**
+
+- **-Principal** - AuthenticatedUsers (S-1-5-11), Administrators (S-1-5-32-544); one or both.
+- **-Account** - Further groups/accounts (DOMAIN\SQL-Readers) or SIDs.
+- **-Rights** - ReadAndExecute (default), Read, Modify, FullControl.
+- **-DriveLetter** - Default: F, G, H, I. Ignored when -Path is given.
+- **-Path** - Folders or drive roots instead of -DriveLetter.
+- **-ExcludeDrive** - Default: C, S. The system drive is always excluded.
+- **-IncludeFiles** - Also files with broken inheritance (reads the ACL of every file).
+- **-EnableException** - Throw instead of reporting Failed.
+
+**Examples (3):**
+
+```powershell
+Grant-sqmVolumeAccess -Principal AuthenticatedUsers -WhatIf
+
+```powershell
+Grant-sqmVolumeAccess -Principal Administrators -Rights FullControl -DriveLetter F, G, H, I
+
+```powershell
+Grant-sqmVolumeAccess -Account 'DOMAIN\SQL-Monitoring' -Path 'F:\MSSQL\Log', 'H:\MSSQL\Log'
 ### Get-sqmDiskBlockSize
 
 Prueft die NTFS-Blockgroesse (Cluster-Groesse) von Laufwerken auf 64KB.
