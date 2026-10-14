@@ -18,6 +18,7 @@ Von dort erreicht sie alles darunter.
 | `-IncludeFiles` | auch Dateien mit unterbrochener Vererbung (liest die ACL jeder Datei) |
 
 Gegenueber `icacls <Wurzel> /grant ... /T`:
+
 - keine doppelte ACE (explizit + geerbt) auf jedem Ordner und keine erneute Weitergabe des ganzen
   Teilbaums je Ordner (auf grossen Volumes Stunden);
 - `System Volume Information` und `$RECYCLE.BIN` werden uebersprungen (dort ist auch Administratoren
