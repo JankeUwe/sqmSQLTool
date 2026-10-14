@@ -35,7 +35,7 @@
     At least one of -Principal or -Account is required.
 
 .PARAMETER Account
-    Further groups/accounts, e.g. 'DOMAIN\SQL-Readers', 'DEV03\Monitoring', or a SID ('S-1-5-...').
+    Further groups/accounts, e.g. 'DOMAIN\SQL-Readers', 'SERVER01\Monitoring', or a SID ('S-1-5-...').
 
 .PARAMETER Rights
     ReadAndExecute (default), Read, Modify or FullControl. Applies to all principals of the call;
