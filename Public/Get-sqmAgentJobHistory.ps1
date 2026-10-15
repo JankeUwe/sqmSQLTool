@@ -6,6 +6,8 @@
     Returns the last execution(s) of all or selected SQL Agent jobs.
     Can filter by job name, status (success/failure) and time range.
     By default, the last 7 days are shown.
+    Writes a CSV file and an HTML report (summary per job + full history,
+    failures highlighted) and returns the rows as objects.
 
 .PARAMETER SqlInstance
     SQL Server instance (default: current computer name).
@@ -27,10 +29,14 @@
 
 .PARAMETER OutputPath
     Full path of the CSV file to write. Default: an auto-named file under
-    <OutputPath config>\AgentJobHistory.
+    <OutputPath config>\AgentJobHistory. An HTML report with the same name
+    (.html) is written next to it and opened automatically.
 
 .PARAMETER EnableException
     Throw exceptions immediately.
+
+.PARAMETER NoOpen
+    Do not open the HTML report after it has been created.
 
 .EXAMPLE
     Get-sqmAgentJobHistory
@@ -61,7 +67,9 @@ function Get-sqmAgentJobHistory {
         [Parameter(Mandatory = $false)]
         [string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) "AgentJobHistory\AgentJobHistory_$(Get-Date -Format 'yyyyMMdd_HHmmss').csv"),
         [Parameter(Mandatory = $false)]
-        [switch]$EnableException
+        [switch]$EnableException,
+        [Parameter(Mandatory = $false)]
+        [switch]$NoOpen
     )
 
     begin {
@@ -87,7 +95,7 @@ function Get-sqmAgentJobHistory {
             # Get-DbaAgentJob unterstuetzt keine Wildcards im -Job-Parameter.
             # Daher: alle Jobs laden und anschliessend per -like filtern.
             $allJobs = Get-DbaAgentJob -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
-                                       -ErrorAction Stop
+                                       -ErrorAction Stop -EnableException
 
             $jobs = if ($JobName -eq '*') {
                 $allJobs
@@ -95,20 +103,21 @@ function Get-sqmAgentJobHistory {
                 $allJobs | Where-Object { $_.Name -like $JobName }
             }
 
+            # Kein return hier: auch ohne Jobs wird ein (leerer) Report geschrieben.
             if (-not $jobs) {
                 Invoke-sqmLogging -Message "Keine Jobs auf '$SqlInstance' gefunden (Filter: '$JobName')." `
                                   -FunctionName $functionName -Level "WARNING"
-                return $allResults
             }
 
-            foreach ($job in $jobs) {
+            foreach ($job in @($jobs)) {
                 # -StartDate ist der korrekte dbatools-Parametername (nicht -Since)
                 $histParams = @{
-                    SqlInstance   = $SqlInstance
-                    SqlCredential = $SqlCredential
-                    Job           = $job.Name
-                    StartDate     = $Since
-                    ErrorAction   = 'Stop'
+                    SqlInstance     = $SqlInstance
+                    SqlCredential   = $SqlCredential
+                    Job             = $job.Name
+                    StartDate       = $Since
+                    ErrorAction     = 'Stop'
+                    EnableException = $true
                 }
                 if ($Status) {
                     $histParams['OutcomeType'] = $outcomeMap[$Status]
@@ -141,10 +150,25 @@ function Get-sqmAgentJobHistory {
             }
 
             if ($OutputPath) {
-                $parentDir = Split-Path -Path $OutputPath -Parent
+                # -OutputPath nennt die CSV-Datei; der HTML-Report liegt daneben mit gleichem Namen.
+                # Wird eine .html-Datei angegeben, gilt dasselbe umgekehrt.
+                $basePath = if ([System.IO.Path]::HasExtension($OutputPath)) {
+                    Join-Path (Split-Path -Path $OutputPath -Parent) ([System.IO.Path]::GetFileNameWithoutExtension($OutputPath))
+                } else {
+                    $OutputPath
+                }
+                $csvFile  = "$basePath.csv"
+                $htmlFile = "$basePath.html"
+                $parentDir = Split-Path -Path $csvFile -Parent
                 if ($parentDir -and -not (Test-Path $parentDir)) { New-Item -ItemType Directory -Path $parentDir -Force | Out-Null }
-                $allResults | Export-Csv -Path $OutputPath -NoTypeInformation -Encoding UTF8 -Force
-                Invoke-sqmLogging -Message "CSV exportiert nach $OutputPath" -FunctionName $functionName -Level "INFO"
+                $allResults | Export-Csv -Path $csvFile -NoTypeInformation -Encoding UTF8 -Force
+                Invoke-sqmLogging -Message "CSV exportiert nach $csvFile" -FunctionName $functionName -Level "INFO"
+
+                $html = _GenerateAgentJobHistoryHtml -Results $allResults -SqlInstance $SqlInstance `
+                                                     -JobName $JobName -Status $Status -Since $Since -LastX $LastX
+                [System.IO.File]::WriteAllText($htmlFile, $html, [System.Text.UTF8Encoding]::new($true))
+                Invoke-sqmLogging -Message "HTML-Report erstellt: $htmlFile" -FunctionName $functionName -Level "INFO"
+                Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
             }
             return $allResults
         }
@@ -155,4 +179,65 @@ function Get-sqmAgentJobHistory {
             return $null
         }
     }
+}
+
+function _GenerateAgentJobHistoryHtml {
+    param(
+        [PSCustomObject[]]$Results,
+        [string]$SqlInstance,
+        [string]$JobName,
+        [string]$Status,
+        [datetime]$Since,
+        [int]$LastX
+    )
+
+    if (-not $Results) { $Results = @() }
+    $enc = { param($s) [System.Net.WebUtility]::HtmlEncode([string]$s) }
+    # RunDate kommt als DbaDateTime; ohne Formatierung landet die Kultur-Darstellung im Report
+    $fmtDate = { param($d) if ($d) { ([datetime]$d).ToString('yyyy-MM-dd HH:mm:ss') } else { '' } }
+    $classByOutcome = @{ Succeeded = 'ok'; Failed = 'crit'; Retry = 'warn'; Canceled = 'warn'; Cancelled = 'warn' }
+
+    # Zusammenfassung je Job: massgeblich ist die Zeile "(Job outcome)" (Schritt 0), die das
+    # Gesamtergebnis eines Laufs traegt. Fehlt sie (z. B. -Status filtert nur Schritte), zaehlen
+    # ersatzweise alle Zeilen des Jobs.
+    $summaryRows = foreach ($grp in ($Results | Group-Object JobName | Sort-Object Name)) {
+        $outcomeRows = @($grp.Group | Where-Object { $_.StepName -eq '(Job outcome)' })
+        # @() aussen: ein einzelner Treffer wuerde sonst zum Skalar, PSCustomObject hat unter 5.1 kein .Count
+        $basis = @(if ($outcomeRows.Count -gt 0) { $outcomeRows } else { $grp.Group })
+        $last = $basis | Sort-Object RunDate -Descending | Select-Object -First 1
+        $failed = @($basis | Where-Object { $_.Outcome -eq 'Failed' }).Count
+        $lastClass = $classByOutcome[[string]$last.Outcome]
+        $lastAttr  = if ($lastClass) { " class='$lastClass'" } else { '' }
+        $failAttr  = if ($failed -gt 0) { " class='num crit'" } else { " class='num'" }
+        "<tr><td>$(& $enc $grp.Name)</td><td class='num'>$($basis.Count)</td><td$failAttr>$failed</td>" +
+            "<td>$(& $fmtDate $last.RunDate)</td><td$lastAttr>$(& $enc $last.Outcome)</td></tr>"
+    }
+
+    $detailRows = foreach ($r in ($Results | Sort-Object @{ Expression = 'RunDate'; Descending = $true }, JobName)) {
+        $cls  = $classByOutcome[[string]$r.Outcome]
+        $attr = if ($cls) { " class='$cls'" } else { '' }
+        "<tr><td>$(& $fmtDate $r.RunDate)</td><td>$(& $enc $r.JobName)</td><td>$(& $enc $r.StepName)</td>" +
+            "<td$attr>$(& $enc $r.Outcome)</td><td class='num'>$(& $enc $r.Duration)</td><td>$(& $enc $r.Message)</td></tr>"
+    }
+
+    $filterText = "Zeitraum: ab $($Since.ToString('yyyy-MM-dd HH:mm')) | Job-Filter: $JobName"
+    if ($Status) { $filterText += " | Status: $Status" }
+    if ($LastX -gt 0) { $filterText += " | Letzte $LastX Eintraege je Job" }
+    $failedTotal = @($Results | Where-Object { $_.Outcome -eq 'Failed' }).Count
+
+    $body = "<p>$(& $enc $filterText)</p>" +
+        "<p>Jobs: $(@($summaryRows).Count) | Eintraege: $($Results.Count) | Fehlgeschlagen: $failedTotal</p>"
+    if ($Results.Count -eq 0) {
+        $body += "<p>Keine Job-Historie im Zeitraum gefunden.</p>"
+    } else {
+        $body += "<h3>Zusammenfassung je Job</h3>" +
+            "<table><tr><th>Job</th><th class='num'>Laeufe</th><th class='num'>Fehlgeschlagen</th><th>Letzter Lauf</th><th>Letztes Ergebnis</th></tr>" +
+            ($summaryRows -join '') + "</table>" +
+            "<h3>Verlauf</h3>" +
+            "<table><tr><th>Zeitpunkt</th><th>Job</th><th>Schritt</th><th>Ergebnis</th><th class='num'>Dauer</th><th>Meldung</th></tr>" +
+            ($detailRows -join '') + "</table>"
+    }
+
+    return (ConvertTo-sqmHtmlReport -Title "SQL Agent Job-Historie - $SqlInstance" `
+                                    -Subtitle "Erstellt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -BodyHtml $body)
 }

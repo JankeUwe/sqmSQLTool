@@ -3849,6 +3849,8 @@ Displays the execution history of SQL Agent jobs.
 Returns the last execution(s) of all or selected SQL Agent jobs.
     Can filter by job name, status (success/failure) and time range.
     By default, the last 7 days are shown.
+    Writes a CSV file and an HTML report (summary per job + full history,
+    failures highlighted) and returns the rows as objects.
 
 **Parameters:**
 
@@ -3858,8 +3860,9 @@ Returns the last execution(s) of all or selected SQL Agent jobs.
 - **-Status** - 'Success', 'Failure', 'Retry' or 'Cancelled'. Default: all.
 - **-Since** - Show history from this date onwards. Default: today minus 7 days.
 - **-LastX** - Instead of a time range: number of last executions per job (e.g. -LastX 5).
-- **-OutputPath** - Export as CSV (optional). If specified, a CSV file is created.
+- **-OutputPath** - Full path of the CSV file. Default: auto-named under <OutputPath config>\AgentJobHistory. An HTML report with the same name (.html) is written next to it and opened.
 - **-EnableException** - Throw exceptions immediately.
+- **-NoOpen** - Do not open the HTML report after it has been created.
 
 **Examples (2):**
 

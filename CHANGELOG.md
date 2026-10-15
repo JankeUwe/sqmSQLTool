@@ -1,5 +1,18 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.176.0] - 2026-10-15
+
+### Erweiterung: `Get-sqmAgentJobHistory` schreibt jetzt einen HTML-Report
+
+- Neben der CSV-Datei entsteht eine gleichnamige `.html`-Datei (Zusammenfassung je Job mit Laeufen,
+  Fehlschlaegen, letztem Lauf und Ergebnis, darunter der komplette Verlauf; Failed rot, Retry/Canceled gelb).
+  Der Report wird geoeffnet, `-NoOpen` unterdrueckt das.
+- `-OutputPath` bleibt der Pfad der CSV-Datei; wird eine `.html`-Datei angegeben, entsteht die CSV daneben.
+- Ohne passende Jobs wird ein leerer Report geschrieben statt gar keiner.
+- Fix: ein Verbindungsfehler kam bisher nur als dbatools-Warnung an, die Funktion lieferte still 0 Zeilen
+  und eine leere CSV. `Get-DbaAgentJob`/`Get-DbaAgentJobHistory` laufen jetzt mit `-EnableException`,
+  der Fehler wird geloggt bzw. mit `-EnableException` geworfen.
+
 ## [1.9.175.0] - 2026-10-14
 
 ### Erweiterung: `Grant-sqmVolumeAccess -Inheritance On|Off`
