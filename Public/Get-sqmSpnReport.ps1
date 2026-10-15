@@ -17,6 +17,10 @@
     - LOCAL SERVICE                          -> no network identity, SPNs
       not possible -> finding with status 'NoNetwork'
 
+    If setspn -L fails (no domain controller reachable, account not found, setspn.exe
+    missing), a WARNING is logged and the expected SPNs are still returned with status
+    'Unchecked' and their setspn -S commands (instance status 'Warning').
+
     Per instance, the four expected MSSQLSvc SPNs are checked:
         MSSQLSvc/<Hostname>:<Port>
         MSSQLSvc/<FQDN>:<Port>
@@ -108,7 +112,10 @@
 .NOTES
     Prerequisites:
     - Invoke-sqmLogging, Get-sqmConfig
-    - setspn.exe in the system path (Windows default or RSAT)
+    - setspn.exe in the system path (Windows default or RSAT). If setspn.exe is missing or
+      setspn -L fails (no domain controller reachable, account not found), a WARNING is logged
+      and the expected SPNs are still returned with status 'Unchecked' and their setspn -S
+      commands; the instance status is 'Warning'.
     - Local administrator rights on the target computer for WMI queries
     - AD module (RSAT) is NOT required; domain resolution is performed via
       [System.DirectoryServices.ActiveDirectory.Domain]
@@ -164,12 +171,16 @@ function Get-sqmSpnReport
 		$setspnCmd = Get-Command -Name 'setspn.exe' -ErrorAction SilentlyContinue
 		if (-not $setspnCmd)
 		{
-			$errMsg = "setspn.exe nicht gefunden. RSAT oder Windows-Tools pruefen."
-			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level 'ERROR'
-			throw $errMsg
+			# Kein Abbruch: die erwarteten SPNs samt setspn-Kommandos werden trotzdem ermittelt
+			# und als 'Unchecked' ausgeliefert.
+			Invoke-sqmLogging -Message "setspn.exe nicht gefunden (RSAT oder Windows-Tools pruefen). Vorhandene SPNs werden nicht geprueft, nur die erwarteten ausgegeben." `
+							  -FunctionName $functionName -Level 'WARNING'
 		}
-		Invoke-sqmLogging -Message "setspn.exe gefunden: $($setspnCmd.Source)" `
-						  -FunctionName $functionName -Level 'INFO'
+		else
+		{
+			Invoke-sqmLogging -Message "setspn.exe gefunden: $($setspnCmd.Source)" `
+							  -FunctionName $functionName -Level 'INFO'
+		}
 
 		Invoke-sqmLogging -Message "Starte $functionName | OutputPath: $OutputPath" `
 						  -FunctionName $functionName -Level 'INFO'
@@ -307,32 +318,43 @@ function Get-sqmSpnReport
 
 		# ------------------------------------------------------------------
 		# Hilfsfunktion: Vorhandene MSSQLSvc-SPNs via setspn.exe einlesen
-		# Rueckgabe: [string[]] der gefundenen SPNs, oder $null bei Fehler
+		# Rueckgabe: [PSCustomObject] Success / Spns / Error. Wirft nie.
+		#
+		# Scheitert setspn -L (kein DC erreichbar, Konto nicht gefunden, setspn.exe fehlt), wurde
+		# frueher geworfen und die Instanz lieferte gar kein Ergebnis - ohne -ContinueOnError brach
+		# der ganze Aufruf ab. Jetzt meldet der Aufrufer eine Warnung und liefert die erwarteten SPNs
+		# mit Status 'Unchecked' aus.
 		# ------------------------------------------------------------------
 		function _GetExistingSpns
 		{
 			param ([string]$SpnAccount)
 
+			if (-not $setspnCmd)
+			{
+				return [PSCustomObject]@{ Success = $false; Spns = @(); Error = 'setspn.exe nicht gefunden' }
+			}
+
+			# setspn schreibt Fehler nach stderr; unter 5.1 macht 2>&1 daraus bei
+			# ErrorActionPreference 'Stop' (z. B. aus der GUI) eine Ausnahme.
+			$ErrorActionPreference = 'Continue'
 			try
 			{
-				$raw = & setspn.exe -L $SpnAccount 2>&1
-				$text = $raw -join "`n"
-
-				if ($text -match '(?i)(no such|Kein Objekt|cannot find|nicht gefunden|Object not found)')
-				{
-					return $null   # Konto nicht in AD gefunden
-				}
-
-				$spns = $raw |
-				        Where-Object { $_ -match 'MSSQLSvc' } |
-				        ForEach-Object { $_.Trim() }
-
-				return @($spns)
+				$raw  = @(& $setspnCmd.Source -L $SpnAccount 2>&1 | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+				$exit = $LASTEXITCODE
 			}
 			catch
 			{
-				throw "setspn.exe Ausfuehrungsfehler: $($_.Exception.Message)"
+				return [PSCustomObject]@{ Success = $false; Spns = @(); Error = $_.Exception.Message }
 			}
+
+			$spns = @($raw | Where-Object { $_ -match '^MSSQLSvc/' })
+			$text = $raw -join ' | '
+			if ($exit -ne 0 -or ($spns.Count -eq 0 -and $text -match '(?i)(no such|Kein Objekt|cannot find|nicht gefunden|Object not found|DsGetDcName)'))
+			{
+				return [PSCustomObject]@{ Success = $false; Spns = @(); Error = "setspn -L Exitcode ${exit}: $text" }
+			}
+
+			return [PSCustomObject]@{ Success = $true; Spns = $spns; Error = $null }
 		}
 	}
 
@@ -595,29 +617,40 @@ function Get-sqmSpnReport
 						)
 					}
 
+					# Ohne DNS-Suffix ist FQDN = Hostname: doppelte Eintraege entfernen
+					$seenSpns = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+					$expectedSpns = @($expectedSpns | Where-Object { $seenSpns.Add($_) })
+
 					Invoke-sqmLogging -Message "[$computer\$instanceName] Erwartete SPNs: $($expectedSpns -join ' | ')" `
 									  -FunctionName $functionName -Level 'INFO'
 
 					# --------------------------------------------------------
 					# Vorhandene SPNs via setspn.exe einlesen
 					# --------------------------------------------------------
-					$existingSpns = _GetExistingSpns -SpnAccount $spnAccount
+					$spnLookup    = _GetExistingSpns -SpnAccount $spnAccount
+					$spnChecked   = $spnLookup.Success
+					$existingSpns = @($spnLookup.Spns)
 
-					if ($null -eq $existingSpns)
+					if ($spnChecked)
 					{
-						throw "Konto '$spnAccount' wurde in AD nicht gefunden (setspn -L lieferte kein Objekt)."
+						Invoke-sqmLogging -Message "[$computer\$instanceName] Vorhandene MSSQLSvc-SPNs ($($existingSpns.Count)): $($existingSpns -join ' | ')" `
+										  -FunctionName $functionName -Level 'INFO'
 					}
-
-					Invoke-sqmLogging -Message "[$computer\$instanceName] Vorhandene MSSQLSvc-SPNs ($($existingSpns.Count)): $($existingSpns -join ' | ')" `
-									  -FunctionName $functionName -Level 'INFO'
+					else
+					{
+						Invoke-sqmLogging -Message "[$computer\$instanceName] setspn -L '$spnAccount' fehlgeschlagen, vorhandene SPNs nicht pruefbar - erwartete SPNs werden als 'Unchecked' ausgegeben. $($spnLookup.Error)" `
+										  -FunctionName $functionName -Level 'WARNING'
+					}
 
 					# --------------------------------------------------------
 					# Soll-/Ist-Vergleich ? Detailzeilen aufbauen
+					# Ohne setspn-Ergebnis: Status 'Unchecked', setspn -S-Kommando trotzdem
+					# angeben (-S legt nur an, was fehlt, und verweigert Duplikate).
 					# --------------------------------------------------------
 					foreach ($expectedSpn in $expectedSpns)
 					{
 						$isPresent = $existingSpns | Where-Object { $_ -ieq $expectedSpn }
-						$status    = if ($isPresent) { 'OK' } else { 'Missing' }
+						$status    = if (-not $spnChecked) { 'Unchecked' } elseif ($isPresent) { 'OK' } else { 'Missing' }
 						$setSpnCmd = if (-not $isPresent)
 						{
 							"setspn -S $expectedSpn `"$spnAccount`""
@@ -634,7 +667,7 @@ function Get-sqmSpnReport
 							Spn            = $expectedSpn
 							Status         = $status
 							SetSpnCommand  = $setSpnCmd
-							Note           = $accountInfo.Note
+							Note           = if ($spnChecked) { $accountInfo.Note } else { "Nicht geprueft (setspn -L fehlgeschlagen): $($spnLookup.Error)" }
 						})
 					}
 
@@ -731,12 +764,13 @@ WHERE ag.group_id IN (
 												  -FunctionName $functionName -Level 'INFO'
 
 								# Existierende Listener-SPNs pruefen (unter gleicher Service-Account)
-								$existingListenerSpns = _GetExistingSpns -SpnAccount $spnAccount
+								$listenerLookup       = _GetExistingSpns -SpnAccount $spnAccount
+								$existingListenerSpns = @($listenerLookup.Spns)
 
 								foreach ($listenerSpn in $listenerSpns)
 								{
 									$isPresent = $existingListenerSpns | Where-Object { $_ -ieq $listenerSpn }
-									$status    = if ($isPresent) { 'OK' } else { 'Missing' }
+									$status    = if (-not $listenerLookup.Success) { 'Unchecked' } elseif ($isPresent) { 'OK' } else { 'Missing' }
 									$setSpnCmd = if (-not $isPresent)
 									{
 										"setspn -S $listenerSpn `"$spnAccount`""
@@ -901,11 +935,12 @@ WHERE ar.group_id IN (
 						foreach ($row in $obsoleteUnexpectedRows) { [void]$detailRows.Remove($row) }
 					}
 
-					$cntOk         = ($detailRows | Where-Object Status -eq 'OK').Count
-					$cntMissing    = ($detailRows | Where-Object Status -eq 'Missing').Count
-					$cntUnexpected = ($detailRows | Where-Object Status -eq 'Unexpected').Count
+					$cntOk         = @($detailRows | Where-Object Status -eq 'OK').Count
+					$cntMissing    = @($detailRows | Where-Object Status -eq 'Missing').Count
+					$cntUnexpected = @($detailRows | Where-Object Status -eq 'Unexpected').Count
+					$cntUnchecked  = @($detailRows | Where-Object Status -eq 'Unchecked').Count
 
-					Invoke-sqmLogging -Message "[$computer\$instanceName] OK: $cntOk | Fehlend: $cntMissing | Unerwartet: $cntUnexpected" `
+					Invoke-sqmLogging -Message "[$computer\$instanceName] OK: $cntOk | Fehlend: $cntMissing | Unerwartet: $cntUnexpected | Nicht geprueft: $cntUnchecked" `
 									  -FunctionName $functionName -Level 'INFO'
 
 					if ($cntMissing -gt 0)
@@ -922,7 +957,7 @@ WHERE ar.group_id IN (
 					# --------------------------------------------------------
 					# Gesamtstatus der Instanz
 					# --------------------------------------------------------
-					$instanceStatus = if ($cntMissing -gt 0 -or $cntUnexpected -gt 0) { 'Warning' }
+					$instanceStatus = if ($cntMissing -gt 0 -or $cntUnexpected -gt 0 -or $cntUnchecked -gt 0) { 'Warning' }
 					                  else { 'OK' }
 
 					# --------------------------------------------------------
@@ -966,7 +1001,24 @@ WHERE ar.group_id IN (
 						$lines.Add("# OK              : $cntOk")
 						$lines.Add("# Fehlend         : $cntMissing")
 						$lines.Add("# Unerwartet      : $cntUnexpected")
+						if ($cntUnchecked -gt 0) { $lines.Add("# Nicht geprueft  : $cntUnchecked (setspn -L fehlgeschlagen)") }
 						$lines.Add($sep)
+
+						# setspn -L gescheitert: erwartete SPNs ausgeben, Ist-Zustand unbekannt
+						$uncheckedSpns = $detailRows | Where-Object Status -eq 'Unchecked'
+						if ($uncheckedSpns)
+						{
+							$lines.Add("")
+							$lines.Add($dash)
+							$lines.Add("# NICHT GEPRUEFT ($cntUnchecked) - setspn -L fehlgeschlagen")
+							$lines.Add($dash)
+							$lines.Add("  $($spnLookup.Error)")
+							$lines.Add("  Erwartete SPNs (ob sie bereits gesetzt sind, ist unbekannt). setspn -S legt nur")
+							$lines.Add("  fehlende an und verweigert Duplikate:")
+							$lines.Add("")
+							foreach ($r in $uncheckedSpns) { $lines.Add("  $($r.SetSpnCommand)") }
+							$lines.Add("  setspn -L `"$spnAccount`"")
+						}
 
 						# Hinweis bei Computerkonto
 						if ($accountInfo.AccountType -eq 'Computer')
@@ -980,7 +1032,7 @@ WHERE ar.group_id IN (
 						$okSpns = $detailRows | Where-Object Status -eq 'OK'
 						$lines.Add("")
 						$lines.Add($dash)
-						$lines.Add("# VORHANDENE SPNs ($cntOk / 4 erwartet)")
+						$lines.Add("# VORHANDENE SPNs ($cntOk / $($expectedSpns.Count) erwartet)")
 						$lines.Add($dash)
 						if ($okSpns)
 						{
@@ -991,7 +1043,7 @@ WHERE ar.group_id IN (
 						}
 						else
 						{
-							$lines.Add("  (keine der erwarteten SPNs vorhanden)")
+							$lines.Add($(if ($cntUnchecked -gt 0) { "  (nicht pruefbar - siehe NICHT GEPRUEFT)" } else { "  (keine der erwarteten SPNs vorhanden)" }))
 						}
 
 						# Ergebnis: Fehlende SPNs + setspn-Kommandos
@@ -1031,7 +1083,7 @@ WHERE ar.group_id IN (
 						}
 						else
 						{
-							$lines.Add("  (keine fehlenden SPNs - kein Handlungsbedarf)")
+							$lines.Add($(if ($cntUnchecked -gt 0) { "  (nicht pruefbar - siehe NICHT GEPRUEFT)" } else { "  (keine fehlenden SPNs - kein Handlungsbedarf)" }))
 						}
 
 						# Unerwartete SPNs
@@ -1051,7 +1103,7 @@ WHERE ar.group_id IN (
 						}
 						else
 						{
-							$lines.Add("  (keine unerwarteten SPNs)")
+							$lines.Add($(if ($cntUnchecked -gt 0) { "  (nicht pruefbar - siehe NICHT GEPRUEFT)" } else { "  (keine unerwarteten SPNs)" }))
 						}
 
 						$lines.Add("")
@@ -1070,13 +1122,21 @@ WHERE ar.group_id IN (
 						$bodySections.Add(
 							"<p>Computer: $([System.Net.WebUtility]::HtmlEncode($computer)) | Instanz: $([System.Net.WebUtility]::HtmlEncode($instanceName)) | " +
 							"Dienstkonto: $([System.Net.WebUtility]::HtmlEncode($serviceAccount)) | SPN-Konto (AD): $([System.Net.WebUtility]::HtmlEncode($spnAccount))<br>" +
-							"OK: $cntOk | Fehlend: $cntMissing | Unerwartet: $cntUnexpected</p>"
+							"OK: $cntOk | Fehlend: $cntMissing | Unerwartet: $cntUnexpected | Nicht geprueft: $cntUnchecked</p>"
 						)
+
+						if ($uncheckedSpns)
+						{
+							$rowsHtml = foreach ($r in $uncheckedSpns) { "<tr><td class='warn'>Nicht geprueft</td><td>$([System.Net.WebUtility]::HtmlEncode($r.Spn))</td><td><code>$([System.Net.WebUtility]::HtmlEncode($r.SetSpnCommand))</code></td></tr>" }
+							$bodySections.Add("<h3>Nicht geprueft ($cntUnchecked) - setspn -L fehlgeschlagen</h3><p class='warn'>$([System.Net.WebUtility]::HtmlEncode($spnLookup.Error))</p>" +
+								"<p>Erwartete SPNs; ob sie bereits gesetzt sind, ist unbekannt. setspn -S legt nur fehlende an und verweigert Duplikate.</p>" +
+								"<table><tr><th>Status</th><th>SPN</th><th>setspn-Kommando</th></tr>$($rowsHtml -join '')</table>")
+						}
 
 						if ($okSpns)
 						{
 							$rowsHtml = foreach ($r in $okSpns) { "<tr><td class='ok'>OK</td><td>$([System.Net.WebUtility]::HtmlEncode($r.Spn))</td><td></td></tr>" }
-							$bodySections.Add("<h3>Vorhandene SPNs ($cntOk / 4 erwartet)</h3><table><tr><th>Status</th><th>SPN</th><th>Hinweis</th></tr>$($rowsHtml -join '')</table>")
+							$bodySections.Add("<h3>Vorhandene SPNs ($cntOk / $($expectedSpns.Count) erwartet)</h3><table><tr><th>Status</th><th>SPN</th><th>Hinweis</th></tr>$($rowsHtml -join '')</table>")
 						}
 						if ($missingSpns)
 						{
@@ -1117,9 +1177,12 @@ WHERE ar.group_id IN (
 						CountOk        = $cntOk
 						CountMissing   = $cntMissing
 						CountUnexpected = $cntUnexpected
+						CountUnchecked = $cntUnchecked
 						Status         = $instanceStatus
 						Message        = if ($instanceStatus -eq 'OK')
 						                 { "Alle SPNs korrekt gesetzt." }
+						                 elseif ($cntUnchecked -gt 0)
+						                 { "setspn -L fehlgeschlagen, $cntUnchecked erwartete SPN(s) nicht geprueft: $($spnLookup.Error)" }
 						                 else
 						                 { "$cntMissing fehlende, $cntUnexpected unerwartete SPN(s). Bericht pruefen." }
 						DetailRows     = $detailRows

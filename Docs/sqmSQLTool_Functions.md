@@ -2398,6 +2398,10 @@ Automatically determines all SQL Server services on the specified computer,
     - LOCAL SERVICE                          -> no network identity, SPNs
       not possible -> finding with status 'NoNetwork'
 
+    If setspn -L fails (no domain controller reachable, account not found, setspn.exe
+    missing), a WARNING is logged and the expected SPNs are still returned with status
+    'Unchecked' and their setspn -S commands (instance status 'Warning').
+
     Per instance, the four expected MSSQLSvc SPNs are checked:
         MSSQLSvc/<Hostname>:<Port>
         MSSQLSvc/<FQDN>:<Port>

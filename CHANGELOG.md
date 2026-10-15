@@ -1,5 +1,20 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.177.0] - 2026-10-15
+
+### Fix: `Get-sqmSpnReport` liefert auch dann ein Ergebnis, wenn `setspn -L` scheitert
+
+- Scheiterte `setspn -L` (kein DC erreichbar, Konto nicht gefunden) oder fehlte `setspn.exe`, endete die
+  Instanz mit einem Fehler und ohne Bericht; ohne `-ContinueOnError` brach der ganze Aufruf ab. Unter
+  PowerShell 5.1 mit `ErrorActionPreference = 'Stop'` (z. B. aus der GUI) wurde schon die stderr-Ausgabe
+  von setspn zur Ausnahme.
+- Jetzt: WARNING im Log, die erwarteten SPNs werden mit Status `Unchecked` samt `setspn -S`-Kommando
+  ausgeliefert, Instanzstatus `Warning`, Meldung nennt die setspn-Fehlermeldung. TXT/CSV/HTML enthalten
+  einen eigenen Abschnitt "Nicht geprueft". Neue Ergebnisspalte `CountUnchecked`.
+- Fix: bei genau einer fehlenden oder unerwarteten SPN meldete die Instanz `OK` ("Alle SPNs korrekt
+  gesetzt"), weil `.Count` auf einem Einzelobjekt unter 5.1 leer ist. Zaehler jetzt per `@()`.
+- Ohne DNS-Suffix (FQDN = Hostname) wurden alle erwarteten SPNs doppelt gelistet; jetzt dedupliziert.
+
 ## [1.9.176.0] - 2026-10-15
 
 ### Erweiterung: `Get-sqmAgentJobHistory` schreibt jetzt einen HTML-Report
