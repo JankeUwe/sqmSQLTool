@@ -176,6 +176,14 @@ Describe 'Grant-sqmVolumeAccess' {
             & icacls "$root\Locked" /inheritance:r /grant '*S-1-3-4:(OI)(CI)R' '*S-1-5-32-544:(OI)(CI)R' | Out-Null
             try
             {
+                # Probe: greift die Sperre ueberhaupt? Auf dem GitHub-Runner (erhoehter Admin) setzt
+                # icacls die ACE trotzdem - dann ist der Fehlerpfad hier nicht herstellbar.
+                & icacls "$root\Locked" /grant '*S-1-5-19:R' 2>&1 | Out-Null
+                if (Get-SidAces "$root\Locked" 'S-1-5-19')
+                {
+                    Set-ItResult -Skipped -Because 'ACL-Sperre greift in diesem Kontext nicht (erhoehter Prozess darf WRITE_DAC trotzdem)'
+                    return
+                }
                 $r = Grant-sqmVolumeAccess -Path $root -Principal AuthenticatedUsers -ExcludeDrive @() -Confirm:$false
                 ($r | Where-Object Scope -eq 'Root').Action | Should -Be 'Granted'
                 $locked = $r | Where-Object Scope -eq 'ProtectedFolder'

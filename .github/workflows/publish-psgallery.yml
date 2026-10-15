@@ -92,11 +92,20 @@ jobs:
             exit 1
           }
 
-          Write-Host "🚀 Publish sqmSQLTool ${{ steps.version.outputs.version }} zu PSGallery..."
-          Write-Host ""
-
           # TLS 1.2 erzwingen (für ältere PS-Versionen)
           [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+
+          # PSGallery nimmt dieselbe Version nie zweimal an. Ein erneuter Lauf ohne Versionssprung
+          # (z. B. Doppelklick auf "Run workflow") ist kein Fehler - klar melden statt rot zu enden.
+          $ver = '${{ steps.version.outputs.version }}'
+          $existing = Find-Module -Name sqmSQLTool -RequiredVersion $ver -Repository PSGallery -ErrorAction SilentlyContinue
+          if ($existing) {
+            Write-Host "::notice::sqmSQLTool $ver ist bereits auf der PSGallery - nichts zu tun. Fuer ein neues Release ModuleVersion in sqmSQLTool.psd1 erhoehen."
+            exit 0
+          }
+
+          Write-Host "🚀 Publish sqmSQLTool $ver zu PSGallery..."
+          Write-Host ""
 
           try {
             Publish-Module -Path "." `
