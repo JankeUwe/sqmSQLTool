@@ -176,7 +176,7 @@ Get-ChildItem -Path $Destination -Recurse -File | ForEach-Object {
 #     sonst Scope-Mismatch: AllUsers-Modul wuerde ein nur in CurrentUser
 #     liegendes dbatools in fremden/Admin-Sessions nicht finden.
 #
-#     "Vorhanden" allein reicht nicht: auf DWP1W02SQLT0001 stand seit 2022 dbatools
+#     "Vorhanden" allein reicht nicht: auf einem Kundenserver stand seit 2022 dbatools
 #     1.1.95 - ein bisher unbemerkter, mehrere Major-Versionen alter Stand, der
 #     Get-DbaPbmPolicy in einer Rueckgabeform lieferte, die aeltere Annahmen im Modul
 #     nicht abdeckten. Diese Pruefung war bisher rein binaer (Ordner da -> ok) und haette
@@ -186,23 +186,63 @@ Get-ChildItem -Path $Destination -Recurse -File | ForEach-Object {
 #     (typisch fuer eine abgeschottete Produktivinstanz), wird die erkannte installierte
 #     Version wenigstens sichtbar geloggt, statt stillschweigend als "ok" durchzugehen.
 #
-#     FITS-Umgebung (Quelle unter W:\ bzw. \\tsclient\W\ - Citrix-Freigabelaufwerk, Erkennung wie
-#     in Schritt 7 unten): PSGallery ist auf einer abgeschotteten Produktivinstanz typischerweise
-#     NICHT erreichbar. Dort liegt bereits ein von FI-TS gepflegtes, fertiges Ordnerpaar
+#     Standort mit Freigabelaufwerk (Standort-Profil 'sqmSQLTool.site.json' in der
+#     Installationsquelle oder unter %ProgramData%\MSSQLTools, Abschnitt 'Install.SourcePatterns'
+#     passt auf -Source): PSGallery ist auf einer abgeschotteten Produktivinstanz typischerweise
+#     NICHT erreichbar. Dort liegt bereits ein gepflegtes, fertiges Ordnerpaar
 #     'dbatools' + 'dbatools.library' (das binaere Begleitmodul von dbatools 2.x) - Quelle der
 #     Wahrheit ist in diesem Fall das Freigabelaufwerk, nicht PSGallery. Der Pfad dazu kommt
-#     jetzt primaer aus der Konfiguration (sqmConfig-Key 'DbatoolsSharePath', siehe
+#     primaer aus der Konfiguration (sqmConfig-Key 'DbatoolsSharePath', siehe
 #     Set-sqmConfig) statt implizit aus -Source abgeleitet zu werden - das Modul selbst ist an
 #     dieser Stelle aber noch NICHT importiert (dbatools muss zuerst da sein, bevor
 #     Import-Module wegen RequiredModules ueberhaupt klappt), daher wird config.json hier
 #     direkt gelesen statt Get-sqmConfig aufzurufen. Ist der Key noch nicht gesetzt (erster
-#     Install auf einer neuen Instanz), Fallback auf die bisherige Herleitung
+#     Install auf einer neuen Instanz), folgen die Kandidaten aus dem Standort-Profil
+#     ('DbatoolsShareCandidates') und zuletzt die bisherige Herleitung
 #     (<SQLSources>\Modules, Geschwisterordner von Tools) - und das Ergebnis wird nach einem
 #     erfolgreichen Modul-Import unten (Schritt 6a) in die Konfiguration zurueckgeschrieben,
 #     damit kuenftige Installationen UND andere Modulfunktionen den Pfad direkt haben.
+#     Die standortspezifischen Pfade stehen bewusst nicht im Code (siehe Docs/SiteProfile.md).
 # ---------------------------------------------------------------------------
-$isFitsInstall = ($Source -like 'W:\*') -or ($Source -like '\\tsclient\W\*')
-$fitsModulesShare = $null
+$siteProfile = $null
+$siteProfileSource = $null
+foreach ($sitePath in @((Join-Path $Source 'sqmSQLTool.site.json'),
+                        (Join-Path $env:ProgramData 'MSSQLTools\sqmSQLTool.site.json'))) {
+    if (-not (Test-Path -LiteralPath $sitePath -PathType Leaf)) { continue }
+    try {
+        $siteProfile = Get-Content -LiteralPath $sitePath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $siteProfileSource = $sitePath
+        break
+    } catch {
+        Write-Warning "Standort-Profil '$sitePath' konnte nicht gelesen werden: $_"
+    }
+}
+
+# Standort-Profil aus der Installationsquelle maschinenweit ablegen: es ueberlebt so Modul-
+# Updates aus Quellen ohne Profil und gilt fuer alle Benutzer (config.json ist pro Benutzer).
+if ($siteProfileSource -and $siteProfileSource -eq (Join-Path $Source 'sqmSQLTool.site.json')) {
+    try {
+        $siteDir = Join-Path $env:ProgramData 'MSSQLTools'
+        if (-not (Test-Path $siteDir)) { New-Item -ItemType Directory -Path $siteDir -Force -ErrorAction Stop | Out-Null }
+        Copy-Item -LiteralPath $siteProfileSource -Destination (Join-Path $siteDir 'sqmSQLTool.site.json') -Force -ErrorAction Stop
+        Write-Host "Standort-Profil abgelegt: $(Join-Path $siteDir 'sqmSQLTool.site.json')" -ForegroundColor Gray
+    } catch {
+        Write-Warning "Standort-Profil konnte nicht nach %ProgramData%\MSSQLTools kopiert werden: $_"
+    }
+}
+
+$isSiteInstall = $false
+if ($siteProfile -and $siteProfile.Install) {
+    $sourcePatterns = @($siteProfile.Install.SourcePatterns) | Where-Object { $_ }
+    if (-not $sourcePatterns) {
+        $isSiteInstall = $true
+    } else {
+        foreach ($pattern in $sourcePatterns) {
+            if ($Source -like $pattern) { $isSiteInstall = $true; break }
+        }
+    }
+}
+$siteModulesShare = $null
 $dbatoolsSharePathFromConfig = $null
 $sqmConfigFile = Join-Path $env:APPDATA 'MSSQLTools\config.json'
 if (Test-Path $sqmConfigFile) {
@@ -210,34 +250,31 @@ if (Test-Path $sqmConfigFile) {
         $dbatoolsSharePathFromConfig = (Get-Content $sqmConfigFile -Raw | ConvertFrom-Json).DbatoolsSharePath
     } catch { }
 }
-#     Seit v1.9.159.0: FI-TS-Standardpfad ist <W>\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module
-#     (vorher ...\SQLSources\Modules). Reihenfolge der Kandidaten: konfigurierter Pfad, neuer
-#     Standardpfad (W:\ und \\tsclient\W\), alter Pfad als Legacy-Fallback. Ein veralteter Wert in
+#     Reihenfolge der Kandidaten: konfigurierter Pfad, Standardpfade aus dem Standort-Profil
+#     (neuer Pfad zuerst), Herleitung aus -Source als Legacy-Fallback. Ein veralteter Wert in
 #     config.json wird dadurch nicht mehr zur Sackgasse - der gefundene Pfad wird in Schritt 6a
 #     zurueckgeschrieben und korrigiert den alten Eintrag.
-$fitsDbatoolsShareCandidates = @(
-    'W:\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module',
-    '\\tsclient\W\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module'
-)
-if ($isFitsInstall) {
+$siteDbatoolsShareCandidates = if ($siteProfile) { @($siteProfile.DbatoolsShareCandidates) | Where-Object { $_ } } else { @() }
+if ($isSiteInstall) {
     $candidateShares = @()
     if (-not [string]::IsNullOrWhiteSpace($dbatoolsSharePathFromConfig)) { $candidateShares += $dbatoolsSharePathFromConfig }
-    $candidateShares += $fitsDbatoolsShareCandidates
+    $candidateShares += $siteDbatoolsShareCandidates
     $candidateShares += Join-Path (Split-Path (Split-Path $Source -Parent) -Parent) 'Modules'   # Legacy: <SQLSources>\Modules
     # [IO.Path]::Combine + [IO.Directory]::Exists statt Join-Path/Test-Path: Join-Path wirft, wenn
-    # das Laufwerk (z.B. W: in der Citrix-Sitzung, wo nur \\tsclient\W existiert) lokal fehlt, und
-    # Test-Path meldet unter PS 5.1 bei nicht erreichbarem UNC-Pfad trotz -ErrorAction einen Fehler.
+    # das Laufwerk (z.B. ein in der Citrix-Sitzung nur als \\tsclient\<X> vorhandenes Laufwerk)
+    # lokal fehlt, und Test-Path meldet unter PS 5.1 bei nicht erreichbarem UNC-Pfad trotz
+    # -ErrorAction einen Fehler.
     foreach ($candidateShare in ($candidateShares | Select-Object -Unique)) {
         if ([IO.Directory]::Exists([IO.Path]::Combine($candidateShare, 'dbatools')) -and
             [IO.Directory]::Exists([IO.Path]::Combine($candidateShare, 'dbatools.library'))) {
-            $fitsModulesShare = $candidateShare
+            $siteModulesShare = $candidateShare
             break
         }
     }
-    if ($fitsModulesShare -and $dbatoolsSharePathFromConfig -and $fitsModulesShare -ne $dbatoolsSharePathFromConfig) {
-        Write-Warning "  Konfigurierter DbatoolsSharePath '$dbatoolsSharePathFromConfig' enthaelt nicht beide erwarteten Ordner ('dbatools', 'dbatools.library') - verwende stattdessen '$fitsModulesShare'."
-    } elseif (-not $fitsModulesShare) {
-        Write-Warning "  Kein FI-TS-Freigabepfad mit 'dbatools' + 'dbatools.library' gefunden. Geprueft: $(($candidateShares | Select-Object -Unique) -join '; ')"
+    if ($siteModulesShare -and $dbatoolsSharePathFromConfig -and $siteModulesShare -ne $dbatoolsSharePathFromConfig) {
+        Write-Warning "  Konfigurierter DbatoolsSharePath '$dbatoolsSharePathFromConfig' enthaelt nicht beide erwarteten Ordner ('dbatools', 'dbatools.library') - verwende stattdessen '$siteModulesShare'."
+    } elseif (-not $siteModulesShare) {
+        Write-Warning "  Kein Freigabepfad mit 'dbatools' + 'dbatools.library' gefunden. Geprueft: $(($candidateShares | Select-Object -Unique) -join '; ')"
     }
 }
 
@@ -279,13 +316,13 @@ function Get-sqmModuleFolderVersion {
 }
 
 Write-Host "Pruefe Abhaengigkeit 'dbatools' (Scope $Scope)..." -ForegroundColor Cyan
-if ($fitsModulesShare) {
-    Write-Host "  FITS-Umgebung erkannt (Quelle: $Source) - pruefe dbatools + dbatools.library gegen '$fitsModulesShare'..." -ForegroundColor Cyan
+if ($siteModulesShare) {
+    Write-Host "  Standort-Profil erkannt (Quelle: $Source) - pruefe dbatools + dbatools.library gegen '$siteModulesShare'..." -ForegroundColor Cyan
     $targetModulesRoot = if ($Scope -eq 'AllUsers') { Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules' }
     else { Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsPowerShell\Modules' }
-    $fitsSyncFailed = $false
+    $siteSyncFailed = $false
     foreach ($modName in @('dbatools', 'dbatools.library')) {
-        $srcMod = Join-Path $fitsModulesShare $modName
+        $srcMod = Join-Path $siteModulesShare $modName
         $dstMod = Join-Path $targetModulesRoot $modName
         $srcVersion = Get-sqmModuleFolderVersion -Path $srcMod
         $dstVersion = Get-sqmModuleFolderVersion -Path $dstMod
@@ -296,15 +333,15 @@ if ($fitsModulesShare) {
         robocopy $srcMod $dstMod /MIR /MT:8 /NJH /NJS /NDL /COPY:DAT | Out-Null
         if ($LASTEXITCODE -ge 8) {
             Write-Warning "  robocopy fuer '$modName' meldete einen Fehler (Exitcode $LASTEXITCODE) - $srcMod -> $dstMod."
-            $fitsSyncFailed = $true
+            $siteSyncFailed = $true
         } else {
             Get-ChildItem -Path $dstMod -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
                 Unblock-File -Path $_.FullName -ErrorAction SilentlyContinue
             }
         }
     }
-    if (-not $fitsSyncFailed) {
-        Write-Host "  dbatools + dbatools.library vom FI-TS-Freigabelaufwerk synchronisiert (-Scope $Scope)." -ForegroundColor Green
+    if (-not $siteSyncFailed) {
+        Write-Host "  dbatools + dbatools.library vom Freigabelaufwerk synchronisiert (-Scope $Scope)." -ForegroundColor Green
     } else {
         Write-Warning "  Synchronisation unvollstaendig - bitte den Zustand von '$targetModulesRoot' manuell pruefen."
     }
@@ -376,14 +413,14 @@ if ($importOk) {
         Write-Warning "Installationsquelle konnte nicht gespeichert werden: $_"
     }
 
-    # DbatoolsSharePath in die Konfiguration zurueckschreiben, wenn Schritt 5b eine FITS-
+    # DbatoolsSharePath in die Konfiguration zurueckschreiben, wenn Schritt 5b eine Standort-
     # Freigabe gefunden hat, die dort noch nicht (oder mit einem anderen Pfad) hinterlegt war -
     # kuenftige Installationen lesen ihn dann direkt aus config.json statt ihn erneut aus
     # -Source herzuleiten, und andere Modulfunktionen koennen ihn ueber Get-sqmConfig nutzen.
-    if ($fitsModulesShare -and $fitsModulesShare -ne $dbatoolsSharePathFromConfig) {
+    if ($siteModulesShare -and $siteModulesShare -ne $dbatoolsSharePathFromConfig) {
         try {
-            Set-sqmConfig -DbatoolsSharePath $fitsModulesShare -ErrorAction Stop
-            Write-Host "DbatoolsSharePath gemerkt: $fitsModulesShare" -ForegroundColor Gray
+            Set-sqmConfig -DbatoolsSharePath $siteModulesShare -ErrorAction Stop
+            Write-Host "DbatoolsSharePath gemerkt: $siteModulesShare" -ForegroundColor Gray
         } catch {
             Write-Warning "DbatoolsSharePath konnte nicht gespeichert werden: $_"
         }
@@ -468,39 +505,34 @@ if ($importOk -and $Scope -eq 'AllUsers') {
 }
 
 # ---------------------------------------------------------------------------
-# 7. FI-TS-Konfiguration automatisch setzen
-#    Kriterium: Installation wurde von W:\ oder \\tsclient\W\ gestartet ($isFitsInstall,
-#    bereits in Schritt 5b berechnet und dort auch fuer das dbatools-Sideloading genutzt).
-#    Setzt alle FI-TS-Standardwerte via Set-sqmConfig (persistiert in config.json).
-#    Laeuft nur wenn der Import erfolgreich war.
+# 7. Standort-Konfiguration automatisch setzen
+#    Kriterium: Standort-Profil vorhanden und -Source passt auf 'Install.SourcePatterns'
+#    ($isSiteInstall, bereits in Schritt 5b berechnet und dort auch fuer das dbatools-
+#    Sideloading genutzt). Setzt die Werte aus 'Install.Config' via Set-sqmConfig
+#    (persistiert in config.json). Laeuft nur wenn der Import erfolgreich war.
 # ---------------------------------------------------------------------------
-if ($importOk -and $isFitsInstall) {
+if ($importOk -and $isSiteInstall -and $siteProfile.Install.Config) {
     Write-Host ""
-    Write-Host "FI-TS-Umgebung erkannt (Quelle: $Source)" -ForegroundColor Cyan
-    Write-Host "Setze FI-TS-Standardkonfiguration..." -ForegroundColor Cyan
-    try {
-        Set-sqmConfig `
-            -OutputPath            'C:\System\WinSrvLog\MSSQL' `
-            -OlaJobNameFull        'FITS-UserDatabases-FULL' `
-            -OlaJobNameDiff        'FITS-UserDatabases-DIFF' `
-            -OlaJobNameLog         'FITS-UserDatabases-LOG' `
-            -OlaJobNameIndexOpt    'FITS IndexOptimize - USER_DATABASES' `
-            -OlaJobNameIntUserDb   'FITS IntegrityCheck - USER_DATABASES' `
-            -OlaJobNameIntSysDb    'FITS IntegrityCheck - SYSTEM_DATABASES' `
-            -OlaJobNameSysDbBackup 'FITS-SystemDatabases-FULL' `
-            -DefaultPolicy         'New Login_Enforce Passwort Policy' `
-            -CheckProfile          'FiTs' `
-            -ErrorAction Stop
-        Write-Host "FI-TS-Konfiguration erfolgreich gesetzt." -ForegroundColor Green
-        Write-Host "  OutputPath   : C:\System\WinSrvLog\MSSQL" -ForegroundColor Gray
-        Write-Host "  OlaJobs      : FITS-*" -ForegroundColor Gray
-        Write-Host "  DefaultPolicy: New Login_Enforce Passwort Policy" -ForegroundColor Gray
-    } catch {
-        Write-Warning "FI-TS-Konfiguration konnte nicht gesetzt werden: $_"
-        Write-Warning "Manuell nachholen mit: Set-sqmConfig -DefaultPolicy 'New Login_Enforce Passwort Policy' ..."
+    Write-Host "Standort-Profil erkannt (Quelle: $Source)" -ForegroundColor Cyan
+    Write-Host "Setze Standort-Konfiguration..." -ForegroundColor Cyan
+    $siteInstallConfig = @{}
+    foreach ($prop in $siteProfile.Install.Config.PSObject.Properties) {
+        $value = $prop.Value
+        if ($value -is [string]) { $value = [Environment]::ExpandEnvironmentVariables($value) }
+        $siteInstallConfig[$prop.Name] = $value
     }
-} elseif ($importOk -and -not $isFitsInstall) {
+    try {
+        Set-sqmConfig @siteInstallConfig -ErrorAction Stop
+        Write-Host "Standort-Konfiguration erfolgreich gesetzt." -ForegroundColor Green
+        foreach ($key in ($siteInstallConfig.Keys | Sort-Object)) {
+            Write-Host ("  {0,-22}: {1}" -f $key, ($siteInstallConfig[$key] -join ', ')) -ForegroundColor Gray
+        }
+    } catch {
+        Write-Warning "Standort-Konfiguration konnte nicht gesetzt werden: $_"
+        Write-Warning "Manuell nachholen mit: Set-sqmConfig -OlaJobNameFull '...' -DefaultPolicy '...'"
+    }
+} elseif ($importOk) {
     Write-Host ""
-    Write-Host "Hinweis: Keine FI-TS-Umgebung erkannt." -ForegroundColor Yellow
+    Write-Host "Hinweis: Kein Standort-Profil erkannt." -ForegroundColor Yellow
     Write-Host "  Job-Namen und Policy manuell setzen: Set-sqmConfig -OlaJobNameFull '...' -DefaultPolicy '...'" -ForegroundColor Gray
 }

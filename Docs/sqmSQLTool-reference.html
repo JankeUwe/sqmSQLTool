@@ -1907,8 +1907,8 @@ Import-sqmDatabaseLogins -InputPath &lt;copied directory&gt; picks the newest on
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmADGroupMembers -GroupName &quot;DL_SQL_Admins&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Get-sqmADGroupMembers -GroupName &quot;Administrators&quot; -Domain &quot;FITS&quot;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmADGroupMembers -GroupName &quot;Administrators&quot; -Domain &quot;FITS&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example-label">Get-sqmADGroupMembers -GroupName &quot;Administrators&quot; -Domain &quot;CORP&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmADGroupMembers -GroupName &quot;Administrators&quot; -Domain &quot;CORP&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -4334,7 +4334,7 @@ Invoke-sqmSetDatabaseRecoveryMode -Database &quot;SalesDB&quot; -RecoveryMode Si
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Set-sqmConfig -HpuDomainGroupMap @(</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmConfig -HpuDomainGroupMap @(
-        [PSCustomObject]@{ DomainPattern = &#39;*.sfinance.net&#39;; GroupNamePattern = &#39;Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod&#39; },
+        [PSCustomObject]@{ DomainPattern = &#39;*.corp.example&#39;; GroupNamePattern = &#39;Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod&#39; },
         [PSCustomObject]@{ DomainPattern = &#39;*&#39;;              GroupNamePattern = &#39;Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod&#39; }
     )</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
@@ -4343,8 +4343,8 @@ Invoke-sqmSetDatabaseRecoveryMode -Database &quot;SalesDB&quot; -RecoveryMode Si
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmConfig -SsrsInstallerPath &#39;\\srv-share\Software\SSRS2022\SQLServerReportingServices.exe&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Set-sqmConfig -DbatoolsSharePath &#39;W:\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module&#39;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmConfig -DbatoolsSharePath &#39;W:\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example-label">Set-sqmConfig -DbatoolsSharePath &#39;\\fileserver\SQLAdmin\Modules&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Set-sqmConfig -DbatoolsSharePath &#39;\\fileserver\SQLAdmin\Modules&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Set-sqmConfig -MasterDbObjectWhitelist @(&#39;sp_Blitz*&#39;, &#39;sp_WhoIsActive&#39;, &#39;CommandExecute&#39;, &#39;CommandLog&#39;, &#39;usp_MyAdminTool&#39;)</div>

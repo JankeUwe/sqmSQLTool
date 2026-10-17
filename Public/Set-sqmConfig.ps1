@@ -84,10 +84,10 @@
 .PARAMETER DbatoolsSharePath
     UNC or local path to a share containing a pre-packaged 'dbatools' + 'dbatools.library'
     baseline (two subfolders of that name). Used by Install.ps1 to sideload dbatools on
-    instances without PSGallery access (e.g. FI-TS-hosted production servers) instead of
+    instances without PSGallery access (e.g. isolated production servers) instead of
     deriving the path from -Source. See github.com/JankeUwe/dbatools-baseline for how such
     a share gets populated/kept in sync.
-    Example: 'W:\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module'
+    Example: '\\fileserver\SQLAdmin\Modules'
 
 .PARAMETER UpdateMode
     Update-Pruefung beim Modulstart (erster Aufruf einer sqmSQLTool-Funktion in einer Sitzung,
@@ -109,9 +109,10 @@
 
 .PARAMETER CheckProfile
     Check-Profil fuer Invoke-sqmSetupReport und verwandte Checks.
-    Auto  = FI-TS-Checks nur wenn sqmIsFitsEnvironment erkannt (Standard)
-    FiTs  = FI-TS-Checks immer erzwingen (auch ausserhalb der Domaene)
-    Generic = nur Standard-Checks, keine FI-TS-spezifischen Pruefungen
+    Auto  = Standort-Checks nur wenn ein Standort-Profil aktiv ist (Standard)
+    Site  = Standort-Checks immer erzwingen (auch ausserhalb der erkannten Umgebung)
+    Generic = nur Standard-Checks, keine standortspezifischen Pruefungen
+    Der fruehere Wert 'FiTs' wird weiter akzeptiert und als 'Site' gespeichert.
 
 .PARAMETER CheckCostThresholdMin
     Mindestwert fuer Cost Threshold for Parallelism im Setup-Check.
@@ -157,7 +158,7 @@
 
 .EXAMPLE
     Set-sqmConfig -HpuDomainGroupMap @(
-        [PSCustomObject]@{ DomainPattern = '*.sfinance.net'; GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' },
+        [PSCustomObject]@{ DomainPattern = '*.corp.example'; GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' },
         [PSCustomObject]@{ DomainPattern = '*';              GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' }
     )
 
@@ -165,7 +166,7 @@
     Set-sqmConfig -SsrsInstallerPath '\\srv-share\Software\SSRS2022\SQLServerReportingServices.exe'
 
 .EXAMPLE
-    Set-sqmConfig -DbatoolsSharePath 'W:\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module'
+    Set-sqmConfig -DbatoolsSharePath '\\fileserver\SQLAdmin\Modules'
 
 .EXAMPLE
     Set-sqmConfig -MasterDbObjectWhitelist @('sp_Blitz*', 'sp_WhoIsActive', 'CommandExecute', 'CommandLog', 'usp_MyAdminTool')
@@ -225,7 +226,7 @@ function Set-sqmConfig
 		[Parameter(Mandatory = $false)]
 		[string]$DbatoolsSharePath,
 		[Parameter(Mandatory = $false)]
-		[ValidateSet('Auto', 'FiTs', 'Generic')]
+		[ValidateSet('Auto', 'Site', 'Generic', 'FiTs')]
 		[string]$CheckProfile,
 		[Parameter(Mandatory = $false)]
 		[ValidateRange(1, 1000)]
@@ -558,7 +559,8 @@ function Set-sqmConfig
 	# Check-Profil und Grenzwerte
 	if ($PSBoundParameters.ContainsKey('CheckProfile'))
 	{
-		$globalConfig['CheckProfile'] = $CheckProfile
+		# 'FiTs' = frueherer Name von 'Site', weiter akzeptiert
+		$globalConfig['CheckProfile'] = if ($CheckProfile -eq 'FiTs') { 'Site' } else { $CheckProfile }
 		$updated = $true
 	}
 	if ($PSBoundParameters.ContainsKey('CheckCostThresholdMin'))
@@ -612,8 +614,8 @@ function Set-sqmConfig
 	}
 	
 	# Persistenz: Nur explizit gesetzte Keys in JSON-Datei schreiben (Merge)
-	# Verhindert, dass Auto-Werte (FI-TS-Defaults, Umgebungsvariablen) in config.json
-	# landen und beim naechsten Modulimport den FI-TS-Block ueberschreiben.
+	# Verhindert, dass Auto-Werte (Standort-Profil, Umgebungsvariablen) in config.json
+	# landen und beim naechsten Modulimport das Standort-Profil ueberschreiben.
 	$configFile = Join-Path $env:APPDATA "MSSQLTools\config.json"
 	$configDir = Split-Path $configFile -Parent
 	if (-not (Test-Path $configDir))

@@ -14,7 +14,7 @@
 # SCHRITT 1: Modulkonfiguration als ERSTES initialisieren
 # (muss vor dem Laden der Funktionen und vor Get-sqmConfig-Aufrufen stehen)
 # Neutrale Standardwerte fuer PSGallery-Nutzer.
-# FI-TS-spezifische Werte werden in Schritt 1b gesetzt wenn erkannt.
+# Standortspezifische Werte kommen aus dem optionalen Standort-Profil (Schritt 1c).
 # =============================================================================
 $script:sqmModuleConfig = @{
 	LogPath               = "C:\System\WinSrvLog\MSSQL"
@@ -30,6 +30,10 @@ $script:sqmModuleConfig = @{
 	OlaJobNameOutputCleanup       = "DatabaseMaintenance-Output File Cleanup"
 	OlaJobNamePurgeJobHistory     = "DatabaseMaintenance-sp_purge_jobhistory"
 	OlaJobNameDeleteBackupHistory = "DatabaseMaintenance-sp_delete_backuphistory"
+	# Sync-Job der Backup-Ausschlusstabelle (New-sqmOlaUsrDbBackupJob -UseExcludeTable)
+	OlaJobNameBackupExcludeSync   = "sqm BackupExclude - SYNC"
+	# Registry-Unterschluessel unter HKLM:\<RegistryBase>\ fuer Invoke-sqmMonitoringKey
+	MonitoringRegistrySubKey      = "sqmSQLTool\SystemCenter"
 	BackupDirectory       = $null
 	# Aufbewahrung der Restore-Test-Nachweise (Monate). Nachweise sind Auditmaterial und
 	# muessen ueber den Pruefzeitraum verfuegbar bleiben - Default 12 Monate. 0 = unbegrenzt
@@ -65,14 +69,15 @@ $script:sqmModuleConfig = @{
 	UpdateCheckIntervalHours = 24
 	ModuleVersion         = '1.9.10.0'
 	Language              = 'en-US'
-	# Check-Profil: 'Auto' = FI-TS wenn erkannt, 'FiTs' = immer, 'Generic' = nie FI-TS-Checks
+	# Check-Profil: 'Auto' = Standort-Checks wenn ein Standort-Profil aktiv ist, 'Site' = immer,
+	# 'Generic' = nie. Der fruehere Wert 'FiTs' wird weiter akzeptiert und als 'Site' gefuehrt.
 	CheckProfile          = 'Auto'
-	# Grenzwerte fuer Setup-Checks (neutrale Defaults, FI-TS-Block setzt gleiche Werte)
+	# Grenzwerte fuer Setup-Checks (neutrale Defaults, ein Standort-Profil kann sie ueberschreiben)
 	CheckCostThresholdMin    = 50
 	CheckTempDbMaxFiles      = 8
 	CheckDiskBlockSize       = 65536
 	# Mindestanteil freier Plattenkapazitaet in Prozent. Ohne neutralen Default existiert der
-	# Schluessel ausserhalb der FI-TS-Umgebung nicht: Get-sqmConfig warnt dann und liefert $null,
+	# Schluessel ohne Standort-Profil nicht: Get-sqmConfig warnt dann und liefert $null,
 	# was zu Schwellwert 0 wird - die Erweiterungsberechnung in Get-sqmDiskInfoByDriveLetter
 	# meldet damit fuer jedes Laufwerk 0 GB.
 	DiskFreeSpaceThresholdPct = 10
@@ -125,57 +130,104 @@ if (Test-Path $configFile)
 }
 
 # =============================================================================
-# SCHRITT 1c: FI-TS-Umgebungserkennung (ueberschreibt config.json — gewinnt immer)
-# Kriterium 1: Modul liegt auf W:\ (FI-TS Netzlaufwerk)
-# Kriterium 2: Angemeldeter Benutzer ist in Domaene OFFICELAN.IZB / OFFICELAN
-# FI-TS-Werte werden NACH config.json gesetzt und haben stets Vorrang.
+# SCHRITT 1c: Standort-Profil (ueberschreibt config.json - gewinnt immer)
+# Umgebungsspezifische Vorgaben (Job-Namen, Freigabepfade, Monitoring-Account, ...)
+# stehen nicht im Code, sondern in einer optionalen, NICHT versionierten JSON-Datei:
+#   1. <Modulordner>\sqmSQLTool.site.json            (kopiert Install.ps1 aus der Quelle mit)
+#   2. %ProgramData%\MSSQLTools\sqmSQLTool.site.json  (maschinenweit, ueberlebt Modul-Updates)
+# Aufbau: siehe Docs/SiteProfile.md.
+#   Defaults: gelten immer, wenn das Profil vorhanden ist (config.json hat Vorrang).
+#   Detection.ModulePathPatterns / UserDnsDomains / UserDomains: wann 'Config' gilt
+#   (ein Treffer genuegt; ohne 'Detection' gilt 'Config' immer).
+#   Config: Schluessel/Werte fuer die Modulkonfiguration. %VAR% in Strings wird expandiert.
+#   DbatoolsShareCandidates / DbatoolsLegacyShareCandidates: Fallback-Freigaben fuer dbatools
+#   (Schritt 2, Reihenfolge: neue Pfade, dann Legacy-Pfade).
+# Die Werte aus 'Config' werden NACH config.json gesetzt und haben stets Vorrang.
 # =============================================================================
-$script:sqmIsFitsEnvironment = $false
+$script:sqmSiteProfile       = $null
+$script:sqmSiteProfilePath   = $null
+$script:sqmSiteProfileActive = $false
 
-if ($PSScriptRoot -like 'W:\*' -or $PSScriptRoot -like '\\tsclient\W\*')
+foreach ($_sitePath in @(
+		(Join-Path $PSScriptRoot 'sqmSQLTool.site.json'),
+		(Join-Path $env:ProgramData 'MSSQLTools\sqmSQLTool.site.json')))
 {
-	$script:sqmIsFitsEnvironment = $true
-	Write-Verbose "sqmSQLTool: FI-TS-Umgebung erkannt (Modulpfad: $PSScriptRoot)."
-}
-
-if (-not $script:sqmIsFitsEnvironment)
-{
-	$_dnsDomain  = $env:USERDNSDOMAIN
-	$_userDomain = $env:USERDOMAIN
-	if (($_dnsDomain  -and $_dnsDomain  -eq 'OFFICELAN.IZB') -or
-		($_userDomain -and $_userDomain -eq 'OFFICELAN'))
+	if (-not (Test-Path -LiteralPath $_sitePath -PathType Leaf)) { continue }
+	try
 	{
-		$script:sqmIsFitsEnvironment = $true
-		Write-Verbose "sqmSQLTool: FI-TS-Umgebung erkannt (Domaene: $_dnsDomain / $_userDomain)."
+		$script:sqmSiteProfile     = Get-Content -LiteralPath $_sitePath -Raw -Encoding UTF8 | ConvertFrom-Json
+		$script:sqmSiteProfilePath = $_sitePath
+		break
+	}
+	catch
+	{
+		Write-Warning "Standort-Profil '$_sitePath' konnte nicht gelesen werden: $($_.Exception.Message)"
 	}
 }
 
-if ($script:sqmIsFitsEnvironment)
+if ($script:sqmSiteProfile)
 {
-	$script:sqmModuleConfig['LogPath']                = 'C:\System\WinSrvLog\MSSQL'
-	$script:sqmModuleConfig['OutputPath']             = 'C:\System\WinSrvLog\MSSQL'
-	$script:sqmModuleConfig['UpdateRepository']       = 'W:\75084-Datenbanken\MSSQL\CPM\sqmSQLTool'
-	$script:sqmModuleConfig['TsmManagementClasses']   = @('MC_B_NL.NL_35.35.NA')
-	$script:sqmModuleConfig['DefaultPolicy']          = 'New Login_Enforce Passwort Policy'
-	$script:sqmModuleConfig['DefaultMonitoringUser']  = "$env:USERDOMAIN\izt0504"
-	$script:sqmModuleConfig['SsrsInstallerPath']      = 'W:\75084-Datenbanken\MSSQL\SQLSources\Reporting'
-	$script:sqmModuleConfig['DbatoolsSharePath']      = 'W:\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module'
-	$script:sqmModuleConfig['OlaJobNameFull']         = 'FITS Backup - USER_DATABASES - FULL'
-	$script:sqmModuleConfig['OlaJobNameDiff']         = 'FITS Backup - USER_DATABASES - DIFF'
-	$script:sqmModuleConfig['OlaJobNameLog']          = 'FITS Backup - USER_DATABASES - LOG'
-	$script:sqmModuleConfig['OlaJobNameIndexOpt']     = 'FITS IndexOptimize - USER_DATABASES'
-	$script:sqmModuleConfig['OlaJobNameIntUserDb']    = 'FITS IntegrityCheck - USER_DATABASES'
-	$script:sqmModuleConfig['OlaJobNameIntSysDb']     = 'FITS IntegrityCheck - SYSTEM_DATABASES'
-	$script:sqmModuleConfig['OlaJobNameSysDbBackup']         = 'FITS Backup - SYSTEM_DATABASES - FULL'
-	$script:sqmModuleConfig['OlaJobNameOutputCleanup']       = 'FITS Output File Cleanup'
-	$script:sqmModuleConfig['OlaJobNamePurgeJobHistory']     = 'FITS sp_purge_jobhistory'
-	$script:sqmModuleConfig['OlaJobNameDeleteBackupHistory'] = 'FITS sp_delete_backuphistory'
-	# FI-TS Check-Profil und Grenzwerte
-	$script:sqmModuleConfig['CheckProfile']           = 'FiTs'
-	$script:sqmModuleConfig['CheckCostThresholdMin']  = 50
-	$script:sqmModuleConfig['CheckTempDbMaxFiles']    = 8
-	$script:sqmModuleConfig['CheckDiskBlockSize']     = 65536
-	$script:sqmModuleConfig['DiskFreeSpaceThresholdPct'] = 10
+	# 'Defaults' gelten immer, wenn das Profil vorhanden ist (wie eingebaute Standardwerte):
+	# ein in config.json gesetzter Wert hat Vorrang.
+	if ($script:sqmSiteProfile.Defaults)
+	{
+		foreach ($_prop in $script:sqmSiteProfile.Defaults.PSObject.Properties)
+		{
+			if ($userConfig -and $userConfig.PSObject.Properties[$_prop.Name]) { continue }
+			$_value = $_prop.Value
+			if ($_value -is [string]) { $_value = [Environment]::ExpandEnvironmentVariables($_value) }
+			$script:sqmModuleConfig[$_prop.Name] = $_value
+		}
+	}
+
+	$_detection = $script:sqmSiteProfile.Detection
+	if (-not $_detection)
+	{
+		$script:sqmSiteProfileActive = $true
+	}
+	else
+	{
+		foreach ($_pattern in @($_detection.ModulePathPatterns))
+		{
+			if ($_pattern -and $PSScriptRoot -like $_pattern)
+			{
+				$script:sqmSiteProfileActive = $true
+				Write-Verbose "sqmSQLTool: Standort-Profil aktiv (Modulpfad: $PSScriptRoot)."
+				break
+			}
+		}
+		if (-not $script:sqmSiteProfileActive)
+		{
+			$_dnsDomain  = $env:USERDNSDOMAIN
+			$_userDomain = $env:USERDOMAIN
+			if (($_dnsDomain  -and @($_detection.UserDnsDomains) -contains $_dnsDomain) -or
+				($_userDomain -and @($_detection.UserDomains) -contains $_userDomain))
+			{
+				$script:sqmSiteProfileActive = $true
+				Write-Verbose "sqmSQLTool: Standort-Profil aktiv (Domaene: $_dnsDomain / $_userDomain)."
+			}
+		}
+	}
+
+	if ($script:sqmSiteProfileActive -and $script:sqmSiteProfile.Config)
+	{
+		foreach ($_prop in $script:sqmSiteProfile.Config.PSObject.Properties)
+		{
+			$_value = $_prop.Value
+			if ($_value -is [string]) { $_value = [Environment]::ExpandEnvironmentVariables($_value) }
+			$script:sqmModuleConfig[$_prop.Name] = $_value
+		}
+	}
+}
+
+# Frueherer Profilname wird weiter akzeptiert (config.json / Standort-Profil)
+if ($script:sqmModuleConfig['CheckProfile'] -eq 'FiTs') { $script:sqmModuleConfig['CheckProfile'] = 'Site' }
+
+if (-not $script:sqmSiteProfile -and $script:sqmModuleConfig['CheckProfile'] -eq 'Site')
+{
+	Write-Warning ("sqmSQLTool: CheckProfile ist 'Site', aber kein Standort-Profil gefunden " +
+		"(<Modulordner>\sqmSQLTool.site.json oder %ProgramData%\MSSQLTools\sqmSQLTool.site.json). " +
+		"Standortwerte wie Job-Namen und Freigabepfade fehlen - es gelten die neutralen Standardwerte.")
 }
 
 # String-Cache invalidieren (wird durch Get-sqmString bei erstem Zugriff neu befuellt)
@@ -201,22 +253,24 @@ else
 	}
 	catch
 	{
-		# dbatools nicht via PSModulePath gefunden - FITS-Fallback: lokaler Modulpfad
-		# Standardpfad seit v1.9.159.0: _SQLAdminTools\Other\Module; SQLSources\Modules nur noch Legacy
-		$fitsFallback = @(
-			'W:\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module',
-			'\\tsclient\W\75084-Datenbanken\MSSQL\_SQLAdminTools\Other\Module',
-			'W:\75084-Datenbanken\MSSQL\SQLSources\Modules',
-			'\\tsclient\W\75084-Datenbanken\MSSQL\SQLSources\Modules'
-		) | Where-Object { [IO.Directory]::Exists([IO.Path]::Combine($_, 'dbatools')) } |
+		# dbatools nicht via PSModulePath gefunden - Fallback: Freigaben aus dem Standort-Profil
+		# (DbatoolsShareCandidates, danach DbatoolsLegacyShareCandidates; erster Treffer gewinnt)
+		$_shareCandidates = @()
+		if ($script:sqmSiteProfile)
+		{
+			$_shareCandidates = @(@($script:sqmSiteProfile.DbatoolsShareCandidates) +
+				@($script:sqmSiteProfile.DbatoolsLegacyShareCandidates) | Where-Object { $_ })
+		}
+		$dbatoolsFallback = $_shareCandidates |
+			Where-Object { [IO.Directory]::Exists([IO.Path]::Combine($_, 'dbatools')) } |
 			Select-Object -First 1
 
-		if ($fitsFallback)
+		if ($dbatoolsFallback)
 		{
 			# Freigabe nur fuer diese Sitzung vorne in PSModulePath, dann regulaer importieren:
 			# so loest dbatools auch sein RequiredModule dbatools.library von dort auf. (Frueher:
 			# 'dbatools*' absteigend sortiert -> erwischte dbatools.library statt dbatools.)
-			$env:PSModulePath = "$fitsFallback;$env:PSModulePath"
+			$env:PSModulePath = "$dbatoolsFallback;$env:PSModulePath"
 			try
 			{
 				Import-Module dbatools -ErrorAction Stop

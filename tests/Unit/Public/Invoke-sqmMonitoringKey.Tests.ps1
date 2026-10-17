@@ -6,11 +6,12 @@
 .DESCRIPTION
     Hintergrund: die Quelldatei ist zwischenzeitlich auf den Pfad
     "HKLM:\<RegistryBase>\dtcSoftware\sqmSQLTool" zurueckgefallen, obwohl die reale
-    System-Center-Konvention beim Kunden "HKLM:\SYSTEM\FITS\Systemcenter" ist, mit den Werten
-    SQL (0/1/2, kundenabhaengig, manuell) und SQLFreeSpaceVersion (Standard/Cluster,
-    per -AutoDetectSQLFreeSpaceVersion erkennbar) direkt unter diesem Schluessel. Die
-    gebaute/verteilte Kopie in bin/Public hatte weiterhin den richtigen Pfad - dieser Test haelt
-    den korrekten Pfad in der Quelle fest, damit das nicht nochmal auseinanderlaeuft.
+    System-Center-Konvention beim Kunden ein fester Schluessel unter HKLM:\SYSTEM ist, mit den
+    Werten SQL (0/1/2, kundenabhaengig, manuell) und SQLFreeSpaceVersion (Standard/Cluster,
+    per -AutoDetectSQLFreeSpaceVersion erkennbar) direkt unter diesem Schluessel. Der
+    Unterschluessel kommt aus der Modulkonfiguration (MonitoringRegistrySubKey, neutraler
+    Standard 'sqmSQLTool\SystemCenter', ein Standort-Profil setzt den Kundenpfad) - diese Tests
+    halten fest, dass der konfigurierte Pfad verwendet wird und nicht der alte dtcSoftware-Pfad.
 
     Alle Registry-Zugriffe sind gemockt - es wird nie in die echte HKLM geschrieben oder aus ihr
     gelesen, auch nicht auf einer Entwicklermaschine, auf der der Schluessel bereits real gepflegt
@@ -29,32 +30,42 @@ AfterAll {
 
 Describe 'Invoke-sqmMonitoringKey' {
 
-    It 'schreibt unter HKLM:\RegistryBase\FITS\SystemCenter, nicht dem alten dtcSoftware-sqmSQLTool-Pfad' {
+    It 'schreibt unter dem konfigurierten MonitoringRegistrySubKey, nicht dem alten dtcSoftware-sqmSQLTool-Pfad' {
         InModuleScope sqmSQLTool {
             Mock Invoke-sqmLogging { }
+            $saved = $script:sqmModuleConfig['MonitoringRegistrySubKey']
+            try {
+                $script:sqmModuleConfig['MonitoringRegistrySubKey'] = 'SiteMonitoring\SystemCenter'
 
-            $usedPaths = [System.Collections.Generic.List[string]]::new()
-            Mock Test-Path { $usedPaths.Add($Path); $false } -ParameterFilter { $Path -like 'HKLM:*' }
-            Mock New-Item { [PSCustomObject]@{ } } -ParameterFilter { $Path -like 'HKLM:*' }
-            Mock Set-ItemProperty { $usedPaths.Add($Path) } -ParameterFilter { $Path -like 'HKLM:*' }
-            Mock Get-ItemProperty { [PSCustomObject]@{ SQL = 2; SQLFreeSpaceVersion = 'Standard'; TSM = $null } } -ParameterFilter { $Path -like 'HKLM:*' }
+                $usedPaths = [System.Collections.Generic.List[string]]::new()
+                Mock Test-Path { $usedPaths.Add($Path); $false } -ParameterFilter { $Path -like 'HKLM:*' }
+                Mock New-Item { [PSCustomObject]@{ } } -ParameterFilter { $Path -like 'HKLM:*' }
+                Mock Set-ItemProperty { $usedPaths.Add($Path) } -ParameterFilter { $Path -like 'HKLM:*' }
+                Mock Get-ItemProperty { [PSCustomObject]@{ SQL = 2; SQLFreeSpaceVersion = 'Standard'; TSM = $null } } -ParameterFilter { $Path -like 'HKLM:*' }
 
-            Invoke-sqmMonitoringKey -Operation Set -SQL Full -Confirm:$false | Out-Null
+                Invoke-sqmMonitoringKey -Operation Set -SQL Full -Confirm:$false | Out-Null
 
-            $usedPaths | Should -Not -BeNullOrEmpty
-            foreach ($p in $usedPaths) { $p | Should -Be 'HKLM:\System\FITS\SystemCenter' }
-            $usedPaths | Should -Not -Contain 'HKLM:\System\dtcSoftware\sqmSQLTool'
+                $usedPaths | Should -Not -BeNullOrEmpty
+                foreach ($p in $usedPaths) { $p | Should -Be 'HKLM:\System\SiteMonitoring\SystemCenter' }
+                $usedPaths | Should -Not -Contain 'HKLM:\System\dtcSoftware\sqmSQLTool'
+            }
+            finally { $script:sqmModuleConfig['MonitoringRegistrySubKey'] = $saved }
         }
     }
 
-    It 'meldet den vollen Pfad HKLM:\System\FITS\SystemCenter im Ergebnisobjekt (Operation Get, Standard-RegistryBase)' {
+    It 'nutzt ohne Standort-Profil den neutralen Standard HKLM:\System\sqmSQLTool\SystemCenter (Operation Get)' {
         InModuleScope sqmSQLTool {
             Mock Invoke-sqmLogging { }
             Mock Test-Path { $false } -ParameterFilter { $Path -like 'HKLM:*' }
+            $saved = $script:sqmModuleConfig['MonitoringRegistrySubKey']
+            try {
+                $script:sqmModuleConfig['MonitoringRegistrySubKey'] = 'sqmSQLTool\SystemCenter'
 
-            $result = Invoke-sqmMonitoringKey -Operation Get
+                $result = Invoke-sqmMonitoringKey -Operation Get
 
-            $result.RegistryPath | Should -Be 'HKLM:\System\FITS\SystemCenter'
+                $result.RegistryPath | Should -Be 'HKLM:\System\sqmSQLTool\SystemCenter'
+            }
+            finally { $script:sqmModuleConfig['MonitoringRegistrySubKey'] = $saved }
         }
     }
 }

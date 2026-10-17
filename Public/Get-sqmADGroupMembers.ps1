@@ -22,7 +22,7 @@
     Format: "GroupName" or "DOMAIN\GroupName"
 
 .PARAMETER Domain
-    Optional: AD domain (e.g., "FITS.LOCAL", "corp.de")
+    Optional: AD domain (e.g., "CORP.LOCAL", "corp.de")
     If not specified, auto-detects current domain.
 
 .OUTPUTS
@@ -32,7 +32,7 @@
     Get-sqmADGroupMembers -GroupName "DL_SQL_Admins"
 
 .EXAMPLE
-    Get-sqmADGroupMembers -GroupName "Administrators" -Domain "FITS"
+    Get-sqmADGroupMembers -GroupName "Administrators" -Domain "CORP"
 
 .NOTES
     Author: sqmSQLTool

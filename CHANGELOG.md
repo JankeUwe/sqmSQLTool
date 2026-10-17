@@ -1,5 +1,35 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.181.0] - 2026-10-17
+
+### Neu: Standort-Profil statt fest eingebauter Umgebungswerte
+
+- Umgebungsspezifische Vorgaben (Agent-Job-Namen, Freigabepfade fuer die dbatools-Baseline, Update-Quelle,
+  SSRS-Installer, Monitoring-Account, Policy-Name, Monitoring-Registry-Pfad) und die Regeln, wann sie gelten
+  (Modulpfad, Domaene), stehen nicht mehr im Modulcode, sondern in einem optionalen, nicht versionierten
+  Standort-Profil `sqmSQLTool.site.json`. Gesucht wird im Modulordner und unter
+  `%ProgramData%\MSSQLTools\`. Aufbau und Abschnitte: `Docs/SiteProfile.md`.
+- Verhalten mit Profil unveraendert: gleiche Werte, gleicher Vorrang vor `config.json`, gleiche Freigabepfade
+  in gleicher Reihenfolge (neuer Pfad vor Legacy-Pfad) beim dbatools-Fallback des Modulimports und beim
+  Sideloading in `Install.ps1`. Geprueft per Vergleich alte/neue Version auf einem simulierten Laufwerk unter
+  PowerShell 7 und Windows PowerShell 5.1.
+- `Install.ps1` legt ein Profil aus der Installationsquelle zusaetzlich unter `%ProgramData%\MSSQLTools\` ab,
+  damit es Modul-Updates aus Quellen ohne Profil ueberlebt und fuer alle Benutzer gilt.
+- **Wichtig fuer bestehende Installationen mit Standortwerten:** vor dem Verteilen dieser Version das
+  Standort-Profil neben `Install.ps1` in die Installationsquelle legen. Ohne Profil gelten die neutralen
+  Standardwerte; steht `CheckProfile` dann noch auf `Site`, warnt der Modulimport.
+- Neue Konfigurationsschluessel: `OlaJobNameBackupExcludeSync` (Sync-Job von
+  `New-sqmOlaUsrDbBackupJob -UseExcludeTable`, Standard `sqm BackupExclude - SYNC`; bisher aus dem Praefix des
+  FULL-Job-Namens abgeleitet) und `MonitoringRegistrySubKey` (`Invoke-sqmMonitoringKey`, Standard
+  `sqmSQLTool\SystemCenter` unter `HKLM:\<RegistryBase>`; bisher fest im Code).
+- `CheckProfile`: neuer Wert `Site`. Der fruehere Wert wird bei `Set-sqmConfig -CheckProfile` und aus
+  `config.json` weiter akzeptiert und als `Site` gefuehrt.
+- `Export-sqmAlwaysOnConfiguration`: Warnungen und Berichte sprechen beim ReadableSecondary-Check vom
+  Betriebsstandard statt von einem Kundennamen.
+- Hilfetexte, Beispiele, Kommentare und Tests ohne Kundenbezug; zwei kundeninterne Anleitungen aus `Docs/`
+  entfernt. Neue Tests `tests/Unit/Config/SiteProfile.Tests.ps1` (Profil an/aus, Detection, Defaults,
+  dbatools-Fallback-Reihenfolge, Alias, Code frei von Kundenkennungen).
+
 ## [1.9.180.0] - 2026-10-17
 
 ### Entwicklung: Pruefung auf doppelte Parameterbindung erweitert

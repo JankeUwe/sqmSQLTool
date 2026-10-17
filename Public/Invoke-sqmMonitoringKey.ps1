@@ -3,8 +3,10 @@
     Gets or sets monitoring registry values for the sqmSQLTool on one or more computers.
 
 .DESCRIPTION
-    Reads or writes the registry key HKLM:\<RegistryBase>\FITS\SystemCenter on
-    the specified computers. The key controls which monitoring components are active:
+    Reads or writes the registry key HKLM:\<RegistryBase>\<MonitoringRegistrySubKey> on
+    the specified computers. MonitoringRegistrySubKey comes from the module configuration
+    (Get-sqmConfig; default 'sqmSQLTool\SystemCenter', a site profile can set the path
+    the local monitoring expects). The key controls which monitoring components are active:
     SQL monitoring level (None/Standard/Full), SQLFreeSpaceVersion (Standard/Cluster),
     and TSM backup monitoring (0/1).
 
@@ -91,7 +93,9 @@ function Invoke-sqmMonitoringKey
 	begin
 	{
 		$functionName = $MyInvocation.MyCommand.Name
-		$regSubKey = "$RegistryBase\FITS\SystemCenter"
+		$monitoringSubKey = (Get-sqmConfig)['MonitoringRegistrySubKey']
+		if ([string]::IsNullOrWhiteSpace($monitoringSubKey)) { $monitoringSubKey = 'sqmSQLTool\SystemCenter' }
+		$regSubKey = "$RegistryBase\$($monitoringSubKey.Trim('\'))"
 		$regPath = "HKLM:\$regSubKey"
 		
 		$sqlToDword = @{ 'None' = 0; 'Standard' = 1; 'Full' = 2 }

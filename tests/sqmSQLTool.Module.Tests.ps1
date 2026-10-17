@@ -59,21 +59,15 @@ Describe 'Modulkonfiguration' {
         Get-sqmConfig -Key 'OutputPath' | Should -Not -BeNullOrEmpty
     }
 
-    It 'LogPath enthaelt keinen FI-TS spezifischen Pfad' {
-        # Hinweis: 'WinSrvLog' ist KEIN FI-TS-Marker - der neutrale Default
-        # (C:\System\WinSrvLog\MSSQL) verwendet ihn ebenfalls. FI-TS-spezifisch sind
-        # das W:\-Netzlaufwerk und 'FITS'-Bezeichner.
-        Get-sqmConfig -Key 'LogPath' | Should -Not -BeLike '*FITS*'
+    It 'LogPath ist ohne Standort-Profil kein Netzlaufwerkspfad' {
+        # Hinweis: 'WinSrvLog' ist KEIN Standort-Marker - der neutrale Default
+        # (C:\System\WinSrvLog\MSSQL) verwendet ihn ebenfalls.
         Get-sqmConfig -Key 'LogPath' | Should -Not -BeLike 'W:\*'
     }
 
-    It 'Ola Job-Namen enthalten kein FITS-Prefix' {
-        $keys = @('OlaJobNameFull','OlaJobNameDiff','OlaJobNameLog',
-                  'OlaJobNameSysDbBackup','OlaJobNameIndexOpt',
-                  'OlaJobNameIntUserDb','OlaJobNameIntSysDb')
-        foreach ($key in $keys) {
-            Get-sqmConfig -Key $key | Should -Not -BeLike 'FITS*' -Because "$key sollte keinen FI-TS Prefix haben"
-        }
+    It 'Ola Job-Namen sind ohne Standort-Profil die neutralen Defaults' {
+        Get-sqmConfig -Key 'OlaJobNameFull' | Should -Be 'OlaHH-UserDatabases-FULL'
+        Get-sqmConfig -Key 'OlaJobNameLog'  | Should -Be 'OlaHH-UserDatabases-LOG'
     }
 
     It 'ModuleVersion entspricht Manifest-Version' {

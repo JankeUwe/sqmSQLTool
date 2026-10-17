@@ -6,11 +6,11 @@
 	Reads all static AG configuration settings (not runtime status) and exports them as TXT, CSV, and optional JSON.
 	For each AG on the specified instance:
 	- AG name, backup preference, failover condition, health check timeout
-	- All replicas with ReadableSecondary setting (with FI-TS standard warning)
+	- All replicas with ReadableSecondary setting (with operations-standard warning)
 	- Listener configuration (name, port, IPs)
 	- Member databases
 
-	CRITICAL FI-TS CHECK: ReadableSecondary must be NO (not NONE, READ_ONLY, or ALL).
+	CRITICAL STANDARD CHECK: ReadableSecondary must be NO (not NONE, READ_ONLY, or ALL).
 	Any other value triggers a warning unless -NoWarning is specified.
 
 	Results are saved as HTML, TXT report and CSV file in the specified directory.
@@ -26,7 +26,7 @@
 	Output directory for report files. Default: $env:ProgramData\sqmSQLTool\Logs
 
 .PARAMETER NoWarning
-	Suppress FI-TS ReadableSecondary warnings (Write-Warning is skipped).
+	Suppress ReadableSecondary standard warnings (Write-Warning is skipped).
 	Note: Status will still be Warning if ReadableSecondary != NO.
 
 .PARAMETER NoOpen
@@ -57,7 +57,7 @@
 	Author:       sqmSQLTool
 	Prerequisites: dbatools, Invoke-sqmLogging
 	Default output path: $env:ProgramData\sqmSQLTool\Logs
-	FI-TS Standard: ReadableSecondary MUST be NO on all replicas.
+	Operations standard: ReadableSecondary MUST be NO on all replicas.
 #>
 function Export-sqmAlwaysOnConfiguration
 {
@@ -181,7 +181,7 @@ ORDER BY ag.name, adc.database_name
 					$null = $dbsByAg[$agName].Add($db.DatabaseName)
 				}
 
-				# FI-TS Check: ReadableSecondary != NO
+				# Standard-Check: ReadableSecondary != NO
 				$readableSecondaryIssues = $configRows | Where-Object {
 					$_.ReadableSecondary -ne "NO" -and $_.ReadableSecondary -ne "NONE" -and -not [string]::IsNullOrWhiteSpace($_.ReadableSecondary)
 				}
@@ -190,8 +190,8 @@ ORDER BY ag.name, adc.database_name
 				{
 					foreach ($issue in $readableSecondaryIssues)
 					{
-						Write-Warning "FI-TS: AG '$($issue.AgName)' Replica '$($issue.ReplicaName)': ReadableSecondary = '$($issue.ReadableSecondary)' - FI-TS Standard erfordert NO!"
-						Invoke-sqmLogging -Message "FI-TS WARNING: ReadableSecondary=$($issue.ReadableSecondary) auf Replikat $($issue.ReplicaName) in AG $($issue.AgName)" -FunctionName $functionName -Level "WARNING"
+						Write-Warning "Standard: AG '$($issue.AgName)' Replica '$($issue.ReplicaName)': ReadableSecondary = '$($issue.ReadableSecondary)' - Betriebsstandard erfordert NO!"
+						Invoke-sqmLogging -Message "STANDARD WARNING: ReadableSecondary=$($issue.ReadableSecondary) auf Replikat $($issue.ReplicaName) in AG $($issue.AgName)" -FunctionName $functionName -Level "WARNING"
 					}
 				}
 
@@ -224,7 +224,7 @@ ORDER BY ag.name, adc.database_name
 						$lines.Add("# sqmSQLTool - AlwaysOn Configuration Export")
 						$lines.Add("# Instanz   : $instance")
 						$lines.Add("# Erstellt  : $timestamp")
-						$lines.Add("# AGs       : $agCount  |  Replicas: $($configRows.Count)  |  FI-TS Warnungen: $cntWarn")
+						$lines.Add("# AGs       : $agCount  |  Replicas: $($configRows.Count)  |  Standard-Warnungen: $cntWarn")
 						$lines.Add("# ================================================================")
 						$lines.Add("")
 
@@ -265,13 +265,13 @@ ORDER BY ag.name, adc.database_name
 								$lines.Add(("{0,-25} {1,-18} {2,-18} {3,-20} {4,-8} {5}" -f $row.ReplicaName, $row.AvailabilityMode, $row.FailoverMode, $row.ReadableSecondary, $row.BackupPriority, $status))
 							}
 
-							# FI-TS Warnung wenn nötig
+							# Standard-Warnung wenn nötig
 							$agIssues = $readableSecondaryIssues | Where-Object { $_.AgName -eq $agName }
 							if ($agIssues.Count -gt 0)
 							{
 								$lines.Add("")
-								$lines.Add("   *** FI-TS WARNING: ReadableSecondary != NO!")
-								$lines.Add("   *** FI-TS Standard erfordert ReadableSecondary = NO auf allen Replicas.")
+								$lines.Add("   *** STANDARD WARNING: ReadableSecondary != NO!")
+								$lines.Add("   *** Betriebsstandard erfordert ReadableSecondary = NO auf allen Replicas.")
 							}
 
 							$lines.Add("")
@@ -303,7 +303,7 @@ ORDER BY ag.name, adc.database_name
 								$(if ($dbListHtml) { "<br>Datenbanken: $dbListHtml" } else { '' }) + "</p>" +
 								"<table><tr><th>Replica</th><th>Availability Mode</th><th>Failover Mode</th><th>ReadableSecondary</th><th>Backup%</th></tr>$($replicaRowsHtml -join '')</table>"
 						}
-						$html = ConvertTo-sqmHtmlReport -Title "AlwaysOn Configuration - $instance" -Subtitle "Erstellt: $timestamp | FI-TS Warnungen: $cntWarn" -BodyHtml ($bodySections -join '')
+						$html = ConvertTo-sqmHtmlReport -Title "AlwaysOn Configuration - $instance" -Subtitle "Erstellt: $timestamp | Standard-Warnungen: $cntWarn" -BodyHtml ($bodySections -join '')
 						$html | Out-File -FilePath $htmlFile -Encoding UTF8 -Force
 
 						Invoke-sqmOpenReport -HtmlFile $htmlFile -TxtFile $txtFile -NoOpen:$NoOpen
@@ -334,7 +334,7 @@ ORDER BY ag.name, adc.database_name
 
 					if ($readableSecondaryIssues.Count -gt 0)
 					{
-						Invoke-sqmLogging -Message "[$instance] $($readableSecondaryIssues.Count) FI-TS ReadableSecondary Issue(s) - Bericht: $txtFile" -FunctionName $functionName -Level "WARNING"
+						Invoke-sqmLogging -Message "[$instance] $($readableSecondaryIssues.Count) ReadableSecondary Standard-Issue(s) - Bericht: $txtFile" -FunctionName $functionName -Level "WARNING"
 					}
 				}
 			}

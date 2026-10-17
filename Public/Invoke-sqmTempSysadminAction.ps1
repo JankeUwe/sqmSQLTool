@@ -274,7 +274,7 @@ function Invoke-sqmTempSysadminAction
 					# Mitglied einer AD-Gruppe, die ihrerseits als sysadmin-Login eingetragen ist,
 					# liefert es bereits 1 - die bedingte ALTER-Anweisung wurde dadurch
 					# uebersprungen und der Login NIE direkt in die Rolle aufgenommen (genau der
-					# Fall auf DWP1W02SQLT0001: "kein Fehler, Log sagt erfolgreich, trotzdem kein
+					# Fall auf einem Kundenserver: "kein Fehler, Log sagt erfolgreich, trotzdem kein
 					# sysadmin"). Umgekehrt kann IS_SRVROLEMEMBER() auch 0 liefern, obwohl direkte
 					# Mitgliedschaft besteht (auf DEV01 mit 'NT Service\MSSQLSERVER' reproduziert).
 					# Fuer "diesen Login temporaer in die Rolle aufnehmen/daraus entfernen" ist

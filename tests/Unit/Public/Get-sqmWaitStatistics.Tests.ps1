@@ -4,7 +4,7 @@
     Unit Tests fuer Get-sqmWaitStatistics
 
 .DESCRIPTION
-    Die Fixture ist ein echter Kundenlauf (SQL 2022, SUEB011IBP, Top 25). Genau
+    Die Fixture ist ein echter Kundenlauf (SQL 2022, SQLPROD01, Top 25). Genau
     dieser Datensatz hat beide Schwaechen gezeigt: SOS_WORK_DISPATCHER mit 88 %
     der ausgewiesenen Wartezeit und Fehlalarme auf PAGEIOLATCH_SH (2,05 ms) und
     SOS_SCHEDULER_YIELD (0,12 ms).
@@ -75,13 +75,13 @@ Describe 'Get-sqmWaitStatistics' {
         }
     }
 
-    Context 'Kundenlauf SUEB011IBP (SQL 2022)' {
+    Context 'Kundenlauf SQLPROD01 (SQL 2022)' {
         BeforeAll {
             Mock -ModuleName sqmSQLTool Invoke-sqmLogging { }
             Mock -ModuleName sqmSQLTool Invoke-DbaQuery { $script:CustomerWaits }
             InModuleScope sqmSQLTool { $script:dbatoolsAvailable = $true }
 
-            $script:Result = Get-sqmWaitStatistics -SqlInstance 'SUEB011IBP' -TopN 25
+            $script:Result = Get-sqmWaitStatistics -SqlInstance 'SQLPROD01' -TopN 25
             $script:ByType = @{}
             foreach ($r in $script:Result) { $script:ByType[$r.WaitType] = $r }
         }
@@ -174,7 +174,7 @@ Describe 'Get-sqmWaitStatistics' {
         }
 
         It 'Mit -IncludeIdle erscheinen die Idle-Waits wieder' {
-            $r = Get-sqmWaitStatistics -SqlInstance 'SUEB011IBP' -IncludeIdle -TopN 25
+            $r = Get-sqmWaitStatistics -SqlInstance 'SQLPROD01' -IncludeIdle -TopN 25
             $r.WaitType | Should -Contain 'SOS_WORK_DISPATCHER'
         }
     }
@@ -255,7 +255,7 @@ Describe 'Get-sqmWaitStatistics' {
         }
 
         It 'Laeuft mit OutputPath ohne Fehler durch' {
-            { Get-sqmWaitStatistics -SqlInstance 'SUEB011IBP' -OutputPath $script:TestDir -NoOpen } |
+            { Get-sqmWaitStatistics -SqlInstance 'SQLPROD01' -OutputPath $script:TestDir -NoOpen } |
                 Should -Not -Throw
         }
     }

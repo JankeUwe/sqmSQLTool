@@ -29,3 +29,6 @@ Docs/commands-en/
 *.user
 Thumbs.db
 desktop.ini
+
+# Standort-Profil (kundenspezifisch, nie versionieren - siehe Docs/SiteProfile.md)
+sqmSQLTool.site.json

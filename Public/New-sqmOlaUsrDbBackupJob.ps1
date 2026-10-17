@@ -320,7 +320,7 @@ function New-sqmOlaUsrDbBackupJob
 		$effFullJobName = if ($FullJobName) { $FullJobName } elseif ($cfg['OlaJobNameFull']) { $cfg['OlaJobNameFull'] } else { 'OlaHH-UserDatabases-FULL' }
 		$effDiffJobName = if ($DiffJobName) { $DiffJobName } elseif ($cfg['OlaJobNameDiff']) { $cfg['OlaJobNameDiff'] } else { 'OlaHH-UserDatabases-DIFF' }
 		$effLogJobName  = if ($LogJobName)  { $LogJobName }  elseif ($cfg['OlaJobNameLog'])  { $cfg['OlaJobNameLog'] }  else { 'OlaHH-UserDatabases-LOG' }
-		$syncJobName    = if ($effFullJobName -like 'FITS *') { 'FITS BackupExclude - SYNC' } else { 'sqm BackupExclude - SYNC' }
+		$syncJobName    = if ($cfg['OlaJobNameBackupExcludeSync']) { $cfg['OlaJobNameBackupExcludeSync'] } else { 'sqm BackupExclude - SYNC' }
 		
 		$connParams = @{ SqlInstance = $SqlInstance }
 		if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
@@ -381,7 +381,7 @@ function New-sqmOlaUsrDbBackupJob
 			}
 			else
 			{
-				# Kein bestehender Job — FITS-Standardwerte: FULL taeglich 21:15, LOG alle 15 Min, DIFF deaktiviert
+				# Kein bestehender Job — Standardwerte: FULL taeglich 21:15, LOG alle 15 Min, DIFF deaktiviert
 				Invoke-sqmLogging -Message "UseExcludeTable: Kein bestehender Job '$effFullJobName' gefunden — verwende Standardwerte (FULL 21:15 taeglich, LOG alle 15 Min, DIFF deaktiviert)." -FunctionName $functionName -Level "INFO"
 				if (-not $PSBoundParameters.ContainsKey('FullScheduleTime'))         { $FullScheduleTime         = '21:15' }
 				if (-not $PSBoundParameters.ContainsKey('FullScheduleDays'))         { $FullScheduleDays         = @('EveryDay') }

@@ -14,7 +14,7 @@
     Name of the AD group. Pipeline-capable.
 
 .PARAMETER Domain
-    Optional: AD domain (e.g., "FITS.LOCAL", "corp.de")
+    Optional: AD domain (e.g., "CORP.LOCAL", "corp.de")
     If not specified, auto-detects current domain.
 
 .PARAMETER Depth

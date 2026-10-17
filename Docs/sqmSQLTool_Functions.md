@@ -61,7 +61,7 @@ Simple, reliable function to list members of an AD group (including nested group
 **Parameters:**
 
 - **-GroupName** - Name of the AD group. Pipeline-capable. Format: "GroupName" or "DOMAIN\GroupName"
-- **-Domain** - Optional: AD domain (e.g., "FITS.LOCAL", "corp.de") If not specified, auto-detects current domain.
+- **-Domain** - Optional: AD domain (e.g., "CORP.LOCAL", "corp.de") If not specified, auto-detects current domain.
 
 **Examples (2):**
 
@@ -69,7 +69,7 @@ Simple, reliable function to list members of an AD group (including nested group
 Get-sqmADGroupMembers -GroupName "DL_SQL_Admins"
 
 ```powershell
-Get-sqmADGroupMembers -GroupName "Administrators" -Domain "FITS"
+Get-sqmADGroupMembers -GroupName "Administrators" -Domain "CORP"
 
 ### Get-sqmHpuAllowGroup
 
@@ -142,7 +142,7 @@ Lists all members of an Active Directory group with controlled recursion depth.
 **Parameters:**
 
 - **-GroupName** - Name of the AD group. Pipeline-capable.
-- **-Domain** - Optional: AD domain (e.g., "FITS.LOCAL", "corp.de") If not specified, auto-detects current domain.
+- **-Domain** - Optional: AD domain (e.g., "CORP.LOCAL", "corp.de") If not specified, auto-detects current domain.
 - **-Depth** - Maximum nesting depth for group expansion (default: 2)
 - **-OutputPath** - Optional: Output directory for TXT/CSV reports Default: C:\System\WinSrvLog\MSSQL
 
@@ -1422,7 +1422,7 @@ Allows setting of LogPath, OutputPath, CentralPath, Ola job names,
 - **-TsmManagementClasses** - Array of valid TSM management classes (e.g. 'MC_B_NL.NL_42.42.NA').
 - **-HpuDomainGroupMap** - Array of PSCustomObject with fields DomainPattern (wildcard) and GroupNamePattern (sAMAccountName suffix of the HPU allow group). Evaluated by Get-sqmHpuAllowGroup. Entries are checked in order; the first match wins. Example: Set-sqmConfig -HpuDomainGroupMap @( [PSCustomObject]@{ DomainPattern = 'your.domain';   GroupNamePattern = 'Fg_DC_AouAllowManageAuditSecLogSrvAll_Mod' }, [PSCustomObject]@{ DomainPattern = '*.your.domain'; GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' }, [PSCustomObject]@{ DomainPattern = '*';                     GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' } )
 - **-SsrsInstallerPath** - Full UNC or local path to the SSRS installer file (SQLServerReportingServices.exe or .msi). Used by Install-sqmSsrsReportServer when -InstallerPath is not specified. Example: '\\srv-share\Software\SSRS2022\SQLServerReportingServices.exe'
-- **-CheckProfile** - Check-Profil fuer Invoke-sqmSetupReport und verwandte Checks. Auto  = FI-TS-Checks nur wenn sqmIsFitsEnvironment erkannt (Standard) FiTs  = FI-TS-Checks immer erzwingen (auch ausserhalb der Domaene) Generic = nur Standard-Checks, keine FI-TS-spezifischen Pruefungen
+- **-CheckProfile** - Check-Profil fuer Invoke-sqmSetupReport und verwandte Checks. Auto  = Standort-Checks nur wenn ein Standort-Profil aktiv ist (Standard) Site  = Standort-Checks immer erzwingen (auch ausserhalb der erkannten Umgebung) Generic = nur Standard-Checks, keine standortspezifischen Pruefungen Der fruehere Wert 'FiTs' wird weiter akzeptiert und als 'Site' gespeichert.
 - **-CheckCostThresholdMin** - Mindestwert fuer Cost Threshold for Parallelism im Setup-Check. Standard: 50
 - **-CheckTempDbMaxFiles** - Maximale TempDB-Dateianzahl im Setup-Check. Standard: 8
 - **-CheckDiskBlockSize** - Empfohlene NTFS-Blockgroesse in Bytes fuer Get-sqmDiskBlockSize. Standard: 65536 (64 KB)
@@ -1440,7 +1440,7 @@ Set-sqmConfig -TsmManagementClasses @('MC_10','MC_30','MC_100')
 
 ```powershell
 Set-sqmConfig -HpuDomainGroupMap @(
-        [PSCustomObject]@{ DomainPattern = '*.sfinance.net'; GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' },
+        [PSCustomObject]@{ DomainPattern = '*.corp.example'; GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' },
         [PSCustomObject]@{ DomainPattern = '*';              GroupNamePattern = 'Rg_DC_AouAllowManageAuditSecLogSrvAll_Mod' }
     )
 
@@ -1949,7 +1949,7 @@ Simple, reliable function to list members of an AD group (including nested group
 **Parameters:**
 
 - **-GroupName** - Name of the AD group. Pipeline-capable. Format: "GroupName" or "DOMAIN\GroupName"
-- **-Domain** - Optional: AD domain (e.g., "FITS.LOCAL", "corp.de") If not specified, auto-detects current domain.
+- **-Domain** - Optional: AD domain (e.g., "CORP.LOCAL", "corp.de") If not specified, auto-detects current domain.
 
 **Examples (2):**
 
@@ -1957,7 +1957,7 @@ Simple, reliable function to list members of an AD group (including nested group
 Get-sqmADGroupMembers -GroupName "DL_SQL_Admins"
 
 ```powershell
-Get-sqmADGroupMembers -GroupName "Administrators" -Domain "FITS"
+Get-sqmADGroupMembers -GroupName "Administrators" -Domain "CORP"
 
 ### Get-sqmLoginSettings
 
@@ -3377,7 +3377,7 @@ Checks GitHub, PSGallery and/or a UNC share for newer versions of sqmSQLTool.
 **Parameters:**
 
 - **-Source** - Which sources to check. Valid values: GitHub, PSGallery, UNC, All. Default: All
-- **-RepositoryPath** - UNC path for the UNC source check. Default: W:\75084-Datenbanken\MSSQL\DEV\sqmSQLTool
+- **-RepositoryPath** - UNC path for the UNC source check. Default: \\fileserver\SQLAdmin\sqmSQLTool
 - **-EnableException** - Throw exceptions immediately instead of returning error object.
 
 **Examples (3):**
@@ -3444,7 +3444,7 @@ Compares the locally installed sqmSQLTool version with the version in the
 
 **Parameters:**
 
-- **-RepositoryPath** - UNC path to the sqmSQLTool repository share. Default: W:\75084-Datenbanken\MSSQL\DEV\sqmSQLTool
+- **-RepositoryPath** - UNC path to the sqmSQLTool repository share. Default: \\fileserver\SQLAdmin\sqmSQLTool
 - **-EnableException** - Throw exceptions immediately instead of returning error object.
 
 **Examples (2):**
@@ -3477,7 +3477,7 @@ Downloads and installs the latest version of sqmSQLTool from the specified sourc
 **Parameters:**
 
 - **-Source** - Update source. Valid values: GitHub, PSGallery, UNC. Default: GitHub
-- **-RepositoryPath** - UNC path for UNC source. Default: W:\75084-Datenbanken\MSSQL\DEV\sqmSQLTool
+- **-RepositoryPath** - UNC path for UNC source. Default: \\fileserver\SQLAdmin\sqmSQLTool
 - **-Destination** - Installation path for the module. Default: C:\Windows\System32\WindowsPowerShell\v1.0\Modules\sqmSQLTool (or %ProgramFiles%\WindowsPowerShell\Modules\sqmSQLTool)
 - **-Force** - Install even if no newer version is available.
 - **-EnableException** - Throw exceptions immediately.
@@ -4226,11 +4226,11 @@ Exports the complete AlwaysOn AG configuration for one or more SQL Server instan
 Reads all static AG configuration settings (not runtime status) and exports them as TXT, CSV, and optional JSON.
 	For each AG on the specified instance:
 	- AG name, backup preference, failover condition, health check timeout
-	- All replicas with ReadableSecondary setting (with FI-TS standard warning)
+	- All replicas with ReadableSecondary setting (with operations-standard warning)
 	- Listener configuration (name, port, IPs)
 	- Member databases
 
-	CRITICAL FI-TS CHECK: ReadableSecondary must be NO (not NONE, READ_ONLY, or ALL).
+	CRITICAL STANDARD CHECK: ReadableSecondary must be NO (not NONE, READ_ONLY, or ALL).
 	Any other value triggers a warning unless -NoWarning is specified.
 
 	Results are saved as TXT report and CSV file in the specified directory.
@@ -4241,7 +4241,7 @@ Reads all static AG configuration settings (not runtime status) and exports them
 - **-SqlInstance** - SQL Server instance(s). Pipeline-capable. Default: current computer name.
 - **-SqlCredential** - Optional PSCredential for the connection.
 - **-OutputPath** - Output directory for report files. Default: $env:ProgramData\sqmSQLTool\Logs
-- **-NoWarning** - Suppress FI-TS ReadableSecondary warnings (Write-Warning is skipped). Note: Status will still be Warning if ReadableSecondary != NO.
+- **-NoWarning** - Suppress ReadableSecondary standard warnings (Write-Warning is skipped). Note: Status will still be Warning if ReadableSecondary != NO.
 - **-NoOpen** - Do not automatically open the TXT report after creation.
 - **-EnableException** - Throw exceptions immediately (overrides ContinueOnError).
 - **-Confirm** - Request confirmation before writing files.
