@@ -37,7 +37,7 @@
 #>
 function Install-sqmOdbcDriver
 {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     [OutputType([PSCustomObject])]
     param (
         [Parameter(Mandatory = $true, Position = 0)]
@@ -113,6 +113,14 @@ function Install-sqmOdbcDriver
         }
 
         _Log "Starte ODBC-Installation: $($installerFile.FullName)"
+
+        if (-not $PSCmdlet.ShouldProcess($installerFile.FullName, 'ODBC-Treiber installieren'))
+        {
+            $result.Status  = 'WhatIf'
+            $result.Message = "ODBC-Treiber installieren (-WhatIf)"
+            _Log $result.Message 'INFO'
+            return $result
+        }
 
         # --- Installation ausfuehren ---
         $exitCode = $null

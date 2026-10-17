@@ -16,7 +16,7 @@
     .NOTES
         Erfordert lokale Administratorrechte fuer das Loeschen in Program Files.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param(
         [switch]$RemoveClassPath
     )
@@ -39,9 +39,10 @@
             foreach ($dir in $dirs) {
                 $jars = Get-ChildItem -Path $dir.FullName -Filter 'mssql-jdbc*.jar' -Recurse -ErrorAction SilentlyContinue
                 foreach ($jar in $jars) {
+                    $notFound = $false
+                    if (-not $PSCmdlet.ShouldProcess($jar.FullName, 'JDBC-JAR loeschen')) { continue }
                     Remove-Item -LiteralPath $jar.FullName -Force -ErrorAction Stop
                     $removed += $jar.FullName
-                    $notFound = $false
                 }
                 # Leeres Verzeichnis entfernen wenn moeglich
                 try {
@@ -61,8 +62,12 @@
         }
     }
 
+    if ($WhatIfPreference) {
+        return [PSCustomObject]@{ Status = 'WhatIf'; Message = 'JDBC-Treiber wuerde entfernt (-WhatIf).' }
+    }
+
     # Optional: CLASSPATH-Systemeintrag bereinigen
-    if ($RemoveClassPath) {
+    if ($RemoveClassPath -and $PSCmdlet.ShouldProcess('CLASSPATH (Machine)', 'mssql-jdbc-Eintraege entfernen')) {
         try {
             $cp = [Environment]::GetEnvironmentVariable('CLASSPATH', [EnvironmentVariableTarget]::Machine)
             if ($cp) {

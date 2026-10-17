@@ -212,9 +212,9 @@ WHERE sp.type = 'G'
 
 				foreach ($grp in $adGroups)
 				{
-					$matches = @($serverLogins | Where-Object { ($_.LoginName -replace '^[^\\]*\\', '') -eq $grp.SamAccountName })
+					$matchedAccounts = @($serverLogins | Where-Object { ($_.LoginName -replace '^[^\\]*\\', '') -eq $grp.SamAccountName })
 
-					if ($matches.Count -eq 0)
+					if ($matchedAccounts.Count -eq 0)
 					{
 						$detailRows.Add([PSCustomObject]@{
 								GroupSamAccountName = $grp.SamAccountName
@@ -231,7 +231,7 @@ WHERE sp.type = 'G'
 						continue
 					}
 
-					foreach ($m in $matches)
+					foreach ($m in $matchedAccounts)
 					{
 						$enabled = -not [bool]$m.IsDisabled
 						$deny = [bool]$m.DenyConnectSql

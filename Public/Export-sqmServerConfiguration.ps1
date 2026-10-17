@@ -372,13 +372,13 @@ function Export-sqmServerConfiguration
 
 				if ($mailProfiles)
 				{
-					foreach ($profile in $mailProfiles)
+					foreach ($mailProfile in $mailProfiles)
 					{
 						$profileList += [PSCustomObject]@{
-							Name          = $profile.Name
-							Description   = $profile.Description
-							IsPublic      = $profile.IsPublic
-							IsDefault     = $profile.IsDefault
+							Name          = $mailProfile.Name
+							Description   = $mailProfile.Description
+							IsPublic      = $mailProfile.IsPublic
+							IsDefault     = $mailProfile.IsDefault
 						}
 					}
 				}

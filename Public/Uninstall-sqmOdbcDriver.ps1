@@ -18,7 +18,7 @@
         Erfordert lokale Administratorrechte.
         ExitCode 1605 (nicht installiert) wird als NotFound behandelt, nicht als Fehler.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param(
         [string]$DriverName = ''
     )
@@ -69,6 +69,10 @@
                 Message = "ProductCode konnte nicht ermittelt werden fuer: $displayName"
             }
         }
+    }
+
+    if (-not $PSCmdlet.ShouldProcess($displayName, 'ODBC-Treiber deinstallieren')) {
+        return [PSCustomObject]@{ Status = 'WhatIf'; Message = 'ODBC-Treiber deinstallieren (-WhatIf)' }
     }
 
     try {

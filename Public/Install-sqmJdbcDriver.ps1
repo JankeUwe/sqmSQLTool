@@ -43,7 +43,7 @@
 #>
 function Install-sqmJdbcDriver
 {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     [OutputType([PSCustomObject])]
     param (
         [Parameter(Mandatory = $true, Position = 0)]
@@ -107,6 +107,14 @@ function Install-sqmJdbcDriver
         if ($exeFile)
         {
             # Microsoft Self-Extractor ausfuehren
+            if (-not $PSCmdlet.ShouldProcess($exeFile.FullName, 'JDBC-Installer ausfuehren'))
+            {
+                $result.Status  = 'WhatIf'
+                $result.Message = "JDBC-Installer ausfuehren (-WhatIf)"
+                _Log $result.Message 'INFO'
+                return $result
+            }
+
             _Log "Fuehre JDBC-Installer aus: $($exeFile.FullName)"
             $proc = Start-Process -FilePath $exeFile.FullName -ArgumentList '/quiet', '/passive' `
                         -Wait -PassThru -ErrorAction Stop
@@ -130,6 +138,14 @@ function Install-sqmJdbcDriver
         elseif ($jarFile)
         {
             # .jar direkt kopieren
+            if (-not $PSCmdlet.ShouldProcess($jarFile.FullName, 'JDBC-JAR kopieren'))
+            {
+                $result.Status  = 'WhatIf'
+                $result.Message = "JDBC-JAR kopieren (-WhatIf)"
+                _Log $result.Message 'INFO'
+                return $result
+            }
+
             if (-not (Test-Path $DestinationPath))
             {
                 New-Item -ItemType Directory -Path $DestinationPath -Force -ErrorAction Stop | Out-Null

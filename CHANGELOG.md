@@ -1,5 +1,23 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.182.0] - 2026-10-17
+
+### Fix: `-WhatIf` / `-Confirm` fuer zustandsaendernde Funktionen
+
+- **`Set-sqmTcpPort`** schrieb den TCP-Port ohne Rueckfrage in die Registry. Jetzt `SupportsShouldProcess`;
+  mit `-WhatIf` kommt `Status = 'WhatIf'`, die Registry bleibt unveraendert.
+- **`Install-/Uninstall-sqmDb2Driver`, `-sqmOdbcDriver`, `-sqmJdbcDriver`**: gleiches Verhalten. Installer,
+  `msiexec /x`, Kopieren bzw. Loeschen der JAR-Dateien und das Bereinigen der CLASSPATH-Variable
+  laufen nur noch, wenn `ShouldProcess` zustimmt; mit `-WhatIf` ist `Status = 'WhatIf'`.
+  Die Standard-Bestaetigung bleibt aus (ConfirmImpact Medium), bestehende Aufrufe laufen unveraendert.
+- **Variablennamen**: Schleifenvariable `$profile` (Export-sqmServerConfiguration, Invoke-sqmConfigRollback),
+  `$matches` (Test-sqmLoginGroupAccess) und der Skriptblock-Parameter `$args` (Test-sqmTsmConnection)
+  verdeckten automatische Variablen von PowerShell und heissen jetzt `$mailProfile`, `$matchedAccounts`
+  und `$cmdLine`.
+- Neuer Vertragstest `tests/Unit/ShouldProcess.Contract.Tests.ps1`: jede Public-Funktion mit Verb
+  Set/Remove/New/Install/... muss `SupportsShouldProcess` deklarieren (Ausnahmen: `New-sqmRandomSaPassword`,
+  `New-sqmSetupReport`), dazu Verhaltenstests fuer `-WhatIf`.
+
 ## [1.9.181.0] - 2026-10-17
 
 ### Neu: Standort-Profil statt fest eingebauter Umgebungswerte

@@ -50,7 +50,7 @@
 #>
 function Set-sqmTcpPort
 {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     [OutputType([PSCustomObject])]
     param (
         [Parameter(Mandatory = $true, Position = 0)]
@@ -163,6 +163,14 @@ function Set-sqmTcpPort
         }
 
         # --- Port setzen ---
+        if (-not $PSCmdlet.ShouldProcess("$instanceUpper (TcpPort $currentPort -> $targetPort)", 'TCP-Port in der Registry setzen'))
+        {
+            $result.Status  = 'WhatIf'
+            $result.Message = "Port fuer '$instanceUpper' wuerde von '$currentPort' auf $targetPort geaendert (-WhatIf)."
+            _Log $result.Message 'INFO'
+            return $result
+        }
+
         Set-ItemProperty -Path $tcpRegPath -Name 'TcpPort'        -Value $targetPort.ToString() -ErrorAction Stop
         Set-ItemProperty -Path $tcpRegPath -Name 'TcpDynamicPorts' -Value ''                    -ErrorAction Stop
 

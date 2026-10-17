@@ -485,13 +485,13 @@ function Invoke-sqmConfigRollback
 				Invoke-sqmLogging -Message "Database Mail-Profile aus Snapshot:" `
 					-FunctionName $functionName -Level "INFO"
 
-				foreach ($profile in $snapshot.Configuration.DatabaseMail.profiles)
+				foreach ($mailProfile in $snapshot.Configuration.DatabaseMail.profiles)
 				{
 					$rollbackResults += [PSCustomObject]@{
-						Setting         = "Profile: $($profile.Name)"
+						Setting         = "Profile: $($mailProfile.Name)"
 						Category        = 'DatabaseMail'
 						OldValue        = 'N/A'
-						NewValue        = $profile.Name
+						NewValue        = $mailProfile.Name
 						Status          = 'Skipped'
 						Message         = "Database Mail-Profile muessen manuell wiederhergestellt werden (keine automatische Restaurierung unterstuetzt)"
 					}

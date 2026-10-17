@@ -12,7 +12,7 @@
         Erfordert lokale Administratorrechte.
         Nach Deinstallation sollte der Server neu gestartet werden.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param()
 
     $ErrorActionPreference = 'Stop'
@@ -49,6 +49,10 @@
             }
         }
 
+        if (-not $PSCmdlet.ShouldProcess($setupExe, 'IBM DB2-Treiber deinstallieren')) {
+            return [PSCustomObject]@{ Status = 'WhatIf'; Message = 'IBM DB2-Treiber deinstallieren (-WhatIf)' }
+        }
+
         try {
             $proc = Start-Process -FilePath $setupExe `
                                   -ArgumentList '/silent', '/uninstall' `
@@ -77,6 +81,10 @@
                 Message = "ProductCode nicht ermittelbar fuer: $displayName"
             }
         }
+    }
+
+    if (-not $PSCmdlet.ShouldProcess($displayName, 'IBM DB2-Treiber deinstallieren')) {
+        return [PSCustomObject]@{ Status = 'WhatIf'; Message = 'IBM DB2-Treiber deinstallieren (-WhatIf)' }
     }
 
     try {

@@ -37,7 +37,7 @@
 #>
 function Install-sqmDb2Driver
 {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     [OutputType([PSCustomObject])]
     param (
         [Parameter(Mandatory = $true, Position = 0)]
@@ -112,6 +112,14 @@ function Install-sqmDb2Driver
         }
 
         _Log "Starte DB2-Installation: $($installerFile.FullName)"
+
+        if (-not $PSCmdlet.ShouldProcess($installerFile.FullName, 'DB2-Treiber installieren'))
+        {
+            $result.Status  = 'WhatIf'
+            $result.Message = "DB2-Treiber installieren (-WhatIf)"
+            _Log $result.Message 'INFO'
+            return $result
+        }
 
         # --- Installation ausfuehren ---
         $exitCode = $null

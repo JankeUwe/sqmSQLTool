@@ -173,10 +173,10 @@ function Test-sqmTsmConnection
 				{
 					$scriptBlock = {
 						param ($exe,
-							$args)
+							$cmdLine)
 						$psi = New-Object System.Diagnostics.ProcessStartInfo
 						$psi.FileName = $exe
-						$psi.Arguments = $args
+						$psi.Arguments = $cmdLine
 						$psi.UseShellExecute = $false
 						$psi.RedirectStandardOutput = $true
 						$psi.RedirectStandardError = $true
