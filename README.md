@@ -120,6 +120,7 @@ Set-sqmConfig -UpdateMode Off         # no check
 - `Get-sqmMissingIndexes` - Index recommendations with CREATE statements
 - `Get-sqmAutoGrowthReport` - Database autogrowth tracking
 - `Get-sqmIndexFragmentation` - Index fragmentation analysis
+- `Invoke-sqmIndexOptimize` - Index maintenance with sensible defaults: REORGANIZE 5-30 %, REBUILD ONLINE from 30 % with low-priority wait, per partition, time limit
 
 ### Security & Compliance
 - `Copy-sqmLogins` - Transfer logins with password hash preservation

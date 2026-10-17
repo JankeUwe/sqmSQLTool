@@ -6180,14 +6180,86 @@ Invoke-sqmDatabaseStandardization -SqlInstance "SQL01" -Database "Arena"
 ```powershell
 Invoke-sqmDatabaseStandardization -SqlInstance "SQL01" -Database "App*" -SkipCompatibilityLevel
 
+### Invoke-sqmIndexOptimize
+
+Reorganizes or rebuilds fragmented indexes with sensible defaults (thresholds, ONLINE where possible, low-priority waits, time limit).
+
+Index maintenance without Ola Hallengren's IndexOptimize, with the same proven defaults:
+
+    - Only indexes with at least -MinPageCount pages (1000 = approx. 8 MB) are considered.
+    - Fragmentation < 5 %: nothing; 5 to < 30 %: REORGANIZE; >= 30 %: REBUILD, ONLINE where possible.
+    - -Online Auto: ONLINE = ON on Enterprise/Developer/Evaluation and Azure. ONLINE rebuilds wait at
+      low priority (WAIT_AT_LOW_PRIORITY 1 min, ABORT_AFTER_WAIT = SELF) and never block the application.
+    - Without ONLINE a rebuild runs offline only with -AllowOfflineRebuild $true (default), else REORGANIZE.
+    - ALLOW_PAGE_LOCKS = OFF: rebuild instead of REORGANIZE.
+    - Partitioned indexes per partition; columnstore: REORGANIZE from 20 % deleted rows.
+    - Heaps, disabled, hypothetical and memory-optimized indexes, read-only databases and AG secondaries are skipped.
+    - -TimeLimitMinutes for the maintenance window, -UpdateStatistics runs Invoke-sqmUpdateStatistics afterwards.
+
+    Fragmentation is read with sys.dm_db_index_physical_stats (LIMITED) only for indexes at or above
+    -MinPageCount (pre-filtered via sys.dm_db_partition_stats).
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance (default: current computer name).
+- **-SqlCredential** - PSCredential for the connection.
+- **-Database** - Database name or wildcard pattern. Default: '*' (all user databases).
+- **-Table** - Table name or wildcard pattern. Default: '*'.
+- **-FragmentationLow** - From this fragmentation (%) an index is reorganized. Default: 5.
+- **-FragmentationHigh** - From this fragmentation (%) an index is rebuilt. Default: 30.
+- **-MinPageCount** - Minimum index size in pages (8 KB). Default: 1000.
+- **-Online** - Auto (default), On, Off.
+- **-AllowOfflineRebuild** - Allow offline rebuilds if ONLINE is not possible; $false: REORGANIZE instead. Default: $true.
+- **-LowPriorityWaitMinutes** - MAX_DURATION for WAIT_AT_LOW_PRIORITY on ONLINE rebuilds (2014+). 0 = normal lock wait. Default: 1.
+- **-MaxDop** - MAXDOP for rebuilds. 0 = server setting.
+- **-SortInTempdb** - SORT_IN_TEMPDB = ON for rebuilds.
+- **-FillFactor** - FILLFACTOR for rebuilds of whole indexes. 0 = keep existing value.
+- **-ColumnstoreDeletedPercent** - Columnstore: REORGANIZE from this share of deleted rows (%). Default: 20.
+- **-PartitionLevel** - Process partitioned indexes per partition. Default: $true.
+- **-TimeLimitMinutes** - Do not start further commands after this many minutes ('NotStarted'). 0 = no limit.
+- **-UpdateStatistics** - Afterwards run Invoke-sqmUpdateStatistics on the processed databases.
+- **-WhatIf** - Shows which indexes would be reorganized/rebuilt and the command.
+- **-EnableException** - Throw exceptions immediately.
+
+**Examples (4):**
+
+```powershell
+# Sensible defaults for all user databases
+Invoke-sqmIndexOptimize -SqlInstance 'SQL01'
+
+```powershell
+# Maintenance window of 2 hours, statistics afterwards
+Invoke-sqmIndexOptimize -SqlInstance 'SQL01' -TimeLimitMinutes 120 -UpdateStatistics
+
+```powershell
+# Show only, what would be done
+Invoke-sqmIndexOptimize -SqlInstance 'SQL01' -Database 'SalesDB' -WhatIf
+
+```powershell
+# Standard edition during business hours: never lock a table offline
+Invoke-sqmIndexOptimize -SqlInstance 'SQL01' -AllowOfflineRebuild $false
+
 ### Invoke-sqmLogShrink
 
-Shrinks the transaction log file (LDF) of one or more databases.
+Shrinks the transaction log file (LDF) of one or more databases and reports why the log has active VLFs or cannot shrink further, and why it has many VLFs.
 
 Executes DBCC SHRINKFILE on the log file(s). Calculates the target size
     as a percentage of the current size (ShrinkTargetPercent) with a
     lower threshold (MinTargetMB). Handles Always On AGs (automatically
     redirects to the primary). System databases and offline databases are skipped.
+
+    Before (and after) the shrink every database is analysed (metadata only, no scans):
+
+    - Why the log is active: log_reuse_wait_desc with details - LOG_BACKUP (last log backup),
+      ACTIVE_TRANSACTION (session, login, host, program, open since), AVAILABILITY_REPLICA (lagging or
+      suspended secondary with queue sizes), REPLICATION (log reader / CDC), CHECKPOINT, ... The oldest
+      open transaction is reported whatever wait SQL Server shows.
+    - Where the last active VLF sits: if it is at the end of the file, the shrink is skipped
+      (Status 'Blocked') and the reason is reported, even when log_reuse_wait_desc says NOTHING.
+    - Why there are many VLFs (>= 300 Warning, >= 1000 Critical): percent growth, small fixed growth,
+      many VLFs below 1 MB, with a recommendation for target size and autogrowth.
+
+    -AnalyzeOnly only returns the analysis without shrinking.
 
     Important notes:
     - Shrink can only reduce to the oldest active VLF.
@@ -6196,24 +6268,33 @@ Executes DBCC SHRINKFILE on the log file(s). Calculates the target size
 
 **Parameters:**
 
-- **-SqlInstance** - SQL Server instance (default: current computer name). For AG members, automatically redirected to the primary.
+- **-SqlInstance** - SQL Server instance (default: current computer name). For AG members, automatically redirected to the primary.
 - **-SqlCredential** - Optional PSCredential for the connection.
-- **-Database** - Target database name(s) (wildcards allowed). Without specification, all user databases are processed (equivalent to -All).
-- **-All** - Processes all user databases (excl. system databases, online only). Also used implicitly when neither -Database nor -All is specified.
+- **-Database** - Target database name(s) (wildcards allowed). Without specification, all user databases are processed (equivalent to -All).
+- **-All** - Processes all user databases (excl. system databases, online only). Also used implicitly when neither -Database nor -All is specified.
 - **-ShrinkTargetPercent** - Target size as a percentage of the current log size (1-99). Default: 10.
 - **-MinTargetMB** - Minimum target size in MB (default: 64 MB).
+- **-AnalyzeOnly** - Only analyse (log reuse wait, active VLFs, VLF count and cause), do not shrink. Status 'Analyzed'.
 - **-ContinueOnError** - Continue with the next database on error.
 - **-EnableException** - Throw exceptions immediately (overrides ContinueOnError).
 - **-Confirm** - Request confirmation before shrinking. Disabled by default.
 - **-WhatIf** - Shows what would happen without executing the shrink.
 
-**Examples (2):**
+Result columns (in addition to sizes and Status): RecoveryModel, LogReuseWait, LogUsed_Pct, MinReachable_MB, Cause, Recommendation, VlfCount, VlfCountAfter, ActiveVlfCount, VlfStatus, VlfCause, VlfRecommendation, Details.
+Status values: Shrunk, NoChangeNeeded, Blocked, Analyzed, WhatIfSkipped, Skipped, Failed.
+
+**Examples (3):**
 
 ```powershell
 Invoke-sqmLogShrink -Database "MyDB" -ShrinkTargetPercent 20
 
 ```powershell
 Invoke-sqmLogShrink -SqlInstance "SQL01" -All -WhatIf
+
+```powershell
+# Why does the log not shrink, why so many VLFs? (no shrink)
+Invoke-sqmLogShrink -SqlInstance "SQL01" -AnalyzeOnly |
+    Format-List Database, LogReuseWait, Cause, Recommendation, VlfCount, VlfStatus, VlfCause, VlfRecommendation
 
 ### Invoke-sqmSetDatabaseRecoveryMode
 
@@ -6252,10 +6333,19 @@ Invoke-sqmSetDatabaseRecoveryMode -Database "SalesDB" -RecoveryMode Simple -Conf
 
 ### Invoke-sqmUpdateStatistics
 
-Updates statistics in one or more databases.
+Updates statistics in one or more databases with adaptive defaults (threshold, sample size).
 
-Executes UPDATE STATISTICS with configurable options (scan percentage, only modified statistics, etc.).
+Executes UPDATE STATISTICS only where it pays off and with a sample size that fits the table.
     Can be restricted to specific databases, tables, or statistics.
+
+    Defaults:
+    - Only statistics with modification_counter >= MIN(SQRT(1000 * rows), rows * 10 %), plus changed
+      statistics older than 30 days.
+    - FULLSCAN up to 1,000,000 rows, above a sample of about that many rows (at least 1 %).
+      A persisted sample rate (PERSIST_SAMPLE_PERCENT) is honoured.
+    - NORECOMPUTE is kept; read-only databases, AG secondaries and temporary statistics are skipped.
+
+    -SamplePercent 0 -ModificationThreshold Any gives the previous behaviour (every changed statistic WITH FULLSCAN).
 
 **Parameters:**
 
@@ -6264,16 +6354,29 @@ Executes UPDATE STATISTICS with configurable options (scan percentage, only modi
 - **-Database** - Database name or wildcard pattern.
 - **-Table** - Table name or wildcard pattern.
 - **-Statistics** - Statistic name or wildcard pattern.
-- **-SamplePercent** - Percentage of rows used for the update (0 = full scan). Default: 0.
+- **-SamplePercent** - Fixed sample for all statistics (0 = FULLSCAN). Without it the sample is chosen per statistic.
+- **-FullScanRowLimit** - Adaptive sample: FULLSCAN up to this many rows, above a sample of about this many rows. Default: 1000000.
 - **-OnlyModified** - Only update statistics that have changed since the last update. Default: $true.
+- **-ModificationThreshold** - Dynamic (default) or Any (at least one change).
+- **-ModificationPercent** - Percentage part of the dynamic threshold. Default: 10.
+- **-MaxAgeDays** - Changed statistics older than this are updated below the threshold too. 0 = off. Default: 30.
 - **-Index** - Also update statistics associated with an index. Default: $true.
+- **-TimeLimitMinutes** - Do not start further updates after this many minutes ('NotStarted'). 0 = no limit.
 - **-WhatIf** - Shows which statistics would be affected.
 - **-EnableException** - Throw exceptions immediately.
 
-**Examples (1):**
+**Examples (3):**
+
+```powershell
+# Adaptive defaults for all user databases
+Invoke-sqmUpdateStatistics -SqlInstance 'SQL01'
 
 ```powershell
 Invoke-sqmUpdateStatistics -Database 'SalesDB' -SamplePercent 10
+
+```powershell
+# Previous behaviour: every changed statistic WITH FULLSCAN
+Invoke-sqmUpdateStatistics -Database 'SalesDB' -SamplePercent 0 -ModificationThreshold Any
 
 ### Set-sqmDatabaseOwner
 

@@ -146,7 +146,7 @@
 	<!-- SIDEBAR -->
 	<div class="psdb-st-sidebar">
 	<input class="psdb-st-sidebar-search" type="text" placeholder="Funktion suchen…" oninput="psstSearch(this.value)">
-																			<div class="psdb-st-nav-group" id="nav-alwayson">
+																				<div class="psdb-st-nav-group" id="nav-alwayson">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-alwayson-list')">
 	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">23</span>
 	</div>
@@ -312,11 +312,12 @@
 
 	<div class="psdb-st-nav-group" id="nav-wartung">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-wartung-list')">
-	<span>🔧 Maintenance</span><span class="psdb-st-nav-count">8</span>
+	<span>🔧 Maintenance</span><span class="psdb-st-nav-count">9</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-wartung-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmmasterdbcustomobjects')">Get-sqmMasterDbCustomObjects</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmdatabasestandardization')">Invoke-sqmDatabaseStandardization</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmformatdrive64k')">Invoke-sqmFormatDrive64k</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmindexoptimize')">Invoke-sqmIndexOptimize</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmntfssetup')">Invoke-sqmNtfsSetup</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-movesqmdatabasefile')">Move-sqmDatabaseFile</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-removesqmmasterdbcustomobjects')">Remove-sqmMasterDbCustomObjects</span></li>
@@ -452,7 +453,7 @@
 
 	<!-- CONTENT -->
 	<div class="psdb-st-content" id="psdb-st-content">
-																			<section class="psdb-st-section" id="cat-alwayson">
+																				<section class="psdb-st-section" id="cat-alwayson">
 	<h2 class="psdb-st-section-title">🔄 AlwaysOn</h2>
 
 	<div class="psdb-st-func-card" id="f-addsqmdatabasetoag">
@@ -1262,7 +1263,7 @@ Repair-sqmAlwaysOnDatabases -Force</pre><button class="psdb-st-copy-btn" onclick
 	<span class="psdb-st-badge psdb-st-badge-backup">Backup</span>
 	</div>
 	<div class="psdb-st-func-desc">Shrinks the transaction log file (LDF) of one or more databases.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 3 examples</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Invoke-sqmLogShrink -Database &quot;MyDB&quot; -ShrinkTargetPercent 20</div>
@@ -1271,6 +1272,12 @@ Repair-sqmAlwaysOnDatabases -Force</pre><button class="psdb-st-copy-btn" onclick
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Invoke-sqmLogShrink -SqlInstance &quot;SQL01&quot; -All -WhatIf</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmLogShrink -SqlInstance &quot;SQL01&quot; -All -WhatIf</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Why does the log not shrink, why so many VLFs? (no shrink)</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Why does the log not shrink, why so many VLFs? (no shrink)
+    Invoke-sqmLogShrink -SqlInstance &quot;SQL01&quot; -AnalyzeOnly |
+        Format-List Database, LogReuseWait, Cause, Recommendation, VlfCount, VlfStatus, VlfCause, VlfRecommendation</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -3626,11 +3633,26 @@ New-sqmAgentCommandJob -SqlInstance &#39;SQL01&#39; -SqlCredential $cred -JobNam
 	<span class="psdb-st-badge psdb-st-badge-performance">Performance</span>
 	</div>
 	<div class="psdb-st-func-desc">Updates statistics in one or more databases.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 1 examples</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
 	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Adaptive defaults for all user databases</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Adaptive defaults for all user databases
+    Invoke-sqmUpdateStatistics -SqlInstance &#39;SQL01&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Only show what would be updated, with the chosen sample</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Only show what would be updated, with the chosen sample
+    Invoke-sqmUpdateStatistics -SqlInstance &#39;SQL01&#39; -Database &#39;SalesDB&#39; -WhatIf</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Invoke-sqmUpdateStatistics -Database &#39;SalesDB&#39; -SamplePercent 10</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmUpdateStatistics -Database &#39;SalesDB&#39; -SamplePercent 10</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Previous behaviour: every changed statistic WITH FULLSCAN</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Previous behaviour: every changed statistic WITH FULLSCAN
+    Invoke-sqmUpdateStatistics -Database &#39;SalesDB&#39; -SamplePercent 0 -ModificationThreshold Any</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -3749,6 +3771,38 @@ New-sqmAgentCommandJob -SqlInstance &#39;SQL01&#39; -SqlCredential $cred -JobNam
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Invoke-sqmFormatDrive64k -DriveLetter D -WhatIf
 
     Simulates the entire process without making any changes.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-invokesqmindexoptimize">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Invoke-sqmIndexOptimize</span>
+	<span class="psdb-st-badge psdb-st-badge-wartung">Maintenance</span>
+	</div>
+	<div class="psdb-st-func-desc">Reorganizes or rebuilds fragmented indexes with sensible defaults (thresholds, ONLINE where possible, low-priority waits, time limit).</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Sensible defaults for all user databases</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Sensible defaults for all user databases
+    Invoke-sqmIndexOptimize -SqlInstance &#39;SQL01&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Maintenance window of 2 hours, statistics afterwards</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Maintenance window of 2 hours, statistics afterwards
+    Invoke-sqmIndexOptimize -SqlInstance &#39;SQL01&#39; -TimeLimitMinutes 120 -UpdateStatistics</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Show only, what would be done</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Show only, what would be done
+    Invoke-sqmIndexOptimize -SqlInstance &#39;SQL01&#39; -Database &#39;SalesDB&#39; -WhatIf |
+        Format-Table Table, Index, Partition, PageCount, FragmentationPercent, Action</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Standard edition during business hours: never lock a table offline</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Standard edition during business hours: never lock a table offline
+    Invoke-sqmIndexOptimize -SqlInstance &#39;SQL01&#39; -AllowOfflineRebuild $false</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -5921,6 +5975,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmFailover</td><td>Performs a controlled AlwaysOn AG failover with pre- and post-checks.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmFormatDrive64k</td><td>Formats a drive with 64K allocation unit size for optimal SQL Server performance.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmHealthReport</td><td>Runs all sqmSQLTool health and performance checks against one instance and writes one consolidated HTML report with a prioritized findings list, plus every detail report.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Invoke-sqmIndexOptimize</td><td>Reorganizes or rebuilds fragmented indexes with sensible defaults (thresholds, ONLINE where possible, low-priority waits, time limit).</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmInstanceInventory</td><td>Creates a complete inventory of a SQL Server instance as a structured report (TXT + CSV).</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmListenerMigrationPrep</td><td>Prepares an AG listener for cluster-level migration without downtime.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Invoke-sqmLoginAudit</td><td>Comprehensive audit of all SQL Server logins on one or more instances.</td></tr>

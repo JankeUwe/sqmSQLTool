@@ -1,5 +1,50 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.178.0] - 2026-10-17
+
+### Neue Funktion: `Invoke-sqmIndexOptimize` - Indexwartung mit sinnvollen Vorgaben
+
+- Fragmentierung < 5 %: nichts, 5 bis < 30 %: `REORGANIZE`, ab 30 %: `REBUILD`. Nur Indizes ab 1000 Seiten
+  (~8 MB); die Fragmentierung wird per `sys.dm_db_index_physical_stats` (LIMITED) nur fuer diese gelesen
+  (Vorfilter ueber `sys.dm_db_partition_stats`), kleine Indizes kosten nichts.
+- `-Online Auto`: ONLINE auf Enterprise/Developer/Evaluation/Azure, mit `WAIT_AT_LOW_PRIORITY (MAX_DURATION = 1
+  MINUTES, ABORT_AFTER_WAIT = SELF)` - ein Rebuild blockiert die Anwendung nie, bekommt er die Sperre nicht,
+  wird der Index als `Failed` gemeldet und der Lauf geht weiter. Ohne ONLINE (Standard, XML-/Spatial-Index)
+  offline nur mit `-AllowOfflineRebuild $true` (Standard), sonst `REORGANIZE`. `ALLOW_PAGE_LOCKS = OFF` -> Rebuild.
+- Partitionierte Indizes je Partition, Columnstore `REORGANIZE` ab 20 % geloeschter Zeilen. Heaps, deaktivierte
+  (ein Rebuild wuerde sie aktivieren), hypothetische und Memory-Optimized-Indizes, READ_ONLY-Datenbanken und
+  AG-Secondaries bleiben unberuehrt.
+- `-TimeLimitMinutes` (Wartungsfenster, Rest `NotStarted`), `-UpdateStatistics` (anschliessend
+  `Invoke-sqmUpdateStatistics`), `-MaxDop`, `-SortInTempdb`, `-FillFactor`, `-WhatIf` zeigt das Kommando.
+
+### Erweiterung: `Invoke-sqmUpdateStatistics` mit adaptiven Vorgaben
+
+- Bisher: jede geaenderte Statistik `WITH FULLSCAN`. Jetzt nur, wo es sich lohnt:
+  `modification_counter >= MIN(SQRT(1000 * Zeilen), Zeilen * 10 %)` (`-ModificationThreshold Dynamic`,
+  `-ModificationPercent`), dazu geaenderte Statistiken aelter als 30 Tage (`-MaxAgeDays`).
+- Stichprobe: `FULLSCAN` bis 1 Mio. Zeilen (`-FullScanRowLimit`), darueber etwa so viele Zeilen, mindestens 1 %
+  (10 Mio.: 10 %, 100 Mio.: 1 %). Eine persistierte Stichprobe (`PERSIST_SAMPLE_PERCENT`) wird beibehalten.
+- `NORECOMPUTE` bleibt erhalten (ein schlichtes `UPDATE STATISTICS` haette es entfernt). READ_ONLY-Datenbanken,
+  AG-Secondaries und temporaere Statistiken lesbarer Secondaries werden uebersprungen.
+- Neue Ergebnisspalten `Rows`, `Modifications`, `LastUpdated`, `Option`, `Reason`, `Duration_s`; Status
+  `WhatIf`/`NotStarted` (`-TimeLimitMinutes`). Laengere Updates brechen nicht mehr nach dem dbatools-Timeout ab.
+- Altes Verhalten: `-SamplePercent 0 -ModificationThreshold Any`.
+
+### Erweiterung: `Invoke-sqmLogShrink` meldet, warum aktive VLFs vorliegen und warum es so viele sind
+
+- Vor und nach dem Shrink je Datenbank eine Analyse (nur Metadaten): `log_reuse_wait_desc` mit Ursache und
+  Empfehlung - `LOG_BACKUP` (letztes Log-Backup), `ACTIVE_TRANSACTION` (Session, Login, Host, Programm, seit wann),
+  `AVAILABILITY_REPLICA` (nachhinkendes/angehaltenes Replikat mit Queues), `REPLICATION` (Log Reader/CDC),
+  `CHECKPOINT`/`OLDEST_PAGE` u. a. Die aelteste offene Transaktion wird immer genannt, auch wenn SQL Server
+  einen anderen Wartegrund zeigt (direkt nach einem Log-Backup meist `OLDEST_PAGE`).
+- Liegt der letzte aktive VLF am Dateiende, wird nicht geshrinkt (Status `Blocked`) und der Grund gemeldet,
+  auch bei `NOTHING`. Wird das Ziel nicht erreicht, nennt die Meldung die konkrete Ursache statt
+  "aktive VLFs verhindern weitere Verkleinerung".
+- VLF-Anzahl (ab 300 Warning, ab 1000 Critical) mit Ursache (prozentuales Wachstum, kleiner fester Zuwachs,
+  viele VLFs unter 1 MB) und Empfehlung (Zielgroesse, Autogrowth). Neue Spalten `LogReuseWait`, `Cause`,
+  `Recommendation`, `MinReachable_MB`, `VlfCount`, `VlfCountAfter`, `VlfStatus`, `VlfCause`, ...
+- Neuer Schalter `-AnalyzeOnly` (nur Analyse, Status `Analyzed`).
+
 ## [1.9.177.0] - 2026-10-15
 
 ### Fix: `Get-sqmSpnReport` liefert auch dann ein Ergebnis, wenn `setspn -L` scheitert

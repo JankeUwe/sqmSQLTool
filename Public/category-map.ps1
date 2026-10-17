@@ -93,6 +93,7 @@ $categoryMap = @{
     'Invoke-sqmExtendedEvents'            = 'Extended Events & Diagnostics'
     'Invoke-sqmFailover'                  = 'Always On & Availability Groups'
     'Invoke-sqmFormatDrive64k'            = 'Storage & Disk Management'
+    'Invoke-sqmIndexOptimize'             = 'Database Maintenance'
     'Invoke-sqmInstanceInventory'         = 'Reporting & Analysis'
     'Invoke-sqmListenerMigrationPrep'     = 'Always On & Availability Groups'
     'Invoke-sqmLoginAudit'                = 'Monitoring & Health Checks'
