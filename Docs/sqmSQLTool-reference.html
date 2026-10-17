@@ -146,7 +146,7 @@
 	<!-- SIDEBAR -->
 	<div class="psdb-st-sidebar">
 	<input class="psdb-st-sidebar-search" type="text" placeholder="Funktion suchen…" oninput="psstSearch(this.value)">
-																				<div class="psdb-st-nav-group" id="nav-alwayson">
+																					<div class="psdb-st-nav-group" id="nav-alwayson">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-alwayson-list')">
 	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">23</span>
 	</div>
@@ -453,7 +453,7 @@
 
 	<!-- CONTENT -->
 	<div class="psdb-st-content" id="psdb-st-content">
-																				<section class="psdb-st-section" id="cat-alwayson">
+																					<section class="psdb-st-section" id="cat-alwayson">
 	<h2 class="psdb-st-section-title">🔄 AlwaysOn</h2>
 
 	<div class="psdb-st-func-card" id="f-addsqmdatabasetoag">
@@ -4768,16 +4768,17 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 4 examples</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Import PFX from CA and bind to AlwaysOn endpoint</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Import PFX from CA and bind to AlwaysOn endpoint
-    Install-sqmCertificate -SqlInstance &quot;SQL01&quot; -CertFile &quot;C:\Certs\sql01.pfx&quot; `
+	<div class="psdb-st-example-label"># Import PFX (SQL Server 2022+) and switch the local AlwaysOn endpoint to it</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Import PFX (SQL Server 2022+) and switch the local AlwaysOn endpoint to it
+    Install-sqmCertificate -SqlInstance &quot;SQL01&quot; -CertFile &quot;\\fs01\certs\sql01_ag.pfx&quot; `
         -CertPassword (Read-Host -AsSecureString) -Purpose AlwaysOn</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Install public-key certificate on AlwaysOn replica (no private key)</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Install public-key certificate on AlwaysOn replica (no private key)
-    Install-sqmCertificate -SqlInstance &quot;SQL02&quot; -CertFile &quot;C:\Certs\SQL01_AG_CERT.cer&quot; `
-        -CertificateName &quot;SQL01_AG_CERT&quot; -Purpose AlwaysOn</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example-label"># Public key of the partner SQL01 on replica SQL02 (no private key, no endpoint change).</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Public key of the partner SQL01 on replica SQL02 (no private key, no endpoint change).
+    # ag_user_sql01 = database user in master of the login with CONNECT on the endpoint.
+    Install-sqmCertificate -SqlInstance &quot;SQL02&quot; -CertFile &quot;\\fs01\certs\SQL01_AG_CERT.cer&quot; `
+        -CertificateName &quot;SQL01_AG_CERT&quot; -Purpose AlwaysOn -AuthorizationUser &quot;ag_user_sql01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label"># Install CER + PVK and bind TDE</div>
@@ -4789,8 +4790,8 @@ Invoke-sqmConfigRollback -SqlInstance &quot;SQL01&quot; `
         -Purpose TDE -TdeDatabaseName &quot;ProdDB&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label"># Install SSL certificate (Windows Store + SQL Server network)</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Install SSL certificate (Windows Store + SQL Server network)
+	<div class="psdb-st-example-label"># TLS certificate: Windows store + binding (on the SQL Server host, restart afterwards)</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # TLS certificate: Windows store + binding (on the SQL Server host, restart afterwards)
     Install-sqmCertificate -SqlInstance &quot;SQL01&quot; -CertFile &quot;C:\Certs\ssl.pfx&quot; `
         -CertPassword (Read-Host -AsSecureString) -Purpose SSL -SetSqlServerSslCert</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>

@@ -184,6 +184,10 @@ function New-sqmCertificateRequest
 					SqlCredential = $SqlCredential
 					Database	  = $Database
 				}
+				# Abfragen in master: eigene Kopie - @connParams enthaelt bereits -Database, ein zusaetzliches
+				# -Database bricht unter Windows PowerShell 5.1 mit 'Parameter mehrfach angegeben' ab
+				$masterParams = $connParams.Clone()
+				$masterParams['Database'] = 'master'
 				
 				$certQuery = @"
 SELECT c.name, c.subject, c.issuer_name, c.expiry_date, c.start_date
@@ -205,7 +209,7 @@ INNER JOIN sys.database_mirroring_endpoints dme ON e.endpoint_id = dme.endpoint_
 INNER JOIN sys.certificates c ON dme.certificate_id = c.certificate_id
 WHERE c.name = '$($CertificateName -replace "'", "''")'
 "@
-				$ep = Invoke-DbaQuery @connParams -Database 'master' -Query $epQuery -ErrorAction SilentlyContinue
+				$ep = Invoke-DbaQuery @masterParams -Query $epQuery -ErrorAction SilentlyContinue
 				if ($ep) { $existingPurpose = 'AlwaysOn'; $boundEndpointName = $ep.EndpointName }
 				
 				# AG-Listener fuer SANs
@@ -214,7 +218,7 @@ SELECT dns_name AS ListenerName FROM sys.availability_group_listeners
 "@
 				try
 				{
-					$listeners = Invoke-DbaQuery @connParams -Database 'master' -Query $listenerQuery -ErrorAction SilentlyContinue
+					$listeners = Invoke-DbaQuery @masterParams -Query $listenerQuery -ErrorAction SilentlyContinue
 					$agListeners = @($listeners | Select-Object -ExpandProperty ListenerName)
 				}
 				catch { }
@@ -230,7 +234,10 @@ SELECT dns_name AS ListenerName FROM sys.availability_group_listeners
 			elseif ($existingSubject) { $existingSubject }
 			else
 			{
-				$fqdn = [System.Net.Dns]::GetHostEntry($SqlInstance).HostName
+				# Nur den Hostteil aufloesen - "HOST\INSTANZ" ist kein DNS-Name
+				$hostPart = ($SqlInstance -split '\\')[0]
+				try { $fqdn = [System.Net.Dns]::GetHostEntry($hostPart).HostName }
+				catch { $fqdn = $hostPart }
 				$cn = "CN=$fqdn"
 				if ($Organization) { $cn += ",O=$Organization" }
 				if ($OrganizationalUnit) { $cn += ",OU=$OrganizationalUnit" }

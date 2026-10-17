@@ -239,18 +239,18 @@ else
 {
 	# TrustServerCertificate fuer ALLE dbatools-Verbindungen aktivieren (self-signed Zertifikate).
 	# Behebt "The certificate chain was issued by an authority that is not trusted" auf SQL 2022+.
-	# Per Set-sqmConfig -TrustServerCertificate $false abschaltbar (vor dem Import gesetzt).
-	if ($script:sqmModuleConfig['TrustServerCertificate'])
+	# Abschaltbar per Set-sqmConfig -TrustServerCertificate $false (sofort wirksam, in config.json
+	# gespeichert und beim naechsten Import hier ausgewertet).
+	# Der Wert wird in beide Richtungen gesetzt: ein Re-Import mit $false hebt ein frueheres
+	# $true derselben Sitzung wieder auf.
+	try
 	{
-		try
-		{
-			# Hinweis: Set-DbatoolsConfig hat KEINEN -Scope-Parameter (dbatools 2.8.x) - die
-			# Einstellung gilt ohnehin sessionweit. Fruehere Variante mit "-Scope Session" warf
-			# eine vom catch verschluckte Exception, sodass trustcert nie gesetzt wurde.
-			Set-DbatoolsConfig -FullName 'sql.connection.trustcert' -Value $true -ErrorAction SilentlyContinue
-		}
-		catch { Write-Verbose "Konnte dbatools trustcert nicht setzen: $($_.Exception.Message)" }
+		# Hinweis: Set-DbatoolsConfig hat KEINEN -Scope-Parameter (dbatools 2.8.x) - die
+		# Einstellung gilt ohnehin sessionweit. Fruehere Variante mit "-Scope Session" warf
+		# eine vom catch verschluckte Exception, sodass trustcert nie gesetzt wurde.
+		Set-DbatoolsConfig -FullName 'sql.connection.trustcert' -Value ([bool]$script:sqmModuleConfig['TrustServerCertificate']) -ErrorAction SilentlyContinue
 	}
+	catch { Write-Verbose "Konnte dbatools trustcert nicht setzen: $($_.Exception.Message)" }
 }
 
 # =============================================================================

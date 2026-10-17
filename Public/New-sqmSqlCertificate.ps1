@@ -10,16 +10,27 @@
     Process:
       1. Read existing certificate and determine its purpose
       2. Back up old certificate as .cer + private key as .pvk (BackupPath)
-      3. Create new certificate with same properties and new expiry date
-      4. Automatically bind based on purpose:
-           AlwaysOn  -> ALTER ENDPOINT ... AUTHENTICATION = CERTIFICATE <new>
-           TDE       -> ALTER DATABASE ... SET ENCRYPTION KEY ... CERTIFICATE <new>
-           Broker    -> ALTER ENDPOINT ... AUTHENTICATION = CERTIFICATE <new>
-      5. Rename old certificate (suffix _OLD_<date>) — do not delete
-      6. Output order data sheet as TXT (Subject, thumbprint old/new, bindings)
+      3. Create new certificate with same subject and new expiry date
+      4. Back up the NEW certificate as .cer + .pvk into the same folder (the .cer is the
+         public key for AlwaysOn/Broker partners, .cer + .pvk are needed for TDE on secondaries
+         and for any restore)
+      5. Only if requested, bind based on purpose:
+           AlwaysOn  -> ALTER ENDPOINT ... FOR DATABASE_MIRRORING (AUTHENTICATION = CERTIFICATE <new>)
+           Broker    -> ALTER ENDPOINT ... FOR SERVICE_BROKER (AUTHENTICATION = CERTIFICATE <new>)
+           TDE       -> ALTER DATABASE ENCRYPTION KEY ENCRYPTION BY SERVER CERTIFICATE <new>
+      6. Write a renewal protocol as TXT (Subject, thumbprint old/new, bindings, next steps)
 
-    NOTE: For AlwaysOn, the new certificate must subsequently be distributed to all
-    replica instances. The function outputs the necessary steps as instructions.
+    The old certificate is neither renamed nor dropped: SQL Server has no way to rename a
+    certificate, and it is still needed until all bindings are switched (and, for TDE, to
+    restore older backups). Drop it manually after verification.
+
+    ORDER FOR ALWAYSON: the partner replicas must know the NEW public key before this replica's
+    endpoint is switched, otherwise they reject the connection and the AG disconnects. Run
+    without -BindEndpoint, import the new .cer on every partner
+    (Install-sqmCertificate -Purpose AlwaysOn -AuthorizationUser ...), then switch the endpoint.
+    TDE IN AN AG: the new certificate (.cer + .pvk) must exist on every secondary before -BindTde.
+
+    BackupPath is a path on the SQL Server host: BACKUP CERTIFICATE is executed by the service.
 
 .PARAMETER SqlInstance
     SQL Server instance (default: current computer name).
@@ -44,19 +55,22 @@
     Default: from module configuration (OutputPath).
 
 .PARAMETER BackupEncryptionPassword
-    Password for encrypting the exported private key (.pvk).
+    Password for encrypting the exported private keys (.pvk) of the old and the new certificate.
     Required when the old certificate has a private key.
 
 .PARAMETER RenameOldCertificate
-    Rename the old certificate after renewal (suffix _OLD_<date>). Default: $true.
+    Obsolete, has no effect. SQL Server cannot rename certificates; the old certificate
+    always stays under its name until you drop it. Kept for compatibility of existing scripts.
 
 .PARAMETER BindEndpoint
-    Automatically bind the new certificate to the existing endpoint (AlwaysOn/Broker).
-    Default: $false — must be explicitly confirmed.
+    Switch the endpoint (AlwaysOn: DATABASE_MIRRORING, Broker: SERVICE_BROKER) to the new
+    certificate immediately. Default: $false. For AlwaysOn only after the partners have the
+    new public key.
 
 .PARAMETER BindTde
-    Automatically activate the new certificate for TDE-encrypted databases.
-    Default: $false — must be explicitly confirmed.
+    Re-encrypt the database encryption keys of the TDE databases with the new certificate.
+    Default: $false. In an availability group only after the new certificate exists on all
+    secondaries.
 
 .PARAMETER EnableException
     Throw exceptions immediately.
@@ -79,8 +93,8 @@
 .NOTES
     Requires: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath
     Requires: sysadmin on the instance.
-    AlwaysOn: After renewal the new certificate (.cer) must be distributed to all replicas
-    and installed there via CREATE CERTIFICATE ... FROM FILE (Install-sqmCertificate).
+    AlwaysOn: After renewal the new certificate (.cer) must be imported on all partner replicas
+    with the endpoint login's user as owner (Install-sqmCertificate -AuthorizationUser).
     TDE: Key rotation runs online, the database remains available.
 #>
 function New-sqmSqlCertificate
@@ -145,6 +159,10 @@ function New-sqmSqlCertificate
 				SqlCredential = $SqlCredential
 				Database	  = $Database
 			}
+			# Abfragen in master: eigene Kopie - @connParams enthaelt bereits -Database, ein zusaetzliches
+			# -Database bricht unter Windows PowerShell 5.1 mit 'Parameter mehrfach angegeben' ab
+			$masterParams = $connParams.Clone()
+			$masterParams['Database'] = 'master'
 			
 			# -------------------------------------------------------------------
 			# 1. Bestehendes Zertifikat lesen
@@ -190,7 +208,7 @@ INNER JOIN sys.service_broker_endpoints sbe ON e.endpoint_id = sbe.endpoint_id
 INNER JOIN sys.certificates c ON sbe.certificate_id = c.certificate_id
 WHERE c.name = '$($CertificateName -replace "'", "''")'
 "@
-			$boundEndpoint = Invoke-DbaQuery @connParams -Database 'master' -Query $endpointQuery -ErrorAction SilentlyContinue
+			$boundEndpoint = Invoke-DbaQuery @masterParams -Query $endpointQuery -ErrorAction SilentlyContinue
 			
 			# -------------------------------------------------------------------
 			# 3. TDE-Bindung ermitteln
@@ -202,7 +220,7 @@ INNER JOIN sys.databases d    ON dek.database_id = d.database_id
 INNER JOIN sys.certificates c ON dek.encryptor_thumbprint = c.thumbprint
 WHERE c.name = '$($CertificateName -replace "'", "''")'
 "@
-			$tdeDatabases = Invoke-DbaQuery @connParams -Database 'master' -Query $tdeQuery -ErrorAction SilentlyContinue
+			$tdeDatabases = Invoke-DbaQuery @masterParams -Query $tdeQuery -ErrorAction SilentlyContinue
 			
 			# -------------------------------------------------------------------
 			# 4. Neuen Zertifikatsnamen festlegen
@@ -241,53 +259,68 @@ WHERE c.name = '$($CertificateName -replace "'", "''")'
 			# -------------------------------------------------------------------
 			# 6. Altes Zertifikat sichern (.cer + optional .pvk)
 			# -------------------------------------------------------------------
-			$cerFile = Join-Path $certBackupDir "$($CertificateName)_OLD.cer"
-			
-			if ($existingCert.HasPrivateKey)
+			# BACKUP CERTIFICATE schreibt der SQL Server-Dienst - Verzeichnis auch serverseitig anlegen
+			$certBackupDirSql = $certBackupDir -replace "'", "''"
+			Invoke-DbaQuery @masterParams -Query "EXEC master.dbo.xp_create_subdir N'$certBackupDirSql';" -ErrorAction Stop
+
+			# Passwort als Klartext fuer T-SQL (nur im Speicher, nicht geloggt)
+			$plainPwd = $null
+			if ($BackupEncryptionPassword)
 			{
-				$pvkFile = Join-Path $certBackupDir "$($CertificateName)_OLD.pvk"
-				
-				# Passwort als Klartext fuer T-SQL (nur im Speicher, nicht geloggt)
 				$bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($BackupEncryptionPassword)
-				$plainPwd = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+				$plainPwd = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr) -replace "'", "''"
 				[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
-				
-				$backupSql = @"
-BACKUP CERTIFICATE [$CertificateName]
-TO FILE = N'$cerFile'
-WITH PRIVATE KEY (
-    FILE               = N'$pvkFile',
-    ENCRYPTION BY PASSWORD = N'$plainPwd'
-);
-"@
-				$plainPwd = $null # Sofort aus Speicher entfernen
 			}
-			else
+
+			try
 			{
-				$backupSql = @"
-BACKUP CERTIFICATE [$CertificateName]
-TO FILE = N'$cerFile';
-"@
+				$cerFile = Join-Path $certBackupDir "$($CertificateName)_OLD.cer"
 				$pvkFile = $null
-			}
-			
-			Invoke-DbaQuery @connParams -Query $backupSql -ErrorAction Stop
-			Invoke-sqmLogging -Message "Backup des alten Zertifikats: $cerFile" -FunctionName $functionName -Level "INFO"
-			
-			# -------------------------------------------------------------------
-			# 7. Neues Zertifikat erstellen
-			# -------------------------------------------------------------------
-			$createSql = @"
+				$backupSql = "BACKUP CERTIFICATE [$CertificateName] TO FILE = N'$($cerFile -replace "'", "''")'"
+				if ($existingCert.HasPrivateKey)
+				{
+					$pvkFile = Join-Path $certBackupDir "$($CertificateName)_OLD.pvk"
+					$backupSql += " WITH PRIVATE KEY (FILE = N'$($pvkFile -replace "'", "''")', ENCRYPTION BY PASSWORD = N'$plainPwd')"
+				}
+				Invoke-DbaQuery @connParams -Query "$backupSql;" -ErrorAction Stop
+				Invoke-sqmLogging -Message "Backup des alten Zertifikats: $cerFile" -FunctionName $functionName -Level "INFO"
+
+				# -------------------------------------------------------------------
+				# 7. Neues Zertifikat erstellen
+				# -------------------------------------------------------------------
+				$createSql = @"
 CREATE CERTIFICATE [$NewCertificateName]
-WITH SUBJECT = N'$subject',
+WITH SUBJECT = N'$($subject -replace "'", "''")',
      EXPIRY_DATE = N'$expiryDate';
 "@
-			Invoke-DbaQuery @connParams -Query $createSql -ErrorAction Stop
-			Invoke-sqmLogging -Message "Neues Zertifikat '$NewCertificateName' erstellt (gueltig bis $expiryDate)." -FunctionName $functionName -Level "INFO"
-			
+				Invoke-DbaQuery @connParams -Query $createSql -ErrorAction Stop
+				Invoke-sqmLogging -Message "Neues Zertifikat '$NewCertificateName' erstellt (gueltig bis $expiryDate)." -FunctionName $functionName -Level "INFO"
+
+				# Neues Zertifikat sofort sichern: .cer = Public Key fuer AG-/Broker-Partner,
+				# .cer + .pvk fuer TDE auf Secondaries und fuer jedes spaetere Restore
+				$newCerFile = Join-Path $certBackupDir "$($NewCertificateName).cer"
+				$newPvkFile = $null
+				$newBackupSql = "BACKUP CERTIFICATE [$NewCertificateName] TO FILE = N'$($newCerFile -replace "'", "''")'"
+				if ($plainPwd)
+				{
+					$newPvkFile = Join-Path $certBackupDir "$($NewCertificateName).pvk"
+					$newBackupSql += " WITH PRIVATE KEY (FILE = N'$($newPvkFile -replace "'", "''")', ENCRYPTION BY PASSWORD = N'$plainPwd')"
+				}
+				Invoke-DbaQuery @connParams -Query "$newBackupSql;" -ErrorAction Stop
+				Invoke-sqmLogging -Message "Backup des neuen Zertifikats: $newCerFile" -FunctionName $functionName -Level "INFO"
+				if (-not $newPvkFile)
+				{
+					Write-Warning "Private Key des neuen Zertifikats '$NewCertificateName' NICHT gesichert (kein -BackupEncryptionPassword). Sofort nachholen: BACKUP CERTIFICATE ... WITH PRIVATE KEY."
+				}
+			}
+			finally
+			{
+				$plainPwd = $null # Sofort aus Speicher entfernen
+			}
+
 			# Neues Zertifikat lesen fuer Rueckgabeobjekt
-			$newCert = Invoke-DbaQuery @connParams -Query ($existingCertQuery -replace $CertificateName, $NewCertificateName) -ErrorAction SilentlyContinue
-			
+			$newCert = Invoke-DbaQuery @connParams -Query ($existingCertQuery -replace [regex]::Escape("'$($CertificateName -replace "'", "''")'"), "'$($NewCertificateName -replace "'", "''")'") -ErrorAction SilentlyContinue
+
 			# -------------------------------------------------------------------
 			# 8. Optional: Endpoint-Bindung aktualisieren
 			# -------------------------------------------------------------------
@@ -296,16 +329,18 @@ WITH SUBJECT = N'$subject',
 			{
 				foreach ($ep in $boundEndpoint)
 				{
+					$epClause = if ($ep.EndpointType -eq 'SERVICE_BROKER') { 'SERVICE_BROKER' }
+					else { 'DATABASE_MIRRORING' }
 					$alterEndpointSql = @"
 ALTER ENDPOINT [$($ep.EndpointName)]
-    FOR DATABASE_MIRRORING (AUTHENTICATION = CERTIFICATE [$NewCertificateName]);
+    FOR $epClause (AUTHENTICATION = CERTIFICATE [$NewCertificateName]);
 "@
-					Invoke-DbaQuery @connParams -Database 'master' -Query $alterEndpointSql -ErrorAction Stop
+					Invoke-DbaQuery @masterParams -Query $alterEndpointSql -ErrorAction Stop
 					Invoke-sqmLogging -Message "Endpoint '$($ep.EndpointName)' auf neues Zertifikat '$NewCertificateName' umgestellt." -FunctionName $functionName -Level "INFO"
 					$endpointBound = $true
 				}
 			}
-			
+
 			# -------------------------------------------------------------------
 			# 9. Optional: TDE-Bindung aktualisieren
 			# -------------------------------------------------------------------
@@ -319,28 +354,19 @@ USE [$($tdeDb.DatabaseName)];
 ALTER DATABASE ENCRYPTION KEY
     ENCRYPTION BY SERVER CERTIFICATE [$NewCertificateName];
 "@
-					Invoke-DbaQuery @connParams -Database 'master' -Query $alterTdeSql -ErrorAction Stop
+					Invoke-DbaQuery @masterParams -Query $alterTdeSql -ErrorAction Stop
 					Invoke-sqmLogging -Message "TDE fuer '$($tdeDb.DatabaseName)' auf '$NewCertificateName' umgestellt." -FunctionName $functionName -Level "INFO"
 					$tdeBound = $true
 				}
 			}
-			
+
 			# -------------------------------------------------------------------
-			# 10. Altes Zertifikat umbenennen
+			# 10. Altes Zertifikat bleibt bestehen
 			# -------------------------------------------------------------------
-			if ($RenameOldCertificate)
-			{
-				$renameSql = "ALTER CERTIFICATE [$CertificateName] WITH PRIVATE KEY (REMOVE PRIVATE KEY);"
-				# Nur umbenennen wenn kein Endpoint/TDE mehr darauf zeigt
-				$canRename = ($endpointBound -or -not $boundEndpoint) -and ($tdeBound -or -not $tdeDatabases)
-				if ($canRename)
-				{
-					# SQL Server hat kein RENAME CERTIFICATE - wir exportieren und reimportieren
-					# Stattdessen: Kommentar im Bestelldatenblatt, manuell per DROP nach Verifikation
-					Invoke-sqmLogging -Message "Altes Zertifikat '$CertificateName' bleibt bestehen. Nach Verifikation manuell umbenennen/loeschen." -FunctionName $functionName -Level "WARNING"
-				}
-			}
-			
+			# SQL Server kennt kein Umbenennen von Zertifikaten (-RenameOldCertificate ist wirkungslos).
+			# Das alte Zertifikat wird erst nach Verifikation manuell geloescht (siehe Protokoll).
+			Invoke-sqmLogging -Message "Altes Zertifikat '$CertificateName' bleibt bestehen. Nach Verifikation manuell loeschen." -FunctionName $functionName -Level "INFO"
+
 			# -------------------------------------------------------------------
 			# 11. Bestelldatenblatt schreiben
 			# -------------------------------------------------------------------
@@ -378,6 +404,8 @@ ALTER DATABASE ENCRYPTION KEY
 			{
 				$lines.Add("  Thumbprint  : $([System.BitConverter]::ToString($newCert.thumbprint).Replace('-', ''))")
 			}
+			$lines.Add("  Backup .cer : $newCerFile")
+			if ($newPvkFile) { $lines.Add("  Backup .pvk : $newPvkFile") }
 			$lines.Add("")
 			
 			if ($boundEndpoint)
@@ -391,17 +419,18 @@ ALTER DATABASE ENCRYPTION KEY
 							else { 'NEIN - manuell erforderlich' })")
 					if (-not $endpointBound)
 					{
-						$lines.Add("  T-SQL       : ALTER ENDPOINT [$($ep.EndpointName)] FOR DATABASE_MIRRORING")
+						$lines.Add("  T-SQL       : ALTER ENDPOINT [$($ep.EndpointName)] FOR $(if ($ep.EndpointType -eq 'SERVICE_BROKER') { 'SERVICE_BROKER' } else { 'DATABASE_MIRRORING' })")
 						$lines.Add("                (AUTHENTICATION = CERTIFICATE [$NewCertificateName]);")
 					}
 				}
 				$lines.Add("")
-				$lines.Add("  *** WICHTIG FueR ALWAYSON ***")
-				$lines.Add("  Das neue Zertifikat muss auf alle AG-Replikat-Instanzen uebertragen werden:")
-				$lines.Add("  1. Neues .cer exportieren: BACKUP CERTIFICATE [$NewCertificateName] TO FILE = N'...'")
-				$lines.Add("  2. .cer auf Replikat-Server kopieren")
-				$lines.Add("  3. Auf jedem Replikat installieren:")
-				$lines.Add("     Install-sqmCertificate -SqlInstance <Replikat> -CertFile <Pfad> -ForAlwaysOn")
+				$lines.Add("  *** WICHTIG FueR ALWAYSON / SERVICE BROKER ***")
+				$lines.Add("  Jeder Partner muss den neuen Public Key kennen, BEVOR der Endpoint umgestellt wird:")
+				$lines.Add("  1. Gesicherter Public Key: $newCerFile")
+				$lines.Add("  2. Auf jedem Partner importieren, Besitzer = Benutzer des Endpoint-Logins:")
+				$lines.Add("     Install-sqmCertificate -SqlInstance <Partner> -CertFile <Pfad>\$NewCertificateName.cer \")
+				$lines.Add("         -CertificateName '$NewCertificateName' -Purpose AlwaysOn -AuthorizationUser <Benutzer>")
+				$lines.Add("  3. Erst dann hier den Endpoint umstellen (T-SQL oben) und den AG-Status pruefen.")
 				$lines.Add("")
 			}
 			
@@ -423,11 +452,20 @@ ALTER DATABASE ENCRYPTION KEY
 				}
 				$lines.Add("")
 				$lines.Add("  *** WICHTIG FueR TDE ***")
-				$lines.Add("  Das neue TDE-Zertifikat MUSS gesichert werden (inkl. Private Key)!")
-				$lines.Add("  Ohne Backup ist bei Datenverlust keine Wiederherstellung moeglich.")
-				$lines.Add("  Backup-Befehl:")
-				$lines.Add("  BACKUP CERTIFICATE [$NewCertificateName] TO FILE = N'<Pfad>.cer'")
-				$lines.Add("  WITH PRIVATE KEY (FILE = N'<Pfad>.pvk', ENCRYPTION BY PASSWORD = N'<Passwort>');")
+				if ($newPvkFile)
+				{
+					$lines.Add("  Neues Zertifikat inkl. Private Key gesichert: $newPvkFile")
+					$lines.Add("  Sicherung getrennt vom Server aufbewahren, Passwort separat ablegen.")
+				}
+				else
+				{
+					$lines.Add("  Private Key des neuen Zertifikats ist NICHT gesichert - sofort nachholen:")
+					$lines.Add("  BACKUP CERTIFICATE [$NewCertificateName] TO FILE = N'<Pfad>.cer'")
+					$lines.Add("  WITH PRIVATE KEY (FILE = N'<Pfad>.pvk', ENCRYPTION BY PASSWORD = N'<Passwort>');")
+				}
+				$lines.Add("  AlwaysOn: .cer + .pvk VOR dem Umstellen auf allen Secondaries importieren")
+				$lines.Add("  (Install-sqmCertificate -CertFile ... -PrivateKeyFile ... -CertPassword ...).")
+				$lines.Add("  Altes Zertifikat behalten, solange Backups existieren, die damit verschluesselt sind.")
 				$lines.Add("")
 			}
 			
@@ -445,6 +483,8 @@ ALTER DATABASE ENCRYPTION KEY
 			$lines.Add("  Verzeichnis : $certBackupDir")
 			$lines.Add("  Zertifikat  : $cerFile")
 			if ($pvkFile) { $lines.Add("  Private Key : $pvkFile (mit Passwort verschluesselt)") }
+			$lines.Add("  Neu .cer    : $newCerFile")
+			if ($newPvkFile) { $lines.Add("  Neu .pvk    : $newPvkFile (mit Passwort verschluesselt)") }
 			$lines.Add("  Protokoll   : $sheetFile")
 			
 			$lines | Out-File -FilePath $sheetFile -Encoding UTF8 -Force
@@ -467,6 +507,8 @@ ALTER DATABASE ENCRYPTION KEY
 				BackupDirectory    = $certBackupDir
 				CerBackupFile	   = $cerFile
 				PvkBackupFile	   = $pvkFile
+				NewCerBackupFile   = $newCerFile
+				NewPvkBackupFile   = $newPvkFile
 				ProtocolFile	   = $sheetFile
 				Success		       = $true
 			}

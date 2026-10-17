@@ -1,5 +1,45 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.179.0] - 2026-10-17
+
+### Fehlerbehebungen: Zertifikatsfunktionen
+
+- **Windows PowerShell 5.1: `Install-sqmCertificate`, `New-sqmSqlCertificate` und `New-sqmCertificateRequest`
+  brachen ab** mit "Parameter Database mehrfach angegeben": `@connParams` enthielt bereits `-Database`, die
+  Abfragen in master gaben es ein zweites Mal an (PowerShell 7 ignoriert das stillschweigend). Betroffen waren
+  Endpoint- und TDE-Bindung in `Install-sqmCertificate`, die gesamte Erneuerung in `New-sqmSqlCertificate` und
+  die Vorlage per `-CertificateName` in `New-sqmCertificateRequest`.
+- **`Install-sqmCertificate -SetSqlServerSslCert` hat nie gebunden**: der Registry-Pfad wurde aus einer nie
+  gesetzten Variable gebaut. Die TLS-Bindung laeuft jetzt ueber `Set-sqmSqlTlsCertificate` (Registry-Schluessel
+  aus `Instance Names\SQL`, Leserecht auf den Private Key fuer das Dienstkonto). `-Purpose SSL` importiert das
+  Zertifikat nur noch in `LocalMachine\My`, nicht mehr zusaetzlich nach `sys.certificates`.
+- **PFX-Import in SQL Server**: das erzeugte `CREATE CERTIFICATE` hatte kein `WITH FORMAT = 'PFX'` und konnte
+  daher nicht funktionieren. Jetzt korrekt fuer SQL Server 2022+; aeltere Versionen bekommen eine klare Meldung
+  (CER + PVK verwenden) statt eines fehlgeschlagenen Imports.
+- **`-Purpose AlwaysOn` mit reinem Public Key** stellte den lokalen Endpoint auf das Zertifikat des Partners um
+  (scheitert, ein Endpoint braucht den Private Key). Jetzt: ohne Private Key keine Endpoint-Aenderung; neuer
+  Parameter `-AuthorizationUser` setzt den Besitzer (`CREATE CERTIFICATE ... AUTHORIZATION`), also den Benutzer
+  des Endpoint-Logins, damit der Partner akzeptiert wird. Ohne den Parameter erscheint eine Warnung mit dem
+  noetigen `ALTER AUTHORIZATION`.
+- **Service Broker**: Endpoint-Suche und `ALTER ENDPOINT` verwenden jetzt `sys.service_broker_endpoints` und
+  `FOR SERVICE_BROKER` statt immer `DATABASE_MIRRORING` (`Install-sqmCertificate` und `New-sqmSqlCertificate`).
+- `Install-sqmCertificate` prueft vorab, ob ein Database Master Key existiert (Private-Key-Import) und ob der
+  `-AuthorizationUser` existiert; Pfade und Passwoerter werden fuer T-SQL korrekt maskiert.
+- **`New-sqmSqlCertificate`**: die Hilfe versprach ein Umbenennen des alten Zertifikats (`_OLD_<Datum>`), das es
+  nie gab und das SQL Server auch nicht kann. Hilfe korrigiert, `-RenameOldCertificate` ist wirkungslos und bleibt
+  nur aus Kompatibilitaet. Neu: das **neue** Zertifikat wird sofort mitgesichert (.cer + .pvk), das Verzeichnis
+  wird per `xp_create_subdir` auf dem SQL Server angelegt (vorher scheiterte `BACKUP CERTIFICATE` bei
+  Remote-Instanzen). Das Protokoll nennt nicht mehr den nicht existierenden Schalter `-ForAlwaysOn`, sondern die
+  richtige Reihenfolge: neuen Public Key auf allen Partnern importieren, erst dann den Endpoint umstellen.
+- `New-sqmCertificateRequest` ohne `-Subject` scheiterte bei benannten Instanzen (`HOST\INSTANZ` als DNS-Name).
+
+### Neu: `Set-sqmConfig -TrustServerCertificate`
+
+- Den Schalter erwaehnte das Modul schon, es gab ihn aber nicht. `$false` laesst alle dbatools-Verbindungen des
+  Moduls das Serverzertifikat pruefen (vertrauenswuerdige CA, passender Name, nicht abgelaufen), `$true`
+  (Standard) vertraut jedem Zertifikat. Sofort wirksam, in `config.json` gespeichert und beim naechsten Import in
+  beide Richtungen angewendet.
+
 ## [1.9.178.0] - 2026-10-17
 
 ### Neue Funktion: `Invoke-sqmIndexOptimize` - Indexwartung mit sinnvollen Vorgaben

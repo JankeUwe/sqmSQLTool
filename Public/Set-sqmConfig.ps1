@@ -136,6 +136,16 @@
     Default: de-DE.
     Example: Set-sqmConfig -Language en-US
 
+.PARAMETER TrustServerCertificate
+    Whether the module's dbatools connections trust the SQL Server certificate without
+    validating it (dbatools option sql.connection.trustcert).
+    $true  = trust any certificate, also the auto-generated self-signed one (default).
+             Connections stay encrypted, but the server identity is not checked.
+    $false = validate the certificate (trusted CA, matching name, not expired). Use this once
+             the instances have proper TLS certificates (Get-sqmTlsStatus, Set-sqmSqlTlsCertificate).
+    Applies immediately to the current session and is saved for future sessions.
+    Example: Set-sqmConfig -TrustServerCertificate $false
+
 .PARAMETER PassThru
     Returns the updated configuration as an object.
 
@@ -232,6 +242,8 @@ function Set-sqmConfig
 		[Parameter(Mandatory = $false)]
 		[ValidateSet('de-DE', 'en-US')]
 		[string]$Language,
+		[Parameter(Mandatory = $false)]
+		[bool]$TrustServerCertificate,
 		[Parameter(Mandatory = $false)]
 		[switch]$PassThru
 	)
@@ -575,6 +587,21 @@ function Set-sqmConfig
 	{
 		$globalConfig['Language'] = $Language
 		$script:_strings = $null    # String-Cache invalidieren
+		$updated = $true
+	}
+
+	# Zertifikatspruefung der dbatools-Verbindungen (sofort wirksam + persistiert)
+	if ($PSBoundParameters.ContainsKey('TrustServerCertificate'))
+	{
+		$globalConfig['TrustServerCertificate'] = $TrustServerCertificate
+		if (Get-Command -Name Set-DbatoolsConfig -ErrorAction SilentlyContinue)
+		{
+			try
+			{
+				Set-DbatoolsConfig -FullName 'sql.connection.trustcert' -Value $TrustServerCertificate -ErrorAction Stop | Out-Null
+			}
+			catch { Write-Warning "dbatools-Option sql.connection.trustcert konnte nicht gesetzt werden: $($_.Exception.Message)" }
+		}
 		$updated = $true
 	}
 

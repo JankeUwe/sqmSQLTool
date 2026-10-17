@@ -1427,6 +1427,7 @@ Allows setting of LogPath, OutputPath, CentralPath, Ola job names,
 - **-CheckTempDbMaxFiles** - Maximale TempDB-Dateianzahl im Setup-Check. Standard: 8
 - **-CheckDiskBlockSize** - Empfohlene NTFS-Blockgroesse in Bytes fuer Get-sqmDiskBlockSize. Standard: 65536 (64 KB)
 - **-Language** - Output language of the module. Allowed values: de-DE, en-US. Default: de-DE. Example: Set-sqmConfig -Language en-US
+- **-TrustServerCertificate** - $true (default): the module's dbatools connections trust any server certificate (encrypted, but the server identity is not checked). $false: validate the certificate (trusted CA, matching name, not expired). Applies immediately and is saved in config.json. Example: Set-sqmConfig -TrustServerCertificate $false
 - **-PassThru** - Returns the updated configuration as an object.
 
 **Examples (4):**
@@ -5560,68 +5561,75 @@ Get-sqmCertificateReport -SqlInstance "SQL01","SQL02" -WarningThresholdDays 180
 
 ### Install-sqmCertificate
 
-
+Installs a certificate (self-signed or CA-signed) in SQL Server and automatically binds it to the configured purpose.
 
 Supports three input formats:
-      PFX   (.pfx)  - Certificate + private key in one file (CA-signed or exported)
-      CER+PVK       - Certificate (.cer) + encrypted private key (.pvk) separately
-      CER only      - Certificate without private key (e.g. public key for AlwaysOn replicas)
 
-    Process:
-      1. Read certificate file and validate content (expiry date, subject, format)
-      2. Check whether a certificate with the same thumbprint already exists in SQL Server
-      3. Import certificate via CREATE CERTIFICATE in SQL Server
-      4. Automatically bind based on -Purpose:
-           AlwaysOn      -> ALTER ENDPOINT ... AUTHENTICATION = CERTIFICATE <new>
-                            Output guidance for replica distribution
-           TDE           -> ALTER DATABASE ... SET ENCRYPTION KEY ... CERTIFICATE <new>
-           SSL           -> Import certificate into Windows machine store +
-                            set SQL Server network protocol certificate (Registry)
-           ServiceBroker -> ALTER ENDPOINT ... AUTHENTICATION = CERTIFICATE <new>
-      5. Write installation log as TXT
+    PFX   (.pfx)  - Certificate + private key in one file. Import into SQL Server requires
+                    SQL Server 2022 or later (CREATE CERTIFICATE ... WITH FORMAT = 'PFX').
+                    Older versions: use CER+PVK (clear error message instead of a failed import).
+    CER+PVK       - Certificate (.cer) + encrypted private key (.pvk) separately
+    CER only      - Certificate without private key (e.g. public key of an AlwaysOn partner)
+
+    Binding by -Purpose:
+      AlwaysOn      - with private key: ALTER ENDPOINT ... FOR DATABASE_MIRRORING on THIS instance.
+                      Without private key (partner public key): NO endpoint change; the certificate
+                      is owned by -AuthorizationUser (database user of the login with CONNECT on the
+                      endpoint), which is what makes SQL Server accept the partner replica.
+      ServiceBroker - same, with ALTER ENDPOINT ... FOR SERVICE_BROKER.
+      TDE           - ALTER DATABASE ENCRYPTION KEY ENCRYPTION BY SERVER CERTIFICATE <new>.
+      SSL           - Windows machine store only (no import into SQL Server). With
+                      -SetSqlServerSslCert the TLS binding runs via Set-sqmSqlTlsCertificate
+                      (registry + private key permission for the service account). Run on the host.
+
+    The files are read by PowerShell (validation) and by the SQL Server service account (import):
+    use a path both can reach. Importing a private key requires a database master key.
 
 **Parameters:**
 
 - **-SqlInstance** - SQL Server instance (default: current computer name).
 - **-SqlCredential** - PSCredential for the SQL Server connection.
-- **-CertFile** - Path to the certificate file (.pfx, .cer, .crt, .p12). For PFX the private key is automatically imported.
-- **-PrivateKeyFile** - Path to the separate private key file (.pvk). Only required for CER+PVK format.
-- **-CertPassword** - Password for the PFX file or .pvk file (as SecureString).
-- **-CertificateName** - Name under which the certificate is created in SQL Server. Default: file name without extension.
+- **-CertFile** - Path to the certificate file (.pfx, .cer, .crt, .p12).
+- **-PrivateKeyFile** - Path to the separate private key file (.pvk). Only for CER+PVK.
+- **-CertPassword** - Password for the PFX file or .pvk file (SecureString).
+- **-CertificateName** - Name in SQL Server. Default: file name without extension.
 - **-Database** - Target database in SQL Server. Default: master.
-- **-Purpose** - Purpose determines the automatic binding after import. Valid values: AlwaysOn, TDE, SSL, ServiceBroker, UserDefined. Default: UserDefined (no automatic binding).
-- **-EndpointName** - Name of the endpoint for AlwaysOn/ServiceBroker binding. If not specified, the first matching endpoint is determined automatically.
-- **-TdeDatabaseName** - Name of the database for TDE binding. If not specified, the current TDE-encrypted database on the instance is determined (only if unique).
-- **-ReplaceCertificateName** - Name of an existing certificate that is replaced (endpoint/TDE switched) after successful installation. The old certificate is NOT deleted.
-- **-ImportToWindowsStore** - Additionally import the certificate into the Windows machine certificate store. Required for SSL/TLS connections. Default: $false; automatically $true when Purpose=SSL.
-- **-SetSqlServerSslCert** - Set the SQL Server network configuration to use this certificate (thumbprint). Requires a restart of the SQL Server service. Default: $false.
+- **-Purpose** - AlwaysOn, TDE, SSL, ServiceBroker, UserDefined (default, no binding).
+- **-EndpointName** - Endpoint for AlwaysOn/ServiceBroker binding (certificate with private key). Default: the database mirroring or Service Broker endpoint of the instance.
+- **-AuthorizationUser** - Owner of the certificate (CREATE CERTIFICATE ... AUTHORIZATION). For the public key of an AlwaysOn/Service Broker partner: the database user of the endpoint login. Must exist.
+- **-TdeDatabaseName** - Database for TDE binding. Default: the only TDE-encrypted database.
+- **-ReplaceCertificateName** - Old certificate that is being replaced (stays, protocol contains the DROP statement).
+- **-ImportToWindowsStore** - Additionally import into LocalMachine\My. Automatically on for -Purpose SSL.
+- **-SetSqlServerSslCert** - Bind as TLS certificate via Set-sqmSqlTlsCertificate. Restart required.
 - **-OutputPath** - Output directory for the installation log. Default: from module configuration.
 - **-EnableException** - Throw exceptions immediately.
 
 **Examples (4):**
 
 ```powershell
-# Import PFX from CA and bind to AlwaysOn endpoint
-    Install-sqmCertificate -SqlInstance "SQL01" -CertFile "C:\Certs\sql01.pfx" `
-        -CertPassword (Read-Host -AsSecureString) -Purpose AlwaysOn
+# Import PFX (SQL Server 2022+) and switch the local AlwaysOn endpoint to it
+Install-sqmCertificate -SqlInstance "SQL01" -CertFile "\\fs01\certs\sql01_ag.pfx" `
+    -CertPassword (Read-Host -AsSecureString) -Purpose AlwaysOn
+```
 
 ```powershell
-# Install public-key certificate on AlwaysOn replica (no private key)
-    Install-sqmCertificate -SqlInstance "SQL02" -CertFile "C:\Certs\SQL01_AG_CERT.cer" `
-        -CertificateName "SQL01_AG_CERT" -Purpose AlwaysOn
+# Public key of the partner SQL01 on replica SQL02 (no endpoint change)
+Install-sqmCertificate -SqlInstance "SQL02" -CertFile "\\fs01\certs\SQL01_AG_CERT.cer" `
+    -CertificateName "SQL01_AG_CERT" -Purpose AlwaysOn -AuthorizationUser "ag_user_sql01"
+```
 
 ```powershell
 # Install CER + PVK and bind TDE
-    Install-sqmCertificate -SqlInstance "SQL01" `
-        -CertFile "C:\Certs\tde_new.cer" `
-        -PrivateKeyFile "C:\Certs\tde_new.pvk" `
-        -CertPassword (Read-Host -AsSecureString "PVK password") `
-        -Purpose TDE -TdeDatabaseName "ProdDB"
+Install-sqmCertificate -SqlInstance "SQL01" -CertFile "C:\Certs\tde_new.cer" `
+    -PrivateKeyFile "C:\Certs\tde_new.pvk" -CertPassword (Read-Host -AsSecureString "PVK password") `
+    -Purpose TDE -TdeDatabaseName "ProdDB"
+```
 
 ```powershell
-# Install SSL certificate (Windows Store + SQL Server network)
-    Install-sqmCertificate -SqlInstance "SQL01" -CertFile "C:\Certs\ssl.pfx" `
-        -CertPassword (Read-Host -AsSecureString) -Purpose SSL -SetSqlServerSslCert
+# TLS certificate: Windows store + binding (on the SQL Server host, restart afterwards)
+Install-sqmCertificate -SqlInstance "SQL01" -CertFile "C:\Certs\ssl.pfx" `
+    -CertPassword (Read-Host -AsSecureString) -Purpose SSL -SetSqlServerSslCert
+```
 
 ### Install-sqmCertificateToStore
 
@@ -5750,55 +5758,55 @@ Reads all relevant properties of the existing certificate from SQL Server
 
 Creates a new self-signed SQL Server certificate as a renewal of an existing one.
 
-Reads all relevant properties of the existing certificate (Subject, purpose,
-    endpoint binding, TDE binding) and creates a new self-signed certificate directly
-    in SQL Server using CREATE CERTIFICATE.
+    1. Reads the old certificate and its bindings (database mirroring / AG or Service Broker
+       endpoint, TDE databases).
+    2. Backs up the old certificate (.cer + .pvk).
+    3. Creates the new certificate with the same subject and -ValidityYears.
+    4. Backs up the NEW certificate (.cer + .pvk) into the same folder: the .cer is the public key
+       for AG/Broker partners, .cer + .pvk are needed for TDE on secondaries and for restores.
+    5. Only on request: -BindEndpoint (FOR DATABASE_MIRRORING or FOR SERVICE_BROKER), -BindTde.
+    6. Writes a renewal protocol.
 
-    Process:
-      1. Read existing certificate and determine its purpose
-      2. Back up old certificate as .cer + private key as .pvk (BackupPath)
-      3. Create new certificate with same properties and new expiry date
-      4. Automatically bind based on purpose:
-           AlwaysOn  -> ALTER ENDPOINT ... AUTHENTICATION = CERTIFICATE <new>
-           TDE       -> ALTER DATABASE ... SET ENCRYPTION KEY ... CERTIFICATE <new>
-           Broker    -> ALTER ENDPOINT ... AUTHENTICATION = CERTIFICATE <new>
-      5. Rename old certificate (suffix _OLD_<date>) — do not delete
-      6. Output order data sheet as TXT (Subject, thumbprint old/new, bindings)
+    The old certificate is neither renamed nor dropped (SQL Server cannot rename certificates).
+    BackupPath is a path on the SQL Server host; the folder is created there via xp_create_subdir.
 
-    NOTE: For AlwaysOn, the new certificate must subsequently be distributed to all
-    replica instances. The function outputs the necessary steps as instructions.
+    ORDER FOR ALWAYSON: import the new .cer on every partner (Install-sqmCertificate -Purpose
+    AlwaysOn -AuthorizationUser ...) BEFORE switching the endpoint, otherwise the AG disconnects.
+    TDE IN AN AG: the new certificate must exist on every secondary before -BindTde.
 
 **Parameters:**
 
 - **-SqlInstance** - SQL Server instance (default: current computer name).
 - **-SqlCredential** - PSCredential for the connection.
-- **-CertificateName** - Name of the certificate to renew (exact name from sys.certificates).
-- **-Database** - Database where the certificate resides. Default: master.
-- **-NewCertificateName** - Name of the new certificate. Default: <OldName>_<Year> (e.g. AG_CERT_2027).
-- **-ValidityYears** - Validity period of the new certificate in years. Default: 5.
-- **-BackupPath** - Path for backing up the old certificate (.cer and .pvk). Default: from module configuration (OutputPath).
-- **-BackupEncryptionPassword** - Password for encrypting the exported private key (.pvk). Required when the old certificate has a private key.
-- **-RenameOldCertificate** - Rename the old certificate after renewal (suffix _OLD_<date>). Default: $true.
-- **-BindEndpoint** - Automatically bind the new certificate to the existing endpoint (AlwaysOn/Broker). Default: $false — must be explicitly confirmed.
-- **-BindTde** - Automatically activate the new certificate for TDE-encrypted databases. Default: $false — must be explicitly confirmed.
+- **-CertificateName** - Name of the certificate to renew (sys.certificates).
+- **-Database** - Database of the certificate. Default: master.
+- **-NewCertificateName** - Name of the new certificate. Default: <OldName>_<Year>.
+- **-ValidityYears** - Validity in years. Default: 5.
+- **-BackupPath** - Backup folder on the SQL Server host. Default: from module configuration.
+- **-BackupEncryptionPassword** - Password for the .pvk files of the old and the new certificate. Required if the old certificate has a private key.
+- **-RenameOldCertificate** - Obsolete, no effect (kept for compatibility).
+- **-BindEndpoint** - Switch the endpoint to the new certificate immediately. Default: off.
+- **-BindTde** - Re-encrypt the database encryption keys with the new certificate. Default: off.
 - **-EnableException** - Throw exceptions immediately.
 
 **Examples (3):**
 
 ```powershell
-# Simple renewal without automatic binding
-    New-sqmSqlCertificate -SqlInstance "SQL01" -CertificateName "AG_CERT" -BackupEncryptionPassword (Read-Host -AsSecureString)
+# Renewal without binding (AlwaysOn: then distribute the new .cer to the partners)
+New-sqmSqlCertificate -SqlInstance "SQL01" -CertificateName "AG_CERT" -BackupEncryptionPassword (Read-Host -AsSecureString)
+```
 
 ```powershell
-# With automatic endpoint binding and 10-year validity
-    New-sqmSqlCertificate -SqlInstance "SQL01" -CertificateName "AG_CERT" `
-        -ValidityYears 10 -BindEndpoint `
-        -BackupEncryptionPassword (Read-Host -AsSecureString "Backup-Passwort")
+# Switch the endpoint immediately (only after the partners know the new public key)
+New-sqmSqlCertificate -SqlInstance "SQL01" -CertificateName "AG_CERT" -NewCertificateName "AG_CERT_2031" `
+    -BindEndpoint -BackupEncryptionPassword (Read-Host -AsSecureString "Backup password")
+```
 
 ```powershell
 # Renew TDE certificate
-    New-sqmSqlCertificate -SqlInstance "SQL01" -CertificateName "TDE_PROD" `
-        -BindTde -BackupEncryptionPassword (Read-Host -AsSecureString "Backup-Passwort")
+New-sqmSqlCertificate -SqlInstance "SQL01" -CertificateName "TDE_PROD" `
+    -BindTde -BackupEncryptionPassword (Read-Host -AsSecureString "Backup password")
+```
 
 ### Set-sqmSqlTlsCertificate
 

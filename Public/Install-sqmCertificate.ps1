@@ -5,22 +5,34 @@
 
 .DESCRIPTION
     Supports three input formats:
-      PFX   (.pfx)  - Certificate + private key in one file (CA-signed or exported)
+      PFX   (.pfx)  - Certificate + private key in one file (CA-signed or exported).
+                      Import into SQL Server requires SQL Server 2022 or later
+                      (CREATE CERTIFICATE ... WITH FORMAT = 'PFX'). Older versions: use CER+PVK.
       CER+PVK       - Certificate (.cer) + encrypted private key (.pvk) separately
-      CER only      - Certificate without private key (e.g. public key for AlwaysOn replicas)
+      CER only      - Certificate without private key (e.g. public key of an AlwaysOn partner)
 
     Process:
       1. Read certificate file and validate content (expiry date, subject, format)
-      2. Check whether a certificate with the same thumbprint already exists in SQL Server
-      3. Import certificate via CREATE CERTIFICATE in SQL Server
+      2. Check whether a certificate with the same name/thumbprint already exists in SQL Server
+      3. Import certificate via CREATE CERTIFICATE in SQL Server (not for -Purpose SSL)
       4. Automatically bind based on -Purpose:
-           AlwaysOn      -> ALTER ENDPOINT ... AUTHENTICATION = CERTIFICATE <new>
-                            Output guidance for replica distribution
-           TDE           -> ALTER DATABASE ... SET ENCRYPTION KEY ... CERTIFICATE <new>
-           SSL           -> Import certificate into Windows machine store +
-                            set SQL Server network protocol certificate (Registry)
-           ServiceBroker -> ALTER ENDPOINT ... AUTHENTICATION = CERTIFICATE <new>
+           AlwaysOn      -> with private key: ALTER ENDPOINT ... FOR DATABASE_MIRRORING
+                            (AUTHENTICATION = CERTIFICATE <new>) on THIS instance.
+                            Without private key (partner public key): NO endpoint change; the
+                            certificate is owned by -AuthorizationUser (the database user of the
+                            login that has CONNECT on the endpoint), which is what makes SQL Server
+                            accept the partner replica.
+           ServiceBroker -> same as AlwaysOn, with ALTER ENDPOINT ... FOR SERVICE_BROKER
+           TDE           -> ALTER DATABASE ENCRYPTION KEY ENCRYPTION BY SERVER CERTIFICATE <new>
+           SSL           -> Import into the Windows machine store (LocalMachine\My) only.
+                            With -SetSqlServerSslCert the certificate is bound as TLS certificate
+                            via Set-sqmSqlTlsCertificate (registry + private key permission for
+                            the service account). Must run on the SQL Server host.
       5. Write installation log as TXT
+
+    The certificate files are read twice: by PowerShell (validation) and by the SQL Server
+    service account (CREATE CERTIFICATE ... FROM FILE). Use a path both can reach (e.g. UNC).
+    Importing a private key requires a database master key in the target database.
 
 .PARAMETER SqlInstance
     SQL Server instance (default: current computer name).
@@ -51,8 +63,15 @@
     Default: UserDefined (no automatic binding).
 
 .PARAMETER EndpointName
-    Name of the endpoint for AlwaysOn/ServiceBroker binding.
-    If not specified, the first matching endpoint is determined automatically.
+    Name of the endpoint for AlwaysOn/ServiceBroker binding (certificate with private key only).
+    If not specified, the database mirroring endpoint (AlwaysOn) or the Service Broker
+    endpoint (ServiceBroker) of the instance is used.
+
+.PARAMETER AuthorizationUser
+    Database user (in -Database, normally master) that becomes the owner of the certificate:
+    CREATE CERTIFICATE ... AUTHORIZATION [user]. Needed for the public key of an AlwaysOn /
+    Service Broker partner: the user belongs to the login that has CONNECT on the endpoint.
+    The user must already exist.
 
 .PARAMETER TdeDatabaseName
     Name of the database for TDE binding. If not specified, the current
@@ -63,12 +82,14 @@
     after successful installation. The old certificate is NOT deleted.
 
 .PARAMETER ImportToWindowsStore
-    Additionally import the certificate into the Windows machine certificate store.
+    Additionally import the certificate into the Windows machine certificate store
+    (LocalMachine\My of the computer running the function).
     Required for SSL/TLS connections. Default: $false; automatically $true when Purpose=SSL.
 
 .PARAMETER SetSqlServerSslCert
-    Set the SQL Server network configuration to use this certificate (thumbprint).
-    Requires a restart of the SQL Server service. Default: $false.
+    Bind this certificate as TLS certificate of the instance via Set-sqmSqlTlsCertificate:
+    thumbprint in SuperSocketNetLib, Read permission on the private key for the service account.
+    Run on the SQL Server host. Requires a restart of the SQL Server service. Default: $false.
 
 .PARAMETER OutputPath
     Output directory for the installation log. Default: from module configuration.
@@ -77,14 +98,15 @@
     Throw exceptions immediately.
 
 .EXAMPLE
-    # Import PFX from CA and bind to AlwaysOn endpoint
-    Install-sqmCertificate -SqlInstance "SQL01" -CertFile "C:\Certs\sql01.pfx" `
+    # Import PFX (SQL Server 2022+) and switch the local AlwaysOn endpoint to it
+    Install-sqmCertificate -SqlInstance "SQL01" -CertFile "\\fs01\certs\sql01_ag.pfx" `
         -CertPassword (Read-Host -AsSecureString) -Purpose AlwaysOn
 
 .EXAMPLE
-    # Install public-key certificate on AlwaysOn replica (no private key)
-    Install-sqmCertificate -SqlInstance "SQL02" -CertFile "C:\Certs\SQL01_AG_CERT.cer" `
-        -CertificateName "SQL01_AG_CERT" -Purpose AlwaysOn
+    # Public key of the partner SQL01 on replica SQL02 (no private key, no endpoint change).
+    # ag_user_sql01 = database user in master of the login with CONNECT on the endpoint.
+    Install-sqmCertificate -SqlInstance "SQL02" -CertFile "\\fs01\certs\SQL01_AG_CERT.cer" `
+        -CertificateName "SQL01_AG_CERT" -Purpose AlwaysOn -AuthorizationUser "ag_user_sql01"
 
 .EXAMPLE
     # Install CER + PVK and bind TDE
@@ -95,16 +117,17 @@
         -Purpose TDE -TdeDatabaseName "ProdDB"
 
 .EXAMPLE
-    # Install SSL certificate (Windows Store + SQL Server network)
+    # TLS certificate: Windows store + binding (on the SQL Server host, restart afterwards)
     Install-sqmCertificate -SqlInstance "SQL01" -CertFile "C:\Certs\ssl.pfx" `
         -CertPassword (Read-Host -AsSecureString) -Purpose SSL -SetSqlServerSslCert
 
 .NOTES
     Requires: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath
-    Needs: sysadmin on the SQL Server instance
+    Needs: sysadmin on the SQL Server instance; local administrator for -Purpose SSL.
     SSL binding (-SetSqlServerSslCert): Requires a restart of the SQL Server service.
-    AlwaysOn: The public key (.cer) must be installed on ALL replica instances.
-    PFX import: The private key is stored in SQL Server under the service account context.
+    AlwaysOn renewal: import the new public key on ALL partners (-AuthorizationUser) BEFORE
+    switching the endpoint on the owning replica, otherwise the replicas disconnect.
+    PFX import into SQL Server: SQL Server 2022+ only.
     Certificate files are NOT deleted after the import.
 #>
 function Install-sqmCertificate
@@ -133,6 +156,8 @@ function Install-sqmCertificate
 		[string]$Purpose = 'UserDefined',
 		[Parameter(Mandatory = $false)]
 		[string]$EndpointName,
+		[Parameter(Mandatory = $false)]
+		[string]$AuthorizationUser,
 		[Parameter(Mandatory = $false)]
 		[string]$TdeDatabaseName,
 		[Parameter(Mandatory = $false)]
@@ -192,6 +217,10 @@ function Install-sqmCertificate
 				SqlCredential = $SqlCredential
 				Database	  = $Database
 			}
+			# Abfragen in master: eigene Kopie - @connParams enthaelt bereits -Database, ein zusaetzliches
+			# -Database bricht unter Windows PowerShell 5.1 mit 'Parameter mehrfach angegeben' ab
+			$masterParams = $connParams.Clone()
+			$masterParams['Database'] = 'master'
 			
 			# -------------------------------------------------------------------
 			# 1. Zertifikatsdatei lesen und vorab validieren
@@ -214,9 +243,41 @@ function Install-sqmCertificate
 			# -------------------------------------------------------------------
 			# 2. Pruefen ob Zertifikat bereits in SQL Server existiert
 			# -------------------------------------------------------------------
-			$existsQuery = "SELECT name, thumbprint FROM sys.certificates WHERE name = '$($CertificateName -replace "'", "''")'"
-			$existingInSql = Invoke-DbaQuery @connParams -Query $existsQuery -ErrorAction SilentlyContinue
-			
+			# Purpose SSL: TLS-Zertifikate gehoeren in den Windows-Store, nicht nach sys.certificates
+			$importToSql = ($Purpose -ne 'SSL')
+			$existingInSql = $null
+			$sqlMajorVersion = 0
+
+			if ($importToSql)
+			{
+				$preQuery = @"
+SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS int) AS MajorVersion,
+       (SELECT COUNT(*) FROM sys.symmetric_keys WHERE name = '##MS_DatabaseMasterKey##') AS HasDmk
+"@
+				$pre = Invoke-DbaQuery @connParams -Query $preQuery -ErrorAction Stop
+				$sqlMajorVersion = [int]$pre.MajorVersion
+
+				if ($isPfx -and $sqlMajorVersion -lt 16)
+				{
+					throw "PFX-Import in SQL Server erst ab SQL Server 2022 (CREATE CERTIFICATE ... WITH FORMAT = 'PFX'). Instanz '$SqlInstance' ist Version $sqlMajorVersion. Zertifikat als CER + PVK bereitstellen (-CertFile .cer -PrivateKeyFile .pvk)."
+				}
+				if ($hasPrivKey -and [int]$pre.HasDmk -eq 0)
+				{
+					throw "In Datenbank '$Database' existiert kein Database Master Key. Ein Private Key kann nur importiert werden, wenn er per DMK geschuetzt werden kann. Zuerst: USE [$Database]; CREATE MASTER KEY ENCRYPTION BY PASSWORD = '<sicheres Passwort>';"
+				}
+				if ($AuthorizationUser)
+				{
+					$userQuery = "SELECT name FROM sys.database_principals WHERE name = '$($AuthorizationUser -replace "'", "''")' AND type IN ('S','U','G','C','E','X')"
+					if (-not (Invoke-DbaQuery @connParams -Query $userQuery -ErrorAction Stop))
+					{
+						throw "Datenbankbenutzer '$AuthorizationUser' existiert nicht in '$Database'. Zuerst anlegen (CREATE USER [$AuthorizationUser] FOR LOGIN [...])."
+					}
+				}
+
+				$existsQuery = "SELECT name, thumbprint FROM sys.certificates WHERE name = '$($CertificateName -replace "'", "''")'"
+				$existingInSql = Invoke-DbaQuery @connParams -Query $existsQuery -ErrorAction SilentlyContinue
+			}
+
 			if ($existingInSql)
 			{
 				$existingThumb = [System.BitConverter]::ToString($existingInSql.thumbprint).Replace('-', '')
@@ -255,6 +316,7 @@ function Install-sqmCertificate
 				WindowsStoreImport = $false
 				SslCertSet	    = $false
 				EndpointBound   = $false
+				PartnerKeyOwner = $null
 				TdeBound	    = $false
 				ProtocolFile    = $null
 				Success		    = $false
@@ -262,7 +324,7 @@ function Install-sqmCertificate
 				Warnings	    = [System.Collections.Generic.List[string]]::new()
 			}
 			
-			if (-not $existingInSql)
+			if ($importToSql -and -not $existingInSql)
 			{
 				$importSql = New-sqmCertImportSql `
 													-CertificateName $CertificateName `
@@ -270,15 +332,24 @@ function Install-sqmCertificate
 													-PrivateKeyFile $PrivateKeyFile `
 													-CertPassword $CertPassword `
 													-IsPfx $isPfx `
-													-HasPrivKey $hasPrivKey
-				
+													-HasPrivKey $hasPrivKey `
+													-AuthorizationUser $AuthorizationUser
+
 				Invoke-DbaQuery @connParams -Query $importSql -ErrorAction Stop
 				$installResult.SqlImported = $true
+				if ($AuthorizationUser) { $installResult.PartnerKeyOwner = $AuthorizationUser }
 				Invoke-sqmLogging -Message "Zertifikat '$CertificateName' erfolgreich in SQL Server importiert." -FunctionName $functionName -Level "INFO"
 			}
-			else
+			elseif ($importToSql)
 			{
 				$installResult.SqlImported = $true # war bereits vorhanden
+				if ($AuthorizationUser)
+				{
+					$alterAuthSql = "ALTER AUTHORIZATION ON CERTIFICATE::[$CertificateName] TO [$AuthorizationUser];"
+					Invoke-DbaQuery @connParams -Query $alterAuthSql -ErrorAction Stop
+					$installResult.PartnerKeyOwner = $AuthorizationUser
+					Invoke-sqmLogging -Message "Besitzer von '$CertificateName' auf '$AuthorizationUser' gesetzt." -FunctionName $functionName -Level "INFO"
+				}
 			}
 			
 			# -------------------------------------------------------------------
@@ -288,29 +359,7 @@ function Install-sqmCertificate
 			{
 				try
 				{
-					if ($isPfx)
-					{
-						$pfxBytes = [System.IO.File]::ReadAllBytes($CertFile)
-						$x509 = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
-							$pfxBytes,
-							$CertPassword,
-							[System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::MachineKeySet -bor
-							[System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet
-						)
-					}
-					else
-					{
-						$x509 = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($CertFile)
-					}
-					
-					$store = [System.Security.Cryptography.X509Certificates.X509Store]::new(
-						[System.Security.Cryptography.X509Certificates.StoreName]::My,
-						[System.Security.Cryptography.X509Certificates.StoreLocation]::LocalMachine
-					)
-					$store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-					$store.Add($x509)
-					$store.Close()
-					
+					Add-sqmCertToMachineStore -CertFile $CertFile -CertPassword $CertPassword -IsPfx $isPfx
 					$installResult.WindowsStoreImport = $true
 					Invoke-sqmLogging -Message "Zertifikat in Windows Maschinen-Store (LocalMachine\My) importiert." -FunctionName $functionName -Level "INFO"
 				}
@@ -330,27 +379,17 @@ function Install-sqmCertificate
 			{
 				try
 				{
-					$thumbprintForReg = $certInfo.Thumbprint # ohne Trennzeichen
-					
-					# Instanzname fuer Registry-Pfad ermitteln
-					$instancePart = if ($SqlInstance -match '\\(.+)$') { $Matches[1] }
-					else { 'MSSQLSERVER' }
-					$regPath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL$($server.VersionMajor).${instancePart}\MSSQLServer\SuperSocketNetLib"
-					
-					if (Test-Path $regPath)
+					# Bindung inkl. Registry-Schluessel aus 'Instance Names\SQL' und Private-Key-Recht
+					# fuer das Dienstkonto: dieselbe Logik wie Set-sqmSqlTlsCertificate (frueher wurde
+					# hier ein Registry-Pfad aus einer nie gesetzten Variable gebaut).
+					$tlsResult = Set-sqmSqlTlsCertificate -SqlInstance $SqlInstance -Thumbprint $certInfo.Thumbprint -Confirm:$false -ErrorAction Stop
+					$installResult.SslCertSet = $true
+					Invoke-sqmLogging -Message "TLS-Zertifikat gebunden (Thumbprint: $($certInfo.Thumbprint))." -FunctionName $functionName -Level "INFO"
+					if ($tlsResult -and -not $tlsResult.PrivateKeyGranted)
 					{
-						Set-ItemProperty -Path $regPath -Name 'Certificate' -Value $thumbprintForReg.ToLower() -ErrorAction Stop
-						$installResult.SslCertSet = $true
-						Invoke-sqmLogging -Message "SSL-Zertifikat in SQL Server Netzwerkkonfiguration gesetzt (Thumbprint: $thumbprintForReg)." -FunctionName $functionName -Level "INFO"
-						$installResult.Warnings.Add("SQL Server-Dienst muss neu gestartet werden, damit das SSL-Zertifikat aktiv wird.")
-						Write-Warning "SSL-Zertifikat gesetzt - SQL Server-Dienst muss neu gestartet werden!"
+						$installResult.Warnings.Add("Leserecht auf den Private Key fuer '$($tlsResult.ServiceAccount)' konnte nicht gesetzt werden - manuell vergeben, sonst startet der Dienst nicht.")
 					}
-					else
-					{
-						$warnMsg = "Registry-Pfad fuer SQL Server Netzwerkkonfiguration nicht gefunden: $regPath"
-						Write-Warning $warnMsg
-						$installResult.Warnings.Add($warnMsg)
-					}
+					$installResult.Warnings.Add("SQL Server-Dienst muss neu gestartet werden, damit das TLS-Zertifikat aktiv wird.")
 				}
 				catch
 				{
@@ -364,29 +403,40 @@ function Install-sqmCertificate
 			# -------------------------------------------------------------------
 			# 7. Endpoint-Bindung (AlwaysOn / ServiceBroker)
 			# -------------------------------------------------------------------
-			if ($Purpose -in @('AlwaysOn', 'ServiceBroker'))
+			if ($Purpose -in @('AlwaysOn', 'ServiceBroker') -and -not $hasPrivKey)
+			{
+				# Public Key eines Partners: Endpoint NICHT umstellen (ein Endpoint braucht ein
+				# Zertifikat mit Private Key). Massgeblich ist der Besitzer des Zertifikats.
+				if (-not $installResult.PartnerKeyOwner)
+				{
+					$warnMsg = "Public Key ohne -AuthorizationUser importiert (Besitzer: dbo). Damit der Partner akzeptiert wird: ALTER AUTHORIZATION ON CERTIFICATE::[$CertificateName] TO [<Benutzer des Endpoint-Logins>]; und GRANT CONNECT ON ENDPOINT::[<Endpoint>] TO [<Login>];"
+					Write-Warning $warnMsg
+					$installResult.Warnings.Add($warnMsg)
+				}
+				Invoke-sqmLogging -Message "Partner-Public-Key '$CertificateName' importiert, Endpoint unveraendert." -FunctionName $functionName -Level "INFO"
+			}
+			elseif ($Purpose -in @('AlwaysOn', 'ServiceBroker'))
 			{
 				$epToUse = $EndpointName
-				
+				$epClause = if ($Purpose -eq 'ServiceBroker') { 'SERVICE_BROKER' }
+				else { 'DATABASE_MIRRORING' }
+
 				# Automatisch ermitteln wenn nicht angegeben
 				if (-not $epToUse)
 				{
-					$epQuery = @"
-SELECT TOP 1 e.name
-FROM sys.endpoints e
-INNER JOIN sys.database_mirroring_endpoints dme ON e.endpoint_id = dme.endpoint_id
-ORDER BY e.endpoint_id
-"@
-					$autoEp = Invoke-DbaQuery @connParams -Database 'master' -Query $epQuery -ErrorAction SilentlyContinue
+					$epView = if ($Purpose -eq 'ServiceBroker') { 'sys.service_broker_endpoints' }
+					else { 'sys.database_mirroring_endpoints' }
+					$epQuery = "SELECT TOP 1 name FROM $epView ORDER BY endpoint_id"
+					$autoEp = Invoke-DbaQuery @masterParams -Query $epQuery -ErrorAction SilentlyContinue
 					$epToUse = $autoEp.name
 				}
-				
+
 				if ($epToUse)
 				{
 					try
 					{
-						$alterEpSql = "ALTER ENDPOINT [$epToUse] FOR DATABASE_MIRRORING (AUTHENTICATION = CERTIFICATE [$CertificateName]);"
-						Invoke-DbaQuery @connParams -Database 'master' -Query $alterEpSql -ErrorAction Stop
+						$alterEpSql = "ALTER ENDPOINT [$epToUse] FOR $epClause (AUTHENTICATION = CERTIFICATE [$CertificateName]);"
+						Invoke-DbaQuery @masterParams -Query $alterEpSql -ErrorAction Stop
 						$installResult.EndpointBound = $true
 						Invoke-sqmLogging -Message "Endpoint '$epToUse' auf '$CertificateName' umgestellt." -FunctionName $functionName -Level "INFO"
 					}
@@ -421,7 +471,7 @@ FROM sys.dm_database_encryption_keys dek
 INNER JOIN sys.databases d ON dek.database_id = d.database_id
 WHERE dek.encryption_state = 3
 "@
-					$tdeDbs = Invoke-DbaQuery @connParams -Database 'master' -Query $tdeAutoQuery -ErrorAction SilentlyContinue
+					$tdeDbs = Invoke-DbaQuery @masterParams -Query $tdeAutoQuery -ErrorAction SilentlyContinue
 					if (@($tdeDbs).Count -eq 1) { $tdeDbName = $tdeDbs.name }
 					elseif (@($tdeDbs).Count -gt 1)
 					{
@@ -447,7 +497,7 @@ WHERE dek.encryption_state = 3
 USE [$tdeDbName];
 ALTER DATABASE ENCRYPTION KEY ENCRYPTION BY SERVER CERTIFICATE [$CertificateName];
 "@
-							Invoke-DbaQuery @connParams -Database 'master' -Query $alterTdeSql -ErrorAction Stop
+							Invoke-DbaQuery @masterParams -Query $alterTdeSql -ErrorAction Stop
 							$installResult.TdeBound = $true
 							Invoke-sqmLogging -Message "TDE fuer '$tdeDbName' auf '$CertificateName' umgestellt." -FunctionName $functionName -Level "INFO"
 						}
@@ -503,6 +553,7 @@ ALTER DATABASE ENCRYPTION KEY ENCRYPTION BY SERVER CERTIFICATE [$CertificateName
 			$lines.Add("INSTALLATIONSERGEBNIS")
 			$lines.Add("-" * 40)
 			$lines.Add("  SQL Import         : $(if ($installResult.SqlImported) { 'OK' }
+					elseif (-not $importToSql) { 'Nicht zutreffend (TLS)' }
 					else { 'FEHLER' })")
 			$lines.Add("  Windows Store      : $(if ($installResult.WindowsStoreImport) { 'OK' }
 					elseif ($ImportToWindowsStore) { 'FEHLER' }
@@ -511,8 +562,14 @@ ALTER DATABASE ENCRYPTION KEY ENCRYPTION BY SERVER CERTIFICATE [$CertificateName
 					elseif ($SetSqlServerSslCert) { 'FEHLER' }
 					else { 'Nicht gesetzt' })")
 			$lines.Add("  Endpoint-Bindung   : $(if ($installResult.EndpointBound) { 'OK' }
+					elseif ($Purpose -in 'AlwaysOn', 'ServiceBroker' -and -not $hasPrivKey) { 'Nicht zutreffend (Partner-Public-Key)' }
 					elseif ($Purpose -in 'AlwaysOn', 'ServiceBroker') { 'FEHLGESCHLAGEN - manuell binden' }
 					else { 'Nicht zutreffend' })")
+			if ($Purpose -in 'AlwaysOn', 'ServiceBroker' -and -not $hasPrivKey)
+			{
+				$lines.Add("  Besitzer (Partner) : $(if ($installResult.PartnerKeyOwner) { $installResult.PartnerKeyOwner }
+						else { 'dbo - Besitzer setzen, siehe Warnungen' })")
+			}
 			$lines.Add("  TDE-Bindung        : $(if ($installResult.TdeBound) { 'OK' }
 					elseif ($Purpose -eq 'TDE') { 'FEHLGESCHLAGEN - manuell binden' }
 					else { 'Nicht zutreffend' })")
@@ -527,24 +584,26 @@ ALTER DATABASE ENCRYPTION KEY ENCRYPTION BY SERVER CERTIFICATE [$CertificateName
 			}
 			
 			# Purpose-spezifische Nacharbeiten
-			if ($Purpose -eq 'AlwaysOn')
+			if ($Purpose -eq 'AlwaysOn' -and $hasPrivKey)
 			{
 				$lines.Add("WEITERE SCHRITTE - ALWAYSON")
 				$lines.Add("-" * 40)
-				$lines.Add("  Das installierte Zertifikat (Public Key) muss auf alle Replikat-Instanzen")
-				$lines.Add("  uebertragen werden. Vorgehen fuer jedes Replikat:")
+				$lines.Add("  Die Partner-Replikate muessen den Public Key dieses Zertifikats kennen,")
+				$lines.Add("  sonst lehnen sie diesen Endpoint ab. Vorgehen fuer jedes Partner-Replikat:")
 				$lines.Add("")
-				$lines.Add("  1. Public Key exportieren (auf PRIMARY ausfuehren):")
+				$lines.Add("  1. Public Key exportieren (auf DIESER Instanz):")
 				$lines.Add("     BACKUP CERTIFICATE [$CertificateName] TO FILE = N'\\<Share>\$CertificateName.cer';")
 				$lines.Add("")
-				$lines.Add("  2. Auf jedem Replikat installieren:")
-				$lines.Add("     Install-sqmCertificate -SqlInstance '<Replikat>' \")
+				$lines.Add("  2. Auf jedem Partner importieren, Besitzer = Benutzer des Endpoint-Logins:")
+				$lines.Add("     Install-sqmCertificate -SqlInstance '<Partner>' \")
 				$lines.Add("         -CertFile '\\<Share>\$CertificateName.cer' \")
 				$lines.Add("         -CertificateName '$CertificateName' \")
-				$lines.Add("         -Purpose AlwaysOn")
+				$lines.Add("         -Purpose AlwaysOn -AuthorizationUser '<Benutzer>'")
+				$lines.Add("")
+				$lines.Add("  Bei einer Erneuerung: Schritt 1 und 2 VOR dem Umstellen des Endpoints.")
 				$lines.Add("")
 				$lines.Add("  3. AG-Replikation und Sync-Status pruefen:")
-				$lines.Add("     Get-sqmAgHealthReport -SqlInstance '<Primary>'")
+				$lines.Add("     Get-sqmAlwaysOnHealthReport -SqlInstance '<Primary>'")
 			}
 			
 			if ($Purpose -eq 'TDE')
@@ -571,7 +630,8 @@ ALTER DATABASE ENCRYPTION KEY ENCRYPTION BY SERVER CERTIFICATE [$CertificateName
 			
 			$lines | Out-File -FilePath $protFile -Encoding UTF8 -Force
 			$installResult.ProtocolFile = $protFile
-			$installResult.Success = $installResult.SqlImported
+			$installResult.Success = if ($importToSql) { $installResult.SqlImported }
+			else { $installResult.WindowsStoreImport -and (-not $SetSqlServerSslCert -or $installResult.SslCertSet) }
 			
 			Invoke-sqmLogging -Message "Installationsprotokoll: $protFile" -FunctionName $functionName -Level "INFO"
 			Copy-sqmToCentralPath -Path @($protFile)
@@ -642,6 +702,37 @@ function Get-sqmCertFileInfo
 	}
 }
 
+function Add-sqmCertToMachineStore
+{
+	param (
+		[string]$CertFile,
+		[System.Security.SecureString]$CertPassword,
+		[bool]$IsPfx
+	)
+	if ($IsPfx)
+	{
+		$pfxBytes = [System.IO.File]::ReadAllBytes($CertFile)
+		$x509 = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
+			$pfxBytes,
+			$CertPassword,
+			[System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::MachineKeySet -bor
+			[System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet
+		)
+	}
+	else
+	{
+		$x509 = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($CertFile)
+	}
+
+	$store = [System.Security.Cryptography.X509Certificates.X509Store]::new(
+		[System.Security.Cryptography.X509Certificates.StoreName]::My,
+		[System.Security.Cryptography.X509Certificates.StoreLocation]::LocalMachine
+	)
+	$store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+	try { $store.Add($x509) }
+	finally { $store.Close() }
+}
+
 function New-sqmCertImportSql
 {
 	param (
@@ -650,9 +741,10 @@ function New-sqmCertImportSql
 		[string]$PrivateKeyFile,
 		[System.Security.SecureString]$CertPassword,
 		[bool]$IsPfx,
-		[bool]$HasPrivKey
+		[bool]$HasPrivKey,
+		[string]$AuthorizationUser
 	)
-	
+
 	# Passwort entschluesseln (nur temporaer im Speicher)
 	$plainPwd = $null
 	if ($CertPassword)
@@ -661,44 +753,34 @@ function New-sqmCertImportSql
 		$plainPwd = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
 		[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
 	}
-	
+
 	try
 	{
+		$q = { param ($s) $s -replace "'", "''" }
+		$authClause = if ($AuthorizationUser) { " AUTHORIZATION [$($AuthorizationUser -replace '\]', ']]')]" }
+		else { '' }
+		$head = "CREATE CERTIFICATE [$($CertificateName -replace '\]', ']]')]$authClause`r`nFROM FILE = N'$(& $q $CertFile)'"
+		$pwdClause = if ($plainPwd) { "DECRYPTION BY PASSWORD = N'$(& $q $plainPwd)'" }
+		else { '' }
+
 		if ($IsPfx)
 		{
-			# PFX: SQL Server 2022+ unterstuetzt CERTIFICATE FROM FILE fuer PFX direkt
-			# Fuer aeltere Versionen: DECRYPTION BY PASSWORD
-			$pwdClause = if ($plainPwd) { "DECRYPTION BY PASSWORD = N'$plainPwd'" }
+			# PFX: erst ab SQL Server 2022, Format muss explizit angegeben werden - ohne
+			# FORMAT = 'PFX' erwartet FROM FILE ein DER-Zertifikat und PRIVATE KEY FILE eine PVK-Datei.
+			$keyClause = if ($pwdClause) { ",`r`n     PRIVATE KEY ($pwdClause)" }
 			else { '' }
-			return @"
-CREATE CERTIFICATE [$CertificateName]
-FROM FILE = N'$CertFile'
-WITH PRIVATE KEY (
-    FILE               = N'$CertFile',
-    $pwdClause
-);
-"@
+			return "$head`r`nWITH FORMAT = 'PFX'$keyClause;"
 		}
 		elseif ($PrivateKeyFile)
 		{
-			$pwdClause = if ($plainPwd) { "DECRYPTION BY PASSWORD = N'$plainPwd'" }
-			else { '' }
-			return @"
-CREATE CERTIFICATE [$CertificateName]
-FROM FILE = N'$CertFile'
-WITH PRIVATE KEY (
-    FILE               = N'$PrivateKeyFile',
-    $pwdClause
-);
-"@
+			$pvk = "FILE = N'$(& $q $PrivateKeyFile)'"
+			if ($pwdClause) { $pvk += ", $pwdClause" }
+			return "$head`r`nWITH PRIVATE KEY ($pvk);"
 		}
 		else
 		{
 			# Nur Public Key (CER ohne Private Key)
-			return @"
-CREATE CERTIFICATE [$CertificateName]
-FROM FILE = N'$CertFile';
-"@
+			return "$head;"
 		}
 	}
 	finally
