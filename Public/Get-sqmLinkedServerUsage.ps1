@@ -52,7 +52,8 @@ function Get-sqmLinkedServerUsage
 			throw "dbatools-Modul nicht gefunden."
 		}
 		$results = [System.Collections.Generic.List[PSCustomObject]]::new()
-		$likePattern = $LinkedServer -replace '\*', '%'
+		# Hochkommas verdoppeln: der Name steht als String-Literal in der Abfrage
+		$likePattern = ($LinkedServer -replace "'", "''") -replace '\*', '%'
 	}
 	
 	process

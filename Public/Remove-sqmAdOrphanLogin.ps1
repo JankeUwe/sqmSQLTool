@@ -142,7 +142,7 @@ function Remove-sqmAdOrphanLogin
 			try
 			{
 				$saQuery = "SELECT name FROM sys.server_principals WHERE is_srvrolemember('sysadmin', name) = 1 AND name NOT LIKE '##%'"
-				$sysAdminLogins = @((Invoke-DbaQuery @connParams -Query $saQuery).name)
+				$sysAdminLogins = @(Invoke-DbaQuery @connParams -Query $saQuery | ForEach-Object { $_.name })
 			}
 			catch
 			{
@@ -210,7 +210,7 @@ function Remove-sqmAdOrphanLogin
 				try
 				{
 					$ownerQuery = "SELECT name FROM sys.databases WHERE SUSER_SNAME(owner_sid) = @login"
-					$ownedDbs = @((Invoke-DbaQuery @connParams -Query $ownerQuery -SqlParameter @{ login = $name }).name)
+					$ownedDbs = @(Invoke-DbaQuery @connParams -Query $ownerQuery -SqlParameter @{ login = $name } | ForEach-Object { $_.name })
 				}
 				catch { }
 				if ($ownedDbs.Count -gt 0)
@@ -222,6 +222,7 @@ function Remove-sqmAdOrphanLogin
 
 				# Rollback-Skript schreiben (vor dem Drop)
 				$thisBackup = $null
+				$backupFailed = $false
 				if (-not $SkipBackup -and $PSCmdlet.ShouldProcess($name, "Rollback-Skript schreiben"))
 				{
 					try
@@ -233,7 +234,7 @@ JOIN sys.server_principals r ON r.principal_id = rm.role_principal_id
 JOIN sys.server_principals m ON m.principal_id = rm.member_principal_id
 WHERE m.name = @login
 "@
-						$roles = @((Invoke-DbaQuery @connParams -Query $roleQuery -SqlParameter @{ login = $name }).RoleName)
+						$roles = @(Invoke-DbaQuery @connParams -Query $roleQuery -SqlParameter @{ login = $name } | ForEach-Object { $_.RoleName })
 						$nameEsc = $name -replace '\]', ']]'
 
 						$lines = [System.Collections.Generic.List[string]]::new()
@@ -254,7 +255,15 @@ WHERE m.name = @login
 					catch
 					{
 						Invoke-sqmLogging -Message "[$name] WARNUNG: Rollback-Skript konnte nicht geschrieben werden: $($_.Exception.Message)" -FunctionName $functionName -Level 'WARNING'
+						$backupFailed = $true
 					}
+				}
+
+				# Ohne Rollback-Skript wird nichts geloescht: das Skript ist die einzige Wiederherstellungsmoeglichkeit
+				if ($backupFailed)
+				{
+					$results.Add([PSCustomObject]@{ SqlInstance = $SqlInstance; Login = $name; Status = 'Skipped'; Reason = 'Rollback-Skript konnte nicht geschrieben werden - nicht entfernt (-SkipBackup umgeht das)'; BackupFile = $null; Timestamp = Get-Date })
+					continue
 				}
 
 				# Entfernen (ShouldProcess, ConfirmImpact High)

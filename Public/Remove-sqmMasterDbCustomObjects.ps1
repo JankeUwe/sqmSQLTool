@@ -165,8 +165,8 @@ ORDER BY o.type_desc, s.name, o.name
 
 				foreach ($obj in $candidates)
 				{
-					$schemaBr = $obj.SchemaName -replace '\]', '\]\]'
-					$nameBr   = $obj.ObjectName -replace '\]', '\]\]'
+					$schemaBr = $obj.SchemaName -replace ']', ']]'
+					$nameBr   = $obj.ObjectName -replace ']', ']]'
 					$typeCode = $obj.ObjectTypeCode.Trim()
 
 					$dropStatement = switch ($typeCode)

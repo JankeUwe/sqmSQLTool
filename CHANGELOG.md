@@ -1,5 +1,37 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.183.0] - 2026-10-17
+
+### Fix: Fehler, die beim Nachziehen der Testabdeckung aufgefallen sind
+
+- **`Remove-sqmAdOrphanLogin`** entfernte in der Praxis nichts: `@((Invoke-DbaQuery ...).name)` ergibt bei
+  null Zeilen ein Array mit einem `$null`-Element (Count 1). Dadurch galt jedes verwaiste Login als
+  "Besitzt Datenbank(en):" und wurde uebersprungen. Bei den Serverrollen stand im Rollback-Skript
+  zusaetzlich eine ungueltige Zeile `ALTER SERVER ROLE [] ...`. Die Abfragen filtern jetzt ueber
+  `ForEach-Object`, ein leeres Ergebnis ist ein leeres Array.
+- **`Remove-sqmAdOrphanLogin`** loescht nicht mehr, wenn das Rollback-Skript nicht geschrieben werden konnte
+  (bisher nur eine Warnung im Log, danach wurde trotzdem `DROP LOGIN` ausgefuehrt). Das Login erscheint als
+  `Skipped`; wer ohne Skript loeschen will, nutzt weiterhin `-SkipBackup`.
+- **`Repair-sqmDbOwnerRisk`, `Set-sqmDatabaseOwner`, `Remove-sqmMasterDbCustomObjects`**: Bezeichner mit `]`
+  wurden mit `-replace '\]', '\]\]'` escaped. Als Ersetzungstext liefert das woertlich `\]\]`, das SQL war
+  dadurch fuer jeden Namen mit `]` ungueltig. Jetzt `]]`.
+- **`Find-sqmDatabaseObject`**: mit `-SearchDefinition` galt `-ObjectType` nur fuer den Definitionstreffer
+  (`A OR B AND C`); die Namensbedingung ist jetzt geklammert. Hochkommas in `-ObjectType` werden verdoppelt.
+- **`Get-sqmLinkedServerUsage`**: Hochkommas im Namen des Linked Servers werden verdoppelt (vorher
+  Syntaxfehler, den die Funktion still verschluckte).
+
+### Tests
+
+- Neue Verhaltenstests fuer 19 bisher ungetestete Funktionen: `Test-sqmMaxDop`, `Test-sqmMaxMemory`,
+  `Test-sqmCostThreshold`, `Test-sqmTempDbFileCount`, `New-sqmRandomSaPassword`, `Get-sqmSupportedCollations`,
+  `Get-sqmDbOwnerRisk`, `Repair-sqmDbOwnerRisk`, `Set-sqmDatabaseOwner`, `Remove-sqmMasterDbCustomObjects`,
+  `Test-sqmOlaInstallation`, `Find-sqmDatabaseObject`, `Get-sqmLinkedServerUsage`, `Test-sqmBackupIntegrity`,
+  `Remove-sqmDatabaseFromAG`, `Remove-sqmAdOrphanLogin`, `Set-sqmBackupExcludePermission` sowie
+  `Set-sqmTcpPort` und die Treiber-Funktionen (`-WhatIf`).
+- Neuer Vertragstest `tests/Unit/Help.Contract.Tests.ps1` fuer alle 204 exportierten Funktionen: Synopsis
+  vorhanden, Credential-Parameter sind `PSCredential`, Passwort-Parameter nie `String`; bekannte Hilfe-Luecken
+  (Description/Beispiel) sind festgehalten, neue Luecken schlagen fehl.
+
 ## [1.9.182.0] - 2026-10-17
 
 ### Fix: `-WhatIf` / `-Confirm` fuer zustandsaendernde Funktionen

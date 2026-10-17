@@ -99,7 +99,7 @@ function Find-sqmDatabaseObject
 				                  -FunctionName $functionName -Level "WARNING"
 				return $allResults
 			}
-			$typeFilter = if ($ObjectType) { "AND type_desc IN ('$($ObjectType -join "','")')" }
+			$typeFilter = if ($ObjectType) { "AND type_desc IN ('$(($ObjectType | ForEach-Object { $_ -replace "'", "''" }) -join "','")')" }
 			else { "" }
 			$searchName = $ObjectName -replace "'", "''"
 			if ($SearchDefinition)
@@ -113,7 +113,7 @@ SELECT
     LEFT(m.definition, 500) AS DefinitionPreview
 FROM sys.objects o
 LEFT JOIN sys.sql_modules m ON o.object_id = m.object_id
-WHERE o.name LIKE '$searchName' OR m.definition LIKE '%$searchName%'
+WHERE (o.name LIKE '$searchName' OR m.definition LIKE '%$searchName%')
 $typeFilter
 "@
 			}

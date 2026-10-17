@@ -183,7 +183,7 @@ ORDER BY dp.name
 				}
 
 				$execEsc     = $ExecuteRoleName -replace "'", "''"
-				$execBracket = $ExecuteRoleName -replace '\]', '\]\]'
+				$execBracket = $ExecuteRoleName -replace ']', ']]'
 
 				$instanceResults = [System.Collections.Generic.List[PSCustomObject]]::new()
 
@@ -237,8 +237,8 @@ WHERE p.is_ms_shipped = 0
 							{
 								$grantStatements = foreach ($p in $procs)
 								{
-									$schemaBr = $p.SchemaName -replace '\]', '\]\]'
-									$procBr   = $p.ProcName   -replace '\]', '\]\]'
+									$schemaBr = $p.SchemaName -replace ']', ']]'
+									$procBr   = $p.ProcName   -replace ']', ']]'
 									"GRANT EXECUTE ON OBJECT::[$schemaBr].[$procBr] TO [$execBracket];"
 								}
 								Invoke-DbaQuery @connParams -Database $dbName -Query ($grantStatements -join "`r`n") -ErrorAction Stop
@@ -268,7 +268,7 @@ WHERE p.is_ms_shipped = 0
 
 							try
 							{
-								$memberBr = $member -replace '\]', '\]\]'
+								$memberBr = $member -replace ']', ']]'
 								$memberSql = @"
 ALTER ROLE db_owner DROP MEMBER [$memberBr];
 ALTER ROLE db_datareader ADD MEMBER [$memberBr];
