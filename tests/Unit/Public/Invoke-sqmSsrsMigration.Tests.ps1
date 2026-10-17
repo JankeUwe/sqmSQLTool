@@ -207,19 +207,22 @@ Describe 'Invoke-sqmSsrsMigration' {
         }
 
         It 'Lehnt -DestinationFolder bei mehreren Quellordnern ab' {
-            $r = Invoke-sqmSsrsMigration @script:Base -SourceFolder '/A', '/B' -DestinationFolder '/X'
+            $p = $script:Base.Clone(); $p.SourceFolder = '/A', '/B'
+            $r = Invoke-sqmSsrsMigration @p -DestinationFolder '/X'
             $r.Status | Should -Be 'Failed'
             $r.Reason | Should -Match 'genau einem'
         }
 
         It 'Lehnt denselben Server und Ordner ab' {
-            $r = Invoke-sqmSsrsMigration @script:Base -DestinationReportServer 'http://src/Reports'
+            $p = $script:Base.Clone(); $p.DestinationReportServer = 'http://src/Reports'
+            $r = Invoke-sqmSsrsMigration @p
             $r.Status | Should -Be 'Failed'
             $r.Reason | Should -Match 'derselbe Report Server'
         }
 
         It 'Lehnt ein Ziel innerhalb des Quellordners ab' {
-            $r = Invoke-sqmSsrsMigration @script:Base -DestinationReportServer 'http://src/Reports' -DestinationFolder '/Finanz/Kopie'
+            $p = $script:Base.Clone(); $p.DestinationReportServer = 'http://src/Reports'
+            $r = Invoke-sqmSsrsMigration @p -DestinationFolder '/Finanz/Kopie'
             $r.Reason | Should -Match 'innerhalb des Quellordners'
         }
 
@@ -229,13 +232,15 @@ Describe 'Invoke-sqmSsrsMigration' {
         }
 
         It 'Meldet einen fehlenden Quellordner verstaendlich' {
-            $r = Invoke-sqmSsrsMigration @script:Base -SourceFolder '/Gibts nicht'
+            $p = $script:Base.Clone(); $p.SourceFolder = '/Gibts nicht'
+            $r = Invoke-sqmSsrsMigration @p
             $r.Status | Should -Be 'Failed'
             $r.Reason | Should -Match "existiert auf .* nicht"
         }
 
         It 'Wirft mit -EnableException' {
-            { Invoke-sqmSsrsMigration @script:Base -SourceFolder '/Gibts nicht' -EnableException } | Should -Throw '*existiert*'
+            $p = $script:Base.Clone(); $p.SourceFolder = '/Gibts nicht'
+            { Invoke-sqmSsrsMigration @p -EnableException } | Should -Throw '*existiert*'
         }
     }
 
@@ -399,7 +404,8 @@ Describe 'Invoke-sqmSsrsMigration' {
         It 'Laesst vorhandene Datenquellen ohne -OverwriteDataSources stehen' {
             $global:SsrsFake.Dst['/Data Sources'] = [PSCustomObject]@{ Id = 'f'; Name = 'Data Sources'; Path = '/Data Sources'; Type = 'Folder' }
             $global:SsrsFake.Dst['/Data Sources/SalesDB'] = [PSCustomObject]@{ Id = 'dst-ds'; Name = 'SalesDB'; Path = '/Data Sources/SalesDB'; Type = 'DataSource' }
-            $r = Invoke-sqmSsrsMigration @script:Base -Overwrite -OutputPath $script:TestDir -DestinationReportServer 'http://dst/Reports'
+            $p = $script:Base.Clone(); $p.DestinationReportServer = 'http://dst/Reports'
+            $r = Invoke-sqmSsrsMigration @p -Overwrite -OutputPath $script:TestDir
             ($r.Items | Where-Object SourcePath -eq '/Data Sources/SalesDB').Status | Should -Be 'Skipped'
             @($global:SsrsFake.Writes | Where-Object { $_.Rel -like 'DataSources*' }).Count | Should -Be 0
         }

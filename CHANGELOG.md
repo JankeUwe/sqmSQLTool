@@ -1,5 +1,29 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.180.0] - 2026-10-17
+
+### Entwicklung: Pruefung auf doppelte Parameterbindung erweitert
+
+- `Tools/Test-DuplicateParameterBinding.ps1` (laeuft im pre-push-Hook und in der CI) prueft jetzt **jeden Schluessel**
+  einer Splat-Hashtable, nicht nur Common Parameter. Anlass: sqmSQLTool 1.9.178.0 hatte
+  `$connParams = @{ SqlInstance; SqlCredential; Database }` plus `Invoke-DbaQuery @connParams -Database 'master'`
+  - unter Windows PowerShell 5.1 `ParameterAlreadyBound`, unter PowerShell 7 gewinnt stillschweigend der
+  explizite Wert. Pre-push-Pruefung und alle pwsh-Tests waren gruen.
+- Die Schluessel werden pro Funktion in Textreihenfolge bis zum Aufruf verfolgt: Hashtable-Literale (auch
+  `[ordered]`), `$p['X'] =`, `$p.X =`, `.Add()`, `+= @{}`, Kopien per `.Clone()` oder Zuweisung. `.Remove()`
+  vor dem Aufruf, eine unbedingte Neuzuweisung und `.Clear()` verhindern Fehlalarme; Zuweisungen im if-Zweig
+  gelten nicht fuer den else-Zweig.
+- Abkuerzungen: Common Parameter ueber Alias (`-ea`, das bisher trotz Kommentar nicht erkannt wurde) und
+  eindeutigen Praefix; Funktionen aus dem Repository ueber ihren `param()`-Block inkl. `[Alias()]`. Bei fremden
+  Befehlen (dbatools) nur exakter Vergleich, damit `-Query` neben `QueryTimeout` kein Treffer ist.
+- Neuer Schalter `-PassThru` (Treffer als Objekte). 13 Pester-Tests in
+  `tests/Test-DuplicateParameterBinding.Tests.ps1`, darunter ein Lauf unter `powershell.exe` 5.1, der den
+  Abbruch beim alten Muster und die Korrektur per `.Clone()` bestaetigt.
+- Erster Lauf ueber das Repository: 6 Treffer in `tests/Unit/Public/Invoke-sqmSsrsMigration.Tests.ps1`
+  (`@script:Base` mit `SourceFolder`/`DestinationReportServer` plus derselbe Parameter explizit) - diese Tests
+  liefen nur, weil Pester 5 unter pwsh laeuft. Jetzt per `$script:Base.Clone()` mit ueberschriebenem Schluessel;
+  55/55 Tests gruen. Im Modulcode selbst keine weiteren Treffer.
+
 ## [1.9.179.0] - 2026-10-17
 
 ### Fehlerbehebungen: Zertifikatsfunktionen
