@@ -508,7 +508,7 @@ function Copy-sqmLogins
 				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'ERROR'
 				_AddResult 'Connect' '(Quelle)' 'Failed' $msg
 				if ($EnableException) { throw }
-				return $results
+				return
 			}
 			
 			try
@@ -521,7 +521,7 @@ function Copy-sqmLogins
 				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'ERROR'
 				_AddResult 'Connect' '(Ziel)' 'Failed' $msg
 				if ($EnableException) { throw }
-				return $results
+				return
 			}
 			
 			# ??????????????????????????????????????????????????????????????
@@ -550,7 +550,7 @@ function Copy-sqmLogins
 					_AddResult 'AuthModeCheck' '(alle)' 'Failed' $msg
 					if ($EnableException) { throw $msg }
 					Write-Error $msg
-					return $results
+					return
 				}
 				
 				$adjustAction = "Ziel '$Destination' von '$dstModeText' auf Mixed-Mode umstellen"
@@ -611,7 +611,7 @@ function Copy-sqmLogins
 						Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'ERROR'
 						_AddResult 'AdjustAuthMode' '(Server)' 'Failed' $msg
 						if (-not $ContinueOnError -and $EnableException) { throw }
-						if (-not $ContinueOnError) { return $results }
+						if (-not $ContinueOnError) { return }
 					}
 				}
 				else
@@ -672,7 +672,7 @@ function Copy-sqmLogins
 					Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'WARNING'
 					Write-Warning $msg
 					_AddResult 'FilterLogins' '(alle)' 'Skipped' $msg
-					return $results
+					return
 				}
 				
 				Invoke-sqmLogging -Message "$(@($sourceLogins).Count) Login(s) nach Filter vorgemerkt." `
@@ -684,7 +684,7 @@ function Copy-sqmLogins
 				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'ERROR'
 				_AddResult 'LoadLogins' '(alle)' 'Failed' $msg
 				if ($EnableException) { throw }
-				return $results
+				return
 			}
 			
 			# ??????????????????????????????????????????????????????????????
@@ -767,7 +767,7 @@ function Copy-sqmLogins
 				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'WARNING'
 				Write-Warning $msg
 				_AddResult 'FilterLogins' '(alle)' 'Skipped' $msg
-				return $results
+				return
 			}
 			
 			# ??????????????????????????????????????????????????????????????

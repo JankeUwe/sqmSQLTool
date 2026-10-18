@@ -165,7 +165,7 @@ function Repair-sqmAlwaysOnDatabases
 			if ($problematicDatabases.Count -eq 0)
 			{
 				Invoke-sqmLogging -Message "Keine problematischen Datenbanken gefunden." -FunctionName $functionName -Level "INFO"
-				return $results
+				return
 			}
 			
 			# --- 4. Reparatur fuer jede problematische DB ---

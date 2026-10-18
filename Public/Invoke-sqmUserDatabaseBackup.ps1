@@ -344,7 +344,7 @@ function Invoke-sqmUserDatabaseBackup
 					Status	     = "NoDatabasesFound"
 					Message	     = $msg
 				}
-				return $results
+				return
 			}
 
 			# Exclude-Tabelle auswerten wenn -UseExcludeTable gesetzt

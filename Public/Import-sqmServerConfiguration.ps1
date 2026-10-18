@@ -143,7 +143,7 @@ function Import-sqmServerConfiguration
 				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'ERROR'
 				if ($EnableException) { throw $msg }
 				Write-Error $msg
-				return $results
+				return
 			}
 			$config = $snapshot.Configuration
 			Invoke-sqmLogging -Message "Snapshot '$InputPath' geladen (Quelle laut Metadaten: '$($snapshot.Metadata.ComputerName)\$($snapshot.Metadata.InstanceName)', exportiert: '$($snapshot.Metadata.ExportDate)')." `

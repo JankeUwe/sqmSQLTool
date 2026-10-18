@@ -258,7 +258,7 @@ function Import-sqmDatabaseLogins
 				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'WARNING'
 				Write-Warning $msg
 				_AddResult 'ParseFile' '(Datei)' 'Skipped' $msg
-				return $results
+				return
 			}
 			Invoke-sqmLogging -Message "$($loginBlocks.Count) Login-Block/Bloecke in '$InputPath' gefunden." -FunctionName $functionName -Level 'INFO'
 

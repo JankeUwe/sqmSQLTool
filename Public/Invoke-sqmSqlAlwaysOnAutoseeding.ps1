@@ -129,7 +129,7 @@ function Invoke-sqmSqlAlwaysOnAutoseeding
 					Status		      = "NoGroupsFound"
 					Message		      = $msg
 				}
-				return $results
+				return
 			}
 			
 			foreach ($ag in $availabilityGroups)

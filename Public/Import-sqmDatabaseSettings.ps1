@@ -173,7 +173,7 @@ function Import-sqmDatabaseSettings
 				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'ERROR'
 				if ($EnableException) { throw $msg }
 				Write-Error $msg
-				return $results
+				return
 			}
 
 			$fileDatabases = @($snapshot.Databases)
@@ -186,7 +186,7 @@ function Import-sqmDatabaseSettings
 				Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level 'WARNING'
 				Write-Warning $msg
 				_AddResult '(Datei)' '(alle)' 'Skipped' $msg
-				return $results
+				return
 			}
 			Invoke-sqmLogging -Message "$($fileDatabases.Count) Datenbank(en) aus '$InputPath' fuer Import ausgewaehlt." -FunctionName $functionName -Level 'INFO'
 

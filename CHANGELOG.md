@@ -1,5 +1,27 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.184.0] - 2026-10-18
+
+### Fix: doppelte Ergebnisse bei vorzeitigem Ende
+
+- **Acht Funktionen gaben bei einem vorzeitigen `return $results` im process-Block jedes Ergebnis doppelt aus**,
+  weil der end-Block dieselbe Liste noch einmal zurueckgibt. Aufgefallen bei `Import-sqmDatabaseLogins` (Datei
+  ohne Login-Bloecke); dasselbe Muster steckte in `Copy-sqmLogins` (7 Stellen, u.a. Verbindungsfehler zur
+  Quelle), `Import-sqmDatabaseSettings`, `Import-sqmServerConfiguration`, `Invoke-sqmSetDatabaseRecoveryMode`,
+  `Invoke-sqmSqlAlwaysOnAutoseeding`, `Invoke-sqmUserDatabaseBackup` (keine Datenbanken gefunden) und
+  `Repair-sqmAlwaysOnDatabases`. Im process-Block steht jetzt ein blosses `return`; die Liste kommt einmal
+  aus dem end-Block.
+
+### Tests
+
+- Neue Verhaltenstests fuer 9 weitere Funktionen: `Invoke-sqmTempSysadminAction`, `Grant-sqmTemporarySysadmin`,
+  `Restore-sqmSysadminAccess` (Dienst wird nach der Notfallprozedur immer wieder normal gestartet, kein
+  Notfall-Zugriff bei vorhandenem sysadmin, Trigger/Policy werden wiederhergestellt),
+  `Export-`/`Import-`/`Sync-sqmDatabaseLogins` (sysadmin und sa landen nie in der Datei, Escaping, Statuswerte aus
+  den PRINT-Meldungen, Rundlauf Export -> Import).
+- Neuer Vertragstest `tests/Unit/OutputContract.Tests.ps1`: kein `return X` im process-Block, wenn der
+  end-Block ebenfalls `return X` ausgibt (203 Faelle, eine pro Funktionsdatei).
+
 ## [1.9.183.0] - 2026-10-17
 
 ### Fix: Fehler, die beim Nachziehen der Testabdeckung aufgefallen sind

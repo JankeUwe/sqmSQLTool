@@ -142,7 +142,7 @@ function Invoke-sqmSetDatabaseRecoveryMode
 					Status	     = "NoSelection"
 					Message	     = $msg
 				}
-				return $results
+				return
 			}
 			
 			if (-not $databases)
@@ -157,7 +157,7 @@ function Invoke-sqmSetDatabaseRecoveryMode
 					Status	     = "NoDatabasesFound"
 					Message	     = $msg
 				}
-				return $results
+				return
 			}
 			
 			foreach ($db in $databases)
