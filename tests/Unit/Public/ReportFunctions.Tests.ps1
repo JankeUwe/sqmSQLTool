@@ -383,6 +383,17 @@ Describe 'Get-sqmConnectionStats' {
         $global:SqmQueries[0] | Should -Not -Match 'is_user_process = 1'
     }
 
+    It 'liefert je Sitzung eine Zeile: Requests und Verbindungen werden per OUTER APPLY TOP (1) geholt (MARS)' {
+        Get-sqmConnectionStats -SqlInstance 'SQL01' -OutputPath '' | Out-Null
+        $q = $global:SqmQueries[0]
+        # MARS: eine Sitzung hat mehrere Requests und mehrere logische Verbindungen in dm_exec_connections.
+        # Ein LEFT JOIN darauf zaehlt sie mehrfach (live auf DEV01: 1 Sitzung = 4 Zeilen).
+        $q | Should -Not -Match 'LEFT JOIN sys\.dm_exec_(requests|connections)'
+        ([regex]::Matches($q, 'OUTER APPLY \(\s+SELECT TOP \(1\)')).Count | Should -Be 2
+        $q | Should -Match 'FROM sys\.dm_exec_connections c1'
+        $q | Should -Match 'parent_connection_id IS NULL THEN 0'
+    }
+
     It 'schreibt CSV und HTML in -OutputPath' {
         $out = Join-Path $script:TestDir ([guid]::NewGuid().ToString('N'))
         Get-sqmConnectionStats -SqlInstance 'SQL01' -OutputPath $out -NoOpen | Out-Null

@@ -123,10 +123,20 @@ SELECT
     c.num_writes,
     c.net_packet_size
 FROM sys.dm_exec_sessions s
-LEFT JOIN sys.dm_exec_requests r
-    ON s.session_id = r.session_id
-LEFT JOIN sys.dm_exec_connections c
-    ON s.session_id = c.session_id
+-- Eine Zeile je Sitzung: mit MARS hat eine Sitzung mehrere Requests und mehrere (logische) Verbindungen,
+-- ein einfacher LEFT JOIN wuerde sie mehrfach zaehlen.
+OUTER APPLY (
+    SELECT TOP (1) r1.session_id, r1.blocking_session_id, r1.wait_type, r1.wait_time
+    FROM sys.dm_exec_requests r1
+    WHERE r1.session_id = s.session_id
+    ORDER BY r1.total_elapsed_time DESC
+) r
+OUTER APPLY (
+    SELECT TOP (1) c1.net_transport, c1.auth_scheme, c1.num_reads, c1.num_writes, c1.net_packet_size
+    FROM sys.dm_exec_connections c1
+    WHERE c1.session_id = s.session_id
+    ORDER BY CASE WHEN c1.parent_connection_id IS NULL THEN 0 ELSE 1 END, c1.connect_time
+) c
 WHERE 1=1
 $sysFilter
 "@

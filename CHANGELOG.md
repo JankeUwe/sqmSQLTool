@@ -1,5 +1,22 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.186.0] - 2026-10-18
+
+### Fix: `Get-sqmConnectionStats` zaehlte MARS-Sitzungen mehrfach
+
+- Die Abfrage verband `sys.dm_exec_sessions` per `LEFT JOIN` mit `sys.dm_exec_requests` und
+  `sys.dm_exec_connections`. Bei Verbindungen mit `MultipleActiveResultSets=True` (MARS) hat eine Sitzung mehrere
+  Requests und mehrere logische Verbindungen; jede Kombination wurde als eigene Zeile gezaehlt. Live gegen SQL
+  Server 2022 nachgestellt: eine MARS-Sitzung mit zwei offenen Readern erschien viermal (`ConnectionCount = 4`
+  statt 1), `TotalConnections` war entsprechend zu hoch, ebenso Verbindungsauslastung und Gruppenzaehler.
+- Request und Verbindung werden jetzt per `OUTER APPLY (SELECT TOP (1) ...)` geholt (Request mit der laengsten
+  Laufzeit, Verbindung bevorzugt die Elternverbindung): eine Zeile je Sitzung. Nach dem Fix liefert dieselbe
+  MARS-Sitzung `ConnectionCount = 1`.
+
+### Tests
+
+- `ReportFunctions.Tests.ps1`: Test auf die Abfrageform (kein `LEFT JOIN` auf Requests/Verbindungen).
+
 ## [1.9.185.0] - 2026-10-18
 
 ### Fix: `Get-sqmAutoGrowthReport` pruefte die Logdateien nicht und typisierte Dateien falsch
