@@ -120,12 +120,21 @@ function Get-sqmAutoGrowthReport
 			foreach ($db in $databases)
 			{
 				$dbName = $db.Name
-				foreach ($fileGroup in $db.FileGroups)
+				# Datendateien liegen in den Dateigruppen, Logdateien in $db.LogFiles (nicht in FileGroups).
+				# SMO-DataFile/LogFile haben keine Eigenschaft 'Type'; der Dateityp ergibt sich aus der Herkunft.
+				$fileGroups = @(foreach ($fg in $db.FileGroups) { [PSCustomObject]@{ Kind = 'Data'; Files = $fg.Files } }) +
+					@([PSCustomObject]@{ Kind = 'Log'; Files = $db.LogFiles })
+				foreach ($fileGroup in $fileGroups)
 				{
 					foreach ($file in $fileGroup.Files)
 					{
-						$growthType = if ($file.GrowthType -eq 'KB') { 'MB' }
-						else { 'Percent' }
+						# SMO FileGrowthType: KB, Percent, None (feste Dateigroesse, kein Autogrowth)
+						$growthType = switch ("$($file.GrowthType)")
+						{
+							'KB'      { 'MB' }
+							'Percent' { 'Percent' }
+							default   { 'None' }
+						}
 						$growthValue = if ($growthType -eq 'MB') { $file.Growth / 1024 }
 						else { $file.Growth }
 						$currentSizeMB = [math]::Round($file.Size / 1024, 2)
@@ -135,6 +144,11 @@ function Get-sqmAutoGrowthReport
 						# Bewertung
 						$assessment = @()
 						$status = "OK"
+						if ($growthType -eq 'None')
+						{
+							$assessment += "Autogrowth deaktiviert (feste Dateigroesse)"
+							$status = "Info"
+						}
 						if ($growthType -eq 'Percent')
 						{
 							$assessment += "Prozent-Wachstum (besser in MB)"
@@ -153,7 +167,7 @@ function Get-sqmAutoGrowthReport
 								if ($status -ne "Warning") { $status = "Info" }
 							}
 						}
-						if ($file.Type -eq 'Log' -and $maxSizeMB -eq -1)
+						if ($fileGroup.Kind -eq 'Log' -and $growthType -ne 'None' -and $maxSizeMB -eq -1)
 						{
 							$assessment += "Log-Datei unbegrenzt - kann zu vollem Laufwerk fuehren"
 							$status = "Warning"
@@ -167,7 +181,7 @@ function Get-sqmAutoGrowthReport
 							$result = [PSCustomObject]@{
 								Server	     = $SqlInstance
 								DatabaseName = $dbName
-								FileType	 = if ($file.Type -eq 'Rows') { 'Data' } else { 'Log' }
+								FileType	 = $fileGroup.Kind
 								FileName	 = $file.Name
 								PhysicalName = $file.FileName
 								GrowthType   = $growthType
@@ -183,7 +197,7 @@ function Get-sqmAutoGrowthReport
 							$result = [PSCustomObject]@{
 								Server	     = $SqlInstance
 								DatabaseName = $dbName
-								FileType	 = if ($file.Type -eq 'Rows') { 'Data' } else { 'Log' }
+								FileType	 = $fileGroup.Kind
 								FileName	 = $file.Name
 								GrowthType   = $growthType
 								GrowthValue  = $growthValue

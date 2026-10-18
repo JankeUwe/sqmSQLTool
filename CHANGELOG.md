@@ -1,5 +1,24 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.185.0] - 2026-10-18
+
+### Fix: `Get-sqmAutoGrowthReport` pruefte die Logdateien nicht und typisierte Dateien falsch
+
+- **Logdateien fehlten im Bericht.** Die Funktion lief nur ueber `$db.FileGroups`; Logdateien liegen in
+  `$db.LogFiles`. Dadurch konnte die Warnung "Log-Datei unbegrenzt" nie ausgeloest werden.
+- **Alle Dateien hatten `FileType = Log`.** SMO-Dateien (`DataFile`/`LogFile`) haben keine Eigenschaft `Type`;
+  der Vergleich `$file.Type -eq 'Rows'` war immer falsch. Der Dateityp ergibt sich jetzt aus der Herkunft
+  (Dateigruppe = `Data`, `LogFiles` = `Log`).
+- **`GrowthType = None` (feste Dateigroesse) wurde als Prozent-Wachstum gemeldet** ("Prozent-Wachstum (besser in MB)",
+  Warning). Jetzt `GrowthType = None`, Status `Info`, Hinweis "Autogrowth deaktiviert (feste Dateigroesse)".
+  Fuer solche Dateien entfaellt auch die Pruefung auf unbegrenzte Logdateien.
+
+### Tests
+
+- Neue Verhaltenstests fuer fuenf Berichtsfunktionen: `Get-sqmAutoGrowthReport`, `Get-sqmAgentJobHistory`,
+  `Get-sqmLongRunningQueries`, `Get-sqmConnectionStats` und `Get-sqmErrorLog` (Bewertung, Filter, gebaute Abfragen,
+  Berichtsdateien, Fehlerpfade). Die Tests zu `Get-sqmAutoGrowthReport` schlagen gegen 1.9.184.0 fehl.
+
 ## [1.9.184.0] - 2026-10-18
 
 ### Fix: doppelte Ergebnisse bei vorzeitigem Ende
