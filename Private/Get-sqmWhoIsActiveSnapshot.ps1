@@ -138,7 +138,7 @@ WHERE s.is_user_process = 1
 ORDER BY ElapsedSeconds DESC, CpuTimeMs DESC
 "@
 
-	$rawData = @(Invoke-DbaQuery @connParams -Query $whoIsActiveQuery)
+	$rawData = @(Invoke-DbaQuery @connParams -Query $whoIsActiveQuery -EnableException)
 
 	foreach ($row in $rawData)
 	{

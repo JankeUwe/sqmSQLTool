@@ -148,7 +148,7 @@ function Set-sqmMaxMemory
 			return $result
 		}
 
-		$applied = Set-DbaMaxMemory @connArgs -Max $targetMB
+		$applied = Set-DbaMaxMemory @connArgs -Max $targetMB -EnableException
 		$result.NewMaxMemMB = [int]$applied.MaxValue
 		$result.Status  = 'Success'
 		$result.Message = "max server memory auf $($result.NewMaxMemMB) MB gesetzt (vorher $($result.PreviousMaxMemMB) MB)."

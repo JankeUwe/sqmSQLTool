@@ -441,7 +441,7 @@ function New-sqmOlaUsrDbBackupJob
 				try
 				{
 					$regQuery = "DECLARE @BackupDirectory NVARCHAR(4000); EXEC master.dbo.xp_instance_regread N'HKEY_LOCAL_MACHINE', N'SOFTWARE\Microsoft\MSSQLServer\MSSQLServer', N'BackupDirectory', @BackupDirectory OUTPUT; SELECT @BackupDirectory AS BackupDirectory;"
-					$regResult = Invoke-DbaQuery @connParams -Query $regQuery -ErrorAction Stop
+					$regResult = Invoke-DbaQuery @connParams -Query $regQuery -ErrorAction Stop -EnableException
 					$effBackupDir = $regResult.BackupDirectory
 				}
 				catch { }
@@ -859,17 +859,17 @@ END
 								-Category    $JobCategory `
 								-OwnerLogin  $saLogin `
 								-Description "sqmSQLTool: Synchronisiert master.dbo.sqm_BackupExclude und propagiert Aenderungen auf AG-Secondaries." `
-								-ErrorAction Stop | Out-Null
+								-ErrorAction Stop -EnableException | Out-Null
 						}
 
 						$existingStep = if ($syncJobExists) { $syncJobExists.JobSteps | Where-Object { $_.ID -eq 1 } } else { $null }
 						if ($existingStep)
 						{
-							Set-DbaAgentJobStep @connParams -Job $syncJobName -StepName 'Sync sqm_BackupExclude' -Command $syncStepCmd -SubSystem CmdExec -ErrorAction Stop | Out-Null
+							Set-DbaAgentJobStep @connParams -Job $syncJobName -StepName 'Sync sqm_BackupExclude' -Command $syncStepCmd -SubSystem CmdExec -ErrorAction Stop -EnableException | Out-Null
 						}
 						else
 						{
-							New-DbaAgentJobStep @connParams -Job $syncJobName -StepId 1 -StepName 'Sync sqm_BackupExclude' -Command $syncStepCmd -SubSystem CmdExec -ErrorAction Stop | Out-Null
+							New-DbaAgentJobStep @connParams -Job $syncJobName -StepId 1 -StepName 'Sync sqm_BackupExclude' -Command $syncStepCmd -SubSystem CmdExec -ErrorAction Stop -EnableException | Out-Null
 						}
 
 						if (-not $syncJobExists)
@@ -883,7 +883,7 @@ END
 								-FrequencySubdayInterval 30 `
 								-StartTime               '000000' `
 								-Force `
-								-ErrorAction Stop | Out-Null
+								-ErrorAction Stop -EnableException | Out-Null
 						}
 
 						$syncAction = if ($syncJobExists) { 'aktualisiert' } else { 'erstellt' }

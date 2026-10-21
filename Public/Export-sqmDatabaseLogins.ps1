@@ -194,7 +194,7 @@ WHERE dp.type = 'S'
 			$systemLoginPatterns = @('##MS_*', 'NT SERVICE\*', 'NT AUTHORITY\*', 'BUILTIN\*')
 			try
 			{
-				$saLoginName = (Invoke-DbaQuery @connParams -Query "SELECT SUSER_SNAME(0x01) AS n").n
+				$saLoginName = (Invoke-DbaQuery @connParams -Query "SELECT SUSER_SNAME(0x01) AS n" -EnableException).n
 				if (-not [string]::IsNullOrWhiteSpace($saLoginName)) { $systemLoginPatterns += $saLoginName }
 			}
 			catch

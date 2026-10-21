@@ -177,7 +177,7 @@ function Compare-sqmAlwaysOnLogins
 		$saLogins = @()
 		try
 		{
-			$saName = (Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Query "SELECT SUSER_SNAME(0x01) AS n" -ErrorAction Stop).n
+			$saName = (Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Query "SELECT SUSER_SNAME(0x01) AS n" -ErrorAction Stop -EnableException).n
 			if (-not [string]::IsNullOrWhiteSpace($saName))
 			{
 				$saLogins = @($saName)
@@ -282,7 +282,7 @@ WHERE sp.type IN ('S','U','G')
 			{
 				try
 				{
-					$rows = Invoke-DbaQuery -SqlInstance $rep -SqlCredential $SqlCredential -Query $loginQuery -ErrorAction Stop
+					$rows = Invoke-DbaQuery -SqlInstance $rep -SqlCredential $SqlCredential -Query $loginQuery -ErrorAction Stop -EnableException
 					$map = @{}
 					foreach ($r in $rows) { $map[$r.LoginName.ToLowerInvariant()] = $r }
 					$replicaData[$rep] = $map

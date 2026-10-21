@@ -5,6 +5,7 @@
                     "EmptyCatch":  114,
                     "SuppressMessage":  0,
                     "WmiCmdlets":  8,
+                    "DbaStopWithoutException":  181,
                     "PublicWithoutTest":  74,
                     "BareShouldThrow":  33,
                     "SkippedTests":  2,

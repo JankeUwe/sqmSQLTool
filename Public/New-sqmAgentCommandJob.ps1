@@ -325,7 +325,7 @@ exit 0
 					if ($PSCmdlet.ShouldProcess("$SqlInstance / $JobName / $($lastStep.Name)", "OnSuccessAction auf 'GoToNextStep' umstellen, damit die Kette die neuen Steps erreicht"))
 					{
 						# Set-DbaAgentJobStep hat KEIN -StepId - Steps werden ueber -StepName adressiert.
-						Set-DbaAgentJobStep @connParams -Job $JobName -StepName $lastStep.Name -OnSuccessAction GoToNextStep -ErrorAction Stop | Out-Null
+						Set-DbaAgentJobStep @connParams -Job $JobName -StepName $lastStep.Name -OnSuccessAction GoToNextStep -ErrorAction Stop -EnableException | Out-Null
 						Invoke-sqmLogging -Message "Bisher letzter Step '$($lastStep.Name)' auf GoToNextStep umgestellt (Anhaengen neuer Steps)." -FunctionName $functionName -Level 'INFO'
 					}
 				}
@@ -340,7 +340,7 @@ exit 0
 				{
 					if ($PSCmdlet.ShouldProcess($JobName, "Vorhandenen Job ersetzen (-Force)"))
 					{
-						Remove-DbaAgentJob @connParams -Job $JobName -Confirm:$false -ErrorAction Stop
+						Remove-DbaAgentJob @connParams -Job $JobName -Confirm:$false -ErrorAction Stop -EnableException
 						Invoke-sqmLogging -Message "Vorhandener Job '$JobName' entfernt (-Force)." -FunctionName $functionName -Level 'WARNING'
 					}
 				}
@@ -350,7 +350,7 @@ exit 0
 					$fnList = ($resolved | ForEach-Object { $_.FunctionName }) -join ', '
 					New-DbaAgentJob @connParams -Job $JobName `
 						-Description "sqmSQLTool-Befehlskette ($fnList) via New-sqmAgentCommandJob" `
-						-ErrorAction Stop | Out-Null
+						-ErrorAction Stop -EnableException | Out-Null
 				}
 			}
 
@@ -389,7 +389,7 @@ exit 0
 				{
 					New-DbaAgentJobStep @connParams -Job $JobName -StepId $stepId `
 						-StepName $entry.StepName -Subsystem 'CmdExec' -Command $stepCommand `
-						-OnSuccessAction $onSuccess -OnFailAction 'QuitWithFailure' -ErrorAction Stop | Out-Null
+						-OnSuccessAction $onSuccess -OnFailAction 'QuitWithFailure' -ErrorAction Stop -EnableException | Out-Null
 				}
 
 				$createdSteps.Add([PSCustomObject]@{
@@ -442,7 +442,7 @@ exit 0
 
 				if ($PSCmdlet.ShouldProcess("$SqlInstance / $JobName", "Zeitplan '$scheduleName' ($schedInfo) anlegen"))
 				{
-					New-DbaAgentSchedule @schedParams -ErrorAction Stop | Out-Null
+					New-DbaAgentSchedule @schedParams -ErrorAction Stop -EnableException | Out-Null
 					Invoke-sqmLogging -Message "Zeitplan '$scheduleName': $schedInfo." -FunctionName $functionName -Level 'INFO'
 				}
 			}
@@ -455,7 +455,7 @@ exit 0
 			{
 				if ($PSCmdlet.ShouldProcess($JobName, "Job sofort starten"))
 				{
-					Start-DbaAgentJob @connParams -Job $JobName -ErrorAction Stop | Out-Null
+					Start-DbaAgentJob @connParams -Job $JobName -ErrorAction Stop -EnableException | Out-Null
 					$started = $true
 					Invoke-sqmLogging -Message "Job '$JobName' wurde gestartet." -FunctionName $functionName -Level 'INFO'
 				}

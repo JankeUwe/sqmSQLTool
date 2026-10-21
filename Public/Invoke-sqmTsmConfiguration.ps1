@@ -230,7 +230,7 @@ EXEC master.dbo.xp_instance_regread
     N'BackupDirectory',
     @BackupDirectory OUTPUT;
 SELECT @BackupDirectory AS BackupDirectory;
-"@ -ErrorAction Stop
+"@ -ErrorAction Stop -EnableException
 					$effBackupDir = $regResult.BackupDirectory
 				}
 				catch

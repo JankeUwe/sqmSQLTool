@@ -436,7 +436,7 @@ SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS int) AS MajorVersion,
 					try
 					{
 						$alterEpSql = "ALTER ENDPOINT [$epToUse] FOR $epClause (AUTHENTICATION = CERTIFICATE [$CertificateName]);"
-						Invoke-DbaQuery @masterParams -Query $alterEpSql -ErrorAction Stop
+						Invoke-DbaQuery @masterParams -Query $alterEpSql -ErrorAction Stop -EnableException
 						$installResult.EndpointBound = $true
 						Invoke-sqmLogging -Message "Endpoint '$epToUse' auf '$CertificateName' umgestellt." -FunctionName $functionName -Level "INFO"
 					}
@@ -497,7 +497,7 @@ WHERE dek.encryption_state = 3
 USE [$tdeDbName];
 ALTER DATABASE ENCRYPTION KEY ENCRYPTION BY SERVER CERTIFICATE [$CertificateName];
 "@
-							Invoke-DbaQuery @masterParams -Query $alterTdeSql -ErrorAction Stop
+							Invoke-DbaQuery @masterParams -Query $alterTdeSql -ErrorAction Stop -EnableException
 							$installResult.TdeBound = $true
 							Invoke-sqmLogging -Message "TDE fuer '$tdeDbName' auf '$CertificateName' umgestellt." -FunctionName $functionName -Level "INFO"
 						}

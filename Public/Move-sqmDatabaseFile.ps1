@@ -253,7 +253,7 @@ function Move-sqmDatabaseFile
 			{
 				$dsParams = @{ ComputerName = $sqlHostName; ErrorAction = 'Stop' }
 				if ($Credential) { $dsParams['Credential'] = $Credential }
-				$volumes = Get-DbaDiskSpace @dsParams
+				$volumes = Get-DbaDiskSpace @dsParams -EnableException
 
 				$match = $volumes |
 				Where-Object { $_.Name -and $Path.ToUpperInvariant().StartsWith($_.Name.ToUpperInvariant()) } |
@@ -573,7 +573,7 @@ ORDER BY mf.type, mf.file_id;
 			foreach ($destDir in $destDirs)
 			{
 				$dirVisible = $false
-				try { $dirVisible = [bool](Test-DbaPath @connParams -Path $destDir) }
+				try { $dirVisible = [bool](Test-DbaPath @connParams -Path $destDir -EnableException) }
 				catch { $dirVisible = $false }
 
 				if (-not $dirVisible)
@@ -604,7 +604,7 @@ ORDER BY mf.type, mf.file_id;
 							# Dienstkonto zusaetzlich explizit berechtigen
 							try
 							{
-								$engineSvc = Get-DbaService @svcParams -Type Engine | Select-Object -First 1
+								$engineSvc = Get-DbaService @svcParams -Type Engine -EnableException | Select-Object -First 1
 								if ($engineSvc -and $engineSvc.StartName)
 								{
 									$acl = Get-Acl -Path $winDir -ErrorAction Stop
@@ -621,7 +621,7 @@ ORDER BY mf.type, mf.file_id;
 								Invoke-sqmLogging -Message "Dienstkonto konnte nicht explizit berechtigt werden: $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
 							}
 
-							try { $dirVisible = [bool](Test-DbaPath @connParams -Path $destDir) }
+							try { $dirVisible = [bool](Test-DbaPath @connParams -Path $destDir -EnableException) }
 							catch { $dirVisible = $false }
 						}
 						catch
@@ -935,7 +935,7 @@ ORDER BY mf.type, mf.file_id;
 							foreach ($p in $appliedAlter)
 							{
 								$exists = $false
-								try { $exists = [bool](Test-DbaPath @connParams -Path $p.NewPath) }
+								try { $exists = [bool](Test-DbaPath @connParams -Path $p.NewPath -EnableException) }
 								catch { $exists = $false }
 
 								if ($exists)

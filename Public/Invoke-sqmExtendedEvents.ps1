@@ -367,7 +367,7 @@ WITH (
 
 				try
 				{
-					Invoke-DbaQuery @connParams -Database master -Query $createSql -ErrorAction Stop
+					Invoke-DbaQuery @connParams -Database master -Query $createSql -ErrorAction Stop -EnableException
 					$result.CreateStatus = 'Success'
 					Invoke-sqmLogging -Message "Session '$SessionName' erfolgreich erstellt." -FunctionName $functionName -Level "INFO"
 				}
@@ -387,7 +387,7 @@ WITH (
 				try
 				{
 					$startSql = "ALTER EVENT SESSION [$SessionName] ON SERVER STATE = START;"
-					Invoke-DbaQuery @connParams -Database master -Query $startSql -ErrorAction Stop
+					Invoke-DbaQuery @connParams -Database master -Query $startSql -ErrorAction Stop -EnableException
 					$result.StartStatus = 'Running'
 					Invoke-sqmLogging -Message "Session '$SessionName' gestartet." -FunctionName $functionName -Level "INFO"
 				}
@@ -407,7 +407,7 @@ WITH (
 				try
 				{
 					$stopSql = "ALTER EVENT SESSION [$SessionName] ON SERVER STATE = STOP;"
-					Invoke-DbaQuery @connParams -Database master -Query $stopSql -ErrorAction Stop
+					Invoke-DbaQuery @connParams -Database master -Query $stopSql -ErrorAction Stop -EnableException
 					$result.StopStatus = 'Stopped'
 					Invoke-sqmLogging -Message "Session '$SessionName' gestoppt." -FunctionName $functionName -Level "INFO"
 				}
@@ -934,7 +934,7 @@ BEGIN
     DROP EVENT SESSION [$SessionName] ON SERVER;
 END
 "@
-					Invoke-DbaQuery @connParams -Database master -Query $dropSql -ErrorAction Stop
+					Invoke-DbaQuery @connParams -Database master -Query $dropSql -ErrorAction Stop -EnableException
 					$result.DropStatus = 'Dropped'
 					Invoke-sqmLogging -Message "Session '$SessionName' entfernt." -FunctionName $functionName -Level "INFO"
 				}

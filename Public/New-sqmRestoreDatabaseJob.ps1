@@ -299,7 +299,7 @@ exit 0
 			{
 				if ($PSCmdlet.ShouldProcess($JobName, "Vorhandenen Job entfernen (-Force)"))
 				{
-					Remove-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -Confirm:$false -ErrorAction Stop
+					Remove-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -Confirm:$false -ErrorAction Stop -EnableException
 					Invoke-sqmLogging -Message "Vorhandener Job '$JobName' entfernt (-Force)." -FunctionName $functionName -Level "INFO"
 				}
 			}
@@ -314,11 +314,11 @@ exit 0
 			{
 				$null = New-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName `
 					-Description "On-Demand-Restore von '$DatabaseName' via Invoke-sqmRestoreDatabase (New-sqmRestoreDatabaseJob)" `
-					-ErrorAction Stop
+					-ErrorAction Stop -EnableException
 
 				$null = New-DbaAgentJobStep -SqlInstance $SqlInstance -Job $JobName `
 					-StepName $StepName -Subsystem 'CmdExec' -Command $command `
-					-OnSuccessAction QuitWithSuccess -OnFailAction QuitWithFailure -ErrorAction Stop
+					-OnSuccessAction QuitWithSuccess -OnFailAction QuitWithFailure -ErrorAction Stop -EnableException
 
 				Invoke-sqmLogging -Message "Job '$JobName' auf '$SqlInstance' erstellt (On-Demand, kein Schedule)." -FunctionName $functionName -Level "INFO"
 			}
@@ -331,7 +331,7 @@ exit 0
 			{
 				if ($PSCmdlet.ShouldProcess($JobName, "Job sofort starten"))
 				{
-					Start-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -ErrorAction Stop | Out-Null
+					Start-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -ErrorAction Stop -EnableException | Out-Null
 					$started = $true
 					Invoke-sqmLogging -Message "Job '$JobName' wurde gestartet." -FunctionName $functionName -Level "INFO"
 				}

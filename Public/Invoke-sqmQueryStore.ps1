@@ -297,7 +297,7 @@ SELECT
     size_based_cleanup_mode_desc                                    AS SizeBasedCleanupMode
 FROM sys.database_query_store_options
 "@
-					$qsOptions = Invoke-DbaQuery @dbConnParams -Query $qsStatusSql -ErrorAction Stop
+					$qsOptions = Invoke-DbaQuery @dbConnParams -Query $qsStatusSql -ErrorAction Stop -EnableException
 					$dbResult.QSOptions = $qsOptions
 				}
 				catch
@@ -328,7 +328,7 @@ ALTER DATABASE [$dbName] SET QUERY_STORE = ON (
 						# Muss gegen master ausgefuehrt werden (ALTER DATABASE)
 						$masterParams = @{ SqlInstance = $SqlInstance; Database = 'master' }
 						if ($SqlCredential) { $masterParams['SqlCredential'] = $SqlCredential }
-						Invoke-DbaQuery @masterParams -Query $configureSql -ErrorAction Stop
+						Invoke-DbaQuery @masterParams -Query $configureSql -ErrorAction Stop -EnableException
 
 						# Aktualisierten Status lesen
 						$qsOptionsNew = Invoke-DbaQuery @dbConnParams -Query $qsStatusSql -ErrorAction SilentlyContinue

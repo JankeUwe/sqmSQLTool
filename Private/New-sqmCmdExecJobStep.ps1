@@ -135,7 +135,7 @@ catch {
         ErrorAction = 'Stop'
     }
 
-    $jobStep = New-DbaAgentJobStep @stepParams
+    $jobStep = New-DbaAgentJobStep @stepParams -EnableException
 
     # =========================================================================
     # 6. Return result

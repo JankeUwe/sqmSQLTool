@@ -1,5 +1,47 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.189.0] - 2026-10-22
+
+### Fix: dbatools-Fehler wurden an 120 Stellen nicht gemeldet
+
+dbatools-Befehle werfen mit nur `-ErrorAction Stop` bei Fehlern nicht: sie schreiben eine Warnung und
+liefern nichts. Live auf DEV01 (Windows PowerShell 5.1, dbatools 2.9.0) fuer Verbindungsfehler, "Job
+existiert bereits", "Job/DB fehlt" bei `Invoke-DbaQuery`, `Get-DbaDatabase`, `Get-DbaAgentJob`,
+`New-DbaAgentJob`, `New-DbaAgentJobStep`, `Start-DbaAgentJob`, `Remove-DbaDatabase`,
+`Set-DbaDbRecoveryModel` geprueft. Der `catch` um solche Aufrufe wurde nie erreicht; ein gescheitertes
+Job-Anlegen, DB-Entfernen oder Failover lief als Erfolg weiter, eine gescheiterte Abfrage als leeres Ergebnis.
+
+Im Modul gab es 301 solche Aufrufe in 95 Dateien. 120 davon haben jetzt `-EnableException`
+(direkt am Aufruf, nicht im Splat, weil `Connect-DbaInstance` den Parameter nicht kennt):
+
+- **alle 47 Aktionen** (`New-`, `Remove-`, `Set-`, `Start-`, `Add-`, `Invoke-DbaAgFailover`, `Restore-` ...),
+  z. B. Job-Erstellung in `New-sqmAgentCommandJob`, `New-sqmRestoreTestJob`, `New-sqmOlaUsrDbBackupJob`,
+  DB-Entfernen in `Remove-sqmDatabaseFromAG` und `Repair-sqmAlwaysOnDatabases`, Failover in
+  `Invoke-sqmServiceBrokerAlwaysOn`, `Set-sqmMaxDop`, `Set-sqmMaxMemory`;
+- **alle Abfragen und Lesezugriffe mit eigenem, lokalem `try/catch`** (67): dort war ein Fehlerpfad gebaut,
+  der nie lief;
+- **6 Einzelabfragen ohne `try`**, deren leeres Ergebnis zu falschen Schluessen fuehrt, u. a. die
+  Login-Liste in `Compare-sqmServerConfiguration` (leer = alle Logins "fehlen") und die Helfer fuer
+  Host-Metriken und Trust/Isolation, deren Aufrufer einen Fallback haben, der bisher nie griff.
+
+**Bewusst noch nicht geaendert (181):** Abfragen und Lesezugriffe innerhalb eines `try`, der die ganze
+Funktion umschliesst, sowie drei Enumerationen in `Compare-sqmServerConfiguration`. Mit `EnableException`
+wuerde dort ein einzelner Fehler (z. B. fehlendes Recht auf eine DMV, eine Datenbank offline) den ganzen
+Bericht abbrechen statt einen Abschnitt leer zu lassen; dbatools bricht mit `EnableException` auch bei
+Fehlern ab, bei denen es sonst mit dem naechsten Objekt weitermacht. Das braucht eine Entscheidung je Funktion.
+
+### Quality Gate
+
+- Neue Ratsche `DbaStopWithoutException` (Startwert 181): erkennt `ErrorAction Stop` ohne `EnableException`
+  explizit und ueber Splats; neue Aufrufe dieser Art lassen das Gate fehlschlagen.
+- `CoveragePercent` hat eine Toleranz von 1 Prozentpunkt: der Wert schwankte ohne Codeaenderung zwischen
+  29,03 und 28,49 %.
+
+Live auf DEV01 (5.1) ohne Fehler: `Compare-sqmServerConfiguration`, `Get-sqmIndexFragmentation`,
+`Get-sqmLongRunningQueries`, `Find-sqmDatabaseObject`, `Export-sqmDatabaseLogins`,
+`Get-sqmLinkedServerUsage`, `Get-sqmWhoIsActive`, `Invoke-sqmSetupReport`. Die Job-Funktionen sind nur per
+Pester abgedeckt. Pester: alle Tests gruen.
+
 ## [1.9.188.0] - 2026-10-21
 
 ### Fix: `Invoke-sqmDeployScripts` - Wrapper-Transaktion schuetzte nicht

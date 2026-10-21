@@ -40,10 +40,11 @@ Duerfen nicht schlechter werden als die Baseline. Kein Zielwert, nur eine Richtu
 | `EmptyCatch` | runter | leere `catch { }` in Public/Private: verschluckte Fehler |
 | `SuppressMessage` | runter | stummgeschaltete Analyzer-Regeln |
 | `WmiCmdlets` | runter | `Get-WmiObject` & Co., gibt es unter PS 7 nicht |
+| `DbaStopWithoutException` | runter | dbatools-Aufruf mit `ErrorAction Stop` (explizit oder per Splat) ohne `EnableException`. dbatools wirft dann bei Fehlern nicht, sondern liefert nichts; der `catch` darum greift nie. Neue Aufrufe: `-EnableException` direkt am Aufruf, nicht im Splat (`Connect-DbaInstance` kennt den Parameter nicht). Bei Enumerationen ueber viele Objekte bedenken: mit `EnableException` bricht ein Fehler bei einem Objekt den ganzen Aufruf ab. |
 | `PublicWithoutTest` | runter | exportierte Funktionen, die in `tests\` nirgends vorkommen |
 | `BareShouldThrow` | runter | `Should -Throw` ohne `-ExpectedMessage`: beweist nicht, *warum* es wirft |
 | `SkippedTests` | runter | `It -Skip`, `Set-ItResult -Skipped/-Inconclusive` |
-| `CoveragePercent` | hoch | Code Coverage `Public\` (nur mit `-Pester`) |
+| `CoveragePercent` | hoch | Code Coverage `Public\` (nur mit `-Pester`). Toleranz 1 Prozentpunkt: der Wert schwankt ohne Codeaenderung (29,03 / 28,49 bei identischem Stand). Die Baseline steigt nur bei Verbesserung. |
 
 ## Aendern der Baseline
 

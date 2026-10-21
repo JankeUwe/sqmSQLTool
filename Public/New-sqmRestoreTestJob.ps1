@@ -357,7 +357,7 @@ exit 0
 			{
 				if ($PSCmdlet.ShouldProcess($JobName, "Vorhandenen Job entfernen (-Force)"))
 				{
-					Remove-DbaAgentJob @connParams -Job $JobName -Confirm:$false -ErrorAction Stop
+					Remove-DbaAgentJob @connParams -Job $JobName -Confirm:$false -ErrorAction Stop -EnableException
 					Invoke-sqmLogging -Message "Vorhandener Job '$JobName' entfernt (-Force)." -FunctionName $functionName -Level "INFO"
 				}
 			}
@@ -372,11 +372,11 @@ exit 0
 			{
 				$null = New-DbaAgentJob @connParams -Job $JobName `
 					-Description "Wiederkehrender Restore-Test von '$DatabaseName' via Invoke-sqmRestoreTest (New-sqmRestoreTestJob). $cleanupNote." `
-					-ErrorAction Stop
+					-ErrorAction Stop -EnableException
 
 				$null = New-DbaAgentJobStep @connParams -Job $JobName `
 					-StepName $StepName -Subsystem 'CmdExec' -Command $command `
-					-OnSuccessAction QuitWithSuccess -OnFailAction QuitWithFailure -ErrorAction Stop
+					-OnSuccessAction QuitWithSuccess -OnFailAction QuitWithFailure -ErrorAction Stop -EnableException
 
 				Invoke-sqmLogging -Message "Job '$JobName' auf '$SqlInstance' erstellt." -FunctionName $functionName -Level "INFO"
 			}
@@ -423,7 +423,7 @@ exit 0
 
 				if ($PSCmdlet.ShouldProcess("$SqlInstance / $JobName", "Zeitplan '$scheduleName' ($schedInfo) anlegen"))
 				{
-					$null = New-DbaAgentSchedule @schedParams
+					$null = New-DbaAgentSchedule @schedParams -EnableException
 					Invoke-sqmLogging -Message "Zeitplan '$scheduleName': $schedInfo." -FunctionName $functionName -Level "INFO"
 				}
 			}
@@ -440,7 +440,7 @@ exit 0
 			{
 				if ($PSCmdlet.ShouldProcess($JobName, "Job sofort starten"))
 				{
-					Start-DbaAgentJob @connParams -Job $JobName -ErrorAction Stop | Out-Null
+					Start-DbaAgentJob @connParams -Job $JobName -ErrorAction Stop -EnableException | Out-Null
 					$started = $true
 					Invoke-sqmLogging -Message "Job '$JobName' wurde gestartet." -FunctionName $functionName -Level "INFO"
 				}

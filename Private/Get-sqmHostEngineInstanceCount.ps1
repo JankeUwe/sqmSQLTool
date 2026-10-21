@@ -38,7 +38,7 @@ function Get-sqmHostEngineInstanceCount
 
 	try
 	{
-		$svc = Get-DbaService -ComputerName $computerName -Type Engine -ErrorAction Stop
+		$svc = Get-DbaService -ComputerName $computerName -Type Engine -ErrorAction Stop -EnableException
 		$count = @($svc | Select-Object -ExpandProperty InstanceName -Unique).Count
 		if ($count -gt 0) { return $count }
 	}

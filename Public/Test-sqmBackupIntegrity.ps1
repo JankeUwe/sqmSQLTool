@@ -81,7 +81,7 @@ EXEC master.dbo.xp_instance_regread
 SELECT @BackupDirectory AS BackupDirectory;
 "@
 					$regResult = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
-						-Query $regQuery -ErrorAction Stop
+						-Query $regQuery -ErrorAction Stop -EnableException
 					if ($regResult.BackupDirectory)
 					{
 						Invoke-sqmLogging -Message "BackupPath aus SQL Server Registry: $($regResult.BackupDirectory)" -FunctionName $functionName -Level "INFO"
@@ -113,7 +113,7 @@ SELECT @BackupDirectory AS BackupDirectory;
 				{
 					# Restore-DbaDatabase kennt kein -FileListOnly; die Backup-Dateiliste (RESTORE FILELISTONLY)
 						# liefert Read-DbaBackupHeader -FileList (LogicalName/PhysicalName/Type/FileGroupName/Size).
-						$fileList = Read-DbaBackupHeader -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Path $file -FileList -ErrorAction Stop
+						$fileList = Read-DbaBackupHeader -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Path $file -FileList -ErrorAction Stop -EnableException
 					foreach ($f in $fileList)
 					{
 						$allResults.Add([PSCustomObject]@{

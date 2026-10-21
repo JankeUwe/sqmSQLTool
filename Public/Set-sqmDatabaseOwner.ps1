@@ -248,7 +248,7 @@ function Set-sqmDatabaseOwner
 						try
 						{
 							$alterSql = "ALTER AUTHORIZATION ON DATABASE::[$($dbName -replace ']', ']]')] TO [$($targetLogin -replace ']', ']]')]"
-							Invoke-DbaQuery @connParams -Database 'master' -Query $alterSql -ErrorAction Stop
+							Invoke-DbaQuery @connParams -Database 'master' -Query $alterSql -ErrorAction Stop -EnableException
 							
 							$rowResult.Status = 'OK'
 							$rowResult.Message = "Owner erfolgreich auf '$targetLogin' gesetzt."

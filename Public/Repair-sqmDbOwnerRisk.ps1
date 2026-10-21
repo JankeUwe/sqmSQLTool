@@ -275,7 +275,7 @@ ALTER ROLE db_datareader ADD MEMBER [$memberBr];
 ALTER ROLE db_datawriter ADD MEMBER [$memberBr];
 ALTER ROLE [$execBracket] ADD MEMBER [$memberBr];
 "@
-								Invoke-DbaQuery @connParams -Database $dbName -Query $memberSql -ErrorAction Stop
+								Invoke-DbaQuery @connParams -Database $dbName -Query $memberSql -ErrorAction Stop -EnableException
 
 								$rowResult.Status = 'OK'
 								$rowResult.Message = "db_owner entfernt; db_datareader/db_datawriter/$ExecuteRoleName zugewiesen ($procCount Prozedur(en))."

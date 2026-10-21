@@ -129,10 +129,10 @@ function Set-sqmMaxDop
 			return $result
 		}
 
-		$null = Set-DbaSpConfigure @connArgs -Name 'max degree of parallelism' -Value $targetDop
+		$null = Set-DbaSpConfigure @connArgs -Name 'max degree of parallelism' -Value $targetDop -EnableException
 		if (-not $SkipCostThreshold)
 		{
-			$null = Set-DbaSpConfigure @connArgs -Name 'cost threshold for parallelism' -Value $CostThreshold
+			$null = Set-DbaSpConfigure @connArgs -Name 'cost threshold for parallelism' -Value $CostThreshold -EnableException
 		}
 
 		$result.Status  = 'Success'

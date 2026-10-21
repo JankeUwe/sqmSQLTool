@@ -183,7 +183,7 @@ function Invoke-sqmNtfsSetup
 				$dirs = @()
 				try
 				{
-					$dp = Get-DbaDefaultPath @connParams -ErrorAction Stop
+					$dp = Get-DbaDefaultPath @connParams -ErrorAction Stop -EnableException
 					$dirs += @($dp.Data, $dp.Log, $dp.Backup)
 				}
 				catch { Write-Verbose "Get-DbaDefaultPath fehlgeschlagen: $($_.Exception.Message)" }

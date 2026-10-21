@@ -415,7 +415,7 @@
         $cp = $script:connParams
         try
         {
-            Invoke-DbaQuery @cp -Database master -Query $sql -ErrorAction Stop
+            Invoke-DbaQuery @cp -Database master -Query $sql -ErrorAction Stop -EnableException
             $orig.IsActive = $newActive
             $orig.Reason   = $newReason
             Set-Status "'$dbName' gespeichert." 'OK'

@@ -279,7 +279,7 @@ function New-sqmAvailabilityGroup
 				Start-Sleep -Seconds 5
 				try
 				{
-					$ping = Invoke-DbaQuery -SqlInstance $instance -SqlCredential $SqlCredential -Query 'SELECT 1 AS ok' -ErrorAction Stop | Select-Object -First 1
+					$ping = Invoke-DbaQuery -SqlInstance $instance -SqlCredential $SqlCredential -Query 'SELECT 1 AS ok' -ErrorAction Stop -EnableException | Select-Object -First 1
 					if ($ping.ok -eq 1) { return $true }
 				}
 				catch { }
@@ -411,7 +411,7 @@ CREATE ENDPOINT [$EndpointName]
     STATE = STARTED
     AS TCP (LISTENER_PORT = $EndpointPort)
     FOR DATABASE_MIRRORING (ROLE = ALL, ENCRYPTION = REQUIRED ALGORITHM AES);
-"@
+"@ -EnableException
 						Add-Step "${inst}: Endpoint '$EndpointName' erstellt und gestartet."
 					}
 				}
@@ -503,7 +503,7 @@ CREATE ENDPOINT [$EndpointName]
 						-Query "SELECT name FROM sys.databases WHERE name = N'$db'" -ErrorAction SilentlyContinue | Select-Object -First 1
 					if (-not $dbCheck -and $PSCmdlet.ShouldProcess($SqlInstance, "CREATE DATABASE [$db]"))
 					{
-						Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction Stop -Query "CREATE DATABASE [$db];"
+						Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction Stop -Query "CREATE DATABASE [$db];" -EnableException
 						Add-Step "Datenbank '$db' auf Primary erstellt."
 					}
 					elseif ($dbCheck)
@@ -512,7 +512,7 @@ CREATE ENDPOINT [$EndpointName]
 					}
 					if ($PSCmdlet.ShouldProcess($SqlInstance, "ALTER DATABASE [$db] SET RECOVERY FULL"))
 					{
-						Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction Stop -Query "ALTER DATABASE [$db] SET RECOVERY FULL;"
+						Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction Stop -Query "ALTER DATABASE [$db] SET RECOVERY FULL;" -EnableException
 						Add-Step "Datenbank '$db': Recovery-Modell FULL."
 					}
 				}
@@ -603,7 +603,7 @@ REPLICA ON
 				$createAgSql = ($createAgSql -split "`r?`n" | Where-Object { $_.Trim() -ne '' }) -join "`r`n"
 				try
 				{
-					Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Query $createAgSql -ErrorAction Stop
+					Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Query $createAgSql -ErrorAction Stop -EnableException
 					Add-Step "AG '$AvailabilityGroupName' auf Primary angelegt."
 				}
 				catch
@@ -619,7 +619,7 @@ REPLICA ON
 					try
 					{
 						Invoke-DbaQuery -SqlInstance $sec -SqlCredential $SqlCredential -ErrorAction Stop `
-							-Query "ALTER AVAILABILITY GROUP [$AvailabilityGroupName] JOIN; ALTER AVAILABILITY GROUP [$AvailabilityGroupName] GRANT CREATE ANY DATABASE;"
+							-Query "ALTER AVAILABILITY GROUP [$AvailabilityGroupName] JOIN; ALTER AVAILABILITY GROUP [$AvailabilityGroupName] GRANT CREATE ANY DATABASE;" -EnableException
 						Add-Step "${sec}: AG beigetreten, Autoseed genehmigt."
 					}
 					catch { Add-Step "${sec}: Beitritt fehlgeschlagen - $($_.Exception.Message)" 'ERROR' }
@@ -631,7 +631,7 @@ REPLICA ON
 					try
 					{
 						Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction Stop `
-							-Query "ALTER AVAILABILITY GROUP [$AvailabilityGroupName] MODIFY REPLICA ON N'$sec' WITH (FAILOVER_MODE = $failMode, AVAILABILITY_MODE = $availMode);"
+							-Query "ALTER AVAILABILITY GROUP [$AvailabilityGroupName] MODIFY REPLICA ON N'$sec' WITH (FAILOVER_MODE = $failMode, AVAILABILITY_MODE = $availMode);" -EnableException
 						Add-Step "${sec}: Failover-Modus '$failMode' gesetzt."
 					}
 					catch { Add-Step "${sec}: MODIFY REPLICA fehlgeschlagen (nicht kritisch) - $($_.Exception.Message)" 'WARNING' }
@@ -671,7 +671,7 @@ REPLICA ON
 						try
 						{
 							Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -ErrorAction Stop `
-								-Query "ALTER AVAILABILITY GROUP [$AvailabilityGroupName] ADD LISTENER N'$ListenerName' (WITH IP ($ipClause), PORT = $ListenerPort);"
+								-Query "ALTER AVAILABILITY GROUP [$AvailabilityGroupName] ADD LISTENER N'$ListenerName' (WITH IP ($ipClause), PORT = $ListenerPort);" -EnableException
 							Add-Step "Listener '$ListenerName' ($($ListenerIPAddress -join ', '):$ListenerPort) erstellt."
 						}
 						catch

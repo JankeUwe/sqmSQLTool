@@ -414,7 +414,7 @@ ORDER BY role_desc ASC
 								# ueber die bestehende SQL-Verbindung (kein Windows/WMI noetig). servicename ist lokalisiert
 								# ("SQL Server-Agent" auf DE), daher locale-robustes LIKE '%Agent%'.
 								$agentSvcQuery = "SELECT TOP 1 service_account FROM sys.dm_server_services WHERE servicename LIKE '%Agent%'"
-								$agentAccount = (Invoke-DbaQuery -SqlInstance $secondaryName -SqlCredential $dstCred -Query $agentSvcQuery -ErrorAction Stop).service_account
+								$agentAccount = (Invoke-DbaQuery -SqlInstance $secondaryName -SqlCredential $dstCred -Query $agentSvcQuery -ErrorAction Stop -EnableException).service_account
 								Invoke-sqmLogging -Message "[$secondaryName] SafeForceMode: Auto-excluding Agent Account: $agentAccount" `
 												  -FunctionName $functionName -Level 'INFO'
 							}

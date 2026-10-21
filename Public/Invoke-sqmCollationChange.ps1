@@ -481,7 +481,7 @@ function Invoke-sqmCollationChange
 				{
 					try
 					{
-						Invoke-DbaQuery @connParams -Database 'master' -Query "ALTER DATABASE [$($db.Name)] COLLATE $NewCollation;" -ErrorAction Stop | Out-Null
+						Invoke-DbaQuery @connParams -Database 'master' -Query "ALTER DATABASE [$($db.Name)] COLLATE $NewCollation;" -ErrorAction Stop -EnableException | Out-Null
 						$changed++
 					}
 					catch

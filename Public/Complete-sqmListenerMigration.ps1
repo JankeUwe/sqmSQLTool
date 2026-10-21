@@ -176,7 +176,7 @@ EXEC xp_regread N'HKEY_LOCAL_MACHINE',
 
 			try
 			{
-				Invoke-DbaQuery @connParams -Query $addListenerSql -ErrorAction Stop
+				Invoke-DbaQuery @connParams -Query $addListenerSql -ErrorAction Stop -EnableException
 			}
 			catch
 			{

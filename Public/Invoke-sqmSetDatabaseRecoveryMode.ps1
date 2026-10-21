@@ -197,7 +197,7 @@ function Invoke-sqmSetDatabaseRecoveryMode
 							ErrorAction   = 'Stop'
 						}
 
-						Set-DbaDbRecoveryModel @setParams
+						Set-DbaDbRecoveryModel @setParams -EnableException
 						
 						$successMsg = "Recovery-Modus fuer '$dbName' erfolgreich auf '$RecoveryMode' gesetzt."
 						Invoke-sqmLogging -Message $successMsg -FunctionName $functionName -Level "INFO"

@@ -65,7 +65,7 @@ function Get-sqmSaLogin
 		$row = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
 			-Database 'master' `
 			-Query "SELECT name FROM sys.server_principals WHERE sid = 0x01" `
-			-ErrorAction Stop
+			-ErrorAction Stop -EnableException
 		if ($row -and -not [string]::IsNullOrWhiteSpace($row.name)) { return $row.name }
 	}
 	catch { }
@@ -341,7 +341,7 @@ OUTER APPLY
      ORDER BY x.[timestamp] DESC) AS cpu;
 "@
 
-	$result = Invoke-DbaQuery @connParams -Database master -Query $sql -ErrorAction Stop
+	$result = Invoke-DbaQuery @connParams -Database master -Query $sql -ErrorAction Stop -EnableException
 	$row = @($result)[0]
 
 	$cpuRaw = $row.CPUUtilizationPercent
@@ -390,7 +390,7 @@ SELECT
     snapshot_isolation_state_desc AS SnapshotIsolationState
 FROM sys.databases
 "@
-	$rows = Invoke-DbaQuery @connParams -Database 'master' -Query $sql -ErrorAction Stop
+	$rows = Invoke-DbaQuery @connParams -Database 'master' -Query $sql -ErrorAction Stop -EnableException
 
 	$map = @{}
 	foreach ($r in $rows)

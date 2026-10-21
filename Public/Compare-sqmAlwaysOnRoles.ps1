@@ -182,7 +182,7 @@ function Compare-sqmAlwaysOnRoles
 		$saLogins = @()
 		try
 		{
-			$saName = (Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Query "SELECT SUSER_SNAME(0x01) AS n" -ErrorAction Stop).n
+			$saName = (Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Query "SELECT SUSER_SNAME(0x01) AS n" -ErrorAction Stop -EnableException).n
 			if (-not [string]::IsNullOrWhiteSpace($saName))
 			{
 				$saLogins = @($saName)
@@ -301,12 +301,12 @@ WHERE sp.type IN ('S','U','G')
 				{
 					try
 					{
-						$rows = Invoke-DbaQuery -SqlInstance $rep -SqlCredential $SqlCredential -Query $roleQueryModern -ErrorAction Stop
+						$rows = Invoke-DbaQuery -SqlInstance $rep -SqlCredential $SqlCredential -Query $roleQueryModern -ErrorAction Stop -EnableException
 					}
 					catch
 					{
 						# is_fixed_role fehlt (SQL Server < 2022) - Fallback ohne diese Spalte
-						$rows = Invoke-DbaQuery -SqlInstance $rep -SqlCredential $SqlCredential -Query $roleQueryLegacy -ErrorAction Stop
+						$rows = Invoke-DbaQuery -SqlInstance $rep -SqlCredential $SqlCredential -Query $roleQueryLegacy -ErrorAction Stop -EnableException
 					}
 
 					$map = @{}

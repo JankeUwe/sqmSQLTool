@@ -191,7 +191,7 @@ ORDER BY o.type_desc, s.name, o.name
 					{
 						try
 						{
-							Invoke-DbaQuery @connParams -Database 'master' -Query $dropStatement -ErrorAction Stop
+							Invoke-DbaQuery @connParams -Database 'master' -Query $dropStatement -ErrorAction Stop -EnableException
 
 							$rowResult.Status = 'OK'
 							$rowResult.Message = "Entfernt ($($obj.ObjectTypeDesc))."

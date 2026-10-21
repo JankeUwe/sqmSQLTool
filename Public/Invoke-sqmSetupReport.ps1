@@ -526,7 +526,7 @@ WHERE sp.name = @acct;
             # SSIS/SSAS/SSRS sind Hostdienste, nicht Teil der Instanz - primaer ueber die Dienste
             # des Zielrechners, das braucht WinRM.
             $hostServices = $null
-            try { $hostServices = @(Get-DbaService -ComputerName $hostName -ErrorAction Stop) } catch { $hostServices = $null }
+            try { $hostServices = @(Get-DbaService -ComputerName $hostName -ErrorAction Stop -EnableException) } catch { $hostServices = $null }
 
             if ($hostServices)
             {

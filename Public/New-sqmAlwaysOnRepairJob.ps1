@@ -46,12 +46,12 @@ function New-sqmAlwaysOnRepairJob
 		}
 		if ($existingJob -and $Force)
 		{
-			Remove-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -Confirm:$false -ErrorAction Stop
+			Remove-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName -Confirm:$false -ErrorAction Stop -EnableException
 		}
 
 		# Create job
 		$job = New-DbaAgentJob -SqlInstance $SqlInstance -Job $JobName `
-			-Description "AutoRepair: Repariert AlwaysOn-Datenbanken" -ErrorAction Stop
+			-Description "AutoRepair: Repariert AlwaysOn-Datenbanken" -ErrorAction Stop -EnableException
 
 		# Create CmdExec job step (calls Repair-Job.ps1)
 		$psExePath = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
@@ -59,7 +59,7 @@ function New-sqmAlwaysOnRepairJob
 		$command = "$psExePath -NoProfile -ExecutionPolicy Bypass -File `"$repairScriptPath`""
 
 		$jobStep = New-DbaAgentJobStep -SqlInstance $SqlInstance -Job $JobName `
-			-StepName "RunRepair" -Subsystem 'CmdExec' -Command $command -ErrorAction Stop
+			-StepName "RunRepair" -Subsystem 'CmdExec' -Command $command -ErrorAction Stop -EnableException
 
 		# Add hourly schedule
 		$schedName = "sch_$JobName"
@@ -77,7 +77,7 @@ EXEC msdb.dbo.sp_add_schedule
     @freq_interval          = 1;
 EXEC msdb.dbo.sp_attach_schedule @job_name = N'$JobName', @schedule_name = N'$schedName';
 "@
-		$null = Invoke-DbaQuery -SqlInstance $SqlInstance -Database msdb -Query $schedSql -ErrorAction Stop
+		$null = Invoke-DbaQuery -SqlInstance $SqlInstance -Database msdb -Query $schedSql -ErrorAction Stop -EnableException
 
 		[PSCustomObject]@{
 			SqlInstance = $SqlInstance

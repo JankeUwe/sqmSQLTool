@@ -719,7 +719,7 @@ WITH PRIVATE KEY (FILE = N'$($files.PvkFile -replace "'", "''")', DECRYPTION BY 
 							try
 							{
 								Invoke-sqmLogging -Message $dropAction -FunctionName $functionName -Level "INFO"
-								Remove-DbaDatabase -SqlInstance $secondary -SqlCredential $SqlCredential -Database $dbName -Confirm:$false -ErrorAction Stop
+								Remove-DbaDatabase -SqlInstance $secondary -SqlCredential $SqlCredential -Database $dbName -Confirm:$false -ErrorAction Stop -EnableException
 							}
 							catch
 							{
@@ -744,7 +744,7 @@ WITH PRIVATE KEY (FILE = N'$($files.PvkFile -replace "'", "''")', DECRYPTION BY 
 					try
 					{
 						Invoke-sqmLogging -Message $addAction -FunctionName $functionName -Level "INFO"
-						Add-DbaAgDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $AvailabilityGroup -Database $dbName -SeedingMode Automatic -ErrorAction Stop
+						Add-DbaAgDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $AvailabilityGroup -Database $dbName -SeedingMode Automatic -ErrorAction Stop -EnableException
 						$results += [PSCustomObject]@{
 							SqlInstance  = $SqlInstance
 							DatabaseName = $dbName

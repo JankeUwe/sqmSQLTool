@@ -183,7 +183,7 @@ function Repair-sqmAlwaysOnDatabases
 						
 						# 3.1 Aus AG entfernen
 						Invoke-sqmLogging -Message "Entferne '$dbName' aus AG '$agName'." -FunctionName $functionName -Level "INFO"
-						Remove-DbaAgDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $agName -Database $dbName -Confirm:$false -ErrorAction Stop
+						Remove-DbaAgDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $agName -Database $dbName -Confirm:$false -ErrorAction Stop -EnableException
 						
 						# 3.2 Auf allen Secondaries loeschen
 						$replicas = Get-DbaAgReplica -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $agName
@@ -194,7 +194,7 @@ function Repair-sqmAlwaysOnDatabases
 							if ($secDb)
 							{
 								Invoke-sqmLogging -Message "Loesche '$dbName' auf Secondary '$secondary'." -FunctionName $functionName -Level "INFO"
-								Remove-DbaDatabase -SqlInstance $secondary -SqlCredential $SqlCredential -Database $dbName -Confirm:$false -ErrorAction Stop
+								Remove-DbaDatabase -SqlInstance $secondary -SqlCredential $SqlCredential -Database $dbName -Confirm:$false -ErrorAction Stop -EnableException
 							}
 						}
 						
@@ -203,12 +203,12 @@ function Repair-sqmAlwaysOnDatabases
 						if ($primaryDb.RecoveryModel -ne 'Full')
 						{
 							Invoke-sqmLogging -Message "Setze Recovery-Modus fuer '$dbName' auf Full." -FunctionName $functionName -Level "INFO"
-							Set-DbaDbRecoveryModel -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $dbName -RecoveryModel Full -ErrorAction Stop
+							Set-DbaDbRecoveryModel -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $dbName -RecoveryModel Full -ErrorAction Stop -EnableException
 						}
 						
 						# 3.4 Wieder hinzufuegen (AutoSeed)
 						Invoke-sqmLogging -Message "Fuege '$dbName' wieder zur AG '$agName' hinzu (AutoSeed)." -FunctionName $functionName -Level "INFO"
-						Add-DbaAgDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $agName -Database $dbName -SeedingMode Automatic -ErrorAction Stop
+						Add-DbaAgDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $agName -Database $dbName -SeedingMode Automatic -ErrorAction Stop -EnableException
 						
 						$successMsg = "Reparatur von '$dbName' erfolgreich abgeschlossen."
 						Invoke-sqmLogging -Message $successMsg -FunctionName $functionName -Level "INFO"

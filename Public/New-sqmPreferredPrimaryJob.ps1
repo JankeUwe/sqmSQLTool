@@ -249,7 +249,7 @@ function New-sqmPreferredPrimaryJob
 									 -FrequencySubdayInterval $IntervalMinutes `
 									 -StartTime $startTimeSql `
 									 -Force `
-									 -ErrorAction Stop | Out-Null
+									 -ErrorAction Stop -EnableException | Out-Null
 			}
 
 			$modeText = if ($CheckOnly) { 'CheckOnly (meldet nur)' } else { 'Aktiv (schwenkt zurueck)' }
@@ -260,7 +260,7 @@ function New-sqmPreferredPrimaryJob
 			{
 				if ($PSCmdlet.ShouldProcess($JobName, "Job sofort starten"))
 				{
-					Start-DbaAgentJob @connParams -Job $JobName -ErrorAction Stop | Out-Null
+					Start-DbaAgentJob @connParams -Job $JobName -ErrorAction Stop -EnableException | Out-Null
 					$started = $true
 				}
 			}

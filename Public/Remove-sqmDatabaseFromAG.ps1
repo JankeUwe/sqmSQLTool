@@ -143,7 +143,7 @@ function Remove-sqmDatabaseFromAG
 					try
 					{
 						Invoke-sqmLogging -Message $removeAction -FunctionName $functionName -Level "INFO"
-						Remove-DbaAgDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $agName -Database $dbName -Confirm:$false -ErrorAction Stop
+						Remove-DbaAgDatabase -SqlInstance $SqlInstance -SqlCredential $SqlCredential -AvailabilityGroup $agName -Database $dbName -Confirm:$false -ErrorAction Stop -EnableException
 						$results += [PSCustomObject]@{
 							SqlInstance  = $SqlInstance
 							DatabaseName = $dbName
@@ -180,7 +180,7 @@ function Remove-sqmDatabaseFromAG
 						try
 						{
 							Invoke-sqmLogging -Message $dropAction -FunctionName $functionName -Level "INFO"
-							Remove-DbaDatabase -SqlInstance $secondary -SqlCredential $SqlCredential -Database $dbName -Confirm:$false -ErrorAction Stop
+							Remove-DbaDatabase -SqlInstance $secondary -SqlCredential $SqlCredential -Database $dbName -Confirm:$false -ErrorAction Stop -EnableException
 							$results += [PSCustomObject]@{
 								SqlInstance  = $secondary
 								DatabaseName = $dbName

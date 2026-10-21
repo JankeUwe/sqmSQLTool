@@ -126,7 +126,7 @@ ORDER BY ips.avg_fragmentation_in_percent DESC
             foreach ($db in $dbList) {
                 try {
                     $rows = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
-                                           -Database $db.Name -Query $query -ErrorAction Stop
+                                           -Database $db.Name -Query $query -ErrorAction Stop -EnableException
 
                     foreach ($row in $rows) {
                         # Tabellen-Wildcard-Filter (in PowerShell, da Parametername kein SQL-Parameter ist)

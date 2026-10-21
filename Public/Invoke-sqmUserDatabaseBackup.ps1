@@ -575,7 +575,7 @@ EXEC msdb.dbo.sp_send_dbmail
 "@
 				try {
 					Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
-						-Database msdb -Query $mailSql -ErrorAction Stop
+						-Database msdb -Query $mailSql -ErrorAction Stop -EnableException
 					Invoke-sqmLogging -Message "Backup-Mail gesendet an: $MailTo" -FunctionName $functionName -Level "INFO"
 				}
 				catch {

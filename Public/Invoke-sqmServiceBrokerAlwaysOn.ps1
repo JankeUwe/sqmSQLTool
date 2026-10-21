@@ -223,7 +223,7 @@ ORDER BY ars.role_desc DESC
 						$logContent.Add("  3a. Initiating failover to $instance...") | Out-Null
 						Invoke-sqmLogging -Message "Initiating failover to $instance..." -FunctionName $functionName -Level "INFO"
 
-						Invoke-DbaAgFailover -SqlInstance $instance -AvailabilityGroup $AvailabilityGroupName -ErrorAction Stop | Out-Null
+						Invoke-DbaAgFailover -SqlInstance $instance -AvailabilityGroup $AvailabilityGroupName -ErrorAction Stop -EnableException | Out-Null
 						$logContent.Add("    Status: Failover initiated") | Out-Null
 
 						Start-Sleep -Seconds $WaitBetweenFailovers
@@ -286,7 +286,7 @@ ORDER BY ars.role_desc DESC
 					$logContent.Add("  Initiating failover back to $currentPrimary...") | Out-Null
 					Invoke-sqmLogging -Message "Failing back to original Primary: $currentPrimary" -FunctionName $functionName -Level "INFO"
 
-					Invoke-DbaAgFailover -SqlInstance $currentPrimary -AvailabilityGroup $AvailabilityGroupName -ErrorAction Stop | Out-Null
+					Invoke-DbaAgFailover -SqlInstance $currentPrimary -AvailabilityGroup $AvailabilityGroupName -ErrorAction Stop -EnableException | Out-Null
 					Start-Sleep -Seconds $WaitBetweenFailovers
 					$logContent.Add("  Failback completed") | Out-Null
 					Invoke-sqmLogging -Message "Failback to $currentPrimary completed" -FunctionName $functionName -Level "INFO"

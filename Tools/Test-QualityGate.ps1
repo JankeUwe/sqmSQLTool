@@ -94,11 +94,13 @@ $metricDefinitions = @(
 	@{ Name = 'EmptyCatch'; Kind = 'Ratchet'; Higher = $false; Text = 'Leere catch-Bloecke (verschluckte Fehler)' }
 	@{ Name = 'SuppressMessage'; Kind = 'Ratchet'; Higher = $false; Text = 'SuppressMessageAttribute (stummgeschaltete Analyzer-Regeln)' }
 	@{ Name = 'WmiCmdlets'; Kind = 'Ratchet'; Higher = $false; Text = 'Get-WmiObject & Co. (gibt es unter PS 7 nicht)' }
+	@{ Name = 'DbaStopWithoutException'; Kind = 'Ratchet'; Higher = $false; Text = 'dbatools-Aufruf mit ErrorAction Stop ohne EnableException: wirft bei Fehlern nicht, liefert nur nichts' }
 	@{ Name = 'PublicWithoutTest'; Kind = 'Ratchet'; Higher = $false; Text = 'Public-Funktionen, die in tests\ nirgends vorkommen' }
 	@{ Name = 'BareShouldThrow'; Kind = 'Ratchet'; Higher = $false; Text = 'Should -Throw ohne -ExpectedMessage/-ExceptionType/-ErrorId' }
 	@{ Name = 'SkippedTests'; Kind = 'Ratchet'; Higher = $false; Text = 'It -Skip / Set-ItResult -Skipped/-Inconclusive' }
 	@{ Name = 'PesterFailed'; Kind = 'Floor'; Higher = $false; Text = 'Fehlgeschlagene Pester-Tests (nur mit -Pester)' }
-	@{ Name = 'CoveragePercent'; Kind = 'Ratchet'; Higher = $true; Text = 'Code Coverage Public\ in Prozent (nur mit -Pester)' }
+	# Coverage schwankt ohne Codeaenderung (gemessen: 29,03 -> 28,49 bei identischem Stand), daher Toleranz
+	@{ Name = 'CoveragePercent'; Kind = 'Ratchet'; Higher = $true; Tolerance = 1.0; Text = 'Code Coverage Public\ in Prozent (nur mit -Pester)' }
 )
 
 $results = @{}
@@ -251,6 +253,75 @@ $hits = @(Find-GateAst $testFiles {
 		$cmd -eq 'Set-ItResult' -and @($params | Where-Object { $_.ParameterName -in @('Skipped', 'Inconclusive', 'Pending') }).Count -gt 0
 	})
 Add-GateResult 'SkippedTests' $hits.Count ($hits | ForEach-Object { Format-GateHit $_ $_.Node.Extent.Text.Split("`n")[0].Trim() })
+
+# dbatools-Befehle werfen mit nur -ErrorAction Stop nicht (Stop-Function schreibt eine Warnung und
+# liefert nichts; live geprueft mit Invoke-DbaQuery, Get-DbaDatabase, New-DbaAgentJob u. a., dbatools
+# 2.9.0). Ein try/catch um so einen Aufruf greift nie. ErrorAction und EnableException werden
+# explizit und ueber Splats erkannt; ein Splat-Schluessel zaehlt, wenn er der Variablen in derselben
+# Funktion irgendwo zugewiesen wird (auch bedingt, lieber ein uebersehener Treffer als ein Fehlalarm).
+# Connect-DbaInstance hat kein EnableException (wirft standardmaessig), *-Dbatools* ist Konfiguration.
+function Get-GateSplatKeys
+{
+	param($Scope, [string]$Var)
+	$keys = @{}
+	foreach ($a in $Scope.FindAll({ param($x) $x -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
+	{
+		$left = $a.Left
+		if ($left -is [System.Management.Automation.Language.ConvertExpressionAst]) { $left = $left.Child }
+		if ($left -is [System.Management.Automation.Language.VariableExpressionAst] -and $left.VariablePath.UserPath -eq $Var)
+		{
+			foreach ($h in $a.Right.FindAll({ param($x) $x -is [System.Management.Automation.Language.HashtableAst] }, $true))
+			{
+				foreach ($kv in $h.KeyValuePairs) { $keys[$kv.Item1.Extent.Text.Trim("'`"")] = $kv.Item2.Extent.Text }
+			}
+		}
+		elseif ($left -is [System.Management.Automation.Language.IndexExpressionAst] -and $left.Target.Extent.Text -eq "`$$Var")
+		{
+			$keys[$left.Index.Extent.Text.Trim("'`"")] = $a.Right.Extent.Text
+		}
+		elseif ($left -is [System.Management.Automation.Language.MemberExpressionAst] -and $left.Expression.Extent.Text -eq "`$$Var")
+		{
+			$keys[$left.Member.Extent.Text] = $a.Right.Extent.Text
+		}
+	}
+	foreach ($m in $Scope.FindAll({ param($x) $x -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and $x.Expression.Extent.Text -eq "`$$Var" -and $x.Member.Extent.Text -eq 'Add' }, $true))
+	{
+		if ($m.Arguments.Count -ge 2) { $keys[$m.Arguments[0].Extent.Text.Trim("'`"")] = $m.Arguments[1].Extent.Text }
+	}
+	$keys
+}
+
+$hits = @(Find-GateAst $sourceFiles {
+		param($n)
+		if ($n -isnot [System.Management.Automation.Language.CommandAst]) { return $false }
+		$name = $n.GetCommandName()
+		if (-not $name -or $name -notmatch '^\w+-Dba(?!tools)\w+$' -or $name -eq 'Connect-DbaInstance') { return $false }
+		$ea = $null
+		$enable = $false
+		$els = $n.CommandElements
+		for ($i = 1; $i -lt $els.Count; $i++)
+		{
+			$e = $els[$i]
+			if ($e -is [System.Management.Automation.Language.CommandParameterAst])
+			{
+				$val = if ($e.Argument) { $e.Argument.Extent.Text }
+				elseif ($i + 1 -lt $els.Count -and $els[$i + 1] -isnot [System.Management.Automation.Language.CommandParameterAst]) { $els[$i + 1].Extent.Text }
+				else { '' }
+				if ($e.ParameterName -in @('ErrorAction', 'ea')) { $ea = $val }
+				if ($e.ParameterName -like 'EnableException*') { $enable = $true }
+			}
+			elseif ($e -is [System.Management.Automation.Language.VariableExpressionAst] -and $e.Splatted)
+			{
+				$scope = $n.Parent
+				while ($scope.Parent -and $scope -isnot [System.Management.Automation.Language.FunctionDefinitionAst]) { $scope = $scope.Parent }
+				$keys = Get-GateSplatKeys $scope $e.VariablePath.UserPath
+				if ($keys.ContainsKey('ErrorAction') -and -not $ea) { $ea = $keys['ErrorAction'] }
+				if ($keys.ContainsKey('EnableException')) { $enable = $true }
+			}
+		}
+		($ea -match 'Stop') -and -not $enable
+	})
+Add-GateResult 'DbaStopWithoutException' $hits.Count ($hits | ForEach-Object { Format-GateHit $_ ($_.Node.GetCommandName() + ': -EnableException ergaenzen (dann greift der catch) oder ErrorAction Stop weglassen') })
 
 # --------------------------------------------------------------------------------------------
 # BOM
@@ -428,7 +499,8 @@ $rows = foreach ($def in $metricDefinitions)
 	}
 	else
 	{
-		$worse = if ($def.Higher) { $cur -lt $base } else { $cur -gt $base }
+		$tol = if ($def.Tolerance) { [double]$def.Tolerance } else { 0 }
+		$worse = if ($def.Higher) { $cur -lt ($base - $tol) } else { $cur -gt ($base + $tol) }
 		$better = if ($def.Higher) { $cur -gt $base } else { $cur -lt $base }
 		$status = if ($worse) { 'VERSCHLECHTERT' } elseif ($better) { 'verbessert' } else { 'OK' }
 	}

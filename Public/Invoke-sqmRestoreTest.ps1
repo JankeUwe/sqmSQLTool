@@ -409,7 +409,7 @@ function Invoke-sqmRestoreTest
 			# Wall-Clock-Messung: dbatools' DatabaseRestoreTime hat nur Sekundenaufloesung und
 			# liefert bei kurzen Restores einen stark ueberhoehten Durchsatz.
 			$stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-			$restoreResult = Restore-DbaDatabase @restoreParams
+			$restoreResult = Restore-DbaDatabase @restoreParams -EnableException
 			$stopwatch.Stop()
 
 			$endTime = Get-Date
@@ -498,7 +498,7 @@ function Invoke-sqmRestoreTest
 				{
 					try
 					{
-						$null = Remove-DbaDatabase -SqlInstance $server -Database $TestDatabaseName -Confirm:$false -ErrorAction Stop
+						$null = Remove-DbaDatabase -SqlInstance $server -Database $TestDatabaseName -Confirm:$false -ErrorAction Stop -EnableException
 						$testDbRemoved = $true
 						Invoke-sqmLogging -Message "Test-Datenbank '$TestDatabaseName' entfernt." -FunctionName $functionName -Level "INFO"
 					}
@@ -669,7 +669,7 @@ function Get-sqmBackupHeaderSize
 			{
 				$safe = $t.File.Replace("'", "''")
 				$rows = @(Invoke-DbaQuery -SqlInstance $Server -SqlCredential $SqlCredential -Database 'master' `
-						-Query "RESTORE HEADERONLY FROM DISK = N'$safe'" -As PSObject -ErrorAction Stop |
+						-Query "RESTORE HEADERONLY FROM DISK = N'$safe'" -As PSObject -ErrorAction Stop -EnableException |
 					Where-Object { [int]$_.Position -eq $t.Position })
 				foreach ($row in $rows)
 				{
@@ -704,7 +704,7 @@ function Get-sqmBackupHeaderSize
 		{
 			$safe = $file.Replace("'", "''")
 			$rows = @(Invoke-DbaQuery -SqlInstance $Server -SqlCredential $SqlCredential -Database 'master' `
-					-Query "RESTORE HEADERONLY FROM DISK = N'$safe'" -As PSObject -ErrorAction Stop)
+					-Query "RESTORE HEADERONLY FROM DISK = N'$safe'" -As PSObject -ErrorAction Stop -EnableException)
 			foreach ($row in $rows)
 			{
 				$key = if ($row.BackupSetGUID) { [string]$row.BackupSetGUID } else { "$file|$($row.Position)" }
@@ -769,7 +769,7 @@ function Get-sqmRestoreTestBackupSource
 		# -LastFull nur die neueste Vollsicherung.
 		if ($IncludeChain) { $histParams['Last'] = $true } else { $histParams['LastFull'] = $true }
 
-		$history = @(Get-DbaDbBackupHistory @histParams)
+		$history = @(Get-DbaDbBackupHistory @histParams -EnableException)
 		if ($history.Count -gt 0)
 		{
 			# .Path ist ein String[] (gestripte Backups liefern mehrere Dateien je Sicherung).
@@ -804,7 +804,7 @@ function Get-sqmRestoreTestBackupSource
 	if ([string]::IsNullOrWhiteSpace($root)) { $root = Get-sqmConfig -Key 'BackupDirectory' 3>$null }
 	if ([string]::IsNullOrWhiteSpace($root))
 	{
-		try { $root = (Get-DbaDefaultPath -SqlInstance $Server -ErrorAction Stop).Backup } catch { }
+		try { $root = (Get-DbaDefaultPath -SqlInstance $Server -ErrorAction Stop -EnableException).Backup } catch { }
 	}
 	if ([string]::IsNullOrWhiteSpace($root))
 	{
@@ -814,7 +814,7 @@ function Get-sqmRestoreTestBackupSource
 	Invoke-sqmLogging -Message "Verzeichnis-Scan nach Vollsicherung von '$DatabaseName' unter: $root" `
 		-FunctionName $FunctionName -Level "INFO"
 
-	$found = @(Get-DbaFile -SqlInstance $Server -Path $root -Depth 4 -FileType bak -ErrorAction Stop |
+	$found = @(Get-DbaFile -SqlInstance $Server -Path $root -Depth 4 -FileType bak -ErrorAction Stop -EnableException |
 		Select-Object -ExpandProperty Filename)
 
 	# Ola-Namensschema: <Server>_<DB>_FULL_<yyyyMMdd>_<HHmmss>[_<n>].bak

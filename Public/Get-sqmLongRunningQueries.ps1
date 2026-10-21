@@ -256,7 +256,7 @@ ORDER BY DurationSeconds DESC
 						# Kein explizites -ErrorAction: $connParams traegt bereits ErrorAction = 'Stop'
 						# (doppelte Bindung crasht unter Windows PowerShell 5.1). Ein fehlender Plan
 						# ist hier unkritisch und wird vom catch unten ohnehin verschluckt.
-						$planResult = Invoke-DbaQuery @connParams -Query $planQuery
+						$planResult = Invoke-DbaQuery @connParams -Query $planQuery -EnableException
 						if ($planResult) { $entry.QueryPlanXml = $planResult.query_plan }
 					}
 					catch { <# Plan nicht verfuegbar - ignorieren #> }

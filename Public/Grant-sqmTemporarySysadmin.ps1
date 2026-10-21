@@ -215,11 +215,11 @@ JOIN sys.dm_hadr_availability_replica_states rs ON rs.replica_id = ar.replica_id
 
 			$existing = Get-DbaAgentJob -SqlInstance $TargetInstance -Job $Name -ErrorAction SilentlyContinue
 			if ($existing -and -not $Force) { throw "Job '$Name' existiert auf '$TargetInstance' bereits. -Force zum Ueberschreiben." }
-			if ($existing -and $Force) { Remove-DbaAgentJob -SqlInstance $TargetInstance -Job $Name -Confirm:$false -ErrorAction Stop }
+			if ($existing -and $Force) { Remove-DbaAgentJob -SqlInstance $TargetInstance -Job $Name -Confirm:$false -ErrorAction Stop -EnableException }
 
-			$null = New-DbaAgentJob -SqlInstance $TargetInstance -Job $Name -Description $Description -ErrorAction Stop
+			$null = New-DbaAgentJob -SqlInstance $TargetInstance -Job $Name -Description $Description -ErrorAction Stop -EnableException
 			$null = New-DbaAgentJobStep -SqlInstance $TargetInstance -Job $Name -StepName 'Run' `
-				-Subsystem 'CmdExec' -Command $Command -ErrorAction Stop
+				-Subsystem 'CmdExec' -Command $Command -ErrorAction Stop -EnableException
 
 			$schedName = "sch_$Name"
 			$startDateInt = [int]$When.ToString('yyyyMMdd')

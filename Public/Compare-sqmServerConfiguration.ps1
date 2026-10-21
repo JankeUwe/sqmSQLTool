@@ -227,7 +227,7 @@ WHERE sp.type IN ('S','U','G')
 
 		function Get-LoginMap($inst)
 		{
-			$rows = Invoke-DbaQuery -SqlInstance $inst -SqlCredential $SqlCredential -Query $loginQuery -ErrorAction Stop
+			$rows = Invoke-DbaQuery -SqlInstance $inst -SqlCredential $SqlCredential -Query $loginQuery -ErrorAction Stop -EnableException
 			$map = @{}
 			foreach ($r in $rows) { $map[$r.LoginName.ToLowerInvariant()] = $r }
 			return $map
@@ -435,8 +435,8 @@ WHERE sp.type IN ('S','U','G')
 				# Linked Servers
 				try
 				{
-					$srcLS = @(Get-DbaLinkedServer -SqlInstance $SourceInstance -SqlCredential $SqlCredential -ErrorAction Stop)
-					$tgtLS = @(Get-DbaLinkedServer -SqlInstance $TargetInstance -SqlCredential $SqlCredential -ErrorAction Stop)
+					$srcLS = @(Get-DbaLinkedServer -SqlInstance $SourceInstance -SqlCredential $SqlCredential -ErrorAction Stop -EnableException)
+					$tgtLS = @(Get-DbaLinkedServer -SqlInstance $TargetInstance -SqlCredential $SqlCredential -ErrorAction Stop -EnableException)
 					$allLsNames = ($srcLS.Name + $tgtLS.Name) | Where-Object { $_ } | Sort-Object -Unique
 					foreach ($n in $allLsNames)
 					{
@@ -453,8 +453,8 @@ WHERE sp.type IN ('S','U','G')
 				# Credentials
 				try
 				{
-					$srcCred = @(Get-DbaCredential -SqlInstance $SourceInstance -SqlCredential $SqlCredential -ErrorAction Stop)
-					$tgtCred = @(Get-DbaCredential -SqlInstance $TargetInstance -SqlCredential $SqlCredential -ErrorAction Stop)
+					$srcCred = @(Get-DbaCredential -SqlInstance $SourceInstance -SqlCredential $SqlCredential -ErrorAction Stop -EnableException)
+					$tgtCred = @(Get-DbaCredential -SqlInstance $TargetInstance -SqlCredential $SqlCredential -ErrorAction Stop -EnableException)
 					$allCredNames = ($srcCred.Name + $tgtCred.Name) | Where-Object { $_ } | Sort-Object -Unique
 					foreach ($n in $allCredNames)
 					{
@@ -470,8 +470,8 @@ WHERE sp.type IN ('S','U','G')
 				# SQL-Agent-Jobs
 				try
 				{
-					$srcJobs = @(Get-DbaAgentJob -SqlInstance $SourceInstance -SqlCredential $SqlCredential -ErrorAction Stop)
-					$tgtJobs = @(Get-DbaAgentJob -SqlInstance $TargetInstance -SqlCredential $SqlCredential -ErrorAction Stop)
+					$srcJobs = @(Get-DbaAgentJob -SqlInstance $SourceInstance -SqlCredential $SqlCredential -ErrorAction Stop -EnableException)
+					$tgtJobs = @(Get-DbaAgentJob -SqlInstance $TargetInstance -SqlCredential $SqlCredential -ErrorAction Stop -EnableException)
 					$allJobNames = ($srcJobs.Name + $tgtJobs.Name) | Where-Object { $_ } | Sort-Object -Unique
 					foreach ($n in $allJobNames)
 					{
@@ -488,8 +488,8 @@ WHERE sp.type IN ('S','U','G')
 				# Endpoints
 				try
 				{
-					$srcEp = @(Get-DbaEndpoint -SqlInstance $SourceInstance -SqlCredential $SqlCredential -ErrorAction Stop)
-					$tgtEp = @(Get-DbaEndpoint -SqlInstance $TargetInstance -SqlCredential $SqlCredential -ErrorAction Stop)
+					$srcEp = @(Get-DbaEndpoint -SqlInstance $SourceInstance -SqlCredential $SqlCredential -ErrorAction Stop -EnableException)
+					$tgtEp = @(Get-DbaEndpoint -SqlInstance $TargetInstance -SqlCredential $SqlCredential -ErrorAction Stop -EnableException)
 					$allEpNames = ($srcEp.Name + $tgtEp.Name) | Where-Object { $_ } | Sort-Object -Unique
 					foreach ($n in $allEpNames)
 					{
@@ -506,8 +506,8 @@ WHERE sp.type IN ('S','U','G')
 				# Database Mail Profile
 				try
 				{
-					$srcMail = @(Get-DbaDbMailProfile -SqlInstance $SourceInstance -SqlCredential $SqlCredential -ErrorAction Stop)
-					$tgtMail = @(Get-DbaDbMailProfile -SqlInstance $TargetInstance -SqlCredential $SqlCredential -ErrorAction Stop)
+					$srcMail = @(Get-DbaDbMailProfile -SqlInstance $SourceInstance -SqlCredential $SqlCredential -ErrorAction Stop -EnableException)
+					$tgtMail = @(Get-DbaDbMailProfile -SqlInstance $TargetInstance -SqlCredential $SqlCredential -ErrorAction Stop -EnableException)
 					$allMailNames = ($srcMail.Name + $tgtMail.Name) | Where-Object { $_ } | Sort-Object -Unique
 					foreach ($n in $allMailNames)
 					{

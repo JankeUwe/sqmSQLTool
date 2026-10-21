@@ -230,7 +230,7 @@ function Copy-sqmLogins
 			# Kein explizites -ErrorAction: $srcConnParams traegt bereits ErrorAction = 'Stop'.
 			# Beides zusammen ist unter Windows PowerShell 5.1 eine doppelte Parameterbindung
 			# (ParameterAlreadyBound), die PS 7 stillschweigend toleriert.
-			$saLoginName = (Invoke-DbaQuery @srcConnParams -Query "SELECT SUSER_SNAME(0x01) AS n").n
+			$saLoginName = (Invoke-DbaQuery @srcConnParams -Query "SELECT SUSER_SNAME(0x01) AS n" -EnableException).n
 			if (-not [string]::IsNullOrWhiteSpace($saLoginName))
 			{
 				$systemLoginPatterns += $saLoginName
@@ -251,7 +251,7 @@ function Copy-sqmLogins
 		try
 		{
 			$query = "SELECT name FROM sys.server_principals WHERE (is_srvrolemember('sysadmin', name) = 1 OR sid = 0x01) AND name NOT LIKE '##%'"
-			$sysAdminLogins = @((Invoke-DbaQuery @srcConnParams -Query $query).name)
+			$sysAdminLogins = @((Invoke-DbaQuery @srcConnParams -Query $query -EnableException).name)
 			if ($sysAdminLogins.Count -gt 0)
 			{
 				Invoke-sqmLogging -Message "Gefundene sysadmin-Logins: $($sysAdminLogins -join ', ')" `

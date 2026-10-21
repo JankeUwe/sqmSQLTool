@@ -135,7 +135,7 @@ $typeFilter
 			{
 				try
 				{
-					$rows = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $db.Name -Query $query -ErrorAction Stop
+					$rows = Invoke-DbaQuery -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $db.Name -Query $query -ErrorAction Stop -EnableException
 					foreach ($row in $rows)
 					{
 						$allResults.Add([PSCustomObject]@{

@@ -137,14 +137,14 @@ WITH COMPRESSION, INIT, NAME = 'Log Backup $DatabaseName'
 RESTORE DATABASE [$DatabaseName] FROM DISK = @BackupPath
     WITH NORECOVERY, REPLACE
 "@
-				Invoke-DbaQuery @secondaryConnParams -Query $restoreSql -SqlParameters @{ BackupPath = $backupFile } -ErrorAction Stop
+				Invoke-DbaQuery @secondaryConnParams -Query $restoreSql -SqlParameters @{ BackupPath = $backupFile } -ErrorAction Stop -EnableException
 
 				# Restore log
 				$restoreLogSql = @"
 RESTORE LOG [$DatabaseName] FROM DISK = @BackupPath
     WITH NORECOVERY
 "@
-				Invoke-DbaQuery @secondaryConnParams -Query $restoreLogSql -SqlParameters @{ BackupPath = $logBackupFile } -ErrorAction Stop
+				Invoke-DbaQuery @secondaryConnParams -Query $restoreLogSql -SqlParameters @{ BackupPath = $logBackupFile } -ErrorAction Stop -EnableException
 
 				$stepResults.Add([PSCustomObject]@{ Step = 'Restore DB'; Status = 'OK'; Details = "Database restored to secondary" })
 			}

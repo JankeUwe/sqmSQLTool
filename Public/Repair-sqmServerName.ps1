@@ -197,7 +197,7 @@ SELECT
 			try
 			{
 				_Log "Fuehre sp_addserver '$expectedName' (local) aus." 'INFO'
-				Invoke-DbaQuery @connParams -Database 'master' -Query "EXEC sp_addserver @server = N'$newEsc', local;" -ErrorAction Stop | Out-Null
+				Invoke-DbaQuery @connParams -Database 'master' -Query "EXEC sp_addserver @server = N'$newEsc', local;" -ErrorAction Stop -EnableException | Out-Null
 			}
 			catch
 			{

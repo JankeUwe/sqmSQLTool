@@ -401,7 +401,7 @@ function New-sqmBackupMaintenanceJob
 				try
 				{
 					$regQuery = "DECLARE @BackupDirectory NVARCHAR(4000); EXEC master.dbo.xp_instance_regread N'HKEY_LOCAL_MACHINE', N'SOFTWARE\Microsoft\MSSQLServer\MSSQLServer', N'BackupDirectory', @BackupDirectory OUTPUT; SELECT @BackupDirectory AS BackupDirectory;"
-					$regResult = Invoke-DbaQuery @connParams -Query $regQuery -ErrorAction Stop
+					$regResult = Invoke-DbaQuery @connParams -Query $regQuery -ErrorAction Stop -EnableException
 					if ($regResult.BackupDirectory) { $effBackupDir = $regResult.BackupDirectory }
 				}
 				catch { }

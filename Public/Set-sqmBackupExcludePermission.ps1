@@ -132,7 +132,7 @@ function Set-sqmBackupExcludePermission
 				if ($PSCmdlet.ShouldProcess($SqlInstance, $actionMsg))
 				{
 					Invoke-sqmLogging -Message "Login '$LoginName' nicht gefunden. Wird erstellt." -FunctionName $functionName -Level "INFO"
-					New-DbaLogin @connParams -Login $LoginName -ErrorAction Stop | Out-Null
+					New-DbaLogin @connParams -Login $LoginName -ErrorAction Stop -EnableException | Out-Null
 					Invoke-sqmLogging -Message "Login '$LoginName' erfolgreich erstellt." -FunctionName $functionName -Level "INFO"
 				}
 				else
@@ -157,7 +157,7 @@ function Set-sqmBackupExcludePermission
 				if ($PSCmdlet.ShouldProcess("master", $actionMsg))
 				{
 					Invoke-sqmLogging -Message "Datenbankbenutzer '$LoginName' in master nicht gefunden. Wird erstellt." -FunctionName $functionName -Level "INFO"
-					New-DbaDbUser @connParams -Database master -Login $LoginName -ErrorAction Stop | Out-Null
+					New-DbaDbUser @connParams -Database master -Login $LoginName -ErrorAction Stop -EnableException | Out-Null
 					Invoke-sqmLogging -Message "Datenbankbenutzer '$LoginName' in master erstellt." -FunctionName $functionName -Level "INFO"
 				}
 				else
