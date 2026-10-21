@@ -9,7 +9,11 @@
     - Validates that ScriptPath and LogPath exist (LogPath is created if missing)
     - Optionally creates a full database backup in a Sonderbackup subdirectory
     - Scans every script for USE DATABASE mismatches and nested BEGIN TRANSACTION statements
-    - Wraps all scripts in one outer transaction by default (COMMIT on full success, ROLLBACK on any error)
+    - Wraps all scripts in one outer transaction by default (COMMIT on full success, ROLLBACK on any error).
+      The wrapper runs BEGIN, every script and COMMIT/ROLLBACK over one dedicated, non-pooled connection.
+      A script that ends the wrapper transaction (COMMIT/ROLLBACK) or leaves its own transaction open
+      counts as failed. The summary object reports TransactionStatus (Committed, RolledBack,
+      EndedByScript, Unknown, NotWrapped).
     - Writes a detailed .log and .csv file to LogPath
     - Returns a result object per script plus an overall summary object
 
@@ -453,7 +457,14 @@ function Invoke-sqmDeployScripts
 		# ----------------------------------------------------------------
 		# Script execution
 		# ----------------------------------------------------------------
+		# Mit Wrapper-Transaktion laufen BEGIN, alle Skripte und COMMIT/ROLLBACK ueber EINE eigene,
+		# nicht gepoolte SMO-Verbindung. Invoke-DbaQuery setzt die Sitzung zwischen zwei Aufrufen zurueck
+		# (live: gleiche SPID, aber @@TRANCOUNT wieder 0, auch mit -NonPooledConnection); ein BEGIN
+		# TRANSACTION per Invoke-DbaQuery schuetzte deshalb nichts, jedes Skript war sofort festgeschrieben.
+		# ServerConnection.ExecuteNonQuery versteht GO-Trenner wie Invoke-DbaQuery.
 		$transactionActive = $false
+		$transactionStatus = if ($NoWrapTransaction) { 'NotWrapped' } else { 'NotStarted' }
+		$txConn = $null
 		$queryParams = @{
 			SqlInstance   = $server
 			Database      = $Database
@@ -461,17 +472,65 @@ function Invoke-sqmDeployScripts
 			EnableException = $true
 		}
 
+		# @@TRANCOUNT der Wrapper-Verbindung; -1 wenn die Verbindung nicht mehr antwortet
+		function _TxTranCount
+		{
+			try { return [int]$txConn.ExecuteScalar('SELECT @@TRANCOUNT') }
+			catch
+			{
+				Write-Verbose "@@TRANCOUNT nicht lesbar: $($_.Exception.Message)"
+				return -1
+			}
+		}
+
+		# Nach einem Fehler: offene Transaktion zuruecknehmen und den tatsaechlichen Zustand loggen
+		function _TxUndo
+		{
+			param ([string]$Reason)
+			$tc = _TxTranCount
+			if ($tc -gt 0)
+			{
+				try
+				{
+					$txConn.RollBackTransaction()
+					_Log "ROLLBACK TRANSACTION ($Reason)" -Level 'ERROR'
+					return 'RolledBack'
+				}
+				catch
+				{
+					_Log "Failed to rollback transaction ($Reason): $($_.Exception.GetBaseException().Message). SQL Server rolls the transaction back when the session ends; the connection is closed now." -Level 'ERROR'
+					return 'Unknown'
+				}
+			}
+			if ($tc -eq 0)
+			{
+				_Log "Wrapper transaction was already ended inside SQL Server ($Reason): by XACT_ABORT or a severe error (changes rolled back) or by COMMIT/ROLLBACK inside the script. Check whether changes of the failed script were committed." -Level 'ERROR'
+				return 'EndedByScript'
+			}
+			_Log "Connection lost ($Reason). SQL Server rolls back an open transaction when the session ends; verify the database state." -Level 'ERROR'
+			return 'Unknown'
+		}
+
 		if (-not $NoWrapTransaction)
 		{
 			try
 			{
-				Invoke-DbaQuery @queryParams -Query 'BEGIN TRANSACTION' | Out-Null
+				$txServer = Connect-DbaInstance @connParams -Database $Database -NonPooledConnection -ErrorAction Stop
+				$txConn = $txServer.ConnectionContext
+				$txConn.StatementTimeout = $QueryTimeout
+				$null = $txConn.ExecuteNonQuery("USE [$($Database -replace '\]', ']]')]")
+				$txConn.BeginTransaction()
 				$transactionActive = $true
-				_Log 'BEGIN TRANSACTION (wrapper)'
+				$transactionStatus = 'Open'
+				_Log "BEGIN TRANSACTION (wrapper, dedicated connection, SPID $($txConn.ExecuteScalar('SELECT @@SPID')))"
 			}
 			catch
 			{
-				_Log "Failed to start wrapper transaction: $($_.Exception.Message)" -Level 'ERROR'
+				_Log "Failed to start wrapper transaction: $($_.Exception.GetBaseException().Message)" -Level 'ERROR'
+				if ($txConn)
+				{
+					try { $txConn.Disconnect() } catch { Write-Verbose "Disconnect: $($_.Exception.Message)" }
+				}
 				throw
 			}
 		}
@@ -500,7 +559,22 @@ function Invoke-sqmDeployScripts
 
 			try
 			{
-				Invoke-DbaQuery @queryParams -Query $scriptContent -MessagesToOutput | Out-Null
+				if ($txConn)
+				{
+					$null = $txConn.ExecuteNonQuery($scriptContent)
+					# Ein Skript darf die Wrapper-Transaktion weder beenden (COMMIT/ROLLBACK) noch eine
+					# eigene offen lassen; sonst liefen die folgenden Skripte ungeschuetzt bzw. das
+					# abschliessende COMMIT wuerde nur die innere Ebene schliessen.
+					$tc = _TxTranCount
+					if ($tc -ne 1)
+					{
+						throw "Script changed the transaction nesting: @@TRANCOUNT is $tc after the script, expected 1 (COMMIT/ROLLBACK without matching BEGIN, or BEGIN TRANSACTION without COMMIT)."
+					}
+				}
+				else
+				{
+					Invoke-DbaQuery @queryParams -Query $scriptContent -MessagesToOutput | Out-Null
+				}
 				$duration = ((Get-Date) - $scriptStart).TotalSeconds
 				$durStr   = [math]::Round($duration, 1)
 
@@ -519,7 +593,8 @@ function Invoke-sqmDeployScripts
 			{
 				$duration  = ((Get-Date) - $scriptStart).TotalSeconds
 				$durStr    = [math]::Round($duration, 1)
-				$errMsg    = $_.Exception.Message
+				# SMO verpackt den SQL-Fehler in ExecutionFailureException; die Ursache steht innen
+				$errMsg    = $_.Exception.GetBaseException().Message
 				$anyFailed = $true
 
 				_Log "[FAIL] $($s.File.Name)  (${durStr}s)" -Level 'ERROR'
@@ -534,45 +609,36 @@ function Invoke-sqmDeployScripts
 					ExecutedAt      = $scriptStart
 				})
 
-				if (-not $NoWrapTransaction -and $transactionActive)
+				if ($txConn -and $transactionActive)
 				{
-					try
-					{
-						Invoke-DbaQuery @queryParams -Query 'ROLLBACK TRANSACTION' | Out-Null
-						$transactionActive = $false
-						_Log 'ROLLBACK TRANSACTION' -Level 'ERROR'
-					}
-					catch
-					{
-						_Log "Failed to rollback transaction: $($_.Exception.Message)" -Level 'ERROR'
-					}
+					$transactionStatus = _TxUndo -Reason "$($s.File.Name) failed"
+					$transactionActive = $false
 				}
 			}
 		}
 
-		if (-not $NoWrapTransaction -and $transactionActive)
+		if ($txConn -and $transactionActive)
 		{
 			try
 			{
-				Invoke-DbaQuery @queryParams -Query 'COMMIT TRANSACTION' | Out-Null
+				$txConn.CommitTransaction()
+				$transactionStatus = 'Committed'
 				_Log 'COMMIT TRANSACTION'
 			}
 			catch
 			{
-				_Log "Failed to commit transaction: $($_.Exception.Message)" -Level 'ERROR'
-				try
-				{
-					Invoke-DbaQuery @queryParams -Query 'ROLLBACK TRANSACTION' | Out-Null
-					_Log 'ROLLBACK TRANSACTION (commit failed)' -Level 'ERROR'
-				}
-				catch
-				{
-					# Weder COMMIT noch ROLLBACK: der Zustand der Transaktion ist offen und muss im Log stehen.
-					_Log "Failed to rollback transaction after failed commit: $($_.Exception.Message). Transaction state on $SqlInstance/$Database is unknown, check for open transactions (DBCC OPENTRAN)." -Level 'ERROR'
-				}
+				_Log "Failed to commit transaction: $($_.Exception.GetBaseException().Message)" -Level 'ERROR'
+				$transactionStatus = _TxUndo -Reason 'commit failed'
 				$anyFailed = $true
 			}
+			$transactionActive = $false
 		}
+
+		if ($txConn)
+		{
+			try { $txConn.Disconnect() } catch { Write-Verbose "Disconnect: $($_.Exception.Message)" }
+		}
+		if (-not $NoWrapTransaction) { _Log "  Transaction: $transactionStatus" }
 
 		# ----------------------------------------------------------------
 		# Compute summary stats
@@ -632,7 +698,8 @@ function Invoke-sqmDeployScripts
 		# ----------------------------------------------------------------
 		# Build summary object
 		# ----------------------------------------------------------------
-		$overallStatus2 = if (($results | Where-Object Status -eq 'Failed').Count -gt 0) { 'FAILED' } else { 'SUCCESS' }
+		# $anyFailed deckt auch einen gescheiterten COMMIT ab (kein Skript Failed, trotzdem nichts festgeschrieben)
+		$overallStatus2 = if ($anyFailed -or ($results | Where-Object Status -eq 'Failed').Count -gt 0) { 'FAILED' } else { 'SUCCESS' }
 
 		$summaryObj = [PSCustomObject]@{
 			OverallStatus        = $overallStatus2
@@ -641,6 +708,7 @@ function Invoke-sqmDeployScripts
 			Failed               = @($results | Where-Object Status -eq 'Failed').Count
 			Skipped              = @($results | Where-Object Status -eq 'Skipped').Count
 			NotExecuted          = @($results | Where-Object Status -eq 'NotExecuted').Count
+			TransactionStatus    = $transactionStatus
 			BackupFile           = $backupFile
 			LogFile              = $logFile
 			CsvFile              = $csvFile

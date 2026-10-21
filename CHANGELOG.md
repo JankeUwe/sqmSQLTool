@@ -1,5 +1,40 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.188.0] - 2026-10-21
+
+### Fix: `Invoke-sqmDeployScripts` - Wrapper-Transaktion schuetzte nicht
+
+- **Ursache:** `BEGIN TRANSACTION`, jedes Skript und `COMMIT` liefen als getrennte `Invoke-DbaQuery`-Aufrufe.
+  `Invoke-DbaQuery` setzt die Sitzung zwischen zwei Aufrufen zurueck: live auf DEV01 gleiche SPID, aber
+  `@@TRANCOUNT` im naechsten Aufruf wieder 0, auch mit `-NonPooledConnection`. Jedes Skript war sofort
+  festgeschrieben; ein Fehler in Skript 2 liess die Aenderungen von Skript 1 stehen, und `COMMIT` meldete
+  "keine entsprechende BEGIN TRANSACTION".
+- **Jetzt:** BEGIN, alle Skripte und COMMIT/ROLLBACK laufen ueber eine eigene, nicht gepoolte
+  SMO-Verbindung (`ServerConnection`). GO-Trenner funktionieren wie bisher.
+- Nach jedem Skript wird `@@TRANCOUNT` geprueft. Ein Skript, das die Wrapper-Transaktion selbst beendet
+  (`COMMIT`/`ROLLBACK`) oder eine eigene offen laesst, gilt als fehlgeschlagen; sonst liefen die folgenden
+  Skripte ungeschuetzt bzw. das COMMIT schloesse nur die innere Ebene.
+- ROLLBACK nur, wenn noch eine Transaktion offen ist (nach `XACT_ABORT` hat SQL Server sie schon beendet).
+- Neues Feld `TransactionStatus` im Summary-Objekt und Zeile `Transaction:` im Log: `Committed`,
+  `RolledBack`, `EndedByScript`, `Unknown`, `NotWrapped`.
+- `OverallStatus` im Summary-Objekt war `SUCCESS`, wenn kein Skript scheiterte, aber das COMMIT; jetzt `FAILED`.
+- Fehlermeldungen nennen die SQL-Ursache statt der SMO-Huelle ("An exception occurred while executing...").
+- `-NoWrapTransaction` laeuft unveraendert ueber `Invoke-DbaQuery`.
+
+Live auf DEV01 (Windows PowerShell 5.1) geprueft: Erfolg mit GO-Batches (festgeschrieben), Laufzeitfehler
+in Skript 2 (auch Skript 1 zurueckgenommen, Skript 3 nicht ausgefuehrt), COMMIT im Skript, offen gelassene
+Transaktion, `XACT_ABORT`, Timeout, `-NoWrapTransaction`; danach keine Sitzung mit offener Transaktion.
+
+### Tests
+
+- `tests/Unit/Public/Invoke-sqmDeployScripts.Tests.ps1` (neu, 7 Tests) mit einer nachgebauten
+  `ServerConnection`, die `@@TRANCOUNT` wie SQL Server fuehrt. Alle 7 schlagen mit 1.9.187.0 fehl.
+  Der Deploy-Test aus `ErrorPathHardening.Tests.ps1` ist darin aufgegangen.
+- Quality Gate: Bei `-Pester` steht zu jedem fehlgeschlagenen Test jetzt die Fehlermeldung in der Ausgabe.
+
+**Bekannt, nicht geaendert:** Enthaelt ein Skript `BEGIN TRANSACTION`, fragt die Vorpruefung per `Read-Host`
+nach, auch mit `-Confirm:$false`. Unter `-NonInteractive` (z. B. Agent-Job) bricht der Lauf dort ab.
+
 ## [1.9.187.0] - 2026-10-21
 
 ### Fix: verschluckte Fehler in sechs Funktionen

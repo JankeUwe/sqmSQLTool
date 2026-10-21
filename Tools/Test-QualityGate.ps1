@@ -359,7 +359,8 @@ $cfg = . (Join-Path $Root 'tests\pester.config.ps1')
 $cfg.Run.PassThru = $true
 $cfg.Output.Verbosity = 'None'
 $r = Invoke-Pester -Configuration $cfg
-$failed = @($r.Failed | ForEach-Object { $_.ExpandedPath })
+$failed = @($r.Failed | ForEach-Object { $_.ExpandedPath + ' -> ' + (($_.ErrorRecord | Select-Object -First 1).Exception.Message -replace '\s+', ' ') })
+'GATE-ENV ' + (@{ Pester = "$((Get-Module Pester).Version)"; dbatools = "$((Get-Module dbatools).Version) $((Get-Module dbatools).ModuleBase)" } | ConvertTo-Json -Compress)
 'GATE-RESULT ' + (@{ Failed = $r.FailedCount; Passed = $r.PassedCount; Coverage = [math]::Round($r.CodeCoverage.CoveragePercent, 2); FailedNames = $failed } | ConvertTo-Json -Compress)
 '@
 	try
@@ -374,6 +375,7 @@ $failed = @($r.Failed | ForEach-Object { $_.ExpandedPath })
 		$line = $out | Where-Object { $_ -like 'GATE-RESULT *' } | Select-Object -Last 1
 		if (-not $line) { throw "Pester lieferte kein Ergebnis:`n$($out -join "`n")" }
 		$pr = $line.Substring(12) | ConvertFrom-Json
+		$out | Where-Object { $_ -like 'GATE-ENV *' } | ForEach-Object { Write-Verbose $_ }
 		Add-GateResult 'PesterFailed' $pr.Failed @($pr.FailedNames)
 		Add-GateResult 'CoveragePercent' $pr.Coverage @("$($pr.Passed) Tests bestanden")
 	}

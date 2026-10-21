@@ -102,32 +102,6 @@ Describe 'Enable-sqmServiceBroker - Rollback auf MULTI_USER scheitert' {
     }
 }
 
-Describe 'Invoke-sqmDeployScripts - COMMIT und ROLLBACK scheitern' {
-    BeforeEach {
-        $script:Scripts = Join-Path $script:TestDir ([guid]::NewGuid().ToString('N'))
-        $script:Logs = Join-Path $script:TestDir ([guid]::NewGuid().ToString('N'))
-        $null = New-Item -ItemType Directory -Path $script:Scripts, $script:Logs -Force
-        Set-Content -Path (Join-Path $script:Scripts '01_test.sql') -Value 'SELECT 1'
-        Mock -ModuleName sqmSQLTool Invoke-sqmLogging { }
-        Mock -ModuleName sqmSQLTool Write-Host { }
-        # Ein String bindet an DbaInstanceParameter, ein pscustomobject nicht
-        Mock -ModuleName sqmSQLTool Connect-DbaInstance { 'SQL01' }
-        Mock -ModuleName sqmSQLTool Invoke-DbaQuery {
-            if ($Query -eq 'COMMIT TRANSACTION') { throw 'Commit-Fehler' }
-            if ($Query -eq 'ROLLBACK TRANSACTION') { throw 'Verbindung weg' }
-        }
-    }
-
-    It 'schreibt den gescheiterten ROLLBACK ins Log statt ihn zu verschlucken' {
-        $r = Invoke-sqmDeployScripts -SqlInstance 'SQL01' -Database 'App' -ScriptPath $script:Scripts -LogPath $script:Logs -SkipBackup -Confirm:$false
-        $log = (Get-ChildItem $script:Logs -File -Recurse | ForEach-Object { Get-Content $_.FullName -Raw }) -join "`n"
-        $log | Should -Match 'Failed to commit transaction: Commit-Fehler'
-        $log | Should -Match 'Failed to rollback transaction after failed commit: Verbindung weg'
-        $log | Should -Match 'DBCC OPENTRAN'
-        $log | Should -Match 'RESULT\s+:\s+FAILED'
-    }
-}
-
 Describe 'Invoke-sqmSetupReport - sysadmin-Mitglieder nicht ermittelbar' {
     BeforeEach {
         $script:Out = Join-Path $script:TestDir ([guid]::NewGuid().ToString('N'))
