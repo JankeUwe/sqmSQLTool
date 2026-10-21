@@ -1,4 +1,4 @@
-@{
+﻿@{
     # CI gates on Error-severity findings only.
     Severity = @('Error')
 

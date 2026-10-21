@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Liefert die gemeinsame Definition der von Export-/Import-sqmDatabaseSettings erfassten bzw.
     angewendeten Datenbank-Optionen (SSMS "Database Properties -> Options"-Seite).
