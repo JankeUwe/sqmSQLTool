@@ -1,5 +1,51 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.187.0] - 2026-10-21
+
+### Fix: verschluckte Fehler in sechs Funktionen
+
+Leere `catch`-Bloecke haben Fehler verschwiegen, die zu einem falschen Status oder Bericht fuehrten.
+Dabei zeigte sich: `Invoke-DbaQuery` wirft mit nur `-ErrorAction Stop` bei einem SQL-Fehler **nicht**,
+sondern liefert 0 Zeilen (live geprueft, dbatools 2.9.0). Mehrere Schutzpruefungen erreichten ihren
+`catch` deshalb nie, auch wenn er nicht leer war.
+
+- **`Remove-sqmAdOrphanLogin`:** Die Abfragen liefen ohne `-EnableException`. Schlug die sysadmin-Abfrage
+  fehl, war die Liste leer statt abzubrechen; schlug die DB-Owner-Pruefung fehl, galt das als "besitzt
+  keine Datenbank". Jetzt mit `-EnableException`; eine gescheiterte Owner-Pruefung ueberspringt das Login
+  (`Skipped`, "DB-Owner-Pruefung fehlgeschlagen").
+- **`Sync-sqmAgNode`:** Ein gescheitertes `Repair-DbaDbOrphanUser` wurde verschluckt und trotzdem
+  `Success` gemeldet. Jetzt je Datenbank `Failed` mit Meldung; `Success` nennt "n von m" Datenbanken.
+- **`Invoke-sqmSetupReport`:** Schlug die Abfrage der sysadmin-Mitglieder fehl (Abfrage ohne
+  `-EnableException`), zeigte die Karte "None" ohne Warnung, also einen sauberen Befund ohne Pruefung.
+  Jetzt "(nicht ermittelbar)", rote Karte und "FEHLER: ... BUILTIN-Pruefung nicht durchgefuehrt".
+- **`Enable-sqmServiceBroker`:** Scheiterte nach einem Broker-Fehler auch das Zuruecksetzen auf
+  `MULTI_USER`, nannte die Fehlermeldung nur den Broker-Fehler. Jetzt steht drin, dass die Datenbank
+  noch in `SINGLE_USER` ist, mit dem Befehl zum manuellen Zuruecksetzen.
+- **`Invoke-sqmDeployScripts`:** Ein gescheiterter `ROLLBACK` nach gescheitertem `COMMIT` steht jetzt im
+  Log statt verschluckt zu werden.
+- **`Get-sqmCertificateReport`:** Waren Endpoint- oder TDE-Zuordnung nicht lesbar (z. B. fehlendes
+  `VIEW SERVER STATE`), erschienen TDE- und Endpoint-Zertifikate als `UserDefined`. Jetzt Hinweis im
+  Ergebnis (`PurposeWarnings`), im Text- und im HTML-Bericht.
+
+### Fix: `Invoke-sqmDeployScripts` brach am Ende jedes Laufs ab
+
+`_Log ''` (Leerzeile im Abschlussblock) rief `Invoke-sqmLogging -Message ''` auf; `-Message` ist
+Pflicht und lehnt leere Zeichenfolgen ab. Jeder Lauf endete deshalb nach dem Deployment mit
+"Das Argument kann nicht an den Parameter 'Message' gebunden werden" (seit Einfuehrung der Funktion).
+Leerzeilen gehen jetzt nur noch in die Logdatei.
+
+**Bekannt, nicht behoben:** Der Transaktions-Wrapper schuetzt nicht. `BEGIN TRANSACTION`, die Skripte und
+`COMMIT` laufen in verschiedenen Sitzungen; auf DEV01 meldet `COMMIT` "keine entsprechende BEGIN
+TRANSACTION", die Skripte sind bereits festgeschrieben, das Ergebnis lautet `FAILED`.
+
+### Tests
+
+- `tests/Unit/Public/ErrorPathHardening.Tests.ps1` (neu) sowie Erweiterungen in `Sync-sqmAgNode.Tests.ps1`
+  und `OrphanLoginAndExcludePermission.Tests.ps1`: 10 Tests, die den frueher verschluckten Fehler ausloesen
+  und die Meldung pruefen. Alle 10 schlagen mit dem alten Code fehl. Die `Invoke-DbaQuery`-Mocks werfen
+  nur mit `-EnableException`, wie das echte dbatools.
+- Quality Gate: `BareShouldThrow` zaehlt `Should -Throw '*Text*'` (Meldung positional) nicht mehr.
+
 ## [1.9.186.0] - 2026-10-18
 
 ### Fix: `Get-sqmConnectionStats` zaehlte MARS-Sitzungen mehrfach

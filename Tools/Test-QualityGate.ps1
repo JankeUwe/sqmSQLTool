@@ -229,8 +229,13 @@ Add-GateResult 'UnscopedParameterSetMix' $hits.Count ($hits | ForEach-Object { F
 $hits = @(Find-GateAst $testFiles {
 		param($n)
 		if ($n -isnot [System.Management.Automation.Language.CommandAst] -or $n.GetCommandName() -ne 'Should') { return $false }
-		$names = @($n.CommandElements | Where-Object { $_ -is [System.Management.Automation.Language.CommandParameterAst] } | ForEach-Object { $_.ParameterName })
-		($names -contains 'Throw') -and -not ($names -contains 'Not') -and -not (@($names | Where-Object { $_ -in @('ExpectedMessage', 'ExceptionType', 'ErrorId') }).Count)
+		$elements = @($n.CommandElements)
+		$names = @($elements | Where-Object { $_ -is [System.Management.Automation.Language.CommandParameterAst] } | ForEach-Object { $_.ParameterName })
+		if (-not ($names -contains 'Throw') -or ($names -contains 'Not')) { return $false }
+		if (@($names | Where-Object { $_ -in @('ExpectedMessage', 'ExceptionType', 'ErrorId') }).Count) { return $false }
+		# Should -Throw '*Text*': das erste positionale Argument ist ExpectedMessage
+		$positional = @($elements | Select-Object -Skip 1 | Where-Object { $_ -isnot [System.Management.Automation.Language.CommandParameterAst] })
+		$positional.Count -eq 0
 	})
 Add-GateResult 'BareShouldThrow' $hits.Count ($hits | ForEach-Object { Format-GateHit $_ 'Should -Throw ohne -ExpectedMessage' })
 

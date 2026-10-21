@@ -185,16 +185,25 @@ FROM sys.endpoints e
 INNER JOIN sys.service_broker_endpoints sbe ON e.endpoint_id = sbe.endpoint_id
 INNER JOIN sys.certificates c ON sbe.certificate_id = c.certificate_id
 "@
+				# Endpoint- und TDE-Zuordnung sind optional, ihr Fehlen muss aber im Bericht stehen:
+				# sonst erscheint ein TDE- oder Endpoint-Zertifikat als 'UserDefined' und wirkt entbehrlich.
+				# -EnableException, weil Invoke-DbaQuery ohne es bei SQL-Fehlern nicht wirft.
+				$purposeWarnings = [System.Collections.Generic.List[string]]::new()
 				$endpointCerts = @{ }
 				try
 				{
-					$epResult = Invoke-DbaQuery @connParams -Database 'master' -Query $endpointCertQuery -ErrorAction SilentlyContinue
+					$epResult = Invoke-DbaQuery @connParams -Database 'master' -Query $endpointCertQuery -EnableException
 					foreach ($ep in $epResult)
 					{
 						$endpointCerts[$ep.CertificateName] = $ep.EndpointType
 					}
 				}
-				catch { <# Endpoint-Abfrage optional - bei Fehler ignorieren #> }
+				catch
+				{
+					$msg = "Endpoint-Zuordnung nicht ermittelbar, Verwendungszweck AlwaysOn/ServiceBroker nur nach Namen geraten: $($_.Exception.Message)"
+					$purposeWarnings.Add($msg)
+					Invoke-sqmLogging -Message "[$instance] $msg" -FunctionName $functionName -Level "WARNING"
+				}
 				
 				# -------------------------------------------------------------------
 				# 3. TDE-Zertifikate ermitteln
@@ -220,7 +229,7 @@ INNER JOIN sys.certificates c ON dek.encryptor_thumbprint = c.thumbprint
 "@
 				try
 				{
-					$tdeResult = Invoke-DbaQuery @connParams -Database 'master' -Query $tdeQuery -ErrorAction SilentlyContinue
+					$tdeResult = Invoke-DbaQuery @connParams -Database 'master' -Query $tdeQuery -EnableException
 					foreach ($tde in $tdeResult)
 					{
 						$tdeCertNames[$tde.CertificateName] = [PSCustomObject]@{
@@ -229,7 +238,13 @@ INNER JOIN sys.certificates c ON dek.encryptor_thumbprint = c.thumbprint
 						}
 					}
 				}
-				catch { <# TDE optional - VIEW DATABASE STATE fehlt moeglicherweise #> }
+				catch
+				{
+					# Typisch: VIEW SERVER STATE fehlt fuer sys.dm_database_encryption_keys
+					$msg = "TDE-Zuordnung nicht ermittelbar, TDE-Zertifikate erscheinen als UserDefined: $($_.Exception.Message)"
+					$purposeWarnings.Add($msg)
+					Invoke-sqmLogging -Message "[$instance] $msg" -FunctionName $functionName -Level "WARNING"
+				}
 				
 				# -------------------------------------------------------------------
 				# 4. Alle Zertifikate in master abfragen
@@ -330,6 +345,7 @@ ORDER BY c.expiry_date ASC
 					WarningCount	  = $warningCount
 					HasDatabaseMasterKey = $hasDmk
 					DmkEncryptedBySmk = $dmkEncryptedBySmk
+					PurposeWarnings   = @($purposeWarnings)
 					Certificates	  = $certificates
 				}
 				
@@ -494,6 +510,7 @@ function Write-sqmCertReport
 			else { 'FEHLT' })")
 	$lines.Add("  DMK mit SMK verschl: $(if ($InstanceResult.DmkEncryptedBySmk) { 'Ja (automatischer Start moeglich)' }
 			else { 'Nein (manuelles oeffnen erforderlich)' })")
+	foreach ($pw in @($InstanceResult.PurposeWarnings)) { $lines.Add("  HINWEIS: $pw") }
 	$lines.Add("")
 	
 	# Gruppiert nach Status
@@ -565,6 +582,10 @@ function Write-sqmCertReport
 		"Kritisch: $($InstanceResult.CriticalCount) | Warnung: $($InstanceResult.WarningCount) | " +
 		"Database Master Key: $(if ($InstanceResult.HasDatabaseMasterKey) { 'Vorhanden' } else { 'FEHLT' })</p>"
 	)
+	foreach ($pw in @($InstanceResult.PurposeWarnings))
+	{
+		$bodySections.Add("<p class='warn'>HINWEIS: $([System.Net.WebUtility]::HtmlEncode($pw))</p>")
+	}
 
 	foreach ($status in @('Expired', 'Critical', 'Warning', 'OK', 'NoExpiry'))
 	{

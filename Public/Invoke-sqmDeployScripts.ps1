@@ -146,7 +146,9 @@ function Invoke-sqmDeployScripts
 					default   { Write-Host $line }
 				}
 			}
-			Invoke-sqmLogging -Message $Msg -FunctionName $functionName -Level $Level
+			# Invoke-sqmLogging -Message ist Mandatory und lehnt '' ab; Leerzeilen (_Log '') brachen
+			# den Abschlussblock jedes Laufs ab, nachdem die Skripte schon ausgefuehrt waren.
+			if ($Msg) { Invoke-sqmLogging -Message $Msg -FunctionName $functionName -Level $Level }
 		}
 
 		# ----------------------------------------------------------------
@@ -563,7 +565,11 @@ function Invoke-sqmDeployScripts
 					Invoke-DbaQuery @queryParams -Query 'ROLLBACK TRANSACTION' | Out-Null
 					_Log 'ROLLBACK TRANSACTION (commit failed)' -Level 'ERROR'
 				}
-				catch { }
+				catch
+				{
+					# Weder COMMIT noch ROLLBACK: der Zustand der Transaktion ist offen und muss im Log stehen.
+					_Log "Failed to rollback transaction after failed commit: $($_.Exception.Message). Transaction state on $SqlInstance/$Database is unknown, check for open transactions (DBCC OPENTRAN)." -Level 'ERROR'
+				}
 				$anyFailed = $true
 			}
 		}

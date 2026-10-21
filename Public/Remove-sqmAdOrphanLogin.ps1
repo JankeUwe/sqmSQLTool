@@ -95,7 +95,10 @@ function Remove-sqmAdOrphanLogin
 		$functionName = $MyInvocation.MyCommand.Name
 		$results = [System.Collections.Generic.List[PSCustomObject]]::new()
 
-		$connParams = @{ SqlInstance = $SqlInstance; ErrorAction = 'Stop' }
+		# EnableException ist Pflicht: mit nur ErrorAction Stop wirft Invoke-DbaQuery bei einem
+		# SQL-Fehler nicht, sondern liefert 0 Zeilen (live geprueft, dbatools 2.9.0). Dann griffen
+		# weder der sysadmin-Abbruch noch der DB-Owner-Schutz.
+		$connParams = @{ SqlInstance = $SqlInstance; ErrorAction = 'Stop'; EnableException = $true }
 		if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
 
 		Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance" -FunctionName $functionName -Level 'INFO'
@@ -212,7 +215,13 @@ function Remove-sqmAdOrphanLogin
 					$ownerQuery = "SELECT name FROM sys.databases WHERE SUSER_SNAME(owner_sid) = @login"
 					$ownedDbs = @(Invoke-DbaQuery @connParams -Query $ownerQuery -SqlParameter @{ login = $name } | ForEach-Object { $_.name })
 				}
-				catch { }
+				catch
+				{
+					# Owner-Pruefung fehlgeschlagen -> NICHT loeschen (wie bei der AD-Abfrage)
+					$results.Add([PSCustomObject]@{ SqlInstance = $SqlInstance; Login = $name; Status = 'Skipped'; Reason = "DB-Owner-Pruefung fehlgeschlagen: $($_.Exception.Message)"; BackupFile = $null; Timestamp = Get-Date })
+					Invoke-sqmLogging -Message "[$name] DB-Owner-Pruefung fehlgeschlagen, uebersprungen: $($_.Exception.Message)" -FunctionName $functionName -Level 'WARNING'
+					continue
+				}
 				if ($ownedDbs.Count -gt 0)
 				{
 					$results.Add([PSCustomObject]@{ SqlInstance = $SqlInstance; Login = $name; Status = 'Skipped'; Reason = "Besitzt Datenbank(en): $($ownedDbs -join ', ') - Owner zuerst aendern"; BackupFile = $null; Timestamp = Get-Date })

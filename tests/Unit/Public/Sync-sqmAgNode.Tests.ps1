@@ -57,6 +57,29 @@ Describe 'Sync-sqmAgNode - Copy-Dba* Parameter' {
         }
     }
 
+    It 'meldet ein gescheitertes Orphan-Repair je Datenbank als Failed statt Success' {
+        InModuleScope sqmSQLTool {
+            Mock Get-DbaAgDatabase { [PSCustomObject]@{ Name = 'Db1' }; [PSCustomObject]@{ Name = 'Db2' } }
+            Mock Repair-DbaDbOrphanUser { if ($Database -eq 'Db2') { throw 'Login fehlt' } }
+            $result = Sync-sqmAgNode -SqlInstance 'SQLB' -ExcludeType Jobs, LinkedServers, Operators, Alerts -EnableException -Confirm:$false
+            $orphan = @($result | Where-Object ObjectType -eq 'OrphanRepair')
+
+            ($orphan | Where-Object Status -eq 'Failed').ObjectName | Should -Be 'Db2'
+            ($orphan | Where-Object Status -eq 'Failed').Message | Should -Match 'Orphan-Repair fehlgeschlagen: Login fehlt'
+            ($orphan | Where-Object Status -eq 'Success').Message | Should -Match '1 von 2'
+        }
+    }
+
+    It 'meldet kein Success, wenn das Orphan-Repair auf allen Datenbanken scheitert' {
+        InModuleScope sqmSQLTool {
+            Mock Get-DbaAgDatabase { [PSCustomObject]@{ Name = 'Db1' } }
+            Mock Repair-DbaDbOrphanUser { throw 'kein Zugriff' }
+            $result = Sync-sqmAgNode -SqlInstance 'SQLB' -ExcludeType Jobs, LinkedServers, Operators, Alerts -EnableException -Confirm:$false
+
+            @($result | Where-Object { $_.ObjectType -eq 'OrphanRepair' -and $_.Status -eq 'Success' }).Count | Should -Be 0
+        }
+    }
+
     It 'reicht -SqlCredential als Source- und DestinationSqlCredential weiter' {
         InModuleScope sqmSQLTool {
             $cred = [PSCredential]::new('dev', (ConvertTo-SecureString 'x' -AsPlainText -Force))

@@ -137,6 +137,29 @@ Describe 'Remove-sqmAdOrphanLogin' {
             Should -Throw '*Sysadmin-Logins*'
         Should -Invoke -ModuleName sqmSQLTool Remove-DbaLogin -Times 0 -Exactly
     }
+
+    # Die Mocks oben werfen immer. Das echte Invoke-DbaQuery wirft aber nur mit -EnableException;
+    # mit nur ErrorAction Stop liefert es bei einem SQL-Fehler 0 Zeilen (live geprueft, dbatools 2.9.0).
+    # Diese Tests ahmen das nach, damit die Schutzregeln auch gegen das echte Verhalten halten.
+    It 'bricht ab, wenn die sysadmin-Abfrage scheitert, auch mit dbatools-Verhalten ohne Ausnahme' {
+        Mock -ModuleName sqmSQLTool Invoke-DbaQuery {
+            if ($EnableException) { throw 'kein Zugriff' }
+        } -ParameterFilter { $Query -like '*is_srvrolemember*' }
+        { Remove-sqmAdOrphanLogin -SqlInstance 'SQL01' -BackupPath $script:Backup -Confirm:$false -EnableException } |
+            Should -Throw '*Sysadmin-Logins*'
+        Should -Invoke -ModuleName sqmSQLTool Remove-DbaLogin -Times 0 -Exactly
+    }
+
+    It 'ueberspringt ein Login, wenn die DB-Owner-Pruefung scheitert, statt es zu loeschen' {
+        Mock -ModuleName sqmSQLTool Invoke-DbaQuery {
+            if ($EnableException) { throw 'Timeout' }
+        } -ParameterFilter { $Query -like '*owner_sid*' }
+        $r = Remove-sqmAdOrphanLogin -SqlInstance 'SQL01' -BackupPath $script:Backup -Confirm:$false
+        ($r | Where-Object Status -eq 'Removed') | Should -BeNullOrEmpty
+        ($r | Where-Object Login -eq 'DOM\gone').Status | Should -Be 'Skipped'
+        ($r | Where-Object Login -eq 'DOM\gone').Reason | Should -Match 'DB-Owner-Pruefung fehlgeschlagen.*Timeout'
+        Should -Invoke -ModuleName sqmSQLTool Remove-DbaLogin -Times 0 -Exactly
+    }
 }
 
 Describe 'Set-sqmBackupExcludePermission' {

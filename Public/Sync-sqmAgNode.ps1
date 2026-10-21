@@ -257,8 +257,10 @@ function Sync-sqmAgNode
 							}
 						}
 						# Orphaned Users auf AG-DBs
+						# Fehler je Datenbank melden; vorher lieferte ein leerer catch trotzdem 'Success'.
 						if ($agDatabases.Count -gt 0)
 						{
+							$repairedCount = 0
 							foreach ($agDb in $agDatabases)
 							{
 								if ($PSCmdlet.ShouldProcess("$secInstance / $agDb", "[$agName] Orphaned Users bereinigen"))
@@ -266,11 +268,20 @@ function Sync-sqmAgNode
 									try
 									{
 										Repair-DbaDbOrphanUser @secConn -Database $agDb -EnableException -ErrorAction Stop | Out-Null
+										$repairedCount++
 									}
-									catch { }
+									catch
+									{
+										$errMsg = "Orphan-Repair fehlgeschlagen: $($_.Exception.Message)"
+										Invoke-sqmLogging -Message "[$agName] $secInstance / ${agDb}: $errMsg" -FunctionName $functionName -Level "WARNING"
+										_AddResult $agName 'OrphanRepair' $primaryName $secInstance $agDb 'Failed' $errMsg
+									}
 								}
 							}
-							_AddResult $agName 'OrphanRepair' $primaryName $secInstance '(AG-DBs)' 'Success' "Orphan-Repair auf $($agDatabases.Count) AG-Datenbank(en) abgeschlossen."
+							if ($repairedCount -gt 0)
+							{
+								_AddResult $agName 'OrphanRepair' $primaryName $secInstance '(AG-DBs)' 'Success' "Orphan-Repair auf $repairedCount von $($agDatabases.Count) AG-Datenbank(en) abgeschlossen."
+							}
 						}
 					}
 					

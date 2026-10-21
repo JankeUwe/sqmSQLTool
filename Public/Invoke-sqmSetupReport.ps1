@@ -246,6 +246,7 @@ GROUP BY d.name, d.recovery_model_desc
             # zuverlaessige IsSysAdmin-Eigenschaft -> Liste blieb sonst leer).
             # sys.server_principals.sid liefert zugleich die SID fuer die BUILTIN-Erkennung.
             $sysadminLogins = @()
+            $sysadminError = $null
             try
             {
                 $sysadminQuery = @"
@@ -256,19 +257,27 @@ JOIN sys.server_principals sp ON rm.member_principal_id = sp.principal_id
 WHERE r.type = 'R' AND r.name = N'sysadmin'
 ORDER BY sp.name
 "@
-                $sysadminLogins = @(Invoke-DbaQuery -SqlInstance $server -Query $sysadminQuery -ErrorAction Stop)
+                # -EnableException: ohne wirft Invoke-DbaQuery bei SQL-Fehlern nicht, die Liste waere leer
+                $sysadminLogins = @(Invoke-DbaQuery -SqlInstance $server -Query $sysadminQuery -EnableException)
             }
             catch
             {
                 # Fallback: dbatools-Rollenmitglieder (ohne SID -> nur Namensabgleich)
                 try
                 {
-                    $sysadminLogins = @(Get-DbaServerRoleMember -SqlInstance $server -ServerRole 'sysadmin' -ErrorAction Stop |
+                    $sysadminLogins = @(Get-DbaServerRoleMember -SqlInstance $server -ServerRole 'sysadmin' -EnableException |
                         ForEach-Object { [PSCustomObject]@{ Name = $_.Name; Sid = $null } })
                 }
-                catch { }
+                catch
+                {
+                    # Ohne Mitgliederliste wuerde die Karte "None" und keine Warnung zeigen, also einen
+                    # sauberen Befund vortaeuschen, obwohl gar nicht geprueft wurde.
+                    $sysadminError = $_.Exception.Message
+                    Invoke-sqmLogging -Message "sysadmin-Mitglieder nicht ermittelbar: $sysadminError" -FunctionName $functionName -Level 'WARNING'
+                }
             }
             $sysadmins = @($sysadminLogins | Select-Object -ExpandProperty Name | Where-Object { $_ })
+            if ($sysadminError) { $sysadmins = @('(nicht ermittelbar)') }
 
             # Warnung: BUILTIN\Administrators (lokalisiert z.B. VORDEFINIERT\Administratoren) als sysadmin
             # ist ein Least-Privilege-Verstoss (jeder lokale Admin wird damit zum SQL-sysadmin).
@@ -294,6 +303,11 @@ ORDER BY sp.name
             $hasBuiltinAdmins = $builtinAdmins.Count -gt 0
             $sysadminColor   = if ($hasBuiltinAdmins) { 'red' } else { '' }
             $sysadminWarning = if ($hasBuiltinAdmins) { "WARNUNG: $($builtinAdmins -join ', ') hat sysadmin-Rechte - fuer Least Privilege entfernen" } else { '' }
+            if ($sysadminError)
+            {
+                $sysadminColor   = 'red'
+                $sysadminWarning = "FEHLER: sysadmin-Mitglieder nicht ermittelbar, BUILTIN-Pruefung nicht durchgefuehrt ($sysadminError)"
+            }
 
             # Logins with Server Roles (only server-level roles)
             $advancedLogins = @()

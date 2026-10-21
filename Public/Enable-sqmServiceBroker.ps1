@@ -141,13 +141,20 @@ function Enable-sqmServiceBroker
 					$errMsg = "Fehler beim Aktivieren von Service Broker: $_"
 					$logContent.Add("  Status: FAILED - $errMsg") | Out-Null
 					Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
-					# Zurück zu MULTI_USER vor Fehler
+					# Zurück zu MULTI_USER vor Fehler. Scheitert das, steht die Datenbank weiter in
+					# SINGLE_USER; das muss in der Fehlermeldung stehen, nicht nur der Broker-Fehler.
 					try
 					{
 						$server.Query("ALTER DATABASE [$DatabaseName] SET MULTI_USER", "master")
 						$logContent.Add("  Rollback: Database set to MULTI_USER") | Out-Null
 					}
-					catch { }
+					catch
+					{
+						$rollbackMsg = "Rollback auf MULTI_USER fehlgeschlagen: $($_.Exception.Message). Datenbank [$DatabaseName] steht noch in SINGLE_USER, manuell zuruecksetzen: ALTER DATABASE [$DatabaseName] SET MULTI_USER"
+						$logContent.Add("  Rollback: FAILED - $rollbackMsg") | Out-Null
+						Invoke-sqmLogging -Message $rollbackMsg -FunctionName $functionName -Level "ERROR"
+						throw "$errMsg | $rollbackMsg"
+					}
 					throw
 				}
 
