@@ -204,11 +204,23 @@ Get-ChildItem -Path $Destination -Recurse -File | ForEach-Object {
 #     damit kuenftige Installationen UND andere Modulfunktionen den Pfad direkt haben.
 #     Die standortspezifischen Pfade stehen bewusst nicht im Code (siehe Docs/SiteProfile.md).
 # ---------------------------------------------------------------------------
+#     Suchreihenfolge: Installationsquelle, dann jeder uebergeordnete Ordner der Quelle (das Profil
+#     liegt so einmal auf der Freigabe, z.B. neben dem Modulordner, und muss nicht in jede neue
+#     Modulversion kopiert werden), zuletzt %ProgramData%\MSSQLTools. Ein Profil aus der Quelle
+#     gewinnt vor %ProgramData%, damit eine geaenderte Fassung auf der Freigabe die alte ersetzt.
+#     [IO.File]::Exists statt Test-Path: siehe Kommentar zu den dbatools-Freigaben unten.
 $siteProfile = $null
 $siteProfileSource = $null
-foreach ($sitePath in @((Join-Path $Source 'sqmSQLTool.site.json'),
-                        (Join-Path $env:ProgramData 'MSSQLTools\sqmSQLTool.site.json'))) {
-    if (-not (Test-Path -LiteralPath $sitePath -PathType Leaf)) { continue }
+$programDataSiteProfile = [IO.Path]::Combine($env:ProgramData, 'MSSQLTools\sqmSQLTool.site.json')
+$siteProfileCandidates = @()
+$siteSearchDir = [IO.DirectoryInfo]$Source
+while ($siteSearchDir) {
+    $siteProfileCandidates += [IO.Path]::Combine($siteSearchDir.FullName, 'sqmSQLTool.site.json')
+    $siteSearchDir = $siteSearchDir.Parent
+}
+$siteProfileCandidates += $programDataSiteProfile
+foreach ($sitePath in $siteProfileCandidates) {
+    if (-not [IO.File]::Exists($sitePath)) { continue }
     try {
         $siteProfile = Get-Content -LiteralPath $sitePath -Raw -Encoding UTF8 | ConvertFrom-Json
         $siteProfileSource = $sitePath
@@ -217,10 +229,17 @@ foreach ($sitePath in @((Join-Path $Source 'sqmSQLTool.site.json'),
         Write-Warning "Standort-Profil '$sitePath' konnte nicht gelesen werden: $_"
     }
 }
+if ($siteProfileSource) {
+    $siteProfileName = if ($siteProfile.Name) { " '$($siteProfile.Name)'" } else { '' }
+    Write-Host "Standort-Profil$siteProfileName gefunden: $siteProfileSource" -ForegroundColor Cyan
+} else {
+    Write-Host "Kein Standort-Profil (sqmSQLTool.site.json) gefunden - es gelten die neutralen Standardwerte. Gesucht:" -ForegroundColor Yellow
+    $siteProfileCandidates | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+}
 
 # Standort-Profil aus der Installationsquelle maschinenweit ablegen: es ueberlebt so Modul-
 # Updates aus Quellen ohne Profil und gilt fuer alle Benutzer (config.json ist pro Benutzer).
-if ($siteProfileSource -and $siteProfileSource -eq (Join-Path $Source 'sqmSQLTool.site.json')) {
+if ($siteProfileSource -and $siteProfileSource -ne $programDataSiteProfile) {
     try {
         $siteDir = Join-Path $env:ProgramData 'MSSQLTools'
         if (-not (Test-Path $siteDir)) { New-Item -ItemType Directory -Path $siteDir -Force -ErrorAction Stop | Out-Null }
@@ -239,6 +258,9 @@ if ($siteProfile -and $siteProfile.Install) {
     } else {
         foreach ($pattern in $sourcePatterns) {
             if ($Source -like $pattern) { $isSiteInstall = $true; break }
+        }
+        if (-not $isSiteInstall) {
+            Write-Host "  Quelle '$Source' passt auf kein Muster aus 'Install.SourcePatterns' ($($sourcePatterns -join '; ')) - keine Standort-Installation." -ForegroundColor Yellow
         }
     }
 }

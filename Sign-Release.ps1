@@ -107,7 +107,8 @@ if (Test-Path $signedZip) { Remove-Item $signedZip -Force }
 
 Write-Host 'Packe Modul-Dateien...' -ForegroundColor Cyan
 
-$exclude = @('.git', 'dist', '.github', 'Tests', '*.log', $zipName)
+# sqmSQLTool.site.json: Standort-Profil, kundenspezifisch - darf nie in ein Release-ZIP
+$exclude = @('.git', 'dist', '.github', 'Tests', '*.log', 'sqmSQLTool.site.json', $zipName)
 $files   = Get-ChildItem $ModuleRoot -Recurse -File | Where-Object {
     $rel = $_.FullName.Replace("$ModuleRoot\", '')
     -not ($exclude | Where-Object { $rel -like "$_*" -or $rel -like "*\$_\*" })

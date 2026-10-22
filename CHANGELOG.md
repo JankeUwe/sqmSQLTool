@@ -1,5 +1,24 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.190.0] - 2026-10-22
+
+### Fix: Installation erkennt den Standort wieder (Standort-Profil auf der Freigabe)
+
+Seit 1.9.181.0 kommt die Standorterkennung aus `sqmSQLTool.site.json`. `Install.ps1` suchte die Datei nur
+direkt im Quellordner und unter `%ProgramData%\MSSQLTools`. Liegt sie dort nicht, weil eine neue
+Modulversion ohne Profil auf die Freigabe kopiert wurde, lief die Installation still als neutrale
+Installation durch: kein dbatools-Sideloading von der Freigabe, keine Standort-Konfiguration.
+
+- `Install.ps1` sucht das Profil jetzt auch in **allen uebergeordneten Ordnern der Quelle**. Es reicht,
+  die Datei einmal auf der Freigabe neben bzw. ueber den Modulordner zu legen; neue Modulversionen
+  muessen sie nicht mehr enthalten. Ein Profil aus der Quelle gewinnt vor `%ProgramData%` und
+  aktualisiert die dortige Kopie.
+- `Install.ps1` meldet sichtbar, welches Profil gefunden wurde, oder **welche Pfade ohne Treffer
+  geprueft wurden**, und ob die Quelle auf `Install.SourcePatterns` passt.
+- `Update-sqmModule` (UNC/Verzeichnis-Quelle) uebernimmt ein Profil aus den uebergeordneten Ordnern
+  der Update-Quelle in den neuen Modulordner.
+- `Sign-Release.ps1` schliesst `sqmSQLTool.site.json` aus dem Release-ZIP aus.
+
 ## [1.9.189.0] - 2026-10-22
 
 ### Fix: dbatools-Fehler wurden an 120 Stellen nicht gemeldet

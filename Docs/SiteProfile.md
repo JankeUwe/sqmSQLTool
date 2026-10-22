@@ -8,11 +8,20 @@ Sie kommen aus einer optionalen JSON-Datei, die **nicht** versioniert wird (`.gi
 
 1. `<Modulordner>\sqmSQLTool.site.json` - `Install.ps1` kopiert die Datei aus der
    Installationsquelle mit, wenn sie dort neben `Install.ps1` liegt.
+   `Update-sqmModule` (UNC/Verzeichnis) legt hier ein Profil ab, das in einem uebergeordneten
+   Ordner der Update-Quelle liegt.
 2. `%ProgramData%\MSSQLTools\sqmSQLTool.site.json` - maschinenweit, gilt fuer alle Benutzer und
    ueberlebt Modul-Updates aus Quellen ohne Profil. `Install.ps1` legt die Datei hier ab, sobald
    die Installationsquelle ein Profil enthaelt.
 
 Die erste gefundene Datei gilt.
+
+`Install.ps1` sucht in dieser Reihenfolge: Quellordner, **jeder uebergeordnete Ordner der Quelle**,
+`%ProgramData%\MSSQLTools`. Empfohlen: das Profil einmal auf der Freigabe **neben den Modulordner**
+legen (z. B. `<Freigabe>\...\sqmSQLTool.site.json` neben `<Freigabe>\...\sqmSQLTool\`). Dann muss
+keine neue Modulversion das Profil enthalten. Ein Profil aus der Quelle ersetzt die Kopie unter
+`%ProgramData%`. `Install.ps1` gibt aus, welches Profil gilt bzw. welche Pfade ohne Treffer geprueft
+wurden.
 
 ## Aufbau
 

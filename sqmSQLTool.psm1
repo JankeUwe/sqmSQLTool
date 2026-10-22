@@ -829,7 +829,23 @@ function Update-sqmModule
 				if ($PSCmdlet.ShouldProcess("sqmSQLTool$verTxt aus '$repo' nach '$($target.Path)'", "Datei-Update"))
 				{
 					Copy-sqmModuleFiles -SourcePath $repo -ModulePath $target.Path -Backup:($Backup -and -not $target.Versioned)
-					Write-Host "Modul wurde aktualisiert: $($target.Path)" -ForegroundColor Green
+					# Standort-Profil, das auf der Freigabe neben/ueber dem Modulordner liegt (nicht
+					# im Ordner selbst), in den neuen Modulordner mitnehmen - sonst verliert ein Update
+					# die Standorterkennung, wenn %ProgramData% kein Profil hat.
+					$siteNote = ''
+					$siteDir = ([IO.DirectoryInfo]$repo).Parent
+					while ($siteDir -and -not [IO.File]::Exists([IO.Path]::Combine($repo, 'sqmSQLTool.site.json')))
+					{
+						$siteFile = [IO.Path]::Combine($siteDir.FullName, 'sqmSQLTool.site.json')
+						if ([IO.File]::Exists($siteFile))
+						{
+							Copy-Item -LiteralPath $siteFile -Destination (Join-Path $target.Path 'sqmSQLTool.site.json') -Force -ErrorAction Stop
+							$siteNote = " (Standort-Profil uebernommen: $siteFile)"
+							break
+						}
+						$siteDir = $siteDir.Parent
+					}
+					Write-Host "Modul wurde aktualisiert: $($target.Path)$siteNote" -ForegroundColor Green
 					$done = $true
 				}
 			}
