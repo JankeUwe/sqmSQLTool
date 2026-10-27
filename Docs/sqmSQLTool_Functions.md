@@ -4731,8 +4731,16 @@ Two modes (-SyncMode):
     - First run (state table is created): secondaries get missing logins as before. Logins that
       are missing on the PRIMARY are not copied but marked as tombstone 'Baseline', so logins
       deliberately dropped on the primary in the past do not come back. Check the report.
-    - Conflicts (same name, different SID / password hash / default DB / language / disabled)
-      are only reported (event 9004), never changed. -Force is ignored in this mode.
+    - Password changes (-HashChange Newest, default): same SQL login and SID, different
+      password hash. The password set last wins (LOGINPROPERTY PasswordLastSetTime, converted to
+      UTC per replica) and is applied with ALTER LOGIN ... WITH PASSWORD = <hash> HASHED, never
+      DROP. CHECK_POLICY / CHECK_EXPIRATION are switched off for the change (HASHED is not allowed
+      with CHECK_POLICY ON) and restored afterwards. If the two newest changes are less than
+      60 seconds apart, the winner is unclear and the difference is only reported. Before the
+      change, a rollback script with the old hashes is written to -BackupPath
+      (LoginBackup_PasswordRollback_<replica>_<timestamp>.sql). -HashChange Report: only report.
+    - Other conflicts (same name, different SID / default DB / language / disabled) are only
+      reported (event 9004), never changed. -Force is ignored in this mode.
     - An unreachable replica is skipped (status Failed, event 9002) and caught up next run.
 
     Primary (behaviour up to v1.9.190.0)
@@ -4765,6 +4773,7 @@ Two modes (-SyncMode):
 
 - **-SqlInstance** - An instance of the AG (normally the primary). Default: $env:COMPUTERNAME
 - **-SyncMode** - 'Union' (default): missing logins in every direction, tombstones and conflicts only reported. 'Primary': previous behaviour, primary -> secondaries, -Force overwrites existing logins.
+- **-HashChange** - Union mode only. 'Newest' (default): a password changed on one replica is applied to the others (newest PasswordLastSetTime wins, ALTER LOGIN ... HASHED, rollback script first). 'Report': differences are only reported.
 - **-ResetTombstone** - Union mode only: login names (exact, no wildcards) whose tombstone is removed on all replicas before the sync, so they are distributed again. Use it after checking the report.
 - **-AvailabilityGroupName** - Name of the Availability Group. If not specified, the first AG found on the instance is used. If multiple AGs exist: Warning is displayed, first AG is used. Specify explicitly to avoid ambiguity.
 - **-SqlCredential** - PSCredential for all replicas (source and destination). Union mode uses one credential for all replicas: -SqlCredential, else -SourceCredential.

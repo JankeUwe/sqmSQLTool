@@ -1,5 +1,48 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.192.0] - 2026-10-27
+
+### Neu: AG-Login-Sync uebernimmt geaenderte Passwoerter
+
+Seit 1.9.191.0 ergaenzt `Sync-sqmLoginsToAlwaysOn -SyncMode Union` fehlende Logins in jede Richtung, meldete
+ein auf einem Replikat geaendertes Passwort aber nur. Nach einem Failover scheiterte die Anwendung dann am
+alten Passwort auf dem neuen Primary.
+
+- **Neuer Parameter `-HashChange`, Default `Newest`.** Gleicher SQL-Login, gleiche SID, anderer Passwort-Hash:
+  das zuletzt gesetzte Passwort wird auf die anderen Replikate uebernommen, per
+  `ALTER LOGIN ... WITH PASSWORD = <hash> HASHED`, ohne DROP. `-HashChange Report` meldet nur.
+- **Erkannt wird eine Aenderung an `PasswordLastSetTime`, nicht am Hash.** Der Snapshot
+  (`master.dbo.sqmLoginSyncState`, neue Spalte `pwd_set_utc`, wird bei bestehenden Tabellen ergaenzt)
+  merkt sich den Zeitpunkt pro Replikat in UTC. Grund, live nachgewiesen: SQL Server 2025 speichert
+  Passwoerter im neuen Format `0x0300` und schreibt einen per `HASHED` gesetzten `0x0200`-Hash bei der
+  naechsten Anmeldung ins neue Format um, ohne `PasswordLastSetTime` zu aendern. Gleiche Passwoerter haben
+  dann auf 2022 und 2025 verschiedene Hashes. Ein reiner Hash-Vergleich haette bei gemischten Versionen
+  (Rolling Upgrade) bei jedem Lauf hin und her geschrieben.
+- Ohne erkannte Aenderung (z. B. erster Lauf nach dem Update) wird nur bei gleichem Hash-Format verglichen.
+  Unterschiedliche Formate ohne neue Aenderung gelten als gleich und loesen nichts aus.
+- **Ein `0x0300`-Hash wird nie auf ein Replikat vor SQL Server 2025 geschrieben**: Meldung (Event 9004),
+  das Passwort muss dort von Hand gesetzt werden.
+- `HASHED` ist mit `CHECK_POLICY = ON` nicht erlaubt. `CHECK_POLICY` und `CHECK_EXPIRATION` werden fuer die
+  Aenderung abgeschaltet und danach auf den vorherigen Stand gesetzt, auch im Fehlerfall. Auf dem Ziel
+  beginnt die Ablauffrist (`CHECK_EXPIRATION`) dadurch neu.
+- Zwei konkurrierende Aenderungen mit weniger als 60 Sekunden Abstand: Gewinner unklar, nur Meldung.
+- Vor jeder Uebernahme schreibt der Sync pro Ziel ein Rollback-Skript mit den alten Hashes
+  (`LoginBackup_PasswordRollback_<Replikat>_<Zeit>.sql` unter `-BackupPath`, Aufbewahrung ueber
+  `-BackupRetentionDays`). Eine konfigurierte Policy (`DefaultPolicy`) wird wie beim Kopieren kurz deaktiviert.
+- Der Standard-Job `AgLoginSync` uebernimmt Passwortaenderungen damit automatisch, auch direkt nach einem
+  Failover (Alert 1480). Bestehende Jobs brauchen keine Neuinstallation.
+
+### Fix: Neu angelegter Login wurde als geloescht behandelt
+
+Wurde ein Login auf allen Replikaten geloescht und vor dem naechsten Sync auf einem neu angelegt, hielt der
+Sync ihn fuer den geloeschten (Tombstone) und verteilte ihn nicht. Tombstones gelten jetzt nur bei gleicher
+SID; ein neu angelegter SQL-Login hat eine neue SID und wird normal verteilt.
+
+**Getestet:** live gegen SQL Server 2022 und 2025 (Windows PowerShell 5.1): Aenderung auf Primary und auf
+Secondary uebernommen, Anmeldung mit neuem Passwort, altes abgelehnt, `CHECK_POLICY`/`CHECK_EXPIRATION`
+wiederhergestellt, Rollback-Skript, Folgelauf nach Umschreibung auf `0x0300` ohne Aktion, `0x0300` nicht auf
+2022, `-HashChange Report`, Aenderungen unter 60 s, `-WhatIf`, neu angelegter Login nach Loeschung.
+
 ## [1.9.191.0] - 2026-10-27
 
 ### Fix: AG-Login-Sync verliert keine Logins mehr nach einem Failover

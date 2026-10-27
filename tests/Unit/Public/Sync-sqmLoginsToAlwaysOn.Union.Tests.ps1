@@ -12,7 +12,8 @@ BeforeAll {
 
     function New-TestLogin
     {
-        param ([string]$Name, [byte[]]$Sid = @(1, 2, 3), [string]$Hash = '0x0200AA', [string]$Machine = 'HOSTA', [int]$Sysadmin = 0, [string]$Type = 'S')
+        param ([string]$Name, [byte[]]$Sid = @(1, 2, 3), [string]$Hash = '0x0200AA', [string]$Machine = 'HOSTA', [int]$Sysadmin = 0, [string]$Type = 'S',
+            [datetime]$PwdSet = '2026-10-01 10:00', [int]$Major = 16)
         [PSCustomObject]@{
             name                  = $Name
             sid                   = $Sid
@@ -21,7 +22,11 @@ BeforeAll {
             default_database_name = 'master'
             default_language_name = 'us_english'
             pwd_hash              = $Hash
-            pwd_set               = [datetime]'2026-10-01 10:00'
+            pwd_set               = $PwdSet
+            pwd_set_utc           = $PwdSet
+            major_version         = $Major
+            is_policy_checked     = $true
+            is_expiration_checked = $false
             is_sysadmin           = $Sysadmin
             machine               = $Machine
         }
@@ -43,17 +48,20 @@ Describe 'Invoke-sqmLoginUnionSync' {
             Logins   = @{ A = @(); B = @() }
             Updates  = @{}
             Deleted  = @()
+            Altered  = @()
         }
         Mock -ModuleName sqmSQLTool Invoke-sqmLogging { }
         Mock -ModuleName sqmSQLTool Invoke-DbaQuery {
             $inst = [string](@($SqlInstance)[0])
             if (-not $script:T.Baseline.ContainsKey($inst)) { if ($EnableException) { throw "Verbindung zu $inst fehlgeschlagen" }; return }
             if ($Query -match 'OBJECT_ID') { return [PSCustomObject]@{ Created = $script:T.Baseline[$inst] } }
-            if ($Query -match '^SELECT login_name') { return $script:T.State[$inst] }
-            if ($Query -match 'FROM sys.server_principals') { return $script:T.Logins[$inst] }
             if ($Query -match 'DECLARE @x xml') { $script:T.Updates[$inst] = @($SqlParameter)[0]['list']; return }
+            if ($Query -match 'SELECT login_name, sid, dropped_at') { return $script:T.State[$inst] }
+            if ($Query -match 'FROM sys.server_principals') { return $script:T.Logins[$inst] }
+            if ($Query -match 'WITH PASSWORD = (0x[0-9A-F]+) HASHED') { $script:T.Altered += "$inst/$($Matches[1])"; return }
             if ($Query -match '^DELETE') { $script:T.Deleted += "$inst/$(@($SqlParameter)[0]['n'])"; return }
         }
+        Mock -ModuleName sqmSQLTool Get-sqmConfig { $null }
         Mock -ModuleName sqmSQLTool Copy-sqmLogins {
             foreach ($l in $Login) { [PSCustomObject]@{ Action = 'CopyLogin'; LoginName = ($l -replace '`', ''); Status = 'Success'; Message = 'Successful' } }
         }
@@ -187,6 +195,117 @@ Describe 'Invoke-sqmLoginUnionSync' {
         Should -Invoke -ModuleName sqmSQLTool Copy-sqmLogins -Exactly 0
         Should -Invoke -ModuleName sqmSQLTool Invoke-DbaQuery -Exactly 0 -ParameterFilter { $Query -match 'CREATE TABLE|DECLARE @x xml' }
     }
+
+    Context 'Passwortaenderungen' {
+
+        BeforeEach {
+            # app existiert auf A und B mit gleicher SID; Snapshot kennt den Stand vom 01.10.
+            $script:T.State.A = @([PSCustomObject]@{ login_name = 'app'; sid = $null; dropped_at = $null; note = $null; pwd_set_utc = [datetime]'2026-10-01 10:00' })
+            $script:T.State.B = @([PSCustomObject]@{ login_name = 'app'; sid = $null; dropped_at = $null; note = $null; pwd_set_utc = [datetime]'2026-10-01 10:00' })
+        }
+
+        It 'Uebernimmt ein auf dem Secondary geaendertes Passwort auf den Primary (ALTER LOGIN HASHED, Rollback-Skript)' {
+            $script:T.Logins.A = @(New-TestLogin 'app' -Hash '0x0200AA')
+            $script:T.Logins.B = @(New-TestLogin 'app' -Hash '0x0200BB' -PwdSet '2026-10-20 12:00')
+
+            $r = InModuleScope sqmSQLTool -Parameters @{ Rb = $TestDrive } { Invoke-sqmLoginUnionSync -Replica 'A', 'B' -PrimaryReplica 'A' -BackupPath $Rb -Confirm:$false }
+
+            $row = $r | Where-Object Action -eq 'PasswordSync'
+            $row.Status | Should -Be 'Success'
+            $row.SourceReplica | Should -Be 'B'
+            $row.TargetReplica | Should -Be 'A'
+            $script:T.Altered | Should -Be @('A/0x0200BB')
+            $rb = @(Get-ChildItem $TestDrive -Filter 'LoginBackup_PasswordRollback_A_*.sql')
+            $rb.Count | Should -Be 1
+            (Get-Content $rb[0].FullName -Raw) | Should -Match 'WITH PASSWORD = 0x0200AA HASHED'
+            (Get-Content $rb[0].FullName -Raw) | Should -Match 'CHECK_POLICY = ON, CHECK_EXPIRATION = OFF'
+        }
+
+        It 'Schaltet CHECK_POLICY fuer HASHED ab und stellt den alten Stand wieder her, auch im Fehlerfall' {
+            $script:T.Logins.A = @(New-TestLogin 'app' -Hash '0x0200AA')
+            $script:T.Logins.B = @(New-TestLogin 'app' -Hash '0x0200BB' -PwdSet '2026-10-20 12:00')
+
+            InModuleScope sqmSQLTool { Invoke-sqmLoginUnionSync -Replica 'A', 'B' -PrimaryReplica 'A' -Confirm:$false } | Out-Null
+
+            Should -Invoke -ModuleName sqmSQLTool Invoke-DbaQuery -Exactly 1 -ParameterFilter {
+                $Query -match 'WITH CHECK_POLICY = OFF; ALTER LOGIN \[app\] WITH PASSWORD = 0x0200BB HASHED; ALTER LOGIN \[app\] WITH CHECK_POLICY = ON, CHECK_EXPIRATION = OFF; END TRY' -and
+                $Query -match 'BEGIN CATCH ALTER LOGIN \[app\] WITH CHECK_POLICY = ON, CHECK_EXPIRATION = OFF; THROW'
+            }
+        }
+
+        It 'Erkennt die Aenderung an PasswordLastSetTime, nicht am juengsten Zeitpunkt allein' {
+            # B wurde zuletzt vom Sync selbst gesetzt (juengster Zeitpunkt, aber im Snapshot bekannt),
+            # A wurde danach von Hand geaendert und ist seit dem letzten Lauf gestiegen.
+            $script:T.State.A[0].pwd_set_utc = [datetime]'2026-10-20 09:00'
+            $script:T.State.B[0].pwd_set_utc = [datetime]'2026-10-20 13:00'
+            $script:T.Logins.A = @(New-TestLogin 'app' -Hash '0x0200AA' -PwdSet '2026-10-20 12:00')
+            $script:T.Logins.B = @(New-TestLogin 'app' -Hash '0x0200BB' -PwdSet '2026-10-20 13:00')
+
+            InModuleScope sqmSQLTool { Invoke-sqmLoginUnionSync -Replica 'A', 'B' -PrimaryReplica 'A' -Confirm:$false } | Out-Null
+
+            $script:T.Altered | Should -Be @('B/0x0200AA')
+        }
+
+        It 'Unterschiedliches Hash-Format ohne Aenderung (SQL 2025 hat umgeschrieben): nichts tun, nichts melden' {
+            $script:T.Logins.A = @(New-TestLogin 'app' -Hash '0x0200AA')
+            $script:T.Logins.B = @(New-TestLogin 'app' -Hash '0x0300CC' -Major 17)
+
+            $r = InModuleScope sqmSQLTool { Invoke-sqmLoginUnionSync -Replica 'A', 'B' -PrimaryReplica 'A' -Confirm:$false }
+
+            $script:T.Altered.Count | Should -Be 0
+            @($r | Where-Object { $_.LoginName -eq 'app' }).Count | Should -Be 0
+        }
+
+        It 'Schreibt einen 0x0300-Hash nie auf ein Replikat vor SQL Server 2025' {
+            $script:T.Logins.A = @(New-TestLogin 'app' -Hash '0x0200AA')
+            $script:T.Logins.B = @(New-TestLogin 'app' -Hash '0x0300CC' -Major 17 -PwdSet '2026-10-20 12:00')
+
+            $r = InModuleScope sqmSQLTool { Invoke-sqmLoginUnionSync -Replica 'A', 'B' -PrimaryReplica 'A' -Confirm:$false }
+
+            $script:T.Altered.Count | Should -Be 0
+            $w = $r | Where-Object { $_.Action -eq 'PasswordSync' -and $_.TargetReplica -eq 'A' }
+            $w.Status | Should -Be 'Warning'
+            $w.Message | Should -Match '0x0300'
+        }
+
+        It 'Uebertraegt 0x0300 auf ein anderes SQL Server 2025-Replikat' {
+            $script:T.Logins.A = @(New-TestLogin 'app' -Hash '0x0300AA' -Major 17)
+            $script:T.Logins.B = @(New-TestLogin 'app' -Hash '0x0300CC' -Major 17 -PwdSet '2026-10-20 12:00')
+
+            InModuleScope sqmSQLTool { Invoke-sqmLoginUnionSync -Replica 'A', 'B' -PrimaryReplica 'A' -Confirm:$false } | Out-Null
+
+            $script:T.Altered | Should -Be @('A/0x0300CC')
+        }
+
+        It 'Meldet nur, wenn zwei Aenderungen weniger als 60 Sekunden auseinanderliegen' {
+            $script:T.Logins.A = @(New-TestLogin 'app' -Hash '0x0200AA' -PwdSet '2026-10-20 12:00:00')
+            $script:T.Logins.B = @(New-TestLogin 'app' -Hash '0x0200BB' -PwdSet '2026-10-20 12:00:30')
+
+            $r = InModuleScope sqmSQLTool { Invoke-sqmLoginUnionSync -Replica 'A', 'B' -PrimaryReplica 'A' -Confirm:$false }
+
+            $script:T.Altered.Count | Should -Be 0
+            ($r | Where-Object Action -eq 'Conflict').Message | Should -Match 'nicht eindeutig'
+        }
+
+        It '-HashChange Report aendert nichts' {
+            $script:T.Logins.A = @(New-TestLogin 'app' -Hash '0x0200AA')
+            $script:T.Logins.B = @(New-TestLogin 'app' -Hash '0x0200BB' -PwdSet '2026-10-20 12:00')
+
+            $r = InModuleScope sqmSQLTool { Invoke-sqmLoginUnionSync -Replica 'A', 'B' -PrimaryReplica 'A' -HashChange Report -Confirm:$false }
+
+            $script:T.Altered.Count | Should -Be 0
+            ($r | Where-Object Action -eq 'Conflict').Message | Should -Match 'nur gemeldet'
+        }
+
+        It 'Schreibt PasswordLastSetTime in den Snapshot' {
+            $script:T.Logins.A = @(New-TestLogin 'app' -PwdSet '2026-10-20 12:00:01.250')
+            $script:T.Logins.B = @(New-TestLogin 'app' -PwdSet '2026-10-20 12:00:01.250')
+
+            InModuleScope sqmSQLTool { Invoke-sqmLoginUnionSync -Replica 'A', 'B' -PrimaryReplica 'A' -Confirm:$false } | Out-Null
+
+            $script:T.Updates.A | Should -Match 't="2026-10-20T12:00:01.250"'
+        }
+    }
 }
 
 Describe 'Sync-sqmLoginsToAlwaysOn -SyncMode' {
@@ -226,8 +345,8 @@ Describe 'Sync-sqmLoginsToAlwaysOn -SyncMode' {
     }
 
     It 'Reicht -ResetTombstone und Filter durch' {
-        Sync-sqmLoginsToAlwaysOn -SqlInstance 'SQL01' -ResetTombstone 'AppUser' -Login 'App*' -BackupRetentionDays 0 -Confirm:$false | Out-Null
-        Should -Invoke -ModuleName sqmSQLTool Invoke-sqmLoginUnionSync -Exactly 1 -ParameterFilter { $ResetTombstone -eq 'AppUser' -and $Login -eq 'App*' }
+        Sync-sqmLoginsToAlwaysOn -SqlInstance 'SQL01' -ResetTombstone 'AppUser' -Login 'App*' -HashChange Report -BackupRetentionDays 0 -Confirm:$false | Out-Null
+        Should -Invoke -ModuleName sqmSQLTool Invoke-sqmLoginUnionSync -Exactly 1 -ParameterFilter { $ResetTombstone -eq 'AppUser' -and $Login -eq 'App*' -and $HashChange -eq 'Report' -and $BackupPath }
     }
 
     It 'Schreibt Event 9004, wenn Tombstones oder Konflikte zu pruefen sind' {
