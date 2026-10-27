@@ -363,7 +363,11 @@ function Invoke-sqmCollationChange
 			# (with a space) is very likely parsed as a bare/malformed -q plus a stray unrecognized
 			# argument: sqlservr.exe then just starts normally in single-user mode and performs NO
 			# collation rebuild at all - a silent, deterministic no-op, not a timing/readiness issue.
-			$startInfo.Arguments = "-m -T4022 -T3659 -q`"$NewCollation`""
+			# Mit -m -T4022 -T3659 -q allein startete sqlservr.exe auf SQL Server 2019 nur normal im Single-User-Modus
+			# und fuehrte keinen Rebuild aus (FTS1W01SCSM0002, 15.0.4490.9). Der manuelle Aufruf mit -c und -s funktioniert:
+			# sqlservr.exe -c -m -T4022 -T3659 -s <Instanz> -q<Collation>
+			$sqlInstName = if ($SqlInstance -match '\\') { ($SqlInstance -split '\\')[1].ToUpper() } else { 'MSSQLSERVER' }
+			$startInfo.Arguments = "-c -m -T4022 -T3659 -s $sqlInstName -q`"$NewCollation`""
 			$startInfo.UseShellExecute = $false
 			$startInfo.RedirectStandardOutput = $true
 			$startInfo.RedirectStandardError = $true

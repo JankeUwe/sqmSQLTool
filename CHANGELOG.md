@@ -1,5 +1,16 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.194.0] - 2026-10-27
+
+### Fix: `Invoke-sqmCollationChange` aenderte die Collation auf SQL Server 2019 nicht
+
+- **Der Aufruf von `sqlservr.exe` entspricht jetzt dem funktionierenden manuellen Weg.** Mit `-m -T4022 -T3659 -q`
+  allein startete SQL Server 2019 (15.0.4490.9) nur normal im Single-User-Modus und fuehrte keinen Rebuild aus;
+  die Collation blieb unveraendert. Das Tool ruft jetzt `sqlservr.exe -c -m -T4022 -T3659 -s <Instanz> -q<Collation>`
+  auf (Instanzname aus `-SqlInstance`, bei Standardinstanz `MSSQLSERVER`).
+- Auf dem Zielserver noch nicht live bestaetigt; die Verifikation am Ende meldet weiterhin, falls die Collation
+  unveraendert bleibt.
+
 ## [1.9.193.0] - 2026-10-27
 
 ### Fix: `Invoke-sqmCollationChange` brach nach dem Pre-Flight ohne brauchbare Meldung ab
