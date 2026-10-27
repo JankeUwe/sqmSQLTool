@@ -3,9 +3,10 @@
 Creates the SQL Agent job for the automatic AlwaysOn login sync (standard job AgLoginSync).
 
 .DESCRIPTION
-Shortcut for Install-sqmStandardJob -Name AgLoginSync: Sync-sqmLoginsToAlwaysOn -Force:$false,
-daily at 02:00, PrimaryOnly. Install it on every AG replica; only the current primary works,
-after a failover the new primary takes over.
+Shortcut for Install-sqmStandardJob -Name AgLoginSync: Sync-sqmLoginsToAlwaysOn -SyncMode Union
+-Force:$false, daily at 02:00, PrimaryOnly, plus an Agent alert on message 1480 that starts the job
+right after a failover. Install it on every AG replica; only the current primary works, after a
+failover the new primary takes over.
 
 Until v1.9.167.0 this function created a step that called jobs\Sync-Job.ps1 without any
 parameters. Existing jobs keep working; recreate them with -Force to switch to the new step.
@@ -25,6 +26,9 @@ only, nothing is deleted).
 
 .PARAMETER BackupRetentionDays
 Retention for login backups and audit reports in days (Sync default: 7, 0 = keep all).
+
+.PARAMETER NoFailoverAlert
+Do not create the failover alert on message 1480.
 
 .PARAMETER Force
 Overwrites an existing job.
@@ -51,6 +55,8 @@ function New-sqmAutoLoginSyncJob
 		[ValidateRange(0, 3650)]
 		[int]$BackupRetentionDays,
 		[Parameter(Mandatory = $false)]
+		[switch]$NoFailoverAlert,
+		[Parameter(Mandatory = $false)]
 		[switch]$Force
 	)
 
@@ -66,6 +72,7 @@ function New-sqmAutoLoginSyncJob
 			JobName     = $JobName
 			Parameters  = $syncParams
 			Force       = $Force
+			NoFailoverAlert = $NoFailoverAlert
 		}
 		if ($AvailabilityGroupName) { $installParams['AvailabilityGroupName'] = $AvailabilityGroupName }
 

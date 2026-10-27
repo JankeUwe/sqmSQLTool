@@ -1,5 +1,56 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.191.0] - 2026-10-27
+
+### Fix: AG-Login-Sync verliert keine Logins mehr nach einem Failover
+
+`Sync-sqmLoginsToAlwaysOn` kopierte immer vom aktuellen Primary auf die Secondaries. Logins gehoeren aber
+nicht zur AG, und die Primary-Rolle sagt nichts darueber, wo ein Login zuletzt angelegt wurde. Wird ein
+Login auf Knoten A angelegt und schwenkt die AG vor dem naechsten Sync auf B, liegt der Login nur noch auf
+dem neuen Secondary. Der Sync auf B fand ihn nie, die Anwendung konnte sich am neuen Primary nicht anmelden.
+Mit dem bisherigen Default `-Force` (DROP + CREATE) wurde ausserdem ein auf A geaendertes Passwort beim
+naechsten Lauf mit dem alten Stand von B ueberschrieben.
+
+- **Neuer Parameter `-SyncMode`, Default `Union`.** Alle Replikate werden gelesen. Ein Login, der auf
+  irgendeinem Replikat existiert, wird mit SID und Passwort-Hash auf jedem Replikat angelegt, dem er fehlt,
+  unabhaengig von der Primary-Rolle. Bestehende Logins werden nie geaendert, `-Force` wird in diesem Modus
+  ignoriert. `-SyncMode Primary` ist das bisherige Verhalten.
+- **Tombstones.** Pro Replikat liegt der zuletzt gesehene Login-Bestand in `master.dbo.sqmLoginSyncState`
+  (wird beim ersten Lauf angelegt). Fehlt ein Login auf einem Replikat, auf dem er schon einmal war, wurde
+  er dort geloescht: er wird nicht wiederhergestellt, sondern gemeldet. Ist er auf allen Replikaten weg,
+  verschwindet der Eintrag. `-ResetTombstone '<login>'` verteilt einen solchen Login wieder.
+- **Erstlauf.** Secondaries bekommen fehlende Logins wie bisher. Auf dem Primary fehlende Logins werden
+  nicht kopiert, sondern als Tombstone `Baseline` gemeldet, damit frueher bewusst auf dem Primary geloeschte
+  Logins nicht zurueckkommen. Nach dem ersten Lauf den Bericht pruefen.
+- **Konflikte** (gleicher Name, SID / Passwort-Hash / Standard-DB / Sprache / deaktiviert unterschiedlich)
+  werden nur gemeldet. Widersprechen sich die Quellen bei SID oder Passwort, wird auch nicht kopiert.
+- Tombstones und Konflikte schreiben **Event 9004** (Warning, Quelle `sqmSQLTool`) ins Application Log.
+  Ein nicht erreichbares Replikat wird in dem Lauf ausgelassen (Status Failed, Event 9002).
+- Nie kopiert: `sa` (SID 0x01), `##MS_*` und lokale Maschinenkonten (`HOST\user` eines Replikats). Ohne
+  `-IncludeSystemLogins` zusaetzlich sysadmins, `NT SERVICE\*`, `NT AUTHORITY\*`, `BUILTIN\*`.
+- Primary-Modus: `LoginsCount` und `OrphansRepaired` im Ergebnis waren immer 0 (falsche Properties auf dem
+  Ergebnis von `Copy-sqmLogins`) und zaehlen jetzt richtig.
+
+### Neu: Standard-Job AgLoginSync startet nach einem Failover sofort
+
+- `Install-sqmStandardJob -Name AgLoginSync` laeuft mit `-SyncMode Union` und legt zusaetzlich den
+  Agent-Alert `<JobName> - AG failover (1480)` an. Meldung 1480 (Datenbank wechselt die AG-Rolle) startet den
+  Job sofort statt erst um 02:00. 1480 kommt einmal pro Datenbank, daher 600 s zwischen den Reaktionen. Der
+  Alert feuert auf altem und neuem Primary, die PrimaryOnly-Pruefung laesst nur den neuen arbeiten.
+- Agent erlaubt nur einen Alert pro Bedingung: ein vorhandener 1480-Alert ohne Job bekommt den Job als
+  Reaktion (Benachrichtigungen bleiben), einer mit anderem Job bleibt unveraendert und wird gemeldet
+  (`AlertStatus` Occupied). `-NoFailoverAlert` laesst den Alert weg und entfernt einen eigenen alten.
+- `New-sqmAutoLoginSyncJob` reicht `-NoFailoverAlert` durch.
+- **Bestehende Jobs:** Sie rufen `Sync-sqmLoginsToAlwaysOn` ohne `-SyncMode` auf und laufen nach dem
+  Modulupdate automatisch im Union-Modus. Fuer den Failover-Alert einmal neu anlegen:
+  `Install-sqmStandardJob -Name AgLoginSync -Force` auf jedem Replikat.
+
+**Getestet:** Union-Kern live gegen zwei SQL-Server-Instanzen (2022 und 2025, Windows PowerShell 5.1):
+Erstlauf, Login vor Failover auf altem Primary angelegt, Tombstone, erledigter Tombstone, `-ResetTombstone`,
+`-WhatIf`, unerreichbares drittes Replikat, Passwortkonflikt; SID und Passwort-Hash nach dem Kopieren
+identisch. Alert-Anlage live gegen msdb (Created / Linked / Occupied / Removed). Nicht im Labor pruefbar:
+das tatsaechliche Ausloesen des Alerts durch einen echten AG-Failover (keine Windows-AG verfuegbar).
+
 ## [1.9.190.0] - 2026-10-22
 
 ### Fix: Installation erkennt den Standort wieder (Standort-Profil auf der Freigabe)

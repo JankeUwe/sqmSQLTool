@@ -1,12 +1,33 @@
 ﻿<#
 .SYNOPSIS
-    Synchronizes logins from the primary replica to all secondary replicas in an AlwaysOn Availability Group.
+    Synchronizes logins across all replicas of an AlwaysOn Availability Group.
 
 .DESCRIPTION
-    Automatically detects the primary and all secondary replicas in an AlwaysOn Availability Group,
-    then copies logins from the primary to each secondary.
+    Two modes (-SyncMode):
 
-    Process:
+    Union (default since v1.9.191.0)
+    Logins are not part of the AG, and the primary role says nothing about where a login was
+    created last. If a login is created on A and the AG fails over to B before the next sync, a
+    primary->secondary sync never finds it: it exists only on the (now) secondary. Union mode
+    therefore reads ALL replicas:
+    - A login that exists on any replica is created on every replica that lacks it (SID and
+      password hash included, never DROP). The direction does not depend on the primary role.
+    - Tombstones: each replica keeps its last seen login set in master.dbo.sqmLoginSyncState. A
+      login that was on a replica before and is gone now was dropped there; it is NOT recreated
+      but reported (event 9004). Once it is gone on all replicas, the entry is removed.
+      -ResetTombstone '<login>' distributes such a login again.
+    - First run (state table is created): secondaries get missing logins as before. Logins that
+      are missing on the PRIMARY are not copied but marked as tombstone 'Baseline', so logins
+      deliberately dropped on the primary in the past do not come back. Check the report.
+    - Conflicts (same name, different SID / password hash / default DB / language / disabled)
+      are only reported (event 9004), never changed. -Force is ignored in this mode.
+    - An unreachable replica is skipped (status Failed, event 9002) and caught up next run.
+
+    Primary (behaviour up to v1.9.190.0)
+    Copies logins from the primary to each secondary, with -Force also overwriting existing
+    logins (DROP + CREATE). Logins that only exist on a secondary are never copied back.
+
+    Process in Primary mode:
     1. Detect primary replica in the AG (role_desc = 'PRIMARY')
     2. Enumerate all secondary replicas
     3. For each secondary:
@@ -29,14 +50,23 @@
     - System logins (sa, ##MS_*, NT SERVICE\*, BUILTIN\*) - use -IncludeSystemLogins to include
 
 .PARAMETER SqlInstance
-    The SQL Server instance hosting the primary replica. Default: $env:COMPUTERNAME
+    An instance of the AG (normally the primary). Default: $env:COMPUTERNAME
+
+.PARAMETER SyncMode
+    'Union' (default): missing logins in every direction, tombstones and conflicts only reported.
+    'Primary': previous behaviour, primary -> secondaries, -Force overwrites existing logins.
+
+.PARAMETER ResetTombstone
+    Union mode only: login names (exact, no wildcards) whose tombstone is removed on all replicas
+    before the sync, so they are distributed again. Use it after checking the report.
 
 .PARAMETER AvailabilityGroupName
     Name of the Availability Group. If not specified, the first AG found on the instance is used.
     If multiple AGs exist: Warning is displayed, first AG is used. Specify explicitly to avoid ambiguity.
 
 .PARAMETER SqlCredential
-    PSCredential for all replicas (source and destination).
+    PSCredential for all replicas (source and destination). Union mode uses one credential for all
+    replicas: -SqlCredential, else -SourceCredential.
 
 .PARAMETER SourceCredential
     PSCredential specifically for the primary replica (overrides -SqlCredential for source).
@@ -69,6 +99,7 @@
     Example: 'SQL02', 'SQL03'
 
 .PARAMETER Force
+    Primary mode only (ignored with -SyncMode Union, conflicts are only reported there).
     Existing logins on secondaries are overwritten (password / language / default-db drift),
     not only new ones added. Default: $true - so a bare 'Sync-sqmLoginsToAlwaysOn' keeps the
     secondaries fully in sync. Opt out with -Force:$false (then only new logins are created).
@@ -124,7 +155,21 @@
 
 .EXAMPLE
     Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG"
-    Syncs all logins from primary to all secondaries in ProdAG.
+    Union mode: creates every login that is missing on any replica of ProdAG, reports conflicts
+    and tombstones.
+
+.EXAMPLE
+    Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -WhatIf
+    Shows what Union mode would copy and report, without changing anything.
+
+.EXAMPLE
+    Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -ResetTombstone 'AppUser'
+    Distributes 'AppUser' again although it was dropped on one replica (or missing on the primary
+    at the first run).
+
+.EXAMPLE
+    Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -SyncMode Primary -Force:$false
+    Previous behaviour: only primary -> secondaries, only new logins.
 
 .EXAMPLE
     Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -IncludeSystemLogins
@@ -135,11 +180,11 @@
     Skips logins matching the pattern.
 
 .EXAMPLE
-    Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -Force -BackupLogins
+    Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -SyncMode Primary -Force -BackupLogins
     Updates existing logins (password changes) with backup before applying changes.
 
 .EXAMPLE
-    Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" `
+    Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -SyncMode Primary `
         -Force -ForceIncludeOnly "AppUser_*", "ServiceDB_Account" -BackupLogins
     Updates only specific logins with backup enabled (safest -Force operation).
 
@@ -158,6 +203,13 @@ function Sync-sqmLoginsToAlwaysOn
 
 		[Parameter(Mandatory = $false)]
 		[string]$AvailabilityGroupName,
+
+		[Parameter(Mandatory = $false)]
+		[ValidateSet('Union', 'Primary')]
+		[string]$SyncMode = 'Union',
+
+		[Parameter(Mandatory = $false)]
+		[string[]]$ResetTombstone,
 
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
@@ -323,6 +375,63 @@ ORDER BY role_desc ASC
 			if (-not $secondaryReplicas)
 			{
 				Invoke-sqmLogging -Message "Keine Secondary Replicas gefunden. AG hat nur 1 Replica." -FunctionName $functionName -Level 'WARNING'
+			}
+
+			# -------------------------------------------------------------------
+			# Union: fehlende Logins in jede Richtung, Konflikte/Tombstones nur melden
+			# -------------------------------------------------------------------
+			if ($SyncMode -eq 'Union')
+			{
+				if ($PSBoundParameters.ContainsKey('Force') -and $Force)
+				{
+					Invoke-sqmLogging -Message "-Force wird im SyncMode Union ignoriert: bestehende Logins werden nicht geaendert, Abweichungen nur gemeldet. Fuer das alte Verhalten -SyncMode Primary." `
+									  -FunctionName $functionName -Level 'WARNING'
+				}
+
+				$primaryName = [string]$primaryReplica.replica_server_name
+				$unionReplicas = [System.Collections.Generic.List[string]]::new()
+				foreach ($rep in $replicas)
+				{
+					$repName = [string]$rep.replica_server_name
+					if ($repName -ne $primaryName -and $SkipSecondaryServers -contains $repName)
+					{
+						$results.Add([PSCustomObject]@{
+							AvailabilityGroup = $agName
+							SyncMode          = 'Union'
+							Action            = 'ReadReplica'
+							LoginName         = '(alle)'
+							SourceReplica     = ''
+							TargetReplica     = $repName
+							Status            = 'Skipped'
+							Message           = 'In SkipSecondaryServers list'
+							Timestamp         = Get-Date
+						})
+						continue
+					}
+					$unionReplicas.Add($repName)
+				}
+
+				$unionParams = @{
+					Replica                  = $unionReplicas.ToArray()
+					PrimaryReplica           = $primaryName
+					AvailabilityGroupName    = $agName
+					IncludeSystemLogins      = $IncludeSystemLogins
+					DisablePolicy            = [bool]$DisablePolicy
+					AdjustAuthMode           = $AdjustAuthMode
+					RestartServiceIfRequired = $RestartServiceIfRequired
+				}
+				$unionCred = if ($SqlCredential) { $SqlCredential } else { $srcCred }
+				if ($unionCred) { $unionParams['SqlCredential'] = $unionCred }
+				if ($Login) { $unionParams['Login'] = $Login }
+				if ($ExcludeLogin) { $unionParams['ExcludeLogin'] = $ExcludeLogin }
+				if ($ResetTombstone) { $unionParams['ResetTombstone'] = $ResetTombstone }
+				if ($AdModuleAction) { $unionParams['AdModuleAction'] = $AdModuleAction }
+
+				foreach ($row in @(Invoke-sqmLoginUnionSync @unionParams -WhatIf:$WhatIfPreference -Confirm:$false))
+				{
+					$results.Add($row)
+				}
+				return
 			}
 
 			# -------------------------------------------------------------------
@@ -527,8 +636,10 @@ ORDER BY sp.name
 					$copyResult = Copy-sqmLogins @copyParams
 
 					# Count logins
-					$loginsCount = if ($copyResult.Logins) { @($copyResult.Logins).Count } else { 0 }
-					$orphansRepaired = if ($copyResult.OrphansRepaired) { @($copyResult.OrphansRepaired).Count } else { 0 }
+					# Copy-sqmLogins liefert eine flache Ergebnisliste (Action/LoginName/Status), keine
+					# Properties .Logins/.OrphansRepaired - bis v1.9.190.0 stand hier deshalb immer 0.
+					$loginsCount = @($copyResult | Where-Object { $_.Action -eq 'CopyLogin' -and $_.Status -eq 'Success' }).Count
+					$orphansRepaired = @($copyResult | Where-Object { $_.Action -eq 'RepairOrphanUsers' -and $_.Status -eq 'Success' }).Count
 
 					Invoke-sqmLogging -Message "[$secondaryName] Erfolgreich: $loginsCount Logins kopiert, $orphansRepaired Orphans repariert" `
 									  -FunctionName $functionName -Level 'INFO'
@@ -594,11 +705,41 @@ ORDER BY sp.name
 		$successCount = @($results | Where-Object Status -eq 'Success').Count
 		$failedCount  = @($results | Where-Object Status -eq 'Failed').Count
 		$skippedCount = @($results | Where-Object Status -eq 'Skipped').Count
-		$totalLogins  = ($results | Measure-Object -Property LoginsCount -Sum).Sum
-		$totalOrphans = ($results | Measure-Object -Property OrphansRepaired -Sum).Sum
+		$warnRows     = @($results | Where-Object { $_.Status -eq 'Warning' -and $_.PSObject.Properties['Action'] })
 
-		Invoke-sqmLogging -Message "$functionName abgeschlossen. Success: $successCount | Failed: $failedCount | Skipped: $skippedCount | Logins: $totalLogins | Orphans: $totalOrphans" `
-						  -FunctionName $functionName -Level 'INFO'
+		if ($SyncMode -eq 'Union')
+		{
+			$copied = @($results | Where-Object { $_.PSObject.Properties['Action'] -and $_.Action -eq 'Copy' -and $_.Status -eq 'Success' }).Count
+			Invoke-sqmLogging -Message "$functionName (Union) abgeschlossen. Kopiert: $copied | Zu pruefen: $($warnRows.Count) | Failed: $failedCount | Skipped: $skippedCount" `
+							  -FunctionName $functionName -Level 'INFO'
+		}
+		else
+		{
+			$totalLogins  = ($results | Where-Object { $_.PSObject.Properties['LoginsCount'] } | Measure-Object -Property LoginsCount -Sum).Sum
+			$totalOrphans = ($results | Where-Object { $_.PSObject.Properties['OrphansRepaired'] } | Measure-Object -Property OrphansRepaired -Sum).Sum
+			Invoke-sqmLogging -Message "$functionName abgeschlossen. Success: $successCount | Failed: $failedCount | Skipped: $skippedCount | Logins: $totalLogins | Orphans: $totalOrphans" `
+							  -FunctionName $functionName -Level 'INFO'
+		}
+
+		# -------------------------------------------------------------------
+		# Union: Tombstones und Konflikte brauchen eine Entscheidung -> Event 9004 (Splunk).
+		# -------------------------------------------------------------------
+		if ($warnRows.Count -gt 0 -and -not $WhatIfPreference)
+		{
+			try
+			{
+				$evtSrc = 'sqmSQLTool'
+				if (-not [System.Diagnostics.EventLog]::SourceExists($evtSrc)) { New-EventLog -LogName Application -Source $evtSrc -ErrorAction Stop }
+				$detail = (($warnRows | Select-Object -First 20 | ForEach-Object { "$($_.Action) $($_.LoginName) [$($_.TargetReplica)]: $($_.Message)" }) -join "`r`n")
+				Write-EventLog -LogName Application -Source $evtSrc -EntryType Warning -EventId 9004 `
+					-Message "sqmSQLTool: Login-Sync AG '$AvailabilityGroupName' - $($warnRows.Count) Login(s) zu pruefen (nicht automatisch geaendert):`r`n$detail" `
+					-ErrorAction Stop
+			}
+			catch
+			{
+				Invoke-sqmLogging -Message "Event 9004 konnte nicht geschrieben werden: $($_.Exception.Message)" -FunctionName $functionName -Level 'WARNING'
+			}
+		}
 
 		# -------------------------------------------------------------------
 		# Bei Fehlern: Windows Event Log (Splunk). Der SQL-Agent-Job-Step ruft nur

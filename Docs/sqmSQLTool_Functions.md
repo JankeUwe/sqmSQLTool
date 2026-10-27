@@ -3967,49 +3967,87 @@ New-sqmAlwaysOnRepairJob -SqlInstance "SQL01"
 
 Installs a predefined sqmSQLTool standard job (e.g. the AlwaysOn login sync) as a SQL Agent job with tested defaults - one call, no parameter hashtables.
 
-    Catalog: AgLoginSync (Sync-sqmLoginsToAlwaysOn -Force:$false, daily 02:00, job 'sqmAutoLoginSync')
-    and AgLoginCompare (Compare-sqmAlwaysOnLogins -FailOnDrift -OnlyDifferences, daily 06:00,
-    job 'sqmAutoLoginCompare'). All AG standard jobs are PrimaryOnly: install them on every
-    replica, on a secondary the step ends with success without doing anything.
+Standard jobs are recurring tasks whose job parameters are fixed in a catalog inside this
+function: target function, safe parameter defaults, job name, schedule and whether the job only
+works on the AG primary. The job itself is created by New-sqmAgentCommandJob (generic wrapper,
+parameters via Clixml).
+
+Catalog (Install-sqmStandardJob -List shows it with all defaults):
+
+  AgLoginSync     Sync-sqmLoginsToAlwaysOn -SyncMode Union -Force:$false, daily 02:00, job
+                  'sqmAutoLoginSync', plus a failover alert (see below).
+                  Creates logins that are missing on any replica, in every direction: a login
+                  created on the old primary shortly before a failover is no longer lost.
+                  Tombstones and conflicts are only reported (event 9004). -Force (DROP + CREATE
+                  of existing logins) is deliberately off: in unattended runs it lost logins
+                  whenever the CREATE failed afterwards (see CHANGELOG v1.8.19.0).
+  AgLoginCompare  Compare-sqmAlwaysOnLogins -FailOnDrift -OnlyDifferences, daily 06:00,
+                  job 'sqmAutoLoginCompare'. The job fails on login drift (event 9001), so the
+                  drift the sync does not fix (passwords, default DB) still gets noticed.
+
+All AG standard jobs are PrimaryOnly: install them on EVERY replica. On a secondary the step ends
+with success without doing anything, after a failover the new primary takes over automatically.
+
+Failover alert (AgLoginSync): an Agent alert '<JobName> - AG failover (1480)' on message 1480
+(database changes its AG role) starts the job right after a failover instead of waiting for the
+next 02:00 run. 1480 is raised once per database, so the alert waits 600 s between responses.
+The alert fires on the old and the new primary; PrimaryOnly lets only the new primary work.
+SQL Agent allows only one alert per condition: if another alert on 1480 already exists without a
+job response, the job is attached to it (its notifications stay). If it already starts another
+job, nothing is changed and the result says so. -NoFailoverAlert skips the alert.
 
 **Parameters:**
 
 - **-Name** - Standard job from the catalog: AgLoginSync, AgLoginCompare.
 - **-List** - Shows the catalog with all defaults instead of installing anything.
-- **-SqlInstance** - Instance on which the job is created (default: computer name). Run this ON that server.
-- **-SqlCredential** - Only for the connection that creates the job.
-- **-AvailabilityGroupName** - AG for the AG standard jobs. Without it the first AG on the instance is used.
+- **-SqlInstance** - Instance on which the job is created (default: computer name). Run this ON that server: the wrapper and parameter files are written locally to the module's jobs folder.
+- **-SqlCredential** - Only for the connection that CREATES the job. The job step itself runs as the SQL Agent service account.
+- **-AvailabilityGroupName** - AG for the AG standard jobs. Without it the target function uses the first AG on the instance.
 - **-JobName** - Overrides the job name from the catalog.
-- **-Parameters** - Hashtable merged over the catalog parameters (your values win).
-- **-ScheduleType** - Overrides the schedule type: None, Daily, Weekly, Monthly.
-- **-ScheduleTime** - Overrides the start time, "HH:mm".
+- **-Parameters** - Hashtable merged over the catalog parameters (your values win), e.g. @{ AuditAdOrphans = $true }.
+- **-ScheduleType** - Overrides the schedule type from the catalog: None, Daily, Weekly, Monthly.
+- **-ScheduleTime** - Overrides the start time from the catalog, "HH:mm".
 - **-ScheduleDays** - Weekdays for -ScheduleType Weekly.
 - **-Force** - Replaces an existing job with the same name.
 - **-StartJob** - Starts the job right after it was created.
-- **-EnableException** - Throw exceptions immediately.
+- **-NoFailoverAlert** - AgLoginSync only: do not create the failover alert on message 1480.
+- **-EnableException** - Throw exceptions immediately instead of returning a result object with Status 'Failed'.
 
-**Examples (3):**
+**Examples (4):**
 
 ```powershell
 Install-sqmStandardJob -List
 
 ```powershell
-Install-sqmStandardJob -Name AgLoginSync -AvailabilityGroupName 'AG_Prod'
+# On every AG replica:
+Install-sqmStandardJob -Name AgLoginSync
+
+```powershell
+Install-sqmStandardJob -Name AgLoginSync -AvailabilityGroupName 'AG_Prod' -Parameters @{ AuditAdOrphans = $true } -Force
 
 ```powershell
 Install-sqmStandardJob -Name AgLoginCompare -ScheduleTime '07:30'
 
 ### New-sqmAutoLoginSyncJob
 
-Creates the SQL Agent job for the automatic AlwaysOn login sync (shortcut for Install-sqmStandardJob -Name AgLoginSync).
+Creates the SQL Agent job for the automatic AlwaysOn login sync (standard job AgLoginSync).
+
+Shortcut for Install-sqmStandardJob -Name AgLoginSync: Sync-sqmLoginsToAlwaysOn -SyncMode Union
+-Force:$false, daily at 02:00, PrimaryOnly, plus an Agent alert on message 1480 that starts the job
+right after a failover. Install it on every AG replica; only the current primary works, after a
+failover the new primary takes over.
+
+Until v1.9.167.0 this function created a step that called jobs\Sync-Job.ps1 without any
+parameters. Existing jobs keep working; recreate them with -Force to switch to the new step.
 
 **Parameters:**
 
-- **-SqlInstance** - Target SQL instance (default: computer name).
-- **-AvailabilityGroupName** - AG to sync. Without it the first AG on the instance is used.
+- **-SqlInstance** - Target SQL instance (default: computer name). Run this ON that server.
+- **-AvailabilityGroupName** - AG to sync. Without it Sync-sqmLoginsToAlwaysOn uses the first AG on the instance.
 - **-JobName** - Name of the Agent job. Default: 'sqmAutoLoginSync'.
-- **-AuditAdOrphans** - Reports Windows logins without an AD account after each run (detection only).
-- **-BackupRetentionDays** - Retention for login backups and audit reports in days.
+- **-AuditAdOrphans** - Additionally reports Windows logins without an AD account after each run (event 9003, detection only, nothing is deleted).
+- **-BackupRetentionDays** - Retention for login backups and audit reports in days (Sync default: 7, 0 = keep all).
+- **-NoFailoverAlert** - Do not create the failover alert on message 1480.
 - **-Force** - Overwrites an existing job.
 
 **Examples (2):**
@@ -4675,12 +4713,33 @@ Repair-sqmAlwaysOnDatabases -Force
 
 ### Sync-sqmLoginsToAlwaysOn
 
-Synchronizes logins from the primary replica to all secondary replicas in an AlwaysOn Availability Group.
+Synchronizes logins across all replicas of an AlwaysOn Availability Group.
 
-Automatically detects the primary and all secondary replicas in an AlwaysOn Availability Group,
-    then copies logins from the primary to each secondary.
+Two modes (-SyncMode):
 
-    Process:
+    Union (default since v1.9.191.0)
+    Logins are not part of the AG, and the primary role says nothing about where a login was
+    created last. If a login is created on A and the AG fails over to B before the next sync, a
+    primary->secondary sync never finds it: it exists only on the (now) secondary. Union mode
+    therefore reads ALL replicas:
+    - A login that exists on any replica is created on every replica that lacks it (SID and
+      password hash included, never DROP). The direction does not depend on the primary role.
+    - Tombstones: each replica keeps its last seen login set in master.dbo.sqmLoginSyncState. A
+      login that was on a replica before and is gone now was dropped there; it is NOT recreated
+      but reported (event 9004). Once it is gone on all replicas, the entry is removed.
+      -ResetTombstone '<login>' distributes such a login again.
+    - First run (state table is created): secondaries get missing logins as before. Logins that
+      are missing on the PRIMARY are not copied but marked as tombstone 'Baseline', so logins
+      deliberately dropped on the primary in the past do not come back. Check the report.
+    - Conflicts (same name, different SID / password hash / default DB / language / disabled)
+      are only reported (event 9004), never changed. -Force is ignored in this mode.
+    - An unreachable replica is skipped (status Failed, event 9002) and caught up next run.
+
+    Primary (behaviour up to v1.9.190.0)
+    Copies logins from the primary to each secondary, with -Force also overwriting existing
+    logins (DROP + CREATE). Logins that only exist on a secondary are never copied back.
+
+    Process in Primary mode:
     1. Detect primary replica in the AG (role_desc = 'PRIMARY')
     2. Enumerate all secondary replicas
     3. For each secondary:
@@ -4704,9 +4763,11 @@ Automatically detects the primary and all secondary replicas in an AlwaysOn Avai
 
 **Parameters:**
 
-- **-SqlInstance** - The SQL Server instance hosting the primary replica. Default: $env:COMPUTERNAME
+- **-SqlInstance** - An instance of the AG (normally the primary). Default: $env:COMPUTERNAME
+- **-SyncMode** - 'Union' (default): missing logins in every direction, tombstones and conflicts only reported. 'Primary': previous behaviour, primary -> secondaries, -Force overwrites existing logins.
+- **-ResetTombstone** - Union mode only: login names (exact, no wildcards) whose tombstone is removed on all replicas before the sync, so they are distributed again. Use it after checking the report.
 - **-AvailabilityGroupName** - Name of the Availability Group. If not specified, the first AG found on the instance is used. If multiple AGs exist: Warning is displayed, first AG is used. Specify explicitly to avoid ambiguity.
-- **-SqlCredential** - PSCredential for all replicas (source and destination).
+- **-SqlCredential** - PSCredential for all replicas (source and destination). Union mode uses one credential for all replicas: -SqlCredential, else -SourceCredential.
 - **-SourceCredential** - PSCredential specifically for the primary replica (overrides -SqlCredential for source).
 - **-DestinationCredential** - PSCredential for the secondary replicas (overrides -SqlCredential for destinations).
 - **-Login** - Filters the copy operation to these login names (wildcards allowed). Without specification, all logins (after ExcludeLogin filter) are copied.
@@ -4716,7 +4777,7 @@ Automatically detects the primary and all secondary replicas in an AlwaysOn Avai
 - **-RestartServiceIfRequired** - When set, restart the SQL Server service on secondary replicas if auth mode was changed.
 - **-DisablePolicy** - Disable SQL Server policies on secondaries during the copy (default: $true).
 - **-SkipSecondaryServers** - Comma-separated list of secondary instance names to skip (for maintenance). Example: 'SQL02', 'SQL03'
-- **-Force** - Existing logins on secondaries are overwritten (password / language / default-db drift), not only new ones added. Default: $true - so a bare 'Sync-sqmLoginsToAlwaysOn' keeps the secondaries fully in sync. Opt out with -Force:$false (then only new logins are created). With SafeForceMode=true (default), all sysadmin logins, the SQL Agent account and system logins (sa via SID, NT SERVICE\*, etc.) are automatically excluded - no self-lockout.
+- **-Force** - Primary mode only (ignored with -SyncMode Union, conflicts are only reported there). Existing logins on secondaries are overwritten (password / language / default-db drift), not only new ones added. Default: $true - so a bare 'Sync-sqmLoginsToAlwaysOn' keeps the secondaries fully in sync. Opt out with -Force:$false (then only new logins are created). With SafeForceMode=true (default), all sysadmin logins, the SQL Agent account and system logins (sa via SID, NT SERVICE\*, etc.) are automatically excluded - no self-lockout.
 - **-ForceIncludeOnly** - When Force is set with this parameter, only these logins are updated (whitelist). Overrides other login filters. System logins still excluded per SafeForceMode. Example: 'AppUser_*', 'ServiceAccount'
 - **-ForceExclude** - Additional logins to exclude from Force operation (blacklist). Combined with SafeForceMode exclusions. Default: none.
 - **-SafeForceMode** - When Force is set and SafeForceMode is true (default), automatically excludes dangerous logins: - sa (system admin) - SQL Agent Service Account - NT SERVICE\* (virtual accounts) - BUILTIN\* (Windows built-in accounts) Set to false ONLY if you fully understand the risks. Default: $true
@@ -4724,13 +4785,28 @@ Automatically detects the primary and all secondary replicas in an AlwaysOn Avai
 - **-BackupPath** - Path where login backups are stored. Default: configured output path (Get-sqmDefaultOutputPath), i.e. C:\System\WinSrvLog\MSSQL unless overridden in the module config. Path is created if it doesn't exist.
 - **-BackupRetentionDays** - When greater than 0, login backups (LoginBackup_*.sql) in BackupPath older than this many days are deleted after the sync. With -AuditAdOrphans, the LoginAudit_<instance>_* reports are cleaned up too. Default: 7. Set to 0 to disable cleanup (keep all files).
 - **-AuditAdOrphans** - When set, runs an AD-orphan check (Invoke-sqmLoginAudit -CheckAdOrphans) on the primary AFTER the sync and reports Windows logins whose AD account no longer exists. Findings go to the log and a Windows Event Log warning (Source 'sqmSQLTool', EventId 9003) for Splunk. DETECTION ONLY - logins are NEVER deleted automatically. Requires the RSAT ActiveDirectory module and AD read rights. Default: $false.
+- **-AdModuleAction** - Passed to Copy-sqmLogins: what to do if the ActiveDirectory module is missing (Install / Skip / Abort). Not set: Install interactively, Skip in an unattended session (SQL Agent job), because the RSAT installation can hang there without Windows Update.
 - **-EnableException** - Throw exceptions immediately instead of returning error status.
 
-**Examples (5):**
+**Examples (8):**
 
 ```powershell
 Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG"
-    Syncs all logins from primary to all secondaries in ProdAG.
+    Union mode: creates every login that is missing on any replica of ProdAG, reports conflicts
+    and tombstones.
+
+```powershell
+Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -WhatIf
+    Shows what Union mode would copy and report, without changing anything.
+
+```powershell
+Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -ResetTombstone 'AppUser'
+    Distributes 'AppUser' again although it was dropped on one replica (or missing on the primary
+    at the first run).
+
+```powershell
+Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -SyncMode Primary -Force:$false
+    Previous behaviour: only primary -> secondaries, only new logins.
 
 ```powershell
 Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -IncludeSystemLogins
@@ -4741,11 +4817,11 @@ Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -E
     Skips logins matching the pattern.
 
 ```powershell
-Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -Force -BackupLogins
+Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -SyncMode Primary -Force -BackupLogins
     Updates existing logins (password changes) with backup before applying changes.
 
 ```powershell
-Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" `
+Sync-sqmLoginsToAlwaysOn -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -SyncMode Primary `
         -Force -ForceIncludeOnly "AppUser_*", "ServiceDB_Account" -BackupLogins
     Updates only specific logins with backup enabled (safest -Force operation).
 

@@ -146,7 +146,7 @@
 	<!-- SIDEBAR -->
 	<div class="psdb-st-sidebar">
 	<input class="psdb-st-sidebar-search" type="text" placeholder="Funktion suchen…" oninput="psstSearch(this.value)">
-																					<div class="psdb-st-nav-group" id="nav-alwayson">
+																						<div class="psdb-st-nav-group" id="nav-alwayson">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-alwayson-list')">
 	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">23</span>
 	</div>
@@ -453,7 +453,7 @@
 
 	<!-- CONTENT -->
 	<div class="psdb-st-content" id="psdb-st-content">
-																					<section class="psdb-st-section" id="cat-alwayson">
+																						<section class="psdb-st-section" id="cat-alwayson">
 	<h2 class="psdb-st-section-title">🔄 AlwaysOn</h2>
 
 	<div class="psdb-st-func-card" id="f-addsqmdatabasetoag">
@@ -974,12 +974,29 @@ Repair-sqmAlwaysOnDatabases -Force</pre><button class="psdb-st-copy-btn" onclick
 	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
 	</div>
 	<div class="psdb-st-func-desc">Synchronizes logins from the primary replica to all secondary replicas in an AlwaysOn Availability Group.</div>
-	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 5 examples</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 8 examples</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot;</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot;
-    Syncs all logins from primary to all secondaries in ProdAG.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+    Union mode: creates every login that is missing on any replica of ProdAG, reports conflicts
+    and tombstones.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -WhatIf</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -WhatIf
+    Shows what Union mode would copy and report, without changing anything.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -ResetTombstone &#39;AppUser&#39;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -ResetTombstone &#39;AppUser&#39;
+    Distributes &#39;AppUser&#39; again although it was dropped on one replica (or missing on the primary
+    at the first run).</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -SyncMode Primary -Force:$false</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -SyncMode Primary -Force:$false
+    Previous behaviour: only primary -&gt; secondaries, only new logins.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
 	<div class="psdb-st-example-label">Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -IncludeSystemLogins</div>
@@ -992,13 +1009,13 @@ Repair-sqmAlwaysOnDatabases -Force</pre><button class="psdb-st-copy-btn" onclick
     Skips logins matching the pattern.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -Force -BackupLogins</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -Force -BackupLogins
+	<div class="psdb-st-example-label">Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -SyncMode Primary -Force -BackupLogins</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -SyncMode Primary -Force -BackupLogins
     Updates existing logins (password changes) with backup before applying changes.</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; `</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; `
+	<div class="psdb-st-example-label">Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -SyncMode Primary `</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Sync-sqmLoginsToAlwaysOn -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -SyncMode Primary `
         -Force -ForceIncludeOnly &quot;AppUser_*&quot;, &quot;ServiceDB_Account&quot; -BackupLogins
     Updates only specific logins with backup enabled (safest -Force operation).</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
