@@ -1,5 +1,17 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.193.0] - 2026-10-27
+
+### Fix: `Invoke-sqmCollationChange` brach nach dem Pre-Flight ohne brauchbare Meldung ab
+
+- **Kopie der Rollback-Datei in den `CentralPath`.** Der Code haengte den lokalen Laufwerkspfad (`C:\...`) an
+  den `CentralPath` an (`\share\C:\...`) und warf "Laufwerk nicht gefunden". Die Rollback-Datei war da schon
+  geschrieben, die Collation-Aenderung kam nie in Gang. Jetzt kopiert `Copy-sqmToCentralPath` flach und warnt nur.
+- **Dienst bleibt nicht mehr gestoppt.** Faellt die Funktion nach `Stop-Service` aus, wird ein uebrig gebliebener
+  `sqlservr.exe` (-m) beendet und der Dienst wieder gestartet. Die Fehlermeldung nennt das; gelingt der Start
+  nicht, steht dort ein deutlicher Hinweis.
+- Die ausgeloeste Ausnahme enthaelt jetzt die ergaenzte Meldung (vorher der Rohtext).
+
 ## [1.9.192.0] - 2026-10-27
 
 ### Neu: AG-Login-Sync uebernimmt geaenderte Passwoerter

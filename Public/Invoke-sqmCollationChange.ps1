@@ -126,6 +126,8 @@ function Invoke-sqmCollationChange
 		$datestamp = Get-Date -Format 'yyyy-MM-dd'
 		$safeInst = $SqlInstance -replace '[\\/:*?"<>|]', '_'
 		$connParams = @{ SqlInstance = $SqlInstance }
+		$serviceStopped = $false
+		$sqlProc = $null
 		if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
 	}
 	
@@ -290,13 +292,9 @@ function Invoke-sqmCollationChange
 			}
 			$rollbackLines | Out-File -FilePath $rollbackFile -Encoding UTF8 -Force
 			# Kopie in CentralPath (optional)
-			$centralPath = Get-sqmConfig -Key 'CentralPath'
-			if ($centralPath)
-			{
-				$centralDir = Join-Path $centralPath (Split-Path $rollbackFile -Parent)
-				if (-not (Test-Path $centralDir)) { New-Item -ItemType Directory -Path $centralDir -Force | Out-Null }
-				Copy-Item $rollbackFile (Join-Path $centralDir (Split-Path $rollbackFile -Leaf)) -Force -ErrorAction SilentlyContinue
-			}
+			# Join-Path $centralPath <Laufwerkspfad> ergab "\share\C:\..." und warf "Laufwerk nicht gefunden"
+			# mitten im Pre-Flight. Copy-sqmToCentralPath kopiert flach und warnt nur.
+			Copy-sqmToCentralPath -Path $rollbackFile
 			Invoke-sqmLogging -Message "Rollback-Dokumentation: $rollbackFile" -FunctionName $functionName -Level "INFO"
 			
 			# WhatIf
@@ -349,6 +347,7 @@ function Invoke-sqmCollationChange
 			# Schritt 4: Dienst stoppen
 			# -----------------------------------------------------------------
 			Write-Host "  Stoppe SQL Server-Dienst '$ServiceName'..." -ForegroundColor Gray
+			$serviceStopped = $true
 			Stop-Service -Name $ServiceName -Force -ErrorAction Stop
 			(Get-Service -Name $ServiceName).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(60))
 			Write-Host "  ? Dienst gestoppt." -ForegroundColor Green
@@ -534,10 +533,29 @@ WHERE c.collation_name IS NOT NULL AND c.collation_name <> DATABASEPROPERTYEX(DB
 		{
 			$errMsg = $_.Exception.Message
 			Invoke-sqmLogging -Message "Fehler: $errMsg" -FunctionName $functionName -Level "ERROR"
-			if ($EnableException) { throw }
+			# Ab dem Stoppen darf die Instanz nicht offline zurueckbleiben. Ein uebrig gebliebener
+			# sqlservr.exe im -m-Modus wuerde den Dienststart blockieren, also zuerst beenden.
+			if ($serviceStopped)
+			{
+				try
+				{
+					if ($sqlProc -and -not $sqlProc.HasExited) { $sqlProc.Kill(); $null = $sqlProc.WaitForExit(10000) }
+					if ((Get-Service -Name $ServiceName -ErrorAction Stop).Status -ne 'Running')
+					{
+						Start-Service -Name $ServiceName -ErrorAction Stop
+						Invoke-sqmLogging -Message "Dienst '$ServiceName' nach Fehler wieder gestartet." -FunctionName $functionName -Level "WARNING"
+						$errMsg = "$errMsg (Dienst '$ServiceName' wurde wieder gestartet, Collation pruefen.)"
+					}
+				}
+				catch
+				{
+					Invoke-sqmLogging -Message "Dienst '$ServiceName' konnte nach Fehler nicht gestartet werden: $($_.Exception.Message)" -FunctionName $functionName -Level "ERROR"
+					$errMsg = "$errMsg ACHTUNG: Dienst '$ServiceName' ist gestoppt und konnte nicht gestartet werden: $($_.Exception.Message)"
+				}
+			}
 			$result.Status = 'Failed'
 			$result.Message = $errMsg
-			if (-not $ContinueOnError) { throw }
+			if ($EnableException -or -not $ContinueOnError) { throw $errMsg }
 		}
 		finally
 		{
