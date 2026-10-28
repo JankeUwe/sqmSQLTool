@@ -142,6 +142,7 @@
     'Orphaned_DirNotReachable'      = 'Verzeichnis nicht erreichbar: {0}'
     'Orphaned_Completed'            = '{0}: {1} Dateien gescannt, {2} verwaiste Dateien gefunden.'
     'Orphaned_NoneFound'            = 'Keine verwaisten Datenbankdateien gefunden.'
+    'Orphaned_NoRegisteredFiles'    = 'sys.master_files auf {0} liefert keine Zeilen fuer master. Dem Login fehlt die Metadaten-Sichtbarkeit (VIEW ANY DATABASE / VIEW ANY DEFINITION), daher kann keine Datei als verwaist bewertet werden. Abbruch.'
 
     # ── Invoke-sqmPerfBaseline ────────────────────────────────────────────────
     'Baseline_Starting'             = 'Starte {0} auf {1}, Action={2}'

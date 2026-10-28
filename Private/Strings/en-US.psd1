@@ -142,6 +142,7 @@
     'Orphaned_DirNotReachable'      = 'Directory not reachable: {0}'
     'Orphaned_Completed'            = '{0}: {1} files scanned, {2} orphaned files found.'
     'Orphaned_NoneFound'            = 'No orphaned database files found.'
+    'Orphaned_NoRegisteredFiles'    = 'sys.master_files on {0} returned no rows for master. The login lacks metadata visibility (VIEW ANY DATABASE / VIEW ANY DEFINITION), so no file can be classified as orphaned. Aborting.'
 
     # ── Invoke-sqmPerfBaseline ────────────────────────────────────────────────
     'Baseline_Starting'             = 'Starting {0} on {1}, Action={2}'

@@ -1,5 +1,16 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.195.0] - 2026-10-28
+
+### Fix: `Get-sqmOrphanedFiles` meldete bei fehlender Metadaten-Sichtbarkeit alle Dateien als verwaist
+
+- **Abbruch statt falschem Ergebnis.** Lieferte `sys.master_files` keine Zeile fuer `master` (Login ohne
+  `VIEW ANY DATABASE` / `VIEW ANY DEFINITION`), war die Menge der registrierten Pfade leer und jede Datei im
+  Verzeichnis galt als verwaist (`RegisteredFiles = 0`). Jetzt bricht die Funktion mit einer klaren Meldung ab.
+- **Fehler der Abfrage werden geworfen.** `Invoke-DbaQuery` laeuft mit `-EnableException`; `-ErrorAction Stop`
+  warf nicht und das Ergebnis wurde stillschweigend `$null`.
+- Ursache auf dem betroffenen Server noch nicht bestaetigt.
+
 ## [1.9.194.0] - 2026-10-27
 
 ### Fix: `Invoke-sqmCollationChange` aenderte die Collation auf SQL Server 2019 nicht

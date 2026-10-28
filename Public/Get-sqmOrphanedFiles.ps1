@@ -104,7 +104,13 @@ SELECT
 FROM sys.master_files
 ORDER BY database_id, file_id
 "@
-			$registeredFiles = Invoke-DbaQuery @connParams -Database master -Query $registeredSql -ErrorAction Stop
+			$registeredFiles = @(Invoke-DbaQuery @connParams -Database master -Query $registeredSql -EnableException)
+
+			# Without metadata visibility sys.master_files returns few or no rows; every file would then look orphaned.
+			if (@($registeredFiles | Where-Object { $_.DatabaseName -eq 'master' }).Count -eq 0)
+			{
+				throw (_s 'Orphaned_NoRegisteredFiles' $SqlInstance)
+			}
 
 			$registeredPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 			foreach ($f in $registeredFiles) { [void]$registeredPaths.Add($f.PhysicalName) }
