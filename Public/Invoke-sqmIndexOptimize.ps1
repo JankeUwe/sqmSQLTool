@@ -89,6 +89,13 @@
 .PARAMETER UpdateStatistics
     Afterwards run Invoke-sqmUpdateStatistics on the processed databases.
 
+.PARAMETER Quiet
+    Suppress the progress output (console lines, progress bar with remaining time estimate).
+    Result objects and log are not affected. Without -Quiet the function writes: per database the
+    analysis and the number of commands, per index one line on completion (large indexes of about
+    100,000 pages = 800 MB or more also one when they start), a summary per database and at the
+    end. The remaining time is estimated from the pages processed so far.
+
 .PARAMETER WhatIf
     Shows which indexes would be reorganized/rebuilt and the command.
 
@@ -169,6 +176,8 @@ function Invoke-sqmIndexOptimize
 		[Parameter(Mandatory = $false)]
 		[switch]$UpdateStatistics,
 		[Parameter(Mandatory = $false)]
+		[switch]$Quiet,
+		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
 
@@ -189,6 +198,7 @@ function Invoke-sqmIndexOptimize
 		if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
 		$started = [System.Diagnostics.Stopwatch]::StartNew()
 		$processedDbs = [System.Collections.Generic.List[string]]::new()
+		$runOk = 0; $runFail = 0; $runOther = 0
 
 		Invoke-sqmLogging -Message "Starte $functionName auf $SqlInstance (Database='$Database', Table='$Table', Low=$FragmentationLow%, High=$FragmentationHigh%, MinPages=$MinPageCount, Online=$Online, AllowOffline=$AllowOfflineRebuild, LowPrio=$LowPriorityWaitMinutes min, MaxDop=$MaxDop, SortInTempdb=$SortInTempdb, FillFactor=$FillFactor, TimeLimit=$TimeLimitMinutes min)" -FunctionName $functionName -Level "INFO"
 	}
@@ -216,15 +226,21 @@ function Invoke-sqmIndexOptimize
 				return
 			}
 
+			$dbIndex = 0
 			foreach ($db in $targetDbs)
 			{
 				$dbName = $db.Name
+				$dbIndex++
+				$showProgress = (-not $Quiet) -and (-not $WhatIfPreference)
+				if ($showProgress) { Write-Progress -Id 1 -Activity $functionName -Status "Datenbank $dbIndex/$($targetDbs.Count): $dbName" -PercentComplete ([int](100 * ($dbIndex - 1) / $targetDbs.Count)) }
 				$upd = @(Invoke-DbaQuery @connParams -Database $dbName -Query "SELECT CAST(DATABASEPROPERTYEX(DB_NAME(), 'Updateability') AS nvarchar(20)) AS Updateability")[0].Updateability
 				if ($upd -ne 'READ_WRITE')
 				{
 					Invoke-sqmLogging -Message "[$dbName] nicht beschreibbar (Updateability=$upd, z. B. READ_ONLY oder AG-Secondary) - uebersprungen." -FunctionName $functionName -Level "WARNING"
 					continue
 				}
+
+				if (-not $Quiet) { Write-sqmMaintLine "[$dbName] ($dbIndex/$($targetDbs.Count)) Analysiere Fragmentierung (LIMITED, ab $MinPageCount Seiten) - das kann bei grossen Datenbanken dauern ..." }
 
 				# ---- Rowstore: Fragmentierung nur fuer Indizes >= MinPageCount lesen ----
 				$rowQuery = @"
@@ -287,9 +303,20 @@ HAVING 100.0 * SUM(CAST(rg.deleted_rows AS bigint)) / NULLIF(SUM(CAST(rg.total_r
 					foreach ($c in $rowsSet) { $work.Add([PSCustomObject]@{ C = $c; IsColumnstore = $set.Cs }) }
 				}
 
+				$totalPages = [double](($work | ForEach-Object { [double]$_.C.PageCount } | Measure-Object -Sum).Sum)
+				$donePages = 0.0
+				$prevPages = 0.0
+				$pos = 0
+				$dbOk = 0; $dbFail = 0
+				$dbWatch = [System.Diagnostics.Stopwatch]::StartNew()
+				if ($showProgress -and $work.Count -gt 0) { Write-sqmMaintLine "[$dbName] $($work.Count) Index-Operation(en) geplant (ca. $([math]::Round($totalPages * 8 / 1024, 0)) MB)." }
+
 				foreach ($w in $work)
 				{
 					$c = $w.C
+					$pos++
+					$donePages += $prevPages
+					$prevPages = [double]$c.PageCount
 					$frag = [double]$c.FragmentationPercent
 					$isPartitioned = $PartitionLevel -and ([int]$c.PartitionCount -gt 1)
 					$idxType = [int]$c.IndexType
@@ -379,6 +406,11 @@ HAVING 100.0 * SUM(CAST(rg.deleted_rows AS bigint)) / NULLIF(SUM(CAST(rg.total_r
 						continue
 					}
 
+					if ($showProgress)
+					{
+						Write-Progress -Id 2 -ParentId 1 -Activity "$action [$dbName]" -Status "$pos/$($work.Count)  $($row.Table).$($c.IndexName)$(if ($isPartitioned) { " (Partition $($c.PartitionNumber))" })  $frag% / $($c.PageCount) Seiten" -PercentComplete ([math]::Min(100, [int](100 * $donePages / [math]::Max(1, $totalPages))))
+						if ([long]$c.PageCount -ge 100000) { Write-sqmMaintLine "  [$pos/$($work.Count)] Start $action $($row.Table).$($c.IndexName) ($frag% fragmentiert, $([math]::Round([long]$c.PageCount * 8 / 1024, 0)) MB) ..." }
+					}
 					$sw = [System.Diagnostics.Stopwatch]::StartNew()
 					try
 					{
@@ -416,9 +448,24 @@ HAVING 100.0 * SUM(CAST(rg.deleted_rows AS bigint)) / NULLIF(SUM(CAST(rg.total_r
 					}
 					$row.Duration_s = [math]::Round($sw.Elapsed.TotalSeconds, 1)
 					Invoke-sqmLogging -Message "[$target] $($row.Action): $($row.Status) in $($row.Duration_s) s." -FunctionName $functionName -Level "VERBOSE"
+					if ($row.Status -eq 'Success') { $dbOk++ } elseif ($row.Status -eq 'Failed') { $dbFail++ }
+					if ($showProgress)
+					{
+						$eta = Get-sqmMaintEta -Elapsed $dbWatch.Elapsed -Done ($donePages + $prevPages) -Total $totalPages
+						$line = "  [$pos/$($work.Count)] $($row.Status) $($row.Action) $($row.Table).$($c.IndexName)$(if ($isPartitioned) { " (P$($c.PartitionNumber))" }) in $($row.Duration_s) s $eta"
+						if ($row.Status -eq 'Failed') { Write-sqmMaintLine $line } else { Write-sqmMaintLine $line }
+					}
 					[PSCustomObject]$row
 				}
+				$runOk += $dbOk; $runFail += $dbFail; $runOther += ($work.Count - $dbOk - $dbFail)
+				if ($showProgress)
+				{
+					Write-Progress -Id 2 -ParentId 1 -Activity $functionName -Completed
+					if ($work.Count -gt 0) { Write-sqmMaintLine "[$dbName] fertig: $dbOk erfolgreich, $dbFail fehlgeschlagen, $($work.Count - $dbOk - $dbFail) uebersprungen/nicht gestartet in $([math]::Round($dbWatch.Elapsed.TotalMinutes, 1)) min." }
+					else { Write-sqmMaintLine "[$dbName] nichts zu tun." }
+				}
 			}
+			if (-not $Quiet) { Write-Progress -Id 1 -Activity $functionName -Completed }
 
 			# ---- Statistiken im Anschluss ----
 			if ($UpdateStatistics -and $processedDbs.Count -gt 0)
@@ -435,12 +482,14 @@ HAVING 100.0 * SUM(CAST(rg.deleted_rows AS bigint)) / NULLIF(SUM(CAST(rg.total_r
 						$statParams = @{ SqlInstance = $SqlInstance; Database = $d; TimeLimitMinutes = $remaining; WhatIf = $WhatIfPreference }
 						if ($SqlCredential) { $statParams['SqlCredential'] = $SqlCredential }
 						if ($EnableException) { $statParams['EnableException'] = $true }
+						if ($Quiet) { $statParams['Quiet'] = $true }
 						$st = @(Invoke-sqmUpdateStatistics @statParams)
 						Invoke-sqmLogging -Message "[$d] Statistiken: $(@($st | Where-Object Status -eq 'Success').Count) aktualisiert, $(@($st | Where-Object Status -eq 'Failed').Count) fehlgeschlagen." -FunctionName $functionName -Level "INFO"
 					}
 				}
 			}
-			Invoke-sqmLogging -Message "$functionName abgeschlossen in $([math]::Round($started.Elapsed.TotalMinutes, 1)) min." -FunctionName $functionName -Level "INFO"
+			Invoke-sqmLogging -Message "$functionName abgeschlossen in $([math]::Round($started.Elapsed.TotalMinutes, 1)) min ($runOk erfolgreich, $runFail fehlgeschlagen, $runOther uebersprungen/nicht gestartet)." -FunctionName $functionName -Level "INFO"
+			if (-not $Quiet -and -not $WhatIfPreference) { Write-sqmMaintLine "$functionName abgeschlossen in $([math]::Round($started.Elapsed.TotalMinutes, 1)) min: $runOk erfolgreich, $runFail fehlgeschlagen, $runOther uebersprungen/nicht gestartet." }
 		}
 		catch
 		{

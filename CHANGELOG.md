@@ -1,5 +1,32 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.196.0] - 2026-10-30
+
+### Neu: `Get-sqmIndexHealth` und `Get-sqmStatisticsHealth` (Zustand von Indizes und Statistiken)
+
+- **`Get-sqmIndexHealth`** zeigt je Index (bei partitionierten je Partition) Zeilen, Seiten, Groesse, Fragmentierung
+  (Columnstore: Anteil geloeschter Zeilen), Fuellfaktor, Lese-/Schreibzugriffe und einen Status
+  (`Ok`, `Reorganize`, `Rebuild`, `Small`, `Disabled`, `NotMeasured`). Schwellen und Regeln wie in
+  `Invoke-sqmIndexOptimize`. `-SkipFragmentation` liest nur Metadaten, `-OnlyProblems`, `-Summary` (eine Zeile je DB).
+- **`Get-sqmStatisticsHealth`** zeigt je Statistik Zeilen, Stichprobe, Aenderungen seit dem letzten Update, Schwelle,
+  Alter, NORECOMPUTE und die Datenbank-Einstellungen (AUTO_UPDATE_STATISTICS, ASYNC, AUTO_CREATE). `NeedsUpdate`
+  entscheidet nach derselben Regel wie `Invoke-sqmUpdateStatistics` (gemeinsame Hilfsfunktion
+  `Get-sqmStatisticsDecision`). Ebenfalls `-OnlyProblems` und `-Summary`.
+- Beide schreiben standardmaessig CSV + HTML nach `<OutputPath>\IndexHealth` bzw. `\StatisticsHealth`
+  (`-OutputPath ''` unterdrueckt das).
+
+### Neu: Rueckmeldungen waehrend des Laufs in `Invoke-sqmIndexOptimize` und `Invoke-sqmUpdateStatistics`
+
+- Fortschrittsbalken (je Datenbank und je Index/Statistik) mit geschaetzter Restzeit, berechnet aus den bisher
+  verarbeiteten Seiten bzw. gelesenen Zeilen.
+- Konsolenzeilen: je Datenbank Anzahl der geplanten Operationen, je Objekt eine Abschlusszeile
+  (`[3/42] Success REBUILD ONLINE ... in 12.3 s ETA ca. 00:03:21`), bei grossen Objekten (ab ca. 100.000 Seiten bzw.
+  10 Mio. gelesenen Zeilen) zusaetzlich eine Startzeile, Zusammenfassung je Datenbank und am Ende. Die Index-Analyse
+  meldet vorab, dass sie die Fragmentierung liest (kann bei grossen Datenbanken dauern).
+- Ausgabe ueber den Information-Stream; `-Quiet` unterdrueckt Zeilen und Balken, `-InformationAction SilentlyContinue`
+  ebenso. Bei `-WhatIf` erscheinen keine Fortschrittszeilen. Die Ergebnisobjekte sind unveraendert.
+- Live gegen SQL Server 2022 (DEV01) geprueft: Abfragen der neuen Funktionen und je ein echter Lauf.
+
 ## [1.9.195.0] - 2026-10-28
 
 ### Fix: `Get-sqmOrphanedFiles` meldete bei fehlender Metadaten-Sichtbarkeit alle Dateien als verwaist

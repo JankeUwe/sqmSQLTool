@@ -75,6 +75,11 @@
     Do not start further updates after this many minutes (maintenance window). The remaining
     statistics are returned with Status 'NotStarted'. 0 = no limit. Default: 0.
 
+.PARAMETER Quiet
+    Suppress the progress output (console lines per statistic and the progress bar with remaining
+    time estimate). Result objects and log are not affected. Per statistic one line is written on
+    completion; for large statistics (about 10 M rows read or more) also one when it starts.
+
 .PARAMETER WhatIf
     Shows which statistics would be affected.
 
@@ -137,6 +142,8 @@ function Invoke-sqmUpdateStatistics {
         [ValidateRange(0, 10080)]
         [int]$TimeLimitMinutes = 0,
         [Parameter(Mandatory = $false)]
+        [switch]$Quiet,
+        [Parameter(Mandatory = $false)]
         [switch]$EnableException
     )
 
@@ -172,8 +179,13 @@ function Invoke-sqmUpdateStatistics {
                 return
             }
 
+            $dbIndex = 0
             foreach ($db in $targetDbs) {
                 $dbName = $db.Name
+                $dbIndex++
+                if (-not $Quiet -and -not $WhatIfPreference) {
+                    Write-Progress -Id 1 -Activity $functionName -Status "Datenbank $dbIndex/$($targetDbs.Count): $dbName" -PercentComplete ([int](100 * ($dbIndex - 1) / $targetDbs.Count))
+                }
 
                 # Nur beschreibbare Datenbanken (READ_ONLY und AG-Secondaries ueberspringen)
                 $upd = @(Invoke-DbaQuery @connParams -Database $dbName -Query "SELECT CAST(DATABASEPROPERTYEX(DB_NAME(), 'Updateability') AS nvarchar(20)) AS Updateability")[0].Updateability
@@ -206,7 +218,8 @@ ORDER BY sp.modification_counter DESC;
 "@
                 $stats = @(Invoke-DbaQuery @connParams -Database $dbName -Query $selectQuery -SqlParameter @{ table = $tableLike; stat = $statLike })
 
-                $selected = 0
+                # ---- Auswahl: welche Statistiken werden aktualisiert? ----
+                $todo = [System.Collections.Generic.List[object]]::new()
                 foreach ($st in $stats) {
                     if (-not $Index -and $st.IsIndexStat -eq 1) { continue }
 
@@ -214,94 +227,121 @@ ORDER BY sp.modification_counter DESC;
                     $mod = if ($st.ModCounter -is [DBNull] -or $null -eq $st.ModCounter) { $null } else { [long]$st.ModCounter }
                     $ageDays = if ($st.AgeDays -is [DBNull] -or $null -eq $st.AgeDays) { $null } else { [int]$st.AgeDays }
 
-                    # Auswahl: Schwelle erreicht?
-                    $reason = 'All'
-                    if ($OnlyModified) {
-                        if ($null -eq $mod -or $mod -le 0) { continue }
-                        if ($ModificationThreshold -eq 'Any') {
-                            $reason = "Modified ($mod)"
-                        }
-                        else {
-                            $threshold = [math]::Max(1, [math]::Ceiling([math]::Min([math]::Sqrt(1000.0 * $rows), $rows * $ModificationPercent / 100.0)))
-                            if ($mod -ge $threshold) {
-                                $reason = "Threshold ($mod >= $threshold)"
-                            }
-                            elseif ($MaxAgeDays -gt 0 -and $null -ne $ageDays -and $ageDays -gt $MaxAgeDays) {
-                                $reason = "Age ($ageDays d > $MaxAgeDays d, $mod changes)"
-                            }
-                            else { continue }
-                        }
-                    }
-                    $selected++
+                    $decision = Get-sqmStatisticsDecision -Rows $rows -Modifications $mod -AgeDays $ageDays -OnlyModified $OnlyModified -ModificationThreshold $ModificationThreshold -ModificationPercent $ModificationPercent -MaxAgeDays $MaxAgeDays
+                    if (-not $decision.NeedsUpdate) { continue }
+                    $reason = $decision.Reason
 
                     # Stichprobe: fest, persistiert oder adaptiv
                     $persisted = if ($st.PersistedSamplePercent -is [DBNull] -or $null -eq $st.PersistedSamplePercent) { 0 } else { [double]$st.PersistedSamplePercent }
+                    $samplePct = 100
                     $withClause = if ($fixedSample) {
-                        if ($SamplePercent -eq 0) { 'FULLSCAN' } else { "SAMPLE $SamplePercent PERCENT" }
+                        if ($SamplePercent -eq 0) { 'FULLSCAN' } else { $samplePct = $SamplePercent; "SAMPLE $SamplePercent PERCENT" }
                     }
                     elseif ($persisted -gt 0) {
-                        "SAMPLE $([math]::Min(100, [math]::Ceiling($persisted))) PERCENT, PERSIST_SAMPLE_PERCENT = ON"
+                        $samplePct = [math]::Min(100, [math]::Ceiling($persisted))
+                        "SAMPLE $samplePct PERCENT, PERSIST_SAMPLE_PERCENT = ON"
                     }
                     elseif ($rows -le $FullScanRowLimit) {
                         'FULLSCAN'
                     }
                     else {
-                        "SAMPLE $([math]::Max(1, [math]::Ceiling(100.0 * $FullScanRowLimit / $rows))) PERCENT"
+                        $samplePct = [math]::Max(1, [math]::Ceiling(100.0 * $FullScanRowLimit / $rows))
+                        "SAMPLE $samplePct PERCENT"
                     }
                     if ($st.NoRecompute -eq $true -or $st.NoRecompute -eq 1) { $withClause += ', NORECOMPUTE' }
 
                     $tableEsc = "[$($st.SchemaName -replace '\]', ']]')].[$($st.TableName -replace '\]', ']]')]"
                     $statEsc  = "[$($st.StatName -replace '\]', ']]')]"
-                    $updateQuery = "UPDATE STATISTICS $tableEsc ($statEsc) WITH $withClause"
-                    $target = "$dbName : $($st.SchemaName).$($st.TableName).$($st.StatName)"
 
-                    $row = [ordered]@{
-                        SqlInstance   = $SqlInstance
-                        Database      = $dbName
-                        Table         = "$($st.SchemaName).$($st.TableName)"
-                        Statistic     = $st.StatName
-                        Rows          = $rows
-                        Modifications = $mod
-                        LastUpdated   = $(if ($st.LastUpdated -is [DBNull]) { $null } else { $st.LastUpdated })
-                        Option        = $withClause
-                        Reason        = $reason
-                        Status        = $null
-                        Duration_s    = 0
-                        Message       = $null
-                    }
+                    $todo.Add([PSCustomObject]@{
+                        UpdateQuery = "UPDATE STATISTICS $tableEsc ($statEsc) WITH $withClause"
+                        WithClause  = $withClause
+                        Target      = "$dbName : $($st.SchemaName).$($st.TableName).$($st.StatName)"
+                        # Aufwand fuer Fortschritt/Restzeit: gelesene Zeilen (Stichprobe beruecksichtigt)
+                        Weight      = [math]::Max(1.0, $rows * $samplePct / 100.0)
+                        Row         = [ordered]@{
+                            SqlInstance   = $SqlInstance
+                            Database      = $dbName
+                            Table         = "$($st.SchemaName).$($st.TableName)"
+                            Statistic     = $st.StatName
+                            Rows          = $rows
+                            Modifications = $mod
+                            LastUpdated   = $(if ($st.LastUpdated -is [DBNull]) { $null } else { $st.LastUpdated })
+                            Option        = $withClause
+                            Reason        = $reason
+                            Status        = $null
+                            Duration_s    = 0
+                            Message       = $null
+                        }
+                    })
+                }
+                $selected = $todo.Count
+
+                # ---- Ausfuehrung mit Fortschritt ----
+                $totalWeight = [double](($todo | Measure-Object Weight -Sum).Sum)
+                $doneWeight = 0.0
+                $doneCount = 0
+                $dbWatch = [System.Diagnostics.Stopwatch]::StartNew()
+                $okCount = 0; $failCount = 0
+                $showProgress = (-not $Quiet) -and (-not $WhatIfPreference) -and $selected -gt 0
+                if ($showProgress) { Write-sqmMaintLine "[$dbName] $selected Statistik(en) zu aktualisieren (von $($stats.Count) geprueft)." }
+
+                foreach ($item in $todo) {
+                    $row = $item.Row
+                    $position = $doneCount + 1
 
                     if ($TimeLimitMinutes -gt 0 -and $started.Elapsed.TotalMinutes -ge $TimeLimitMinutes) {
                         $row.Status = 'NotStarted'
                         $row.Message = "Zeitlimit $TimeLimitMinutes min erreicht."
+                        $doneCount++
                         [PSCustomObject]$row
                         continue
                     }
 
-                    if ($PSCmdlet.ShouldProcess($target, "UPDATE STATISTICS WITH $withClause")) {
+                    if ($PSCmdlet.ShouldProcess($item.Target, "UPDATE STATISTICS WITH $($item.WithClause)")) {
+                        if ($showProgress) {
+                            Write-Progress -Id 2 -ParentId 1 -Activity "UPDATE STATISTICS [$dbName]" -Status "$position/$selected  $($row.Table).$($row.Statistic)  ($($item.WithClause))" -PercentComplete ([math]::Min(100, [int](100 * $doneWeight / $totalWeight)))
+                            if ($item.Weight -ge 10000000) { Write-sqmMaintLine "  [$position/$selected] Start $($row.Table).$($row.Statistic) ($($row.Rows) Zeilen, $($item.WithClause)) ..." }
+                        }
                         $sw = [System.Diagnostics.Stopwatch]::StartNew()
                         try {
-                            Invoke-DbaQuery @connParams -Database $dbName -Query $updateQuery -QueryTimeout 86400 -EnableException | Out-Null
+                            Invoke-DbaQuery @connParams -Database $dbName -Query $item.UpdateQuery -QueryTimeout 86400 -EnableException | Out-Null
                             $row.Status = 'Success'
-                            $row.Message = "Updated WITH $withClause"
+                            $row.Message = "Updated WITH $($item.WithClause)"
+                            $okCount++
                         }
                         catch {
-                            $errMsg = "Fehler bei UPDATE STATISTICS ($target): $($_.Exception.Message)"
+                            $errMsg = "Fehler bei UPDATE STATISTICS ($($item.Target)): $($_.Exception.Message)"
                             Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
                             if ($EnableException) { throw }
                             $row.Status = 'Failed'
                             $row.Message = $errMsg
+                            $failCount++
                         }
                         $row.Duration_s = [math]::Round($sw.Elapsed.TotalSeconds, 1)
+                        $doneWeight += $item.Weight
+                        $doneCount++
+                        if ($showProgress) {
+                            $eta = Get-sqmMaintEta -Elapsed $dbWatch.Elapsed -Done $doneWeight -Total $totalWeight
+                            $line = "  [$position/$selected] $($row.Status) $($row.Table).$($row.Statistic) in $($row.Duration_s) s $eta"
+                            if ($row.Status -eq 'Failed') { Write-sqmMaintLine $line } else { Write-sqmMaintLine $line }
+                        }
                         [PSCustomObject]$row
                     }
                     else {
                         $row.Status = 'WhatIf'
-                        $row.Message = "WhatIf: $updateQuery"
+                        $row.Message = "WhatIf: $($item.UpdateQuery)"
+                        $doneCount++
                         [PSCustomObject]$row
                     }
                 }
+                if ($showProgress) {
+                    Write-Progress -Id 2 -ParentId 1 -Activity "UPDATE STATISTICS [$dbName]" -Completed
+                    Write-sqmMaintLine "[$dbName] fertig: $okCount aktualisiert, $failCount fehlgeschlagen, $($selected - $okCount - $failCount) nicht ausgefuehrt in $([math]::Round($dbWatch.Elapsed.TotalMinutes, 1)) min."
+                }
                 Invoke-sqmLogging -Message "[$dbName] $($stats.Count) Statistik(en) geprueft, $selected ausgewaehlt." -FunctionName $functionName -Level "INFO"
             }
+            if (-not $Quiet) { Write-Progress -Id 1 -Activity $functionName -Completed }
         }
         catch {
             Invoke-sqmLogging -Message $_.Exception.Message -FunctionName $functionName -Level "ERROR"
