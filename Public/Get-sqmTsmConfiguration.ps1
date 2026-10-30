@@ -9,7 +9,7 @@
 
     Steps:
       1. Determine the dsm.opt path (auto-detected via _FindDsmOptPath, or -DsmOptPath).
-      2. Read the file (UNC/remote-capable via _ReadRemoteFile).
+      2. Read the file (UNC/remote-capable via _ToUncPath).
       3. Parse all non-comment options into a hashtable.
       4. Extract TCPServeraddress, USERID and PASSWORD.
 
@@ -41,7 +41,7 @@
     # Uses an explicit dsm.opt path and also returns the plain-text password.
 
 .NOTES
-    Requires the private helpers _FindDsmOptPath and _ReadRemoteFile.
+    Requires the private helpers _FindDsmOptPath and _ToUncPath.
 #>
 function Get-sqmTsmConfiguration
 {
@@ -98,8 +98,23 @@ function Get-sqmTsmConfiguration
 			}
 			
 			# 2. Datei lesen
-			# Hinweis: _ReadRemoteFile muss UNC-Pfad Handling beherrschen
-			$lines = _ReadRemoteFile -ComputerName $ComputerName -FilePath $optFile -Credential $Credential -ErrorAction Stop
+			$readPath = if ($isLocal -or $optFile.StartsWith('\')) { $optFile }
+			else { _ToUncPath -ComputerName $ComputerName -LocalPath $optFile }
+			
+			$psDrive = $null
+			try
+			{
+				if ($Credential -and -not $isLocal)
+				{
+					$share = ($readPath -split '\')[0..3] -join ''
+					$psDrive = New-PSDrive -Name ('tsmcfg' + [guid]::NewGuid().ToString('N').Substring(0, 6)) -PSProvider FileSystem -Root $share -Credential $Credential -ErrorAction Stop
+				}
+				$lines = Get-Content -Path $readPath -Encoding UTF8 -ErrorAction Stop
+			}
+			finally
+			{
+				if ($psDrive) { Remove-PSDrive -Name $psDrive.Name -Force -ErrorAction SilentlyContinue }
+			}
 			
 			# 3. Optionen parsen
 			$options = @{ }

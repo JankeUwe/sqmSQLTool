@@ -1,5 +1,13 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.197.0] - 2026-10-30
+
+### Fehler behoben: `Get-sqmTsmConfiguration` scheiterte mit `_ReadRemoteFile`
+
+- Die Funktion rief die nicht vorhandene Hilfsfunktion `_ReadRemoteFile` auf und meldete
+  "Fehler beim Lesen der dsm.opt". Die Datei wird jetzt direkt gelesen, bei Remote-Rechnern ueber den
+  Admin-Share (`_ToUncPath`), mit `-Credential` ueber ein temporaeres PSDrive.
+
 ## [1.9.196.0] - 2026-10-30
 
 ### Neu: `Get-sqmIndexHealth` und `Get-sqmStatisticsHealth` (Zustand von Indizes und Statistiken)
