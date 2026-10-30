@@ -12,7 +12,7 @@ jobs:
     name: Lint & BOM
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install PSScriptAnalyzer
         shell: pwsh
@@ -57,7 +57,7 @@ jobs:
     name: Import (Windows PowerShell 5.1)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install dbatools (5.1) and import
         shell: powershell
@@ -74,7 +74,7 @@ jobs:
     name: Import & Pester (PowerShell 7)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install dbatools and Pester (7)
         shell: pwsh
