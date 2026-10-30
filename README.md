@@ -1,4 +1,4 @@
-# sqmSQLTool
+﻿# sqmSQLTool
 
 **Enterprise SQL Server Administration & AlwaysOn Automation Toolkit**
 
@@ -120,6 +120,8 @@ Set-sqmConfig -UpdateMode Off         # no check
 - `Get-sqmMissingIndexes` - Index recommendations with CREATE statements
 - `Get-sqmAutoGrowthReport` - Database autogrowth tracking
 - `Get-sqmIndexFragmentation` - Index fragmentation analysis
+- `Get-sqmIndexHealth` - State of all indexes (size, fragmentation, fill factor, status) and what Invoke-sqmIndexOptimize would do; read-only
+- `Get-sqmStatisticsHealth` - State of all statistics (age, changes, sample, auto-update settings) and what Invoke-sqmUpdateStatistics would update; read-only
 - `Invoke-sqmIndexOptimize` - Index maintenance with sensible defaults: REORGANIZE 5-30 %, REBUILD ONLINE from 30 % with low-priority wait, per partition, time limit
 
 ### Security & Compliance

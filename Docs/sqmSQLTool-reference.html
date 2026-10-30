@@ -146,7 +146,7 @@
 	<!-- SIDEBAR -->
 	<div class="psdb-st-sidebar">
 	<input class="psdb-st-sidebar-search" type="text" placeholder="Funktion suchen…" oninput="psstSearch(this.value)">
-																							<div class="psdb-st-nav-group" id="nav-alwayson">
+																								<div class="psdb-st-nav-group" id="nav-alwayson">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-alwayson-list')">
 	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">23</span>
 	</div>
@@ -287,7 +287,7 @@
 
 	<div class="psdb-st-nav-group" id="nav-performance">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-performance-list')">
-	<span>⚡ Performance</span><span class="psdb-st-nav-count">19</span>
+	<span>⚡ Performance</span><span class="psdb-st-nav-count">21</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-performance-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmautogrowthreport')">Get-sqmAutoGrowthReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmblockinghistory')">Get-sqmBlockingHistory</span></li>
@@ -295,6 +295,7 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmdeadlockreport')">Get-sqmDeadlockReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmfilelatencyreport')">Get-sqmFileLatencyReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmindexfragmentation')">Get-sqmIndexFragmentation</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmindexhealth')">Get-sqmIndexHealth</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmindexusagereport')">Get-sqmIndexUsageReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmlongrunningqueries')">Get-sqmLongRunningQueries</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmmissingindexes')">Get-sqmMissingIndexes</span></li>
@@ -302,6 +303,7 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmplancachereport')">Get-sqmPlanCacheReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmplaninsights')">Get-sqmPlanInsights</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmserverutilization')">Get-sqmServerUtilization</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmstatisticshealth')">Get-sqmStatisticsHealth</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmwaitstatistics')">Get-sqmWaitStatistics</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmextendedevents')">Invoke-sqmExtendedEvents</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmperfbaseline')">Invoke-sqmPerfBaseline</span></li>
@@ -453,7 +455,7 @@
 
 	<!-- CONTENT -->
 	<div class="psdb-st-content" id="psdb-st-content">
-																							<section class="psdb-st-section" id="cat-alwayson">
+																								<section class="psdb-st-section" id="cat-alwayson">
 	<h2 class="psdb-st-section-title">🔄 AlwaysOn</h2>
 
 	<div class="psdb-st-func-card" id="f-addsqmdatabasetoag">
@@ -3335,6 +3337,33 @@ New-sqmAgentCommandJob -SqlInstance &#39;SQL01&#39; -SqlCredential $cred -JobNam
 	</div>
 	</div>
 
+	<div class="psdb-st-func-card" id="f-getsqmindexhealth">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Get-sqmIndexHealth</span>
+	<span class="psdb-st-badge psdb-st-badge-performance">Performance</span>
+	</div>
+	<div class="psdb-st-func-desc">Reports the state of all indexes (size, fragmentation, fill factor, disabled) and what Invoke-sqmIndexOptimize would do with each of them.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 3 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># What would the next index maintenance do?</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # What would the next index maintenance do?
+    Get-sqmIndexHealth -SqlInstance &#39;SQL01&#39; -OnlyProblems -OutputPath &#39;&#39; |
+        Format-Table Database, Table, Index, PageCount, FragmentationPercent, Status</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># One line per database</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # One line per database
+    Get-sqmIndexHealth -SqlInstance &#39;SQL01&#39; -Summary -OutputPath &#39;&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Fast overview without reading the index pages</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Fast overview without reading the index pages
+    Get-sqmIndexHealth -Database &#39;SalesDB&#39; -SkipFragmentation -OutputPath &#39;&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
 	<div class="psdb-st-func-card" id="f-getsqmindexusagereport">
 	<div class="psdb-st-func-header">
 	<span class="psdb-st-func-name">Get-sqmIndexUsageReport</span>
@@ -3531,6 +3560,28 @@ New-sqmAgentCommandJob -SqlInstance &#39;SQL01&#39; -SqlCredential $cred -JobNam
 	<div class="psdb-st-example-label">Get-sqmServerUtilization -SqlInstance &quot;SQL01&quot; -SampleCount 12 -SampleIntervalSeconds 5</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmServerUtilization -SqlInstance &quot;SQL01&quot; -SampleCount 12 -SampleIntervalSeconds 5
     # Collects 12 snapshots (60 seconds total)</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-getsqmstatisticshealth">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Get-sqmStatisticsHealth</span>
+	<span class="psdb-st-badge psdb-st-badge-performance">Performance</span>
+	</div>
+	<div class="psdb-st-func-desc">Reports the state of all statistics (age, changes since the last update, sample) and which of them Invoke-sqmUpdateStatistics would update.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># What would the next statistics run update?</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # What would the next statistics run update?
+    Get-sqmStatisticsHealth -SqlInstance &#39;SQL01&#39; -OnlyProblems -OutputPath &#39;&#39; |
+        Format-Table Database, Table, Statistic, Rows, Modifications, AgeDays, Reason</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># One line per database, including the auto-update settings</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # One line per database, including the auto-update settings
+    Get-sqmStatisticsHealth -SqlInstance &#39;SQL01&#39; -Summary -OutputPath &#39;&#39;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -5941,6 +5992,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Get-sqmFileLatencyReport</td><td>Measures read and write latency per database file (sys.dm_io_virtual_file_stats), either since the last restart or as a live sample over a few seconds.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmHpuAllowGroup</td><td>Searches for the HPU allow group in Active Directory based on configurable domain/group mappings.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmIndexFragmentation</td><td>Analyzes index fragmentation in one or more databases.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Get-sqmIndexHealth</td><td>Reports the state of all indexes (size, fragmentation, fill factor, disabled) and what Invoke-sqmIndexOptimize would do with each of them.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmIndexUsageReport</td><td>Finds unused, duplicate and overlapping indexes, heaps and disabled or hypothetical indexes in one or more databases.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmLinkedServerUsage</td><td>Analyzes which database objects (procedures, functions, views, triggers, SQL Agent jobs) access linked servers.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmLoginLastAccess</td><td>Determines the last known access per SQL Server login.</td></tr>
@@ -5962,6 +6014,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Get-sqmSpnReport</td><td>Checks the registered SPNs for SQL Server instances (default and named instances).</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmSQLInstanceCheck</td><td>Checks a SQL Server instance against best practices.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmSsasDeploymentMode</td><td>Reads the current DeploymentMode (Multidimensional / Tabular / SharePoint) of an SSAS instance.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Get-sqmStatisticsHealth</td><td>Reports the state of all statistics (age, changes since the last update, sample) and which of them Invoke-sqmUpdateStatistics would update.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmSupportedCollations</td><td>Lists the collations a SQL Server instance actually supports.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmSysadminAccounts</td><td>Retrieves all logins with sysadmin rights on a SQL Server instance.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmTempDbRecommendation</td><td>Analyzes the TempDB configuration and provides optimization recommendations.</td></tr>

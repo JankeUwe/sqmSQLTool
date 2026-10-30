@@ -5248,6 +5248,74 @@ Get-sqmIndexFragmentation -Database 'AdventureWorks' -MinFragmentationPercent 10
 ```powershell
 Get-sqmIndexFragmentation -SqlInstance 'SQL01' -MinFragmentationPercent 30
 
+### Get-sqmIndexHealth
+
+Reports the state of all indexes (size, fragmentation, fill factor, disabled) and what Invoke-sqmIndexOptimize would do with each of them.
+
+Read-only counterpart of Invoke-sqmIndexOptimize: same thresholds, same rules, no changes.
+    Per index (per partition for partitioned indexes): rows, pages, size, fragmentation (columnstore:
+    share of deleted rows), fill factor, reads and writes since the last restart, and a status
+    (Ok, Reorganize, Rebuild, Small, Disabled, NotMeasured).
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance (default: current computer name).
+- **-SqlCredential** - PSCredential for the connection.
+- **-Database** - Database name or wildcard pattern. System databases only when named explicitly.
+- **-Table** - Table name or wildcard pattern.
+- **-FragmentationLow** - From this fragmentation (%) the status is Reorganize. Default: 5.
+- **-FragmentationHigh** - From this fragmentation (%) the status is Rebuild. Default: 30.
+- **-MinPageCount** - Minimum index size in pages for the fragmentation measurement. Default: 1000.
+- **-ColumnstoreDeletedPercent** - Columnstore: Reorganize from this share of deleted rows (%). Default: 20.
+- **-SkipFragmentation** - Metadata only (size, fill factor, usage); reads no index pages.
+- **-OnlyProblems** - Only indexes with status Reorganize or Rebuild.
+- **-Summary** - One row per database.
+- **-OutputPath** - Directory for CSV + HTML report. Default: <OutputPath config>\IndexHealth. '' skips the files.
+- **-NoOpen** - Do not open the HTML report.
+- **-EnableException** - Throw exceptions immediately.
+
+**Examples (2):**
+
+```powershell
+Get-sqmIndexHealth -SqlInstance 'SQL01' -OnlyProblems -OutputPath '' | Format-Table Database, Table, Index, PageCount, FragmentationPercent, Status
+
+```powershell
+Get-sqmIndexHealth -SqlInstance 'SQL01' -Summary -OutputPath ''
+
+### Get-sqmStatisticsHealth
+
+Reports the state of all statistics (age, changes since the last update, sample) and which of them Invoke-sqmUpdateStatistics would update.
+
+Read-only counterpart of Invoke-sqmUpdateStatistics: the same rule decides NeedsUpdate.
+    Per statistic: rows, sample, steps, modifications, threshold, last update and age, NORECOMPUTE,
+    the database settings AUTO_UPDATE_STATISTICS/ASYNC/AUTO_CREATE, and a status
+    (Ok, Stale, NeverUpdated, NoRecompute).
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance (default: current computer name).
+- **-SqlCredential** - PSCredential for the connection.
+- **-Database** - Database name or wildcard pattern. System databases only when named explicitly.
+- **-Table** - Table name or wildcard pattern.
+- **-Statistics** - Statistic name or wildcard pattern.
+- **-ModificationThreshold** - Dynamic (default) or Any (at least one change).
+- **-ModificationPercent** - Percentage part of the dynamic threshold. Default: 10.
+- **-MaxAgeDays** - Changed statistics older than this count as stale. 0 = off. Default: 30.
+- **-Index** - Include statistics backed by an index. Default: $true.
+- **-OnlyProblems** - Only Stale, NeverUpdated and NoRecompute statistics with changes.
+- **-Summary** - One row per database.
+- **-OutputPath** - Directory for CSV + HTML report. Default: <OutputPath config>\StatisticsHealth. '' skips the files.
+- **-NoOpen** - Do not open the HTML report.
+- **-EnableException** - Throw exceptions immediately.
+
+**Examples (2):**
+
+```powershell
+Get-sqmStatisticsHealth -SqlInstance 'SQL01' -OnlyProblems -OutputPath '' | Format-Table Database, Table, Statistic, Rows, Modifications, AgeDays, Reason
+
+```powershell
+Get-sqmStatisticsHealth -SqlInstance 'SQL01' -Summary -OutputPath ''
+
 ### Get-sqmMissingIndexes
 
 Retrieves missing index recommendations from the SQL Server DMV cache.
@@ -6311,6 +6379,7 @@ Index maintenance without Ola Hallengren's IndexOptimize, with the same proven d
 - **-PartitionLevel** - Process partitioned indexes per partition. Default: $true.
 - **-TimeLimitMinutes** - Do not start further commands after this many minutes ('NotStarted'). 0 = no limit.
 - **-UpdateStatistics** - Afterwards run Invoke-sqmUpdateStatistics on the processed databases.
+- **-Quiet** - Suppress the progress output (console lines, progress bar with remaining time).
 - **-WhatIf** - Shows which indexes would be reorganized/rebuilt and the command.
 - **-EnableException** - Throw exceptions immediately.
 
@@ -6455,6 +6524,7 @@ Executes UPDATE STATISTICS only where it pays off and with a sample size that fi
 - **-MaxAgeDays** - Changed statistics older than this are updated below the threshold too. 0 = off. Default: 30.
 - **-Index** - Also update statistics associated with an index. Default: $true.
 - **-TimeLimitMinutes** - Do not start further updates after this many minutes ('NotStarted'). 0 = no limit.
+- **-Quiet** - Suppress the progress output (console lines, progress bar with remaining time).
 - **-WhatIf** - Shows which statistics would be affected.
 - **-EnableException** - Throw exceptions immediately.
 
