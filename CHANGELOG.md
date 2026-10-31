@@ -1,5 +1,26 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.198.0] - 2026-10-31
+
+### Neu: TSM-Options-Datei mit abweichendem Namen (nicht nur `dsm.opt`)
+
+- **Pfadsuche** (`_FindDsmOptPath`, genutzt von `Get-sqmTsmConfiguration`, `Invoke-sqmTsmConfiguration`,
+  `Test-sqmTsmConnection`): Der Name der Options-Datei wird zuerst aus den TSM-Diensten (Scheduler, CAD, Journal)
+  gelesen, und zwar aus `-optfile=` im `ImagePath` und aus einem Registry-Wert `optfile` unter `Parameters`.
+  Danach folgen `DSM_DIR`, `DSM_CONFIG`, die BackupClient-Registry und die Standardpfade. Gibt es dort keine
+  `dsm.opt`, wird eine beliebige `*.opt` im baclient-Verzeichnis gewaehlt, die `TCPServeraddress` enthaelt
+  (`ie_*`, `incl*`, `excl*` werden uebersprungen). Lokal und remote.
+- **`Test-sqmTsmConnection`:** uebergibt die ermittelte Datei per `-optfile` an `dsmadmc` (vorher wurde immer die
+  Standard-`dsm.opt` gelesen). Neues Feld `DsmOptPath` im Ergebnis. Das Kennwort steht nicht mehr im
+  VERBOSE-Log der `dsmadmc`-Kommandozeile.
+- **`Invoke-sqmTsmConfiguration`:** Ein relativer `INCLEXCL`-Wert (nur Dateiname) wird im Verzeichnis der
+  Options-Datei aufgeloest, nicht im Arbeitsverzeichnis.
+
+### Fehler behoben: `Get-sqmTsmConfiguration -Credential` bei Remote-Rechnern
+
+- Das Aufteilen des UNC-Pfads (`-split ''`) war ein ungueltiger Regex und brach den Zugriff mit `-Credential`
+  ab. Der Share wird jetzt korrekt ermittelt.
+
 ## [1.9.197.0] - 2026-10-30
 
 ### Fehler behoben: `Get-sqmTsmConfiguration` scheiterte mit `_ReadRemoteFile`

@@ -23,7 +23,9 @@
     TSM server address (TCPServeraddress from dsm.opt if not specified).
 
 .PARAMETER DsmOptPath
-    Full path to dsm.opt. Determined automatically if not specified.
+    Full path to the TSM options file (dsm.opt or a differently named file). Determined
+    automatically if not specified (TSM service -optfile, DSM_CONFIG, any *.opt in baclient).
+    The resolved file is passed to dsmadmc via -optfile.
 
 .PARAMETER Credential
     PSCredential for remote access (WinRM).
@@ -72,6 +74,7 @@ function Test-sqmTsmConnection
 			Success	    = $false
 			Message	    = $null
 			DsmadmcPath = $null
+			DsmOptPath  = $null
 			ServerName  = $null
 			UserName    = $null
 			Output	    = $null
@@ -98,6 +101,8 @@ function Test-sqmTsmConnection
 			$effUserName = $UserName
 			$effPassword = $Password
 			$effServerName = $ServerName
+				$effOptFile = $DsmOptPath
+				$isLocalHost = $ComputerName -in @($env:COMPUTERNAME, 'localhost', '127.0.0.1', '.')
 			
 			if (-not $effUserName -or -not $effPassword -or -not $effServerName)
 			{
@@ -106,7 +111,8 @@ function Test-sqmTsmConnection
 				{
 					throw "TSM-Konfiguration konnte nicht gelesen werden: $($cfg.ErrorMessage)"
 				}
-				if (-not $effServerName) { $effServerName = $cfg.ServerName }
+				if (-not $effOptFile) { $effOptFile = $cfg.FilePath }
+					if (-not $effServerName) { $effServerName = $cfg.ServerName }
 				if (-not $effUserName) { $effUserName = $cfg.UserName }
 				if (-not $effPassword -and $cfg.Password) { $effPassword = $cfg.Password }
 			}
@@ -143,8 +149,12 @@ function Test-sqmTsmConnection
 			$plainPwd = _SecureToPlain $effPassword
 			
 			# ---- 4. dsmadmc-Befehl aufbauen ----
-			$cmdArgs = "-id=$effUserName -password=$plainPwd -se=$effServerName -dataonly=yes show version"
-			Invoke-sqmLogging -Message "Fuehre dsmadmc aus: $dsmadmc $cmdArgs" -FunctionName $functionName -Level "VERBOSE"
+			if (-not $effOptFile) { $effOptFile = _FindDsmOptPath -ComputerName $ComputerName -IsLocal $isLocalHost -Credential $Credential }
+				$optArg = if ($effOptFile) { " -optfile=`"$effOptFile`"" } else { '' }
+				$result.DsmOptPath = $effOptFile
+				$cmdArgs = "-id=$effUserName -password=$plainPwd -se=$effServerName$optArg -dataonly=yes show version"
+				$logArgs = $cmdArgs.Replace($plainPwd, '********')
+			Invoke-sqmLogging -Message "Fuehre dsmadmc aus: $dsmadmc $logArgs" -FunctionName $functionName -Level "VERBOSE"
 			
 			# ---- 5. Befehl ausfuehren ----
 			$output = $null

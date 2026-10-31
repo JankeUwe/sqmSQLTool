@@ -3798,7 +3798,7 @@ Locates dsmadmc.exe on the local or remote computer, reads the TSM configuration
 - **-UserName** - TSM user name (USERID from dsm.opt if not specified).
 - **-Password** - TSM password as SecureString (PASSWORD from dsm.opt if not specified).
 - **-ServerName** - TSM server address (TCPServeraddress from dsm.opt if not specified).
-- **-DsmOptPath** - Full path to dsm.opt. Determined automatically if not specified.
+- **-DsmOptPath** - Full path to the TSM options file (dsm.opt or a differently named file). Determined automatically if not specified (TSM service -optfile, DSM_CONFIG, any *.opt in baclient). The resolved file is passed to dsmadmc via -optfile.
 - **-Credential** - PSCredential for remote access (WinRM).
 - **-EnableException** - Throw exceptions immediately.
 
@@ -3818,7 +3818,10 @@ Reads the IBM TSM / Spectrum Protect client configuration (dsm.opt) and returns 
     returns the relevant TSM client settings as an object.
 
     Steps:
-      1. Determine the dsm.opt path (auto-detected via _FindDsmOptPath, or -DsmOptPath).
+      1. Determine the options file path (auto-detected via _FindDsmOptPath, or -DsmOptPath).
+         The file may have a different name than dsm.opt: -optfile= of the TSM services,
+         DSM_CONFIG and any *.opt in the baclient directory containing TCPServeraddress
+         are considered.
       2. Read the file (UNC/remote-capable via _ReadRemoteFile).
       3. Parse all non-comment options into a hashtable.
       4. Extract TCPServeraddress, USERID and PASSWORD.

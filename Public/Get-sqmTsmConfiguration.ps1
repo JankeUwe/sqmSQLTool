@@ -8,7 +8,10 @@
     returns the relevant TSM client settings as an object.
 
     Steps:
-      1. Determine the dsm.opt path (auto-detected via _FindDsmOptPath, or -DsmOptPath).
+      1. Determine the options file path (auto-detected via _FindDsmOptPath, or -DsmOptPath).
+         The file may have a different name than dsm.opt: -optfile= of the TSM services,
+         DSM_CONFIG and any *.opt in the baclient directory containing TCPServeraddress
+         are considered.
       2. Read the file (UNC/remote-capable via _ToUncPath).
       3. Parse all non-comment options into a hashtable.
       4. Extract TCPServeraddress, USERID and PASSWORD.
@@ -106,7 +109,7 @@ function Get-sqmTsmConfiguration
 			{
 				if ($Credential -and -not $isLocal)
 				{
-					$share = ($readPath -split '\')[0..3] -join ''
+					$share = ($readPath -split '\\')[0..3] -join '\'
 					$psDrive = New-PSDrive -Name ('tsmcfg' + [guid]::NewGuid().ToString('N').Substring(0, 6)) -PSProvider FileSystem -Root $share -Credential $Credential -ErrorAction Stop
 				}
 				$lines = Get-Content -Path $readPath -Encoding UTF8 -ErrorAction Stop

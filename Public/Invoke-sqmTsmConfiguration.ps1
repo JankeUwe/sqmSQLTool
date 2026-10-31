@@ -35,8 +35,10 @@
     Default: $ComputerName.
 
 .PARAMETER DsmOptPath
-    Full path to the dsm.opt on the target computer.
-    Determined automatically when not specified.
+    Full path to the options file (dsm.opt or a differently named file) on the target computer.
+    Determined automatically when not specified (TSM service -optfile, DSM_CONFIG, any *.opt
+    in the baclient directory containing TCPServeraddress). A relative INCLEXCL value is
+    resolved against the directory of this file.
 
 .PARAMETER BackupDirectory
     Base backup directory. The subdirectories \Usr-db and \Sys-db
@@ -289,7 +291,7 @@ SELECT @BackupDirectory AS BackupDirectory;
 				}
 				$dsmAccess = if ($isLocal) { $localDsmOpt }
 				else { _ToUncPath -ComputerName $ComputerName -LocalPath $localDsmOpt }
-				$targetLocal = _ResolveInclExclPath -DsmOptAccessPath $dsmAccess
+				$targetLocal = _ResolveInclExclPath -DsmOptAccessPath $dsmAccess -DsmOptLocalPath $localDsmOpt
 				if (-not $targetLocal)
 				{
 					$msg = "Keine INCLEXCL-Option in dsm.opt gefunden ($dsmAccess). Bitte -InclExclPath explizit angeben."
@@ -605,22 +607,99 @@ function _FindDsmOptPath
 		}
 	}
 	
+	# Abweichende Dateinamen (Kundenumgebungen): -optfile= aus den TSM-Diensten (Scheduler/CAD/Journal)
+	# und Registry-Parameter 'optfile' auswerten. Diese Treffer haben Vorrang vor Standardnamen.
+	$optFromServices = [System.Collections.Generic.List[string]]::new()
+	try
+	{
+		if ($IsLocal) { $hklmSvc = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, [Microsoft.Win32.RegistryView]::Registry64) }
+		else { $hklmSvc = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, $ComputerName) }
+		$svcRoot = $hklmSvc.OpenSubKey('SYSTEM\CurrentControlSet\Services')
+		if ($svcRoot)
+		{
+			foreach ($svcName in $svcRoot.GetSubKeyNames())
+			{
+				if ($svcName -notmatch 'TSM|ADSM|Spectrum|Tivoli|dsm') { continue }
+				$svcKey = $svcRoot.OpenSubKey($svcName)
+				if (-not $svcKey) { continue }
+				$imagePath = [string]$svcKey.GetValue('ImagePath', '')
+				if ($imagePath -match '(?i)-optfile\s*=\s*(?:"([^"]+)"|(\S+))')
+				{
+					$optFromServices.Add($(if ($Matches[1]) { $Matches[1] } else { $Matches[2] }))
+				}
+				$parKey = $svcKey.OpenSubKey('Parameters')
+				if ($parKey)
+				{
+					foreach ($vn in $parKey.GetValueNames())
+					{
+						if ($vn -match '(?i)^opt(ions)?file$')
+						{
+							$pv = [string]$parKey.GetValue($vn, '')
+							if ($pv) { $optFromServices.Add($pv.Trim('"')) }
+						}
+					}
+					$parKey.Close()
+				}
+				$svcKey.Close()
+			}
+			$svcRoot.Close()
+		}
+		$hklmSvc.Close()
+	}
+	catch
+	{
+		Write-Verbose "Dienst-Auswertung fuer -optfile auf $ComputerName fehlgeschlagen: $($_.Exception.Message)"
+	}
+
+	# Dienst-Treffer an den Anfang der Kandidatenliste stellen
+	if ($optFromServices.Count -gt 0)
+	{
+		$candidates.InsertRange(0, $optFromServices)
+	}
+
 	# Standardpfade hinzufuegen
-	$candidates.Add('C:\Program Files\Tivoli\TSM\baclient\dsm.opt')
-	$candidates.Add('C:\Program Files\IBM\TSM\baclient\dsm.opt')
-	$candidates.Add('C:\Program Files\IBM\SpectrumProtect\baclient\dsm.opt')
-	
+	$baclientDirs = @(
+		'C:\Program Files\Tivoli\TSM\baclient',
+		'C:\Program Files\IBM\TSM\baclient',
+		'C:\Program Files\IBM\SpectrumProtect\baclient'
+	)
+	foreach ($d in $baclientDirs) { $candidates.Add((Join-Path $d 'dsm.opt')) }
+
 	foreach ($c in ($candidates | Select-Object -Unique))
 	{
 		if (-not $c) { continue }
-		
+
 		$testPath = if ($IsLocal) { $c }
 		else { _ToUncPath -ComputerName $ComputerName -LocalPath $c }
-		
+
 		# Test-Path mit New-PSDrive kombinieren, falls Credentials noetig sind
 		if (Test-Path -Path $testPath -ErrorAction SilentlyContinue)
 		{
 			return $c
+		}
+	}
+
+	# Letzter Fallback: beliebige *.opt im baclient-Verzeichnis (DSM_DIR, Registry, Standardpfade).
+	# Bevorzugt die Datei mit TCPServeraddress; ie_*/incl*-Dateien werden hintenan gestellt.
+	$dirs = [System.Collections.Generic.List[string]]::new()
+	foreach ($c in $candidates) { if ($c) { $dirs.Add((Split-Path -Path $c -Parent)) } }
+	foreach ($d in $baclientDirs) { $dirs.Add($d) }
+
+	foreach ($dir in ($dirs | Where-Object { $_ } | Select-Object -Unique))
+	{
+		$testDir = if ($IsLocal) { $dir } else { _ToUncPath -ComputerName $ComputerName -LocalPath $dir }
+		$optFiles = @(Get-ChildItem -Path $testDir -Filter '*.opt' -File -ErrorAction SilentlyContinue)
+		if ($optFiles.Count -eq 0) { continue }
+
+		$withServer = foreach ($f in $optFiles)
+		{
+			if ($f.Name -match '(?i)^(ie_|incl|excl)') { continue }
+			if (Select-String -Path $f.FullName -Pattern '^\s*TCPServeraddress\s' -Quiet -ErrorAction SilentlyContinue) { $f }
+		}
+		$pick = @($withServer | Sort-Object { $_.Name -ne 'dsm.opt' }, Name)[0]
+		if ($pick)
+		{
+			return (Join-Path $dir $pick.Name)
 		}
 	}
 	return $null
@@ -646,7 +725,10 @@ function _ResolveInclExclPath
 	# letzten Treffer. Gibt $null zurück, wenn keine INCLEXCL-Option vorhanden ist.
 	param (
 		[Parameter(Mandatory = $true)]
-		[string]$DsmOptAccessPath
+		[string]$DsmOptAccessPath,
+		# Lokaler Pfad der Options-Datei auf dem Zielrechner; Basis fuer relative INCLEXCL-Angaben
+		# (z. B. "INCLEXCL ie_node01.opt" ohne Verzeichnis).
+		[string]$DsmOptLocalPath
 	)
 
 	if (-not (Test-Path -Path $DsmOptAccessPath -ErrorAction SilentlyContinue)) { return $null }
@@ -666,6 +748,11 @@ function _ResolveInclExclPath
 		{
 			$resolved = $Matches[2].Trim().Trim('"').Trim("'")
 		}
+	}
+
+	if ($resolved -and $resolved -notmatch '^([A-Za-z]:[\\/]|\\\\)' -and $DsmOptLocalPath)
+	{
+		$resolved = Join-Path -Path (Split-Path -Path $DsmOptLocalPath -Parent) -ChildPath $resolved
 	}
 	return $resolved
 }
