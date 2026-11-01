@@ -111,6 +111,7 @@ Set-sqmConfig -UpdateMode Off         # no check
 - `Get-sqmPlanInsights` - Execution plan analysis: CE mismatches, SARGability, spills, missing indexes
 - `Get-sqmIndexUsageReport` - Unused, duplicate and overlapping indexes, heaps (read-only, DROP script commented out)
 - `Get-sqmFileLatencyReport` - Read/write latency per database file, cumulative or live sample
+- `Get-sqmAgRedoDiagnosis` - Why an Always On secondary does not catch up: samples the redo threads and names the bottleneck per database
 - `Get-sqmWaitStatistics` - SQL Server wait statistics
 - `Get-sqmDiskSpaceReport` - Disk utilization and growth trends
 - `Grant-sqmVolumeAccess` - Grants Authenticated Users, Administrators or any group NTFS rights on data volumes/folders, including folders with broken inheritance, inheritance downwards on/off; verifies every change

@@ -26,6 +26,7 @@ $categoryMap = @{
     'Get-sqmADMemberGroups'               = 'Active Directory Integration'
     'Get-sqmAgentJobHistory'              = 'SQL Agent & Proxy Jobs'
     'Get-sqmAgentJobScheduleReport'       = 'SQL Agent & Proxy Jobs'
+    'Get-sqmAgRedoDiagnosis'              = 'Always On & Availability Groups'
     'Get-sqmAlwaysOnFailoverHistory'      = 'Always On & Availability Groups'
     'Get-sqmAlwaysOnHealthReport'         = 'Always On & Availability Groups'
     'Get-sqmAutoGrowthReport'             = 'Reporting & Analysis'

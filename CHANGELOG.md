@@ -1,5 +1,18 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.199.0] - 2026-11-01
+
+### Neu: `Get-sqmAgRedoDiagnosis` (warum holt das Secondary nicht auf?)
+
+- Fuer Replikate mit grosser Redo-Queue bei kleiner Send-Queue: sammelt `-SampleSeconds` (Standard 60) lang alle Redo-Threads
+  (`DB STARTUP`, `PARALLEL REDO*` aus `sys.dm_exec_requests`: Status, Wait, Blocker, CPU-Delta), Redo-Queue und -Rate je
+  Datenbank, runnable Tasks je Scheduler und die Wait-Statistik-Differenz (Redo-, I/O- und Scheduler-Waits).
+- Liefert je Datenbank ein Urteil: `BlockedByQuery`, `SingleThreadedRedo`, `SchedulerPressure`, `PageReadIO`, `LogReadIO`,
+  `TransactionDependency`, `DispatchBound`, `WorkerSkew`, `ApplyCpuBound`, `RedoIdle` (daneben `Suspended`, `NoRedoTask`,
+  `NoBacklog`, `Inconclusive`), dazu `Evidence` (die Zahlen), `Recommendation`, Queue-Trend und geschaetzte Abbauzeit.
+- Das Urteil ist eine Heuristik aus Stichproben, kein Beweis; die Zahlen in `Evidence` dienen zur Gegenpruefung.
+- Entscheidungslogik als eigene Funktion `Get-sqmAgRedoVerdict` (privat, einzeln getestet).
+
 ## [1.9.198.0] - 2026-10-31
 
 ### Neu: TSM-Options-Datei mit abweichendem Namen (nicht nur `dsm.opt`)
