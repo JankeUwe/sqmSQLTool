@@ -275,8 +275,8 @@
 					[string]$Description
 				)
 				Invoke-sqmLogging -Message "WMI call: $MethodName - $Description" -FunctionName $functionName -Level "INFO"
-				$r = Invoke-CimMethod @cimBase -Namespace $adminNamespace -ClassName 'MSReportServer_ConfigurationSetting' `
-					-MethodName $MethodName -Arguments $Arguments -ErrorAction Stop
+				# Instanzmethode: per -InputObject aufrufen, ein statischer Aufruf per -ClassName scheitert am Provider.
+				$r = Invoke-CimMethod -InputObject $wmiConfig -MethodName $MethodName -Arguments $Arguments -ErrorAction Stop
 				if ($r.HRESULT -ne 0)
 				{
 					$hexCode = '0x' + $r.HRESULT.ToString('X8')

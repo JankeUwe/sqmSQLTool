@@ -53,7 +53,8 @@
     Install only; do not call Set-sqmSsrsConfiguration.
 
 .PARAMETER InstanceName
-    SSRS instance name. Passed to Set-sqmSsrsConfiguration.
+    SSRS/PBIRS instance name (e.g. 'SSRS', 'PBIRS'). Passed to Set-sqmSsrsConfiguration.
+    Default: auto-detected when exactly one instance exists.
     Default: 'MSSQLSERVER'.
 
 .PARAMETER DatabaseServer
@@ -142,7 +143,9 @@
 
 .NOTES
     Prerequisites : Invoke-sqmLogging, Set-sqmSsrsConfiguration, local administrator rights
-    Supported versions: SSRS 2022 (SQLServerReportingServices.exe)
+    Supported versions: SSRS 2022 (SQLServerReportingServices.exe).
+    Power BI Report Server (PowerBIReportServer.exe) uses the same silent switches; installation is untested,
+    configuration of an installed PBIRS is covered by Set-sqmSsrsConfiguration.
     Exit Codes    : 0 = Success, 3010 = Restart recommended, other = Error
     WMI Namespace : root\Microsoft\SqlServer\ReportServer
 #>
@@ -178,7 +181,7 @@ function Install-sqmSsrsReportServer
 
         # ?? Konfigurations-Parameter (Durchreich an Set-sqmSsrsConfiguration) ??
         [Parameter(Mandatory = $false)]
-        [string]$InstanceName = 'MSSQLSERVER',
+        [string]$InstanceName,
 
         [Parameter(Mandatory = $false)]
         [string]$DatabaseServer,

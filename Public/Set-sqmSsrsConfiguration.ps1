@@ -26,7 +26,7 @@
         SSRS server (local or remote). Default: $env:COMPUTERNAME.
 
     .PARAMETER InstanceName
-        SSRS instance name. Default: 'MSSQLSERVER'.
+        SSRS/PBIRS instance name (e.g. 'SSRS', 'PBIRS', 'RS_PBIRS'). Default: auto-detected when exactly one instance exists.
 
     .PARAMETER DatabaseServer
         SQL Server instance or AG listener for the ReportServer database.
@@ -111,7 +111,7 @@
 		[Parameter(Mandatory = $false)]
 		[string]$ComputerName = $env:COMPUTERNAME,
 		[Parameter(Mandatory = $false)]
-		[string]$InstanceName = 'MSSQLSERVER',
+		[string]$InstanceName,
 		[Parameter(Mandatory = $false)]
 		[string]$DatabaseServer,
 		[Parameter(Mandatory = $false)]
@@ -237,6 +237,20 @@
 			$wmiConfig = $null
 			$wmiVersion = $null
 			$rsNamespace = 'root\Microsoft\SqlServer\ReportServer'
+			if (-not $InstanceName)
+			{
+				# SSRS 2017+ heisst RS_SSRS, Power BI Report Server RS_PBIRS, SSRS <= 2016 RS_MSSQLSERVER
+				$foundInstances = @(Get-CimInstance @cimBase -Namespace $rsNamespace -ClassName '__NAMESPACE' -ErrorAction Stop |
+					Select-Object -ExpandProperty Name)
+				if ($foundInstances.Count -eq 0) { throw "Keine SSRS/PBIRS-Instanz unter '$rsNamespace' gefunden." }
+				if ($foundInstances.Count -gt 1) { throw "Mehrere Instanzen gefunden ($($foundInstances -join ', ')). Bitte -InstanceName angeben." }
+				$InstanceName = $foundInstances[0]
+			}
+			elseif ($InstanceName -notlike 'RS_*')
+			{
+				$InstanceName = "RS_$InstanceName"
+			}
+			$safeInst = $InstanceName -replace '[\\/:*?"<>|]', '_'
 			$instNs = "$rsNamespace\$InstanceName"
 			$versionNs = Get-CimInstance @cimBase -Namespace $instNs -ClassName '__NAMESPACE' -ErrorAction Stop |
 			Where-Object { $_.Name -like 'v*' } |
@@ -269,13 +283,19 @@
 			function _InvokeCim($method, [hashtable]$arguments, $desc)
 			{
 				_Log "WMI ? $method - $desc"
-				$r = Invoke-CimMethod @cimBase -Namespace $adminNs -ClassName 'MSReportServer_ConfigurationSetting' -MethodName $method -Arguments $arguments -ErrorAction Stop
+				# Instanzmethode: ueber -InputObject aufrufen. Ein Aufruf per -ClassName ist ein statischer
+				# Aufruf und scheitert beim Report-Server-WMI-Provider ("Parameter ungueltig"/"allgemeiner Fehler").
+				$r = Invoke-CimMethod -InputObject $wmiConfig -MethodName $method -Arguments $arguments -ErrorAction Stop
 				if ($r.HRESULT -ne 0)
 				{
 					throw "$method (HRESULT 0x$($r.HRESULT.ToString('X8'))): $($r.Error)"
 				}
 				return $r
 			}
+			
+			# SQL-Anmeldung fuer alle Invoke-DbaQuery-Aufrufe (sonst Windows-Auth, auch bei -DatabaseAuthType SQL)
+			$sqlCredSplat = @{ }
+			if ($DatabaseAuthType -eq 'SQL' -and $DatabaseCredential) { $sqlCredSplat['SqlCredential'] = $DatabaseCredential }
 			
 			# AG-Listener-Erkennung
 			$dbCreateServer = $result.DatabaseServer
@@ -285,7 +305,7 @@
 			{
 				try
 				{
-					$listenerCheck = Invoke-DbaQuery -SqlInstance $result.DatabaseServer -ErrorAction SilentlyContinue -Query @"
+					$listenerCheck = Invoke-DbaQuery -SqlInstance $result.DatabaseServer @sqlCredSplat -ErrorAction SilentlyContinue -Query @"
 SELECT ag.name AS AgName, agl.dns_name AS ListenerName, ar.replica_server_name AS PrimaryReplica
 FROM sys.availability_group_listeners agl
 JOIN sys.availability_groups ag ON ag.group_id = agl.group_id
@@ -379,10 +399,10 @@ WHERE agl.dns_name = @@SERVERNAME OR UPPER(agl.dns_name) = UPPER('$($result.Data
 						$dbExists = $false
 						try
 						{
-							$dbCheck = Invoke-DbaQuery -SqlInstance $dbCreateServer -Query "SELECT name FROM sys.databases WHERE name = N'$DatabaseName'" -ErrorAction SilentlyContinue
+							$dbCheck = Invoke-DbaQuery -SqlInstance $dbCreateServer @sqlCredSplat -Query "SELECT name FROM sys.databases WHERE name = N'$DatabaseName'" -EnableException
 							$dbExists = $null -ne $dbCheck
 						}
-						catch { $dbExists = $false }
+						catch { throw "Verbindung zu '$dbCreateServer' fehlgeschlagen: $($_.Exception.Message)" }
 						
 						if (-not $dbExists)
 						{
@@ -390,9 +410,9 @@ WHERE agl.dns_name = @@SERVERNAME OR UPPER(agl.dns_name) = UPPER('$($result.Data
 							$genResult = _InvokeCim 'GenerateDatabaseCreationScript' @{
 								DatabaseName = $DatabaseName
 								Lcid		 = 1033
-								IsSharePoint = $isSharePoint
+								IsSharePointMode = $isSharePoint
 							} "DB-Erstellungs-Skript generieren"
-							Invoke-DbaQuery -SqlInstance $dbCreateServer -Query $genResult.Script -EnableException -ErrorAction Stop | Out-Null
+							Invoke-DbaQuery -SqlInstance $dbCreateServer @sqlCredSplat -Query $genResult.Script -EnableException -ErrorAction Stop | Out-Null
 							_Log "Datenbank '$DatabaseName' + '${DatabaseName}TempDB' auf '$dbCreateServer' angelegt."
 							Write-Host "    Datenbank angelegt auf: $dbCreateServer" -ForegroundColor Gray
 						}
@@ -402,15 +422,17 @@ WHERE agl.dns_name = @@SERVERNAME OR UPPER(agl.dns_name) = UPPER('$($result.Data
 						}
 						
 						$isRemoteDb = ($ComputerName.Split('.')[0].ToUpper() -ne $dbCreateServer.Split('\\')[0].Split('.')[0].ToUpper()) -or $isAgListener
+						$rightsAccount = if ($DatabaseAuthType -eq 'SQL' -and $DatabaseCredential) { $DatabaseCredential.UserName }
+						else { $wmiConfig.WindowsServiceIdentityActual }
 						$rightsResult = _InvokeCim 'GenerateDatabaseRightsScript' @{
 							DatabaseName = $DatabaseName
-							AccountName  = $wmiConfig.WindowsServiceIdentityActual
+							UserName     = $rightsAccount
 							IsRemote	 = $isRemoteDb
-							IsWindowsAccount = ($DatabaseAuthType -eq 'Windows')
+							IsWindowsUser = ($DatabaseAuthType -eq 'Windows')
 						} "Rechte-Skript generieren"
 						if ($rightsResult.Script)
 						{
-							Invoke-DbaQuery -SqlInstance $dbCreateServer -Query $rightsResult.Script -EnableException -ErrorAction SilentlyContinue | Out-Null
+							Invoke-DbaQuery -SqlInstance $dbCreateServer @sqlCredSplat -Query $rightsResult.Script -EnableException -ErrorAction SilentlyContinue | Out-Null
 							_Log "DB-Rechte fuer '$($wmiConfig.WindowsServiceIdentityActual)' auf '$dbCreateServer' gesetzt."
 							if ($isAgListener)
 							{
@@ -429,6 +451,7 @@ WHERE agl.dns_name = @@SERVERNAME OR UPPER(agl.dns_name) = UPPER('$($result.Data
 						$null = _InvokeCim 'SetDatabaseConnection' @{
 							Server = $result.DatabaseServer
 							DatabaseName = $DatabaseName
+							Encrypt = $false
 							CredentialsType = $dbAuthTypeInt
 							Username = $dbUser
 							Password = $dbPwd
@@ -489,18 +512,34 @@ WHERE agl.dns_name = @@SERVERNAME OR UPPER(agl.dns_name) = UPPER('$($result.Data
 					{
 						try
 						{
-							$null = _InvokeCim 'ReserveURL' @{
-								Application = 'ReportServerWebService'
-								UrlString   = $ReportServerUrl
-								Lcid	    = 1033
-							} "ReportServerWebService: $ReportServerUrl"
-							$reportsApp = if ([int]($wmiVersion -replace 'v', '') -ge 14) { 'ReportServerWebApp' }
+							# WMI erwartet UrlString nur als Schema+Host+Port; der Pfad ist ein eigenes
+							# virtuelles Verzeichnis (SetVirtualDirectory), sonst scheitert ReserveURL.
+							$reportsApp = if ([int]($wmiVersion -replace '\D', '') -ge 14) { 'ReportServerWebApp' }
 							else { 'ReportManager' }
-							$null = _InvokeCim 'ReserveURL' @{
-								Application = $reportsApp
-								UrlString   = $ReportsUrl
-								Lcid	    = 1033
-							} "${reportsApp}: $ReportsUrl"
+							foreach ($urlSpec in @(
+									@{ App = 'ReportServerWebService'; Url = $ReportServerUrl },
+									@{ App = $reportsApp; Url = $ReportsUrl }))
+							{
+								if ($urlSpec.Url -notmatch '^(?<base>https?://[^/]+)(?:/(?<vdir>[^/]+))?/?$')
+								{
+									throw "Ungueltige URL '$($urlSpec.Url)' (erwartet z.B. http://+:80/ReportServer)."
+								}
+								$urlBase = $Matches['base']
+								$urlVdir = $Matches['vdir']
+								if ($urlVdir)
+								{
+									$null = _InvokeCim 'SetVirtualDirectory' @{
+										Application      = $urlSpec.App
+										VirtualDirectory = $urlVdir
+										Lcid			 = 1033
+									} "$($urlSpec.App): virtuelles Verzeichnis '$urlVdir'"
+								}
+								$null = _InvokeCim 'ReserveURL' @{
+									Application = $urlSpec.App
+									UrlString   = $urlBase
+									Lcid	    = 1033
+								} "$($urlSpec.App): $urlBase"
+							}
 							$result.UrlResult = 'OK'
 							Write-Host "  ? URLs konfiguriert: $ReportServerUrl | $ReportsUrl" -ForegroundColor Green
 							_Log "URLs: $ReportServerUrl + $ReportsUrl ($reportsApp)"

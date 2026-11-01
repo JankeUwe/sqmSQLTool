@@ -1,5 +1,28 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.201.0] - 2026-11-01
+
+### Fix: SSRS-Konfiguration funktioniert jetzt fuer SSRS 2017+ und Power BI Report Server (PBIRS)
+
+Live gegen SSRS 2022 (16.0.9760) und Power BI Report Server 1.25 (15.0.1120) geprueft.
+
+- `Set-sqmSsrsConfiguration` und `Set-sqmSsrsHttpsCertificate` riefen die WMI-Methoden des Report Servers per `-ClassName`
+  (statisch) auf. Der Provider kennt nur Instanzmethoden und antwortete mit "allgemeiner Fehler" bzw. "Parameter ungueltig".
+  Aufruf jetzt per `-InputObject`.
+- `Set-sqmSsrsConfiguration`: Ohne `-InstanceName` wird die Instanz automatisch erkannt (`RS_SSRS`, `RS_PBIRS`, `RS_MSSQLSERVER`);
+  bei mehreren Instanzen kommt eine klare Meldung. Kurze Namen (`PBIRS`) werden zu `RS_PBIRS` ergaenzt. Der alte Standard
+  `MSSQLSERVER` zeigte auf einen Namespace, den es bei SSRS 2017+ nicht gibt.
+- URLs: `ReserveURL` bekommt nur noch `http://+:Port`; der Pfad wird ueber `SetVirtualDirectory` gesetzt.
+- Datenbank anlegen: WMI-Parameter heissen `IsSharePointMode`, `UserName` und `IsWindowsUser` (zuvor falsche Namen); `SetDatabaseConnection`
+  bekommt `Encrypt`.
+- `-DatabaseAuthType SQL`: Die SQL-Anmeldung wird jetzt an `Invoke-DbaQuery` weitergereicht (zuvor Windows-Anmeldung) und das
+  Rechte-Skript wird fuer den SQL-Login erzeugt. Ein Verbindungsfehler bei der Datenbankpruefung wird gemeldet statt als
+  "Datenbank nicht vorhanden" gewertet.
+- `Install-sqmSsrsReportServer`: Standard-Instanzname entfernt (Autoerkennung). Hilfe nennt PBIRS; die Installation selbst mit
+  `PowerBIReportServer.exe` ist nicht getestet.
+- Neue Unit Tests `Set-sqmSsrsConfiguration.Tests.ps1`.
+- `Invoke-sqmSsrsMigration` (SSRS 2022 nach PBIRS) und die 22 Berichte aus ReportServerCheck liefen ohne Aenderung auf PBIRS.
+
 ## [1.9.200.0] - 2026-11-01
 
 ### Fix: Invoke-sqmHealthReport Detail-Links im CentralPath
