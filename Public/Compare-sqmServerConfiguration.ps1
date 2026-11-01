@@ -15,6 +15,10 @@
     - Migrationsrelevante Objekte (-IncludeMigrationObjects): Linked Servers, Credentials,
       SQL-Agent-Jobs, Endpoints, Database-Mail-Profile
     - Datenbanken (-CompareDatabases): Name, Owner, RecoveryModel, Collation, Trustworthy, IsolationLevel
+    - Alle Konfigurationsoptionen (-AllConfigOptions): komplette sys.configurations (value_in_use, ausstehende
+      Aenderungen RECONFIGURE/Neustart) und globale Trace Flags. Optionen, die nur in einer der beiden
+      Hauptversionen existieren, gelten nicht als Drift. Fuer Drift ueber die Zeit siehe Save-sqmConfigBaseline
+      und Compare-sqmConfigBaseline.
 
     Jede Abweichung erhaelt einen Status (OK/Warning/Critical). Ausgabe als Rueckgabeobjekt
     sowie TXT- und HTML-Report (Report wird nach Erstellung automatisch geoeffnet, ausser -NoOpen).
@@ -30,6 +34,13 @@
 
 .PARAMETER CompareDatabases
     Wenn gesetzt, werden Benutzerdatenbanken (Name, Owner, RecoveryModel, Collation) verglichen.
+
+.PARAMETER AllConfigOptions
+    Wenn gesetzt, werden zusaetzlich alle Optionen aus sys.configurations (auch die advanced) und die globalen
+    Trace Flags verglichen. Die bereits in der Instance-Kategorie gepruefte Handvoll Optionen erscheint nicht doppelt.
+    Verglichen wird der aktive Wert (value_in_use); weicht der konfigurierte Wert davon ab, kommt eine Zeile
+    "ausstehend" (RECONFIGURE bzw. Neustart). Sicherheitsrelevante Optionen (xp_cmdshell, Ole Automation,
+    Ad Hoc Distributed Queries, CLR, ...) sind Critical.
 
 .PARAMETER CompareLogins
     Wenn gesetzt, werden Server-Logins verglichen (Vorhanden, SID, Standard-DB, Sprache,
@@ -83,6 +94,8 @@ function Compare-sqmServerConfiguration
 		[Parameter(Mandatory = $false)]
 		[switch]$CompareDatabases,
 		[Parameter(Mandatory = $false)]
+		[switch]$AllConfigOptions,
+		[Parameter(Mandatory = $false)]
 		[switch]$CompareLogins,
 		[Parameter(Mandatory = $false)]
 		[switch]$IncludeSystemLogins,
@@ -112,7 +125,7 @@ function Compare-sqmServerConfiguration
 		$results = [System.Collections.Generic.List[PSCustomObject]]::new()
 
 		# Reihenfolge der Kategorien im Report
-		$categoryOrder = @('Instance', 'Collation', 'Login', 'LinkedServer', 'Credential', 'AgentJob', 'Endpoint', 'DatabaseMail', 'Database')
+		$categoryOrder = @('Instance', 'ConfigOption', 'TraceFlag', 'Collation', 'Login', 'LinkedServer', 'Credential', 'AgentJob', 'Endpoint', 'DatabaseMail', 'Database')
 		$statusOrder = @{ Critical = 0; Warning = 1; OK = 2 }
 
 		$sysLoginPatterns = @('sa', '##MS_*', 'NT SERVICE\*', 'NT AUTHORITY\*', 'BUILTIN\*')
@@ -307,6 +320,30 @@ WHERE sp.type IN ('S','U','G')
 			# Collation immer ausgegeben (nicht nur bei Abweichung) - Mismatch ist Critical
 			$collationStatus = if ($sourceProps['Collation'] -eq $targetProps['Collation']) { 'OK' } else { 'Critical' }
 			_AddResult 'Collation' 'Collation (Instance)' $sourceProps['Collation'] $targetProps['Collation'] $collationStatus
+
+			# -------------------------------------------------------------------
+			# 1b. Alle Konfigurationsoptionen + Trace Flags
+			# -------------------------------------------------------------------
+			if ($AllConfigOptions)
+			{
+				try
+				{
+					$srcSet = Get-sqmConfigOptionSet -SqlInstance $SourceInstance -SqlCredential $SqlCredential
+					$tgtSet = Get-sqmConfigOptionSet -SqlInstance $TargetInstance -SqlCredential $SqlCredential
+					# Bereits in der Instance-Kategorie (SMO) verglichen: nicht doppelt ausgeben
+					$alreadyCovered = @('max server memory (MB)', 'min server memory (MB)', 'max degree of parallelism',
+						'cost threshold for parallelism', 'xp_cmdshell', 'clr enabled', 'default language', 'default full-text language')
+					foreach ($row in @(Compare-sqmConfigOptionSet -Reference $srcSet -Difference $tgtSet -IgnoreOption $alreadyCovered))
+					{
+						_AddResult $row.Category $row.Setting $row.SourceValue $row.TargetValue $row.Status
+					}
+				}
+				catch
+				{
+					Invoke-sqmLogging -Message "Fehler beim Vergleich aller Konfigurationsoptionen: $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
+					if ($EnableException) { throw }
+				}
+			}
 
 			# -------------------------------------------------------------------
 			# 2. Logins

@@ -1,4 +1,4 @@
-﻿# sqmSQLTool
+# sqmSQLTool
 
 **Enterprise SQL Server Administration & AlwaysOn Automation Toolkit**
 
@@ -134,7 +134,8 @@ Set-sqmConfig -UpdateMode Off         # no check
 
 ### Configuration & Deployment
 - `Export-sqmServerConfiguration` - Full instance configuration export
-- `Compare-sqmServerConfiguration` - Instance comparison
+- `Compare-sqmServerConfiguration` - Instance comparison (`-AllConfigOptions`: all sys.configurations options and trace flags)
+- `Save-sqmConfigBaseline` / `Compare-sqmConfigBaseline` - Config drift: save a baseline, check an instance or a second baseline against it
 - `Export-sqmAlwaysOnConfiguration` - AG configuration export
 - `Export-sqmDatabaseDocumentation` - Database schema documentation
 

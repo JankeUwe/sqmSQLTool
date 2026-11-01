@@ -1,5 +1,38 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.202.0] - 2026-11-01
+
+### Neu: Config Drift - alle Konfigurationsoptionen und Trace Flags, Baselines ueber die Zeit
+
+Anlass war der Artikel "Config Drift" auf sqlserverscience.com. `Compare-sqmServerConfiguration` verglich bisher nur eine feste
+Handvoll sp_configure-Werte; Optionen wie Ad Hoc Distributed Queries, filestream access level oder backup compression default
+fielen durch, und einen gespeicherten Zustand zum Vergleichen ueber die Zeit gab es nicht.
+
+- `Compare-sqmServerConfiguration -AllConfigOptions`: vergleicht die komplette `sys.configurations` (auch advanced) und die
+  globalen Trace Flags. Verglichen wird `value_in_use`; weicht der konfigurierte Wert vom aktiven ab, kommt eine Zeile
+  "ausstehend" (RECONFIGURE bei dynamischen, Neustart bei nicht dynamischen Optionen). Sicherheitsrelevante Optionen
+  (xp_cmdshell, Ole Automation Procedures, Ad Hoc Distributed Queries, clr enabled, clr strict security,
+  cross db ownership chaining, scan for startup procs, external scripts enabled) sind bei Abweichung Critical.
+  Neue Kategorien `ConfigOption` und `TraceFlag` im Report; die schon in der Instance-Kategorie geprueften Optionen
+  erscheinen nicht doppelt.
+- Neu: `Save-sqmConfigBaseline` speichert alle Optionen und globalen Trace Flags mit Metadaten (Server, Version, Zeitpunkt, Label)
+  als JSON. Die Hauptversion steht im Dateinamen: pro Hauptversion eine Baseline fuehren.
+- Neu: `Compare-sqmConfigBaseline` prueft eine Instanz (`-SqlInstance`) oder eine zweite Baseline (`-ComparePath`, z.B. vor und
+  nach einem Patch) gegen eine Baseline. Kein Drift = leere Rueckgabe plus Report "Kein Drift gefunden". TXT- und HTML-Report.
+- Optionen, die nur in einer der beiden Hauptversionen existieren, gelten nicht als Drift (Warnung bei unterschiedlicher Version).
+  Ignoriert werden immer `version high part of SQL Server`, `version low part of SQL Server` (aendern sich mit dem Build) und
+  `show advanced options` (reiner Anzeigeschalter); weitere ueber `-IgnoreOption` (Wildcards).
+- Ausstehend wird nur gemeldet, wenn sich der Pending-Zustand zwischen den Seiten unterscheidet. SQL Server zeigt z.B. bei
+  `min server memory (MB)` dauerhaft konfiguriert 0 / aktiv 16; das ist normal und war im ersten Entwurf ein Fehlalarm.
+- Nicht abgedeckt: Datenbankoptionen (dafuer `-CompareDatabases` bzw. `Export-sqmDatabaseSettings`), Startparameter und
+  Einstellungen, die nur ueber ALTER SERVER CONFIGURATION existieren. Trace Flags brauchen VIEW SERVER STATE
+  (ab SQL Server 2022 VIEW SERVER PERFORMANCE STATE); fehlt das Recht, werden sie uebersprungen statt als Drift gemeldet.
+- Live gegen SQL Server 2022 (DEV01) unter Windows PowerShell 5.1 geprueft: Selbstvergleich 0 Zeilen, nicht dynamische Option mit
+  ausstehender Aenderung (`user connections`) und globales Trace Flag 3226 werden erkannt, nach Zuruecksetzen wieder 0 Zeilen.
+  Der Vergleich ueber zwei Hauptversionen ist nur per Unit Test geprueft, nicht live.
+- Neue Unit Tests `ConfigBaseline.Tests.ps1` (14 Tests). Ein Test deckte auf, dass der Ignore-Name `version high part`
+  den echten Optionsnamen `version high part of SQL Server` nicht traf (jetzt mit Wildcard).
+
 ## [1.9.201.0] - 2026-11-01
 
 ### Fix: SSRS-Konfiguration funktioniert jetzt fuer SSRS 2017+ und Power BI Report Server (PBIRS)

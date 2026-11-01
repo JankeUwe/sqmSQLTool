@@ -1,4 +1,4 @@
-﻿# sqmSQLTool - Complete Function Reference
+# sqmSQLTool - Complete Function Reference
 
 ## Installation
 
@@ -1286,12 +1286,50 @@ Displays differences in the following areas: sp_configure, instance properties (
 - **-TargetInstance** - Target instance (server to compare). Mandatory.
 - **-SqlCredential** - PSCredential for both instances (if identical). For different credentials, separate parameters are required (simplified).
 - **-CompareDatabases** - When set, databases (Name, Owner, RecoveryModel, Collation) are compared.
+- **-AllConfigOptions** - When set, all sys.configurations options (value_in_use, pending RECONFIGURE/restart) and global trace flags are compared.
 - **-EnableException** - Throw exceptions immediately.
+
+**Examples (2):**
+
+```powershell
+Compare-sqmServerConfiguration -SourceInstance "SQL01" -TargetInstance "SQL02"
+Compare-sqmServerConfiguration -SourceInstance "SQL01" -TargetInstance "SQL02" -AllConfigOptions
+
+### Save-sqmConfigBaseline
+
+Saves all configuration options (sys.configurations) and global trace flags of an instance as a JSON baseline with metadata (server, version, time, label). The major version is part of the file name: keep one baseline per major version.
+
+**Parameters:**
+
+- **-SqlInstance** - Instance to capture. Mandatory.
+- **-SqlCredential** - Optional SQL login.
+- **-Label** - Optional label stored in the file.
+- **-OutputPath** - Target folder. Default: `<module output path>\ConfigBaseline`.
+- **-EnableException** - Throw instead of logging.
 
 **Examples (1):**
 
 ```powershell
-Compare-sqmServerConfiguration -SourceInstance "SQL01" -TargetInstance "SQL02"
+Save-sqmConfigBaseline -SqlInstance "SQL01" -Label "Standard 2019"
+
+### Compare-sqmConfigBaseline
+
+Checks an instance (`-SqlInstance`) or a second baseline (`-ComparePath`) against a baseline saved with Save-sqmConfigBaseline. Compares all options (active value, pending changes) and global trace flags. Options that exist in only one major version are not drift. No drift returns nothing and writes a "no drift" report.
+
+**Parameters:**
+
+- **-BaselinePath** - Baseline JSON (reference). Mandatory.
+- **-SqlInstance** - Live mode: instance to check.
+- **-SqlCredential** - Optional SQL login (live mode).
+- **-ComparePath** - File mode: second baseline to check against the first.
+- **-IgnoreOption** - Additional option names to skip (wildcards allowed).
+- **-OutputPath**, **-NoOpen**, **-NoReport**, **-EnableException**
+
+**Examples (2):**
+
+```powershell
+Compare-sqmConfigBaseline -BaselinePath "D:\Baselines\ConfigBaseline_SQL01_v15_20261101_090000.json" -SqlInstance "SQL02"
+Compare-sqmConfigBaseline -BaselinePath $beforePatch -ComparePath $afterPatch -NoOpen
 
 ### Export-sqmServerConfiguration
 
