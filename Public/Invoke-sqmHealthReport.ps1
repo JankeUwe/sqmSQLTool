@@ -567,6 +567,10 @@ h3{color:#94a8c0;font-size:14px;margin:16px 0 6px}
 		[void]$sb.Append("<p>$(& $enc $info.ServerName) &middot; $(& $enc $info.Edition) &middot; $(& $enc $info.ProductVersion) &middot; $mode$(if ($InDepth) { ' &middot; InDepth' })</p>")
 		[void]$sb.Append("<p class='toc'>" + (($sections | ForEach-Object { $c = switch ($_.Status) { 'Critical' { 'crit' } 'Failed' { 'crit' } 'Warning' { 'warn' } default { 'ok' } }; "<a href='#s-$($_.Section)'><span class='$c'>&#9679;</span> $($_.Section)</a>" }) -join '') + '</p>')
 
+		if (@($sections | Where-Object { $_.DetailFiles }).Count -gt 0)
+		{
+			[void]$sb.Append("<p class='toc'>Hinweis: Die Detail-Links funktionieren nur, wenn der Ordner mit dem Unterordner <b>Details</b> vorliegt. Ein ZIP bitte zuerst vollstaendig entpacken, nicht index.html direkt aus dem ZIP oeffnen.</p>")
+		}
 		[void]$sb.Append('<h2>Befunde</h2>')
 		if ($sorted.Count -eq 0) { [void]$sb.Append("<p class='ok'>Keine Befunde.</p>") }
 		else
@@ -605,6 +609,13 @@ h3{color:#94a8c0;font-size:14px;margin:16px 0 6px}
 		}
 
 		Copy-sqmToCentralPath -Path @($htmlFile)
+		# Detail-Links sind relativ (Details/...): ohne den Unterordner laufen sie im Zentralpfad ins Leere
+		$centralPath = Get-sqmConfig -Key 'CentralPath'
+		if ($centralPath -and (Test-Path $centralPath))
+		{
+			try { Copy-Item -Path $folder -Destination $centralPath -Recurse -Force -ErrorAction Stop }
+			catch { Invoke-sqmLogging -Message "Report-Ordner nicht in CentralPath kopiert: $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING" }
+		}
 		Invoke-sqmLogging -Message "Health Report $overall (Critical=$nCrit, Warning=$nWarn, Info=$nInfo) in $totalSec s: $htmlFile" -FunctionName $functionName -Level "INFO"
 		Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
 

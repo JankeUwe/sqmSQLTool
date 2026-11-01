@@ -1,5 +1,13 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.200.0] - 2026-11-01
+
+### Fix: Invoke-sqmHealthReport Detail-Links im CentralPath
+
+- Die Detail-Links (`Details/...html`) im `index.html` sind relativ und liefen im CentralPath ins Leere, weil dort nur
+  `index.html` lag. Der komplette Report-Ordner inklusive `Details` wird jetzt in den CentralPath kopiert.
+- Der Bericht enthaelt einen Hinweis: ein ZIP vor dem Oeffnen vollstaendig entpacken, `index.html` nicht direkt aus dem ZIP oeffnen.
+
 ## [1.9.199.0] - 2026-11-01
 
 ### Neu: `Get-sqmAgRedoDiagnosis` (warum holt das Secondary nicht auf?)
