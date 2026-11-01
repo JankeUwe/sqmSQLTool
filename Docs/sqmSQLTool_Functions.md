@@ -4302,6 +4302,31 @@ Export-sqmAlwaysOnConfiguration -SqlInstance "SQL01" -NoWarning
 Export-sqmAlwaysOnConfiguration -SqlInstance "SQL01" -OutputPath "D:\Reports" -NoOpen
 	# Exports to D:\Reports, does not auto-open TXT file
 
+### Get-sqmAgRedoDiagnosis
+
+Finds out why an Always On secondary does not catch up: samples the redo threads for a minute and names the likely bottleneck per database.
+
+Use it on a secondary replica with a large redo queue while the send queue is small. Verdicts: BlockedByQuery, SingleThreadedRedo, SchedulerPressure, PageReadIO, LogReadIO, TransactionDependency, DispatchBound, WorkerSkew, ApplyCpuBound, RedoIdle (plus Suspended, NoRedoTask, NoBacklog, Inconclusive). The verdict is a heuristic from point samples and CPU deltas; the Evidence column shows the numbers behind it.
+
+**Parameters:**
+
+- **-SqlInstance** - The secondary replica (default: current computer name). Not the listener.
+- **-SqlCredential** - PSCredential for the connection.
+- **-Database** - Only these databases (wildcards allowed).
+- **-SampleSeconds** - Length of the measurement. Default 60, range 10-3600.
+- **-IntervalSeconds** - Time between two samples. Default 2, range 1-60.
+- **-MinRedoQueueMB** - Smaller redo queues get the verdict NoBacklog. Default: 100.
+- **-Quiet** - No progress bar.
+- **-EnableException** - Throw exceptions immediately.
+
+**Examples (2):**
+
+```powershell
+Get-sqmAgRedoDiagnosis -SqlInstance "SQL02"
+
+```powershell
+Get-sqmAgRedoDiagnosis -SqlInstance "SQL02" -SampleSeconds 300 | Select-Object -First 1 | Format-List DatabaseName, RedoQueueMB, TrendMBPerMin, Verdict, Evidence, Recommendation
+
 ### Get-sqmAlwaysOnFailoverHistory
 
 Ermittelt AlwaysOn-Failover-Ereignisse aus dem Windows Event Log.

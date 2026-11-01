@@ -146,15 +146,16 @@
 	<!-- SIDEBAR -->
 	<div class="psdb-st-sidebar">
 	<input class="psdb-st-sidebar-search" type="text" placeholder="Funktion suchen…" oninput="psstSearch(this.value)">
-																								<div class="psdb-st-nav-group" id="nav-alwayson">
+																									<div class="psdb-st-nav-group" id="nav-alwayson">
 	<div class="psdb-st-nav-cat" onclick="psstToggleCat('nav-alwayson-list')">
-	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">23</span>
+	<span>🔄 AlwaysOn</span><span class="psdb-st-nav-count">24</span>
 	</div>
 	<ul class="psdb-st-nav-funcs" id="nav-alwayson-list"><li><span class="psdb-st-nav-func" onclick="psstJump('f-addsqmdatabasetoag')">Add-sqmDatabaseToAG</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-comparesqmalwaysonlogins')">Compare-sqmAlwaysOnLogins</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-comparesqmalwaysonroles')">Compare-sqmAlwaysOnRoles</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-completesqmlistenermigration')">Complete-sqmListenerMigration</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-exportsqmalwaysonconfiguration')">Export-sqmAlwaysOnConfiguration</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmagredodiagnosis')">Get-sqmAgRedoDiagnosis</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmalwaysonfailoverhistory')">Get-sqmAlwaysOnFailoverHistory</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmalwaysonhealthreport')">Get-sqmAlwaysOnHealthReport</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-getsqmalwaysonqueuestatus')">Get-sqmAlwaysOnQueueStatus</span></li>
@@ -455,7 +456,7 @@
 
 	<!-- CONTENT -->
 	<div class="psdb-st-content" id="psdb-st-content">
-																								<section class="psdb-st-section" id="cat-alwayson">
+																									<section class="psdb-st-section" id="cat-alwayson">
 	<h2 class="psdb-st-section-title">🔄 AlwaysOn</h2>
 
 	<div class="psdb-st-func-card" id="f-addsqmdatabasetoag">
@@ -581,6 +582,27 @@ Add-sqmDatabaseToAG -AvailabilityGroup &quot;AG1&quot; -All -WhatIf</pre><button
 	<div class="psdb-st-example-label">Export-sqmAlwaysOnConfiguration -SqlInstance &quot;SQL01&quot; -OutputPath &quot;D:\Reports&quot; -NoOpen</div>
 	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">	Export-sqmAlwaysOnConfiguration -SqlInstance &quot;SQL01&quot; -OutputPath &quot;D:\Reports&quot; -NoOpen
 	# Exports to D:\Reports, does not auto-open TXT file</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	</div>
+	</div>
+
+	<div class="psdb-st-func-card" id="f-getsqmagredodiagnosis">
+	<div class="psdb-st-func-header">
+	<span class="psdb-st-func-name">Get-sqmAgRedoDiagnosis</span>
+	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
+	</div>
+	<div class="psdb-st-func-desc">Finds out why an Always On secondary does not catch up: samples the redo threads for a minute and names the likely bottleneck per database.</div>
+	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
+	<div class="psdb-st-examples">
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label">Get-sqmAgRedoDiagnosis -SqlInstance &quot;SQL02&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    Get-sqmAgRedoDiagnosis -SqlInstance &quot;SQL02&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	</div>
+	<div class="psdb-st-example">
+	<div class="psdb-st-example-label"># Longer sample, only the worst database, with the numbers behind the verdict</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">    # Longer sample, only the worst database, with the numbers behind the verdict
+    Get-sqmAgRedoDiagnosis -SqlInstance &quot;SQL02&quot; -SampleSeconds 300 |
+        Select-Object -First 1 | Format-List DatabaseName, RedoQueueMB, TrendMBPerMin, Verdict, Evidence, Recommendation</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -5965,6 +5987,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">Get-sqmADMemberGroups</td><td>Finds all Active Directory groups that contain a specified user, group, or computer.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmAgentJobHistory</td><td>Displays the execution history of SQL Agent jobs.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmAgentJobScheduleReport</td><td>Generates a comprehensive SQL Agent Job Schedule Report.</td></tr>
+	<tr><td class="psdb-st-ov-fn">Get-sqmAgRedoDiagnosis</td><td>Finds out why an Always On secondary does not catch up: samples the redo threads for a minute and names the likely bottleneck per database.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmAlwaysOnFailoverHistory</td><td>Retrieves AlwaysOn failover events from the Windows Event Log.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmAlwaysOnHealthReport</td><td>Creates a detailed health report for all Always On availability groups on an instance.</td></tr>
 	<tr><td class="psdb-st-ov-fn">Get-sqmAlwaysOnQueueStatus</td><td>Returns the current redo queue / send queue status for all Always On availability groups on an instance - no files written.</td></tr>
