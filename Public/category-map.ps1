@@ -59,6 +59,7 @@ $categoryMap = @{
     'Get-sqmLoginPermissions'             = 'Login & User Security'
     'Get-sqmLoginSettings'                = 'Login & User Security'
     'Get-sqmLongRunningQueries'           = 'Monitoring & Health Checks'
+    'Get-sqmMemoryDump'                   = 'Monitoring & Health Checks'
     'Get-sqmMissingIndexes'               = 'Performance Analysis & Optimization'
     'Get-sqmOperationStatus'              = 'Backup & Recovery'
     'Get-sqmOrphanedFiles'                = 'Storage & Disk Management'

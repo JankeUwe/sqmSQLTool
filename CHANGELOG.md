@@ -1,5 +1,27 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.207.0] - 2026-11-02
+
+### Neu: Get-sqmMemoryDump listet SQL-Server-Speicherabbilder und ermittelt nach Moeglichkeit den Grund
+
+Ein Memory Dump (SQLDump<n>.mdmp) ist gross, und der Anlass ist ihm von aussen nicht anzusehen. Bisher blieb nur, den Errorlog von Hand
+nach dem Zeitpunkt zu durchsuchen.
+
+- Liest die Abbilder aus `sys.dm_server_memory_dumps` (Datei, Zeitpunkt, Groesse, `-Days` begrenzt) und wertet je Abbild den Errorlog kurz
+  vor dem Schreiben aus: Fehlernummern, Exception Code und -Adresse, Modul (z.B. `sqllang+0x...`), SPID und Input Buffer des ausloesenden
+  Befehls.
+- Ordnet den Anlass ein (`Type`): Assertion, AccessViolation, NonYieldingScheduler, DeadlockedSchedulers, StackOverflow, OutOfMemory,
+  LatchTimeout, Corruption, WorkingSetTrimmed, Manual (z.B. `DBCC STACKDUMP`), sonst Unknown. Dazu ein kurzer `Hint`, was als Naechstes
+  zu pruefen ist, und `ProductVersion` fuer den Patchstand.
+- Anker ist der Erstellzeitpunkt des Abbilds. Aeltere Builds nennen die Datei zusaetzlich im Errorlog ("Stack Dump being sent to
+  ...SQLDump<n>.txt"), das wird zur Verfeinerung genutzt. SQL Server 2025 schreibt diese Zeile nicht mehr; ein erster Entwurf, der sich auf
+  sie verliess, fand dort keinen Eintrag und wurde erst durch den Live-Test mit einem echten Abbild korrigiert.
+- Eine Ersteinschaetzung aus dem Errorlog, keine Analyse des Abbilds: die Ursache im Code von SQL Server braucht das Abbild selbst
+  (Microsoft Support, WinDbg). Ist der Errorlog nicht lesbar oder schon rotiert, bleibt der Grund `Unknown`, Datei, Zeit und Groesse
+  stehen trotzdem im Ergebnis.
+- 9 Unit Tests (gemockt). Live gegen SQL Server 2025 mit einem echten Abbild aus `DBCC STACKDUMP` unter Windows PowerShell 5.1 geprueft:
+  als Manual mit SPID erkannt. Nicht geprueft: echte Absturzdumps (Access Violation, Assertion, Non-yielding) und Windows-Errorlogs; die
+  Einordnung dafuer stuetzt sich auf die dokumentierten Meldungstexte und die gemockten Tests.
 ## [1.9.206.0] - 2026-11-02
 
 ### Neu: Set-sqmTempDbFileSize gleicht die TempDB-Datendateien auf eine Groesse an

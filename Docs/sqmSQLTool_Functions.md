@@ -5657,6 +5657,27 @@ Checks the number and size of TempDB files, autogrow settings and the path.
 ```powershell
 Get-sqmTempDbRecommendation -SqlInstance "SQL01"
 
+### Get-sqmMemoryDump
+
+Lists the SQL Server memory dumps of an instance (`sys.dm_server_memory_dumps`: file, time, size) and, where possible, determines the reason. For each dump the SQL error log around the time the dump was written is read and classified: error numbers (17066 assertion, 17883 non-yielding scheduler, 701 out of memory, 823/824/825, 844-847 ...), exception code, address and module, the SPID and the input buffer of the triggering statement, plus a short hint on what to check next. Older builds also name the file in an error log line "Stack Dump being sent to ...SQLDump<n>.txt", which is used to refine the match; newer builds (for example SQL Server 2025) do not, so the dump's creation time is the anchor.
+
+This is a first assessment from the error log, not an analysis of the dump itself. The cause inside SQL Server needs the dump (Microsoft Support or WinDbg), but the result usually names the session and statement involved and shows the patch level in `ProductVersion`.
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance (default: current computer name).
+- **-SqlCredential** - Optional SQL login.
+- **-Days** - Only dumps of the last N days. Default 365, 0 = all.
+- **-MaxLogFiles** - How many error log files (current plus archives) are searched. Default 20.
+- **-EnableException** - Throw instead of logging.
+
+**Examples (2):**
+
+```powershell
+Get-sqmMemoryDump -SqlInstance "SQL01"
+Get-sqmMemoryDump -SqlInstance "SQL01" -Days 30 | Format-List FileName, CreationTime, SizeMB, Type, Reason, Hint
+```
+
 ### Set-sqmTempDbFileSize
 
 Equalizes the size of all TempDB data files (default: the size of the largest file). SQL Server fills files proportionally to their free space, so one oversized file takes most of the load and the extra files do not relieve the allocation pages. Only smaller files are grown (online, `ALTER DATABASE ... MODIFY FILE`); the new size is persisted as the startup size. The log file is not touched.
