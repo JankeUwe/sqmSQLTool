@@ -1,5 +1,22 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.205.0] - 2026-11-02
+
+### Behoben: Nach Install.cmd meldete das Modul sofort "Neue Version" und installierte erneut
+
+Zwei Ursachen, beide behoben:
+
+- Aeltere `Set-sqmConfig`-Staende schrieben die komplette Konfiguration in die `config.json`, auch `ModuleVersion`. Der Import legte
+  diesen alten Wert ueber die Version aus dem Manifest. Das Modul hielt sich fuer veraltet (z.B. 1.9.10.0), bot bei jedem Start ein
+  Update an, und das Update half nie, weil die Version weiter aus der `config.json` kam. `ModuleVersion` wird jetzt aus der
+  `config.json` nicht mehr gelesen, die Version kommt immer aus dem Manifest. Eine vorhandene alte Datei muss nicht bereinigt werden.
+- `Install.ps1` importiert das Modul in Schritt 6, bevor die Installationsquelle gespeichert ist (Schritt 6a). Die Update-Pruefung
+  lief dort mit der Fallback-Kette gegen PSGallery/GitHub und konnte direkt nach der Installation ein Update anbieten oder (Modus
+  `Auto`) installieren. Der Installer unterdrueckt die Pruefung jetzt waehrend seines Imports und setzt den Pruefzeitstempel, damit
+  auch der erste Start danach nicht sofort pruefen muss.
+- Neue Unit Tests `ModuleVersionConfig.Tests.ps1`. Die Ursache wurde mit einer `config.json` mit `ModuleVersion = 1.9.10.0` unter
+  Windows PowerShell 5.1 nachgestellt (vorher 1.9.10.0, nachher 1.9.204.0). Nicht geprueft: ein kompletter Install.cmd-Lauf mit UAC.
+
 ## [1.9.204.0] - 2026-11-02
 
 ### Geaendert: Invoke-sqmRestoreDatabase findet das letzte Backup auch auf einem AG-Secondary
@@ -10,7 +27,7 @@ Ohne `-BackupFile`/`-BackupFiles` wurde die Backup-Historie nur auf der Einstieg
 - Ist die Datenbank in einer AG, wird die Historie auf allen Replikaten gelesen (inkl. COPY_ONLY) und die Kette ueber die LSNs
   gebaut: neuestes Full, passendes Diff (DatabaseBackupLsn = CheckpointLsn des Fulls), lueckenlose Logs. Dasselbe Log in mehreren
   Historien zaehlt einmal, das der Arbeits-Instanz (Primary) gewinnt. Eine Log-Luecke beendet die Kette mit Warnung.
-- Dateien eines anderen Replikats werden als Admin-Share angesprochen (`\Replikat\G$\...`); das Dienstkonto der Primary braucht dort
+- Dateien eines anderen Replikats werden als Admin-Share angesprochen (`\\Replikat\G$\...`); das Dienstkonto der Primary braucht dort
   Leserechte. Ein nicht erreichbares Replikat ist nur eine Warnung.
 - Mit `-BackupFile`/`-BackupFiles` entfaellt die Suche. Ohne AG verhaelt sich die Funktion wie bisher.
 - Neu: private Funktion `Get-sqmRestoreChainFromReplica`, 5 Unit Tests (gemockte Historie). Nicht geprueft: echte AG mit Secondary-Backups

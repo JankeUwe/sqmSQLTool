@@ -114,6 +114,11 @@ if (Test-Path $configFile)
 		$userConfig = Get-Content $configFile -Raw | ConvertFrom-Json
 		foreach ($key in $userConfig.PSObject.Properties)
 		{
+			# ModuleVersion ist keine Einstellung, sondern die installierte Version aus dem Manifest.
+			# Aeltere Set-sqmConfig-Staende haben die ganze Konfiguration inkl. ModuleVersion in die
+			# config.json geschrieben; dieser alte Wert ueberdeckte die echte Version, das Modul hielt
+			# sich fuer veraltet und bot bei jedem Start ein "Update" an, das nie half.
+			if ($key.Name -eq 'ModuleVersion') { continue }
 			$script:sqmModuleConfig[$key.Name] = $key.Value
 		}
 		# Altkonfiguration: wer AutoUpdate=$true gesetzt hat (vor UpdateMode), behaelt das

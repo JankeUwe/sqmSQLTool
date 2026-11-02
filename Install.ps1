@@ -406,7 +406,23 @@ $importOk = $false
 try {
     # Expliziter Pfad zur .psd1 verhindert dass eine alte Version aus PSModulePath geladen wird
     $psd1Path = Join-Path $Destination "sqmSQLTool.psd1"
-    Import-Module $psd1Path -Force -WarningAction SilentlyContinue -ErrorAction Stop
+    # Die Update-Pruefung des Moduls laeuft beim Import. Hier ist sie sinnlos und schaedlich: gerade
+    # wurde installiert, die Installationsquelle ist noch nicht gespeichert (Schritt 6a), also wuerde
+    # die Fallback-Kette gegen PSGallery/GitHub pruefen und direkt nach der Installation "Neue Version"
+    # melden bzw. neu installieren. Stattdessen Pruefung unterdruecken und den Zeitstempel setzen,
+    # damit auch der erste Start danach nicht sofort prueft.
+    $prevSkipUpdate = $env:SQMSQLTOOL_SKIP_AUTO_UPDATE
+    $env:SQMSQLTOOL_SKIP_AUTO_UPDATE = '1'
+    try {
+        Import-Module $psd1Path -Force -WarningAction SilentlyContinue -ErrorAction Stop
+    } finally {
+        $env:SQMSQLTOOL_SKIP_AUTO_UPDATE = $prevSkipUpdate
+    }
+    try {
+        $markerDir = Join-Path $env:LOCALAPPDATA 'sqmSQLTool'
+        if (-not (Test-Path $markerDir)) { New-Item -ItemType Directory -Path $markerDir -Force | Out-Null }
+        (Get-Date).ToString('o') | Set-Content -Path (Join-Path $markerDir 'lastUpdateCheck') -Force
+    } catch { }
     $version = (Get-Module sqmSQLTool).Version
     Write-Host "sqmSQLTool v$version successfully loaded." -ForegroundColor Green
     Write-Host "Scope: $Scope  |  Path: $Destination" -ForegroundColor Gray
