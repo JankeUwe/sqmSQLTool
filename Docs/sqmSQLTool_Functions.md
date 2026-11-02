@@ -5657,6 +5657,29 @@ Checks the number and size of TempDB files, autogrow settings and the path.
 ```powershell
 Get-sqmTempDbRecommendation -SqlInstance "SQL01"
 
+### Set-sqmTempDbFileSize
+
+Equalizes the size of all TempDB data files (default: the size of the largest file). SQL Server fills files proportionally to their free space, so one oversized file takes most of the load and the extra files do not relieve the allocation pages. Only smaller files are grown (online, `ALTER DATABASE ... MODIFY FILE`); the new size is persisted as the startup size. The log file is not touched.
+
+Before the first change it checks that no file has a `MAXSIZE` below the target and that each volume has enough free space. If either fails, nothing is changed. Shrinking is deliberately not part of this function.
+
+**Parameters:**
+
+- **-SqlInstance** - SQL Server instance (default: current computer name).
+- **-SqlCredential** - Optional SQL login.
+- **-TargetSizeMB** - Target size per data file in MB. Must not be below the largest file. Default: the largest file.
+- **-FileGrowthMB** - Optional fixed autogrowth step in MB for all data files.
+- **-WhatIf** / **-Confirm** - Show or confirm each change.
+- **-EnableException** - Throw instead of logging.
+
+**Examples (3):**
+
+```powershell
+Set-sqmTempDbFileSize -SqlInstance "SQL01" -WhatIf
+Set-sqmTempDbFileSize -SqlInstance "SQL01"
+Set-sqmTempDbFileSize -SqlInstance "SQL01" -TargetSizeMB 8192 -FileGrowthMB 512
+```
+
 ### Test-sqmTempDbFileCount
 
 Prueft ob die Anzahl der TempDB-Datendateien der empfohlenen CPU-Anzahl entspricht.

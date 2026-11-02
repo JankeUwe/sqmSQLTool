@@ -1,5 +1,26 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.206.0] - 2026-11-02
+
+### Neu: Set-sqmTempDbFileSize gleicht die TempDB-Datendateien auf eine Groesse an
+
+SQL Server verteilt Allokationen proportional zum freien Platz der Dateien. Ist eine TempDB-Datei groesser als die anderen, bekommt sie
+den Grossteil der Last, und die zusaetzlichen Dateien entlasten die Allocation-Seiten nicht wie erwartet. `Test-sqmTempDbFileCount`
+und `Get-sqmTempDbRecommendation` meldeten ungleiche Groessen bisher nur, angleichen liess sich das nicht.
+
+- Zielgroesse ist standardmaessig die groesste vorhandene Datei (`-TargetSizeMB` setzt eine groessere). Es wird nur vergroessert, online
+  und als Startgroesse gespeichert; verkleinert wird bewusst nicht, die Logdatei bleibt unberuehrt.
+- Vor der ersten Aenderung wird geprueft, ob ein `MAXSIZE` unter der Zielgroesse liegt und ob der freie Platz je Laufwerk reicht. Trifft
+  eines zu, bricht die Funktion ab, ohne etwas zu aendern, damit TempDB nicht halb angeglichen bleibt. Fehlt `VIEW SERVER STATE` fuer den
+  Platzcheck, wird er mit Warnung uebersprungen.
+- `-FileGrowthMB` setzt zusaetzlich eine einheitliche Autogrowth-Schrittweite. Ohne den Parameter wird ein Unterschied nur gemeldet.
+- `SIZE` und `FILEGROWTH` gehen in getrennten Anweisungen raus: `MODIFY FILE` akzeptiert nur eine Eigenschaft je Anweisung. Das hat erst der
+  Live-Test gezeigt, die erste Fassung kombinierte beides und scheiterte.
+- Unterstuetzt `-WhatIf`/`-Confirm`. Rueckgabe je Datei: alte/neue Groesse, alte/neue Schrittweite, Status (`Changed`, `Unchanged`, `WhatIf`, `Failed`).
+- 8 Unit Tests. Live gegen SQL Server 2025 (Container, 8 Dateien) unter Windows PowerShell 5.1 geprueft: Abbruch bei MAXSIZE und bei zu wenig
+  Platz ohne Aenderung, `-WhatIf`, Angleichen mit `-FileGrowthMB`, zweiter Lauf ohne Aenderung, zu kleine Zielgroesse. Nicht geprueft: ein
+  Windows-Server mit TempDB auf einem eigenen Laufwerk.
+- Quality-Baseline: PublicWithoutTest 73 -> 72 (durch einen frueheren Test, hier nachgezogen).
 ## [1.9.205.0] - 2026-11-02
 
 ### Behoben: Nach Install.cmd meldete das Modul sofort "Neue Version" und installierte erneut

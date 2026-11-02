@@ -161,6 +161,7 @@ $categoryMap = @{
     'Set-sqmSsrsConfiguration'            = 'SSRS Configuration'
     'Set-sqmSsrsHttpsCertificate'         = 'Certificates & TLS Security'
     'Set-sqmTcpPort'                      = 'Configuration Management'
+    'Set-sqmTempDbFileSize'               = 'Performance Analysis & Optimization'
     'Show-sqmToolGui'                     = 'Module & Update Management'
     'Stop-sqmSqlProcess'                  = 'Monitoring & Health Checks'
     'Sync-sqmAgNode'                      = 'Always On & Availability Groups'
