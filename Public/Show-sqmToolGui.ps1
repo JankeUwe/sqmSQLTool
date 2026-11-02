@@ -689,7 +689,9 @@
 				# Pre-fill instance parameters with the current machine name
 				if ($p.Name -in @('SqlInstance', 'Instance')) { $ctrl.Text = $env:COMPUTERNAME }
 
-				if ($p.Name -match 'Files?$')
+				# Nur Text-/Textarray-Parameter: der Name allein reicht nicht, -MaxLogFiles, -MaxFiles oder
+				# -MaxRolloverFiles sind Zahlen und bekamen faelschlich einen Datei-Dialog.
+				if ($p.Name -match 'Files?$' -and ($pt -eq [string] -or $pt -eq [string[]]))
 				{
 					# File-path parameter (e.g. BackupFile/BackupFiles on Invoke-sqmRestoreDatabase) -
 					# offer an OpenFileDialog instead of forcing the user to type/paste a path.

@@ -1,5 +1,15 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.208.0] - 2026-11-02
+
+### Behoben: GUI zeigte bei Zahlenparametern einen "Browse..."-Button
+
+Die GUI (`Show-sqmToolGui`) erkannte Datei-Parameter allein am Namen (endet auf `File`/`Files`) und bot dafuer einen Datei-Dialog an,
+ohne den Typ zu pruefen. Dadurch bekamen auch Zahlenparameter einen sinnlosen Browse-Button: `-MaxLogFiles` (Get-sqmMemoryDump),
+`-MaxFiles` (Test-sqmTempDbFileCount), `-MaxRolloverFiles` (Invoke-sqmExtendedEvents) und `-CheckTempDbMaxFiles` (Set-sqmConfig). Der
+Dialog gilt jetzt nur noch fuer Text- und Textarray-Parameter wie `-BackupFile`/`-BackupFiles`. Ueber alle Funktionen geprueft: das waren
+die einzigen vier Zahlenparameter mit diesem Namensmuster. Die GUI selbst wurde nicht gestartet, die Aenderung ist per Parse-Pruefung unter
+Windows PowerShell 5.1 und die Parameterliste abgesichert.
 ## [1.9.207.0] - 2026-11-02
 
 ### Neu: Get-sqmMemoryDump listet SQL-Server-Speicherabbilder und ermittelt nach Moeglichkeit den Grund
