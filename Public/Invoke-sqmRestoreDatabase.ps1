@@ -105,6 +105,14 @@ from the instance's backup history (`Get-DbaDbBackupHistory -Database <name> -La
 msdb.dbo.backupset) and restored to the most recent possible point - no need to know or type the
 actual file path(s) at all. Throws if no backup history exists for that database name.
 
+If the database belongs to an availability group, the history is searched on ALL replicas, not
+just on -SqlInstance: with a "prefer secondary" backup preference the latest Full (COPY_ONLY) and
+Log backups sit in the msdb of a Secondary. The chain is assembled from the merged history via the
+LSNs (newest Full, matching newest Diff, gap-free Logs). Files that live on another replica are
+addressed through its admin share (\\Replica\G$\...), so the service account of the working
+instance (the Primary) needs read access to that backup folder. With -BackupFile/-BackupFiles
+this lookup does not happen at all.
+
 Used for logging, for looking up the existing database of that name (AG membership check,
 pre-restore backup, user export, single-user handling - only relevant when -NewDatabaseName is NOT
 used), and as the restore target if -NewDatabaseName is not given. It does NOT need to match
@@ -399,25 +407,22 @@ function Invoke-sqmRestoreDatabase
 			{
 				Invoke-sqmLogging -Message "Weder -BackupFile noch -BackupFiles angegeben - ermittle die aktuellste Wiederherstellungskette aus der Backup-Historie fuer '$DatabaseName' auf '$SqlInstance'." -FunctionName $functionName -Level "INFO"
 
-				$histRows = Get-DbaDbBackupHistory -SqlInstance $SqlInstance -SqlCredential $SqlCredential `
-					-Database $DatabaseName -Last -EnableException -ErrorAction Stop
-
-				if (-not $histRows)
+				# Bei einer AG-Datenbank liegt das letzte Backup evtl. auf einem Secondary (Backup-
+				# Praeferenz Secondary): die Historie wird deshalb auf ALLEN Replikaten gesucht und
+				# die Kette per LSN zusammengesetzt, Pfade fremder Replikate als Admin-Share. Ohne AG
+				# wird wie bisher nur $SqlInstance befragt. Mit -BackupFile/-BackupFiles entfaellt das.
+				try
 				{
-					$errMsg = "Keine Backup-Historie fuer Datenbank '$DatabaseName' auf '$SqlInstance' gefunden (msdb.dbo.backupset) - -BackupFile oder -BackupFiles muss dann explizit angegeben werden."
-					Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
-					throw $errMsg
+					$chainInfo = Get-sqmRestoreChainFromReplica -SqlInstance $SqlInstance -SqlCredential $SqlCredential -Database $DatabaseName
+				}
+				catch
+				{
+					Invoke-sqmLogging -Message $_.Exception.Message -FunctionName $functionName -Level "ERROR"
+					throw
 				}
 
-				# Get-DbaDbBackupHistory -Last liefert eine Zeile pro Backup (Full, ggf. Diff, ggf.
-				# mehrere Logs), .Path ist bei gestreiften Backups selbst ein Array - beides hier
-				# chronologisch (Start) zu einer flachen Liste zusammenfuehren, in exakt der
-				# Reihenfolge, die die 'Sequence'-Restorelogik weiter unten ohnehin erwartet.
-				$resolvedFiles = [System.Collections.Generic.List[string]]::new()
-				foreach ($histRow in ($histRows | Sort-Object Start)) { foreach ($p in @($histRow.Path)) { $resolvedFiles.Add($p) } }
-
-				Invoke-sqmLogging -Message "Wiederherstellungskette aus Historie ermittelt ($($resolvedFiles.Count) Datei(en)): $($resolvedFiles -join ', ')" -FunctionName $functionName -Level "INFO"
-				$resolvedFiles.ToArray()
+				Invoke-sqmLogging -Message "Wiederherstellungskette aus Historie ermittelt ($($chainInfo.Files.Count) Datei(en)): $($chainInfo.Files -join ', ')" -FunctionName $functionName -Level "INFO"
+				$chainInfo.Files
 			}
 			default { $BackupFile }
 		}

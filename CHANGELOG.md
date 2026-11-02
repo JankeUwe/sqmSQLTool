@@ -1,5 +1,21 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.204.0] - 2026-11-02
+
+### Geaendert: Invoke-sqmRestoreDatabase findet das letzte Backup auch auf einem AG-Secondary
+
+Ohne `-BackupFile`/`-BackupFiles` wurde die Backup-Historie nur auf der Einstiegs-Instanz gelesen. Bei einer AG mit Backup-Praeferenz
+"Secondary" liegen Full (COPY_ONLY) und Logs in der msdb des Secondary; der Restore nahm dann einen alten Stand oder fand nichts.
+
+- Ist die Datenbank in einer AG, wird die Historie auf allen Replikaten gelesen (inkl. COPY_ONLY) und die Kette ueber die LSNs
+  gebaut: neuestes Full, passendes Diff (DatabaseBackupLsn = CheckpointLsn des Fulls), lueckenlose Logs. Dasselbe Log in mehreren
+  Historien zaehlt einmal, das der Arbeits-Instanz (Primary) gewinnt. Eine Log-Luecke beendet die Kette mit Warnung.
+- Dateien eines anderen Replikats werden als Admin-Share angesprochen (`\Replikat\G$\...`); das Dienstkonto der Primary braucht dort
+  Leserechte. Ein nicht erreichbares Replikat ist nur eine Warnung.
+- Mit `-BackupFile`/`-BackupFiles` entfaellt die Suche. Ohne AG verhaelt sich die Funktion wie bisher.
+- Neu: private Funktion `Get-sqmRestoreChainFromReplica`, 5 Unit Tests (gemockte Historie). Nicht geprueft: echte AG mit Secondary-Backups
+  und der Zugriff der Primary auf den Admin-Share.
+
 ## [1.9.203.0] - 2026-11-02
 
 ### Neu: Get-sqmTsmConfiguration wertet Include/Exclude-Dateien aus und erzeugt einen HTML-Report
