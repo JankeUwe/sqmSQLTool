@@ -1,5 +1,20 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.211.0] - 2026-11-02
+
+### Neu: Copy-sqmBackupToArchive
+
+Kopiert die Monats- oder Jahresendbackups in ein Archivverzeichnis. Je Datenbank wird in der Backup-Historie das letzte Full-Backup des zuletzt
+abgeschlossenen Monats (`-Period Month`) bzw. Jahres (`-Period Year`) gesucht, bezogen auf `-ReferenceDate` (Standard heute: am 3. Dezember ist es der November),
+und alle zugehoerigen Dateien (auch alle Stripes) werden nach `<Ziel>\<JJJJ>\<JJJJ-MM>\<Datenbank>\` bzw. `<Ziel>\<JJJJ>\<Datenbank>\` kopiert.
+Always On: die Historie wird von ALLEN Replikaten gelesen (aus `sys.availability_replicas`), je Datenbank gilt das juengste Backup, gleich auf welchem Knoten es lag, und die
+Dateien werden ueber die Admin-Freigabe des schreibenden Knotens geholt. Ist ein Replikat nicht lesbar, bricht die Funktion ab, statt aus unvollstaendiger Historie ein aelteres
+Backup zu waehlen. Kopiert wird mit robocopy `/XO`, ohne `/MIR` und `/PURGE`: im Archiv wird nie etwas geloescht oder ueberschrieben, wiederholte Laeufe sind harmlos (taeglicher
+Job genuegt). Backups auf Band, TSM/VDI oder URL stehen als `Skipped` im Ergebnis, Online-Benutzerdatenbanken ohne Full-Backup im Zeitraum als `NoBackup`. Im Agent-Job per
+`New-sqmAgentCommandJob` mit `PrimaryOnly = $true` einrichten. 12 Unit-Tests. Live gegen den SQL-Server-2025-Container geprueft (msdb-Abfrage, gestripetes Backup mit 2 Dateien,
+Month und Year, NoBackup); der Dateikopierschritt nutzt denselben Helfer wie `Copy-sqmBackupToAgPeer`. Noch nicht gegen ein echtes AG-Paar gelaufen. Die Aufbewahrung im Archiv
+(Loeschen alter Jahre) ist bewusst nicht Teil der Funktion.
+
 ## [1.9.210.0] - 2026-11-02
 
 ### Neu: Copy-sqmBackupToAgPeer

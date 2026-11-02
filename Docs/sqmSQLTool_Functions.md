@@ -1274,6 +1274,29 @@ WinForms-Dialog zur Verwaltung der Backup-Ausschlusstabelle (master.dbo.sqm_Back
 
 ```
 
+### Copy-sqmBackupToArchive
+
+Copies the month-end or year-end full backups to an archive directory. For each database it finds the last full backup of the most recently completed month (`-Period Month`) or year (`-Period Year`), relative to `-ReferenceDate` (default today), and copies all its files (all stripes) to `<Destination>\<yyyy>\<yyyy-MM>\<Database>\` (year: `<Destination>\<yyyy>\<Database>\`). Always On aware: the backup history of all replicas is read, the latest backup per database wins regardless of which node wrote it, and the files are fetched through that node's admin share. If a replica cannot be read it aborts instead of picking an older backup from incomplete history. Uses robocopy with `/XO` and never `/MIR` or `/PURGE`; nothing in the archive is ever deleted or overwritten, so a daily job is safe. Non-disk backups (tape, TSM/VDI, URL) are reported as `Skipped`, user databases without a full backup in the period as `NoBackup`.
+
+**Parameters:**
+
+- **-Destination** - Archive directory (local or UNC).
+- **-Period** - `Month` or `Year`.
+- **-ReferenceDate** - Date the completed period is derived from. Default: today.
+- **-Database** / **-ExcludeDatabase** - Limit or exclude databases.
+- **-IncludeSystemDatabases** - Also master, model, msdb.
+- **-AvailabilityGroupName** - Only the replicas of this AG.
+- **-SqlInstance** / **-SqlCredential** - Instance used to find the replicas.
+- **-WhatIf** / **-Confirm** - Show or confirm each copy.
+- **-EnableException** - Throw if a copy failed or a replica is unreachable.
+
+**Examples (2):**
+
+```powershell
+Copy-sqmBackupToArchive -Destination "\fileserver\sqlarchiv" -Period Month -WhatIf
+New-sqmAgentCommandJob -SqlInstance "SQL01" -JobName "Archiv_Monatsende" -ScheduleType Daily -ScheduleTime "05:00" -Command @{ FunctionName = "Copy-sqmBackupToArchive"; Parameters = @{ Destination = "\fileserver\sqlarchiv"; Period = "Month" }; PrimaryOnly = $true }
+```
+
 ### Copy-sqmBackupToAgPeer
 
 Copies node-local backup files to the same path on the other Always On replicas, so the new primary has them after a failover. Give it only the source directory: the partner servers are read from `sys.availability_replicas`, the target is the partner's admin share with the same path (`G:\Backup\Anonym` -> `\<Partner>\G$\Backup\Anonym`). Uses robocopy with `/XO` and never `/MIR` or `/PURGE`, so a newer file on the partner is never overwritten or deleted. Run it as a step after the backup and as a catch-up job (Sat/Sun morning) with `New-sqmAgentCommandJob` and `PrimaryOnly = $true`; on a secondary the step does nothing.
