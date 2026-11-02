@@ -1272,6 +1272,29 @@ WinForms-Dialog zur Verwaltung der Backup-Ausschlusstabelle (master.dbo.sqm_Back
 ```powershell
     Show-sqmBackupExcludeForm -SqlInstance "SQL01\INST1"
 
+```
+
+### Copy-sqmBackupToAgPeer
+
+Copies node-local backup files to the same path on the other Always On replicas, so the new primary has them after a failover. Give it only the source directory: the partner servers are read from `sys.availability_replicas`, the target is the partner's admin share with the same path (`G:\Backup\Anonym` -> `\<Partner>\G$\Backup\Anonym`). Uses robocopy with `/XO` and never `/MIR` or `/PURGE`, so a newer file on the partner is never overwritten or deleted. Run it as a step after the backup and as a catch-up job (Sat/Sun morning) with `New-sqmAgentCommandJob` and `PrimaryOnly = $true`; on a secondary the step does nothing.
+
+**Parameters:**
+
+- **-SourcePath** - Local directory with the backups (drive letter required).
+- **-Filter** - File patterns. Default: `*.bak` (so `.tmp` files of a running backup are skipped).
+- **-AvailabilityGroupName** - Only use the partners of this AG. Default: all AGs of the instance.
+- **-PartnerServer** - Fix the partner computer names instead of reading them from the AG.
+- **-SqlInstance** / **-SqlCredential** - Instance used to read the replicas.
+- **-WhatIf** / **-Confirm** - Show or confirm each copy.
+- **-EnableException** - Throw after the last partner if a copy failed.
+
+**Examples (2):**
+
+```powershell
+Copy-sqmBackupToAgPeer -SourcePath "G:\Backup\Anonym" -Filter "*_anonym*.bak" -WhatIf
+New-sqmAgentCommandJob -SqlInstance "SQL01" -JobName "Anonym_Backup" -AppendStep -Command @{ FunctionName = "Copy-sqmBackupToAgPeer"; Parameters = @{ SourcePath = "G:\Backup\Anonym" }; PrimaryOnly = $true }
+```
+
 ## 7. Configuration Management
 
 ### Compare-sqmServerConfiguration

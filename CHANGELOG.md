@@ -1,5 +1,21 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.210.0] - 2026-11-02
+
+### Neu: Copy-sqmBackupToAgPeer
+
+Kopiert knoten-lokale Backups auf denselben Pfad der anderen Always-On-Replikate, damit nach einem Failover (z. B. Patch-Wochenende) auch der neue
+Primary die Dateien hat. Gedacht fuer Faelle wie anonymisierte Datenbanken, die ein anderes Team ueber den Listener abholt, waehrend die Ablage lokal
+auf dem jeweiligen Primary liegt. Der Aufrufer gibt nur das Quellverzeichnis an: die Partner-Server werden aus `sys.availability_replicas` gelesen
+(Instanzteil entfernt, lokales Replikat nicht dabei), das Ziel ist die Admin-Freigabe des Partners mit gleichem Pfad (`G:\Backup\Anonym` ->
+`\<Partner>\G$\Backup\Anonym`). Kopiert wird per robocopy mit `/XO`, bewusst ohne `/MIR` und `/PURGE`: ein neuerer Stand auf dem Partner wird nie
+ueberschrieben oder geloescht. Der Standardfilter `*.bak` laesst `.tmp`-Dateien eines noch laufenden Backups aus. Robocopy-Exitcodes ab 8 gelten als Fehler;
+mit `-EnableException` (im Agent-Job automatisch) wirft die Funktion erst nach dem letzten Partner, ein Fehler bei einem Partner stoppt die anderen nicht.
+Im Agent-Job mit `New-sqmAgentCommandJob ... PrimaryOnly = $true` als Step nach dem Backup und als Nachhol-Job (Sa/So frueh) einrichten; auf einem
+Secondary tut der Step nichts. Neuer privater Helfer `Invoke-sqmRobocopy` (mockbar). 12 Unit-Tests. Live unter Windows PowerShell 5.1 geprueft: neuere Datei
+auf dem Ziel bleibt erhalten, `.tmp` wird nicht kopiert, Dateien nur auf dem Ziel bleiben liegen, zweiter Lauf kopiert nur das Neue. Noch nicht gegen ein echtes
+AG-Paar gelaufen (Partner-Ermittlung und Admin-Freigabe sind nur gemockt bzw. gegen localhost geprueft).
+
 ## [1.9.209.0] - 2026-11-02
 
 ### Geaendert: Standard-Logpfad liegt auf dem Installationslaufwerk des SQL Servers
