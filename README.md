@@ -100,7 +100,7 @@ Set-sqmConfig -UpdateMode Off         # no check
 ### AlwaysOn Availability Groups
 - `Sync-sqmLoginsToAlwaysOn` - Automated login synchronization
 - `Install-sqmStandardJob` - Standard Agent jobs (AgLoginSync, AgLoginCompare) in one call
-- `New-sqmAutoLoginSyncJob` - Shortcut for `Install-sqmStandardJob -Name AgLoginSync`
+- `New-sqmAlwaysOnLoginSyncJob` - Shortcut for `Install-sqmStandardJob -Name AgLoginSync`
 - `Get-sqmDistributedAgHealth` - Distributed AG status
 - `Get-sqmSpnReport` - SPN validation including listeners
 - `Complete-sqmListenerMigration` - Listener migration workflow

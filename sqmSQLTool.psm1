@@ -16,9 +16,33 @@
 # Neutrale Standardwerte fuer PSGallery-Nutzer.
 # Standortspezifische Werte kommen aus dem optionalen Standort-Profil (Schritt 1c).
 # =============================================================================
+# Standard-Arbeitsverzeichnis: <Installationslaufwerk des SQL Servers>:\sqm. Der Agent-Dienst darf
+# immer auf die Laufwerke des SQL Servers schreiben; unter C:\System (nur Administratoren/SYSTEM)
+# scheiterte das Logging und die Reports, sobald ein Agent-Job unter dem Dienstkonto lief.
+function Get-sqmDefaultWorkRoot
+{
+	$drive = $null
+	try
+	{
+		$base = 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server'
+		$names = Get-ItemProperty -Path "$base\Instance Names\SQL" -ErrorAction Stop
+		$ids = @($names.PSObject.Properties | Where-Object { $_.Name -notlike 'PS*' } |
+			Sort-Object { if ($_.Name -eq 'MSSQLSERVER') { 0 } else { 1 } }, Name | ForEach-Object { [string]$_.Value })
+		foreach ($id in $ids)
+		{
+			$sqlPath = (Get-ItemProperty -Path "$base\$id\Setup" -ErrorAction Stop).SQLPath
+			if ($sqlPath -match '^[A-Za-z]:') { $drive = $sqlPath.Substring(0, 2); break }
+		}
+	}
+	catch { }
+	if (-not $drive) { $drive = if ($env:SystemDrive) { $env:SystemDrive } else { 'C:' } }
+	return (Join-Path "$drive\" 'sqm')
+}
+$script:sqmDefaultWorkRoot = Get-sqmDefaultWorkRoot
+
 $script:sqmModuleConfig = @{
-	LogPath               = "C:\System\WinSrvLog\MSSQL"
-	OutputPath            = "C:\System\WinSrvLog\MSSQL"
+	LogPath               = (Join-Path $script:sqmDefaultWorkRoot 'Log')
+	OutputPath            = (Join-Path $script:sqmDefaultWorkRoot 'Output')
 	CentralPath           = $null
 	OlaJobNameFull                = "OlaHH-UserDatabases-FULL"
 	OlaJobNameDiff                = "OlaHH-UserDatabases-DIFF"
@@ -119,6 +143,10 @@ if (Test-Path $configFile)
 			# config.json geschrieben; dieser alte Wert ueberdeckte die echte Version, das Modul hielt
 			# sich fuer veraltet und bot bei jedem Start ein "Update" an, das nie half.
 			if ($key.Name -eq 'ModuleVersion') { continue }
+			# Der fruehere Standard C:\System\WinSrvLog\MSSQL steht oft nur deshalb in der
+			# config.json, weil Set-sqmConfig den Standard mitgeschrieben hat. Er gilt als
+			# nie angepasst und wird durch den neuen Standard ersetzt.
+			if ($key.Name -in 'LogPath', 'OutputPath' -and "$($key.Value)".TrimEnd('\') -ieq 'C:\System\WinSrvLog\MSSQL') { continue }
 			$script:sqmModuleConfig[$key.Name] = $key.Value
 		}
 		# Altkonfiguration: wer AutoUpdate=$true gesetzt hat (vor UpdateMode), behaelt das

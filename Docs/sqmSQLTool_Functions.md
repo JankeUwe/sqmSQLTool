@@ -88,7 +88,7 @@ Get-sqmHpuAllowGroup -EnableException
 Removes Windows logins whose Active Directory account no longer exists (AD orphans).
 
 Safe, deliberate cleanup of "dead" AD logins on a SQL Server instance. This is the manual
-    counterpart to the detection-only -AuditAdOrphans option of New-sqmAutoLoginSyncJob and is
+    counterpart to the detection-only -AuditAdOrphans option of New-sqmAlwaysOnLoginSyncJob and is
     intentionally NOT meant for unattended or scheduled use: a missing AD account can be a
     transient domain controller or trust problem, and dropping a valid login would cause an outage.
 
@@ -2122,7 +2122,7 @@ Invoke-sqmSaObfuscation -SqlInstance "SQL01" -NewName "hidden_sa" -PasswordLengt
 Removes Windows logins whose Active Directory account no longer exists (AD orphans).
 
 Safe, deliberate cleanup of "dead" AD logins on a SQL Server instance. This is the manual
-    counterpart to the detection-only -AuditAdOrphans option of New-sqmAutoLoginSyncJob and is
+    counterpart to the detection-only -AuditAdOrphans option of New-sqmAlwaysOnLoginSyncJob and is
     intentionally NOT meant for unattended or scheduled use: a missing AD account can be a
     transient domain controller or trust problem, and dropping a valid login would cause an outage.
 
@@ -4069,7 +4069,7 @@ Install-sqmStandardJob -Name AgLoginSync -AvailabilityGroupName 'AG_Prod' -Param
 ```powershell
 Install-sqmStandardJob -Name AgLoginCompare -ScheduleTime '07:30'
 
-### New-sqmAutoLoginSyncJob
+### New-sqmAlwaysOnLoginSyncJob
 
 Creates the SQL Agent job for the automatic AlwaysOn login sync (standard job AgLoginSync).
 
@@ -4094,10 +4094,10 @@ parameters. Existing jobs keep working; recreate them with -Force to switch to t
 **Examples (2):**
 
 ```powershell
-New-sqmAutoLoginSyncJob -SqlInstance "SQL01"
+New-sqmAlwaysOnLoginSyncJob -SqlInstance "SQL01"
 
 ```powershell
-New-sqmAutoLoginSyncJob -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -AuditAdOrphans -Force
+New-sqmAlwaysOnLoginSyncJob -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -AuditAdOrphans -Force
 
 ### Get-sqmAgentJobScheduleReport
 

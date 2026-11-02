@@ -24,7 +24,7 @@
 function Get-sqmDefaultOutputPath
 {
 	$path = Get-sqmConfig -Key 'OutputPath'
-	if (-not $path) { $path = 'C:\System\WinSrvLog\MSSQL' }
+	if (-not $path) { $path = Join-Path (Get-sqmDefaultWorkRoot) 'Output' }
 	return $path
 }
 

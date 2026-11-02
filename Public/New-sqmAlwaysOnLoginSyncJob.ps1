@@ -34,12 +34,12 @@ Do not create the failover alert on message 1480.
 Overwrites an existing job.
 
 .EXAMPLE
-New-sqmAutoLoginSyncJob -SqlInstance "SQL01"
+New-sqmAlwaysOnLoginSyncJob -SqlInstance "SQL01"
 
 .EXAMPLE
-New-sqmAutoLoginSyncJob -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -AuditAdOrphans -Force
+New-sqmAlwaysOnLoginSyncJob -SqlInstance "SQL01" -AvailabilityGroupName "ProdAG" -AuditAdOrphans -Force
 #>
-function New-sqmAutoLoginSyncJob
+function New-sqmAlwaysOnLoginSyncJob
 {
 	[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]
 	param (
@@ -79,3 +79,6 @@ function New-sqmAutoLoginSyncJob
 		Install-sqmStandardJob @installParams -WhatIf:$WhatIfPreference -Confirm:$false
 	}
 }
+
+# Backward compatibility: old name "New-sqmAutoLoginSyncJob" -> "New-sqmAlwaysOnLoginSyncJob"
+Set-Alias -Name 'New-sqmAutoLoginSyncJob' -Value 'New-sqmAlwaysOnLoginSyncJob' -Force

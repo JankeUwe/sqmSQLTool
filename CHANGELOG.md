@@ -1,5 +1,33 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.209.0] - 2026-11-02
+
+### Geaendert: Standard-Logpfad liegt auf dem Installationslaufwerk des SQL Servers
+
+Der Standard fuer `LogPath` und `OutputPath` war `C:\System\WinSrvLog\MSSQL`. Auf C:\System duerfen nur Administratoren und SYSTEM schreiben,
+das Dienstkonto des SQL Agents (bei AGs ein anderes als der Installateur) bekam dort "Keine Schreibrechte" und Agent-Jobs konnten weder loggen
+noch Reports ablegen. Der Agent darf auf die Laufwerke des SQL Servers immer schreiben, deshalb gilt jetzt `<Laufwerk der SQL-Installation>:\sqm\Log`
+und `<Laufwerk>:\sqm\Output`. Das Laufwerk kommt aus `SQLPath` der Standardinstanz (sonst der ersten Instanz) in der Registry, ohne SQL-Server-
+Installation das Systemlaufwerk. Ein in `config.json` stehender alter Standard `C:\System\WinSrvLog\MSSQL` wird nicht mehr uebernommen (er stand dort meist
+nur, weil Set-sqmConfig den Standard mitgeschrieben hat). Bewusst gesetzte andere Pfade und das Standort-Profil gelten weiter. Bereits vorhandene
+Logs bleiben am alten Ort liegen.
+
+### Behoben: Standard-Job (AgLoginSync) bei Anlage auf einem anderen Server
+
+- `New-sqmAgentCommandJob` schrieb den Wrapper und die Parameterdatei (.clixml) immer auf den lokalen Rechner. Bei einer Remote-Anlage fehlte die
+  Datei dort, wo der Agent den Step ausfuehrt. Jetzt wird der Zielserver aus der Instanz ermittelt und die Datei ueber die Admin-Freigabe (C$)
+  auf diesen Server geschrieben. Ist das Modul dort nicht installiert, kommt eine klare Fehlermeldung. Gegen DEV01 getestet (Dateien liegen
+  dort, Testjob wieder entfernt).
+- Der Name der Parameterdatei enthaelt jetzt den Instanznamen (`<Job>_<Instanz>_<Step>.clixml`). Zwei Instanzen auf einem Server mit gleichem
+  Jobnamen ueberschrieben sich vorher gegenseitig die Datei. Bestehende Jobs behalten ihren alten Dateinamen; beim Neuanlegen mit -Force wird der
+  neue verwendet.
+
+### Umbenannt: New-sqmAutoLoginSyncJob -> New-sqmAlwaysOnLoginSyncJob
+
+Der Name verriet nicht, dass der Job nur fuer Always On gilt (Union-Sync ueber AG-Replikate, Failover-Alert 1480). Die Funktion steht jetzt unter
+dem neuen Namen in der Kategorie Always On & Availability Groups, der alte Name bleibt als Alias erhalten.
+Hinweis: pro Instanz kann nur ein Alert auf Meldung 1480 existieren. Bei zwei AGs auf einer Instanz braucht der zweite Job einen eigenen
+`-JobName`; den Alert teilen sich beide nicht (der zweite meldet "Occupied").
 ## [1.9.208.0] - 2026-11-02
 
 ### Behoben: GUI zeigte bei Zahlenparametern einen "Browse..."-Button

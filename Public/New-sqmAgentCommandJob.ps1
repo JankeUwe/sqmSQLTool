@@ -111,8 +111,9 @@ New-sqmAgentCommandJob -SqlInstance 'SQL01' -SqlCredential $cred -JobName 'sqmCm
 .NOTES
 Requires dbatools, Invoke-sqmLogging (same module).
 The wrapper and per-step .clixml parameter files are written to
-C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs\ on $SqlInstance - run this ON the
-target instance, like the module's other job-generating functions.
+C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool\jobs\ on the server of $SqlInstance (local, or via the admin share for a
+remote server - the module must be installed there). The .clixml name contains the instance name, so several
+instances on one server do not overwrite each other.
 Auth model matches New-sqmRestoreDatabaseJob/New-sqmAlwaysOnRepairJob: no SQL credential is
 embedded - the job step runs as the SQL Agent service account (or an assigned job step proxy),
 which therefore needs whatever rights the target function(s) require.
@@ -254,12 +255,39 @@ function New-sqmAgentCommandJob
 			# ------------------------------------------------------------------
 			$modulePath = 'C:\Program Files\WindowsPowerShell\Modules\sqmSQLTool'
 			$jobsDir = Join-Path $modulePath 'jobs'
-			if (-not (Test-Path $jobsDir))
+
+			# Zielserver und Instanzname ermitteln. Die Dateien muessen auf dem Server liegen, auf dem
+			# der Agent den Job ausfuehrt: lokal direkt, sonst ueber die Admin-Freigabe (C$). Ohne das
+			# lag bei einer Remote-Anlage die .clixml auf dem falschen Rechner (Step: Datei nicht gefunden).
+			$targetHost = $env:COMPUTERNAME
+			$instanceTag = 'MSSQLSERVER'
+			try
 			{
-				New-Item -ItemType Directory -Path $jobsDir -Force -ErrorAction Stop | Out-Null
+				$ti = Invoke-DbaQuery @connParams -Database master -EnableException -Query "SELECT CAST(SERVERPROPERTY('ComputerNamePhysicalNetBIOS') AS nvarchar(128)) AS HostName, CAST(ISNULL(SERVERPROPERTY('InstanceName'), N'MSSQLSERVER') AS nvarchar(128)) AS InstanceName"
+				if ($ti.HostName) { $targetHost = [string]$ti.HostName }
+				if ($ti.InstanceName) { $instanceTag = [string]$ti.InstanceName }
+			}
+			catch
+			{
+				Invoke-sqmLogging -Message "Zielserver/Instanz nicht ermittelbar, nehme lokal an: $($_.Exception.Message)" -FunctionName $functionName -Level 'WARNING'
+			}
+
+			$writeJobsDir = $jobsDir
+			if ($targetHost -ne $env:COMPUTERNAME)
+			{
+				$writeJobsDir = "\\$targetHost\" + ($jobsDir -replace '^([A-Za-z]):', '$1$')
+				if (-not (Test-Path -LiteralPath (Split-Path $writeJobsDir -Parent)))
+				{
+					throw "Das Modul sqmSQLTool ist auf '$targetHost' nicht erreichbar ($(Split-Path $writeJobsDir -Parent)). Modul dort installieren und Admin-Freigabe/Rechte pruefen."
+				}
+			}
+			if (-not (Test-Path -LiteralPath $writeJobsDir))
+			{
+				New-Item -ItemType Directory -Path $writeJobsDir -Force -ErrorAction Stop | Out-Null
 			}
 
 			$genericInvokePath = Join-Path $jobsDir 'generic-invoke.ps1'
+			$genericInvokeWritePath = Join-Path $writeJobsDir 'generic-invoke.ps1'
 			$genericInvoke = @'
 param(
     [Parameter(Mandatory)][string]$FunctionName,
@@ -297,10 +325,10 @@ foreach ($opt in 'EnableException', 'Confirm') {
 exit 0
 '@
 
-			if ($PSCmdlet.ShouldProcess($genericInvokePath, "Generischen Wrapper schreiben"))
+			if ($PSCmdlet.ShouldProcess($genericInvokeWritePath, "Generischen Wrapper schreiben"))
 			{
 				# UTF-8 MIT BOM (Windows PowerShell 5.1 liest das Skript sonst evtl. falsch)
-				[System.IO.File]::WriteAllText($genericInvokePath, $genericInvoke, (New-Object System.Text.UTF8Encoding($true)))
+				[System.IO.File]::WriteAllText($genericInvokeWritePath, $genericInvoke, (New-Object System.Text.UTF8Encoding($true)))
 			}
 
 			# ------------------------------------------------------------------
@@ -369,12 +397,15 @@ exit 0
 				$entry = $resolved[$i]
 				$isLast = ($i -eq $resolved.Count - 1)
 
-				$safeName = ($JobName + '_' + $entry.StepName) -replace '[\\/:*?"<>|]', '_'
+				# Instanzname im Dateinamen: mehrere Instanzen auf einem Server (je eine AG) mit gleichem
+				# Jobnamen ueberschrieben sich sonst gegenseitig die Parameterdatei.
+				$safeName = ($JobName + '_' + $instanceTag + '_' + $entry.StepName) -replace '[\\/:*?"<>|]', '_'
 				$paramsPath = Join-Path $jobsDir "$safeName.clixml"
+				$paramsWritePath = Join-Path $writeJobsDir "$safeName.clixml"
 
-				if ($PSCmdlet.ShouldProcess($paramsPath, "Parameter fuer Step '$($entry.StepName)' serialisieren"))
+				if ($PSCmdlet.ShouldProcess($paramsWritePath, "Parameter fuer Step '$($entry.StepName)' serialisieren"))
 				{
-					$entry.Parameters | Export-Clixml -Path $paramsPath -Force
+					$entry.Parameters | Export-Clixml -Path $paramsWritePath -Force
 				}
 
 				# WICHTIG: NICHT '$command' nennen - kollidiert case-insensitiv mit dem typisierten

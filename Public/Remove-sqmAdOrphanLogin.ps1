@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Safe, deliberate cleanup of "dead" AD logins on a SQL Server instance. This is the manual
-    counterpart to the detection-only -AuditAdOrphans option of New-sqmAutoLoginSyncJob and is
+    counterpart to the detection-only -AuditAdOrphans option of New-sqmAlwaysOnLoginSyncJob and is
     intentionally NOT meant for unattended or scheduled use: a missing AD account can be a
     transient domain controller or trust problem, and dropping a valid login would cause an outage.
 

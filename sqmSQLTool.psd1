@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.9.208.0'
+	ModuleVersion		   = '1.9.209.0'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
@@ -224,7 +224,7 @@
 		'New-sqmOlaMaintenanceJobs',
 		'New-sqmOlaSysDbBackupJob',
 		'New-sqmOlaUsrDbBackupJob',
-		'New-sqmAutoLoginSyncJob',
+		'New-sqmAlwaysOnLoginSyncJob',
 		'New-sqmPreferredPrimaryJob',
 		'New-sqmRandomSaPassword',
 		'New-sqmRestoreDatabaseJob',
@@ -299,7 +299,7 @@
 	# Ausnahme: Set-sqmSqlDirectoryPermissions -> Invoke-sqmNtfsSetup (Alias fuer bessere
 	# Auffindbarkeit unter Get-Command -Noun *DirectoryPermissions* / *Permission*; siehe
 	# Set-Alias am Ende von Public\Invoke-sqmNtfsSetup.ps1)
-	AliasesToExport	       = @('Set-sqmSqlDirectoryPermissions', 'Prepare-sqmListenerForMigration')
+	AliasesToExport	       = @('Set-sqmSqlDirectoryPermissions', 'Prepare-sqmListenerForMigration', 'New-sqmAutoLoginSyncJob')
 	
 	# List of all modules packaged with this module
 	ModuleList			   = @()

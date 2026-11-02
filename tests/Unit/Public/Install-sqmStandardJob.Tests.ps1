@@ -1,7 +1,7 @@
 ﻿#Requires -Modules Pester
 <#
 .SYNOPSIS
-    Unit Tests fuer Install-sqmStandardJob und New-sqmAutoLoginSyncJob.
+    Unit Tests fuer Install-sqmStandardJob und New-sqmAlwaysOnLoginSyncJob.
     New-sqmAgentCommandJob wird gemockt - getestet wird, WAS an Job, Step-Parametern und
     Zeitplan erzeugt wuerde.
 #>
@@ -162,7 +162,7 @@ Describe 'Install-sqmStandardJob' {
     }
 }
 
-Describe 'New-sqmAutoLoginSyncJob' {
+Describe 'New-sqmAlwaysOnLoginSyncJob' {
     BeforeAll {
         Mock -ModuleName sqmSQLTool Invoke-sqmLogging { }
         Mock -ModuleName sqmSQLTool New-sqmAgentCommandJob {
@@ -172,12 +172,12 @@ Describe 'New-sqmAutoLoginSyncJob' {
     }
 
     It 'Reicht -NoFailoverAlert durch' {
-        New-sqmAutoLoginSyncJob -SqlInstance 'SQL01' -NoFailoverAlert | Out-Null
+        New-sqmAlwaysOnLoginSyncJob -SqlInstance 'SQL01' -NoFailoverAlert | Out-Null
         Should -Invoke -ModuleName sqmSQLTool Invoke-DbaQuery -Exactly 0 -ParameterFilter { $Query -match 'sp_add_alert' }
     }
 
     It 'Installiert den Standard-Job AgLoginSync unter dem bisherigen Jobnamen' {
-        $r = New-sqmAutoLoginSyncJob -SqlInstance 'SQL01' -AvailabilityGroupName 'AG1' -AuditAdOrphans -BackupRetentionDays 14 -Force
+        $r = New-sqmAlwaysOnLoginSyncJob -SqlInstance 'SQL01' -AvailabilityGroupName 'AG1' -AuditAdOrphans -BackupRetentionDays 14 -Force
         $r.Name | Should -Be 'AgLoginSync'
         Should -Invoke -ModuleName sqmSQLTool New-sqmAgentCommandJob -Exactly 1 -ParameterFilter {
             $JobName -eq 'sqmAutoLoginSync' -and $Force -eq $true -and

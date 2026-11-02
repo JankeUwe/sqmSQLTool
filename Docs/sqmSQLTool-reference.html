@@ -167,7 +167,7 @@
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-invokesqmsqlalwaysonautoseeding')">Invoke-sqmSqlAlwaysOnAutoseeding</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-movesqmalwaysonlistener')">Move-sqmAlwaysOnListener</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmalwaysonrepairjob')">New-sqmAlwaysOnRepairJob</span></li>
-<li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmautologinsyncjob')">New-sqmAutoLoginSyncJob</span></li>
+<li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmautologinsyncjob')">New-sqmAlwaysOnLoginSyncJob</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmavailabilitygroup')">New-sqmAvailabilityGroup</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-newsqmpreferredprimaryjob')">New-sqmPreferredPrimaryJob</span></li>
 <li><span class="psdb-st-nav-func" onclick="psstJump('f-removesqmdatabasefromag')">Remove-sqmDatabaseFromAG</span></li>
@@ -863,19 +863,19 @@ Invoke-sqmSqlAlwaysOnAutoseeding -All</pre><button class="psdb-st-copy-btn" oncl
 
 	<div class="psdb-st-func-card" id="f-newsqmautologinsyncjob">
 	<div class="psdb-st-func-header">
-	<span class="psdb-st-func-name">New-sqmAutoLoginSyncJob</span>
+	<span class="psdb-st-func-name">New-sqmAlwaysOnLoginSyncJob</span>
 	<span class="psdb-st-badge psdb-st-badge-alwayson">AlwaysOn</span>
 	</div>
 	<div class="psdb-st-func-desc">Creates a SQL Agent job to automatically synchronize logins in an AlwaysOn Availability Group.</div>
 	<div class="psdb-st-examples-toggle" onclick="psstToggleEx(this)">▶ Show 2 examples</div>
 	<div class="psdb-st-examples">
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">New-sqmAutoLoginSyncJob -SqlInstance &quot;SQL01&quot;</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">New-sqmAutoLoginSyncJob -SqlInstance &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example-label">New-sqmAlwaysOnLoginSyncJob -SqlInstance &quot;SQL01&quot;</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">New-sqmAlwaysOnLoginSyncJob -SqlInstance &quot;SQL01&quot;</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	<div class="psdb-st-example">
-	<div class="psdb-st-example-label">New-sqmAutoLoginSyncJob -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -AuditAdOrphans -Force</div>
-	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">New-sqmAutoLoginSyncJob -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -AuditAdOrphans -Force</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
+	<div class="psdb-st-example-label">New-sqmAlwaysOnLoginSyncJob -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -AuditAdOrphans -Force</div>
+	<div class="psdb-st-pre-wrap"><pre class="psdb-st-code">New-sqmAlwaysOnLoginSyncJob -SqlInstance &quot;SQL01&quot; -AvailabilityGroupName &quot;ProdAG&quot; -AuditAdOrphans -Force</pre><button class="psdb-st-copy-btn" onclick="psstCopy(this)">copy</button></div>
 	</div>
 	</div>
 	</div>
@@ -6101,7 +6101,7 @@ Get-Command -Module sqmSQLTool | Measure-Object</pre>
 	<tr><td class="psdb-st-ov-fn">New-sqmAgentCommandJob</td><td>Creates or extends a SQL Server Agent job that runs one or more sqmSQLTool functions as CmdExec steps, with parameters passed via a generic, reusable wrapper (no PowerShell-source string- building of parameter values).</td></tr>
 	<tr><td class="psdb-st-ov-fn">New-sqmAgentProxy</td><td>Creates a SQL Server credential and a SQL Agent proxy and links them together.</td></tr>
 	<tr><td class="psdb-st-ov-fn">New-sqmAlwaysOnRepairJob</td><td>Creates a SQL Server Agent job that regularly runs Repair-sqmAlwaysOnDatabases.</td></tr>
-	<tr><td class="psdb-st-ov-fn">New-sqmAutoLoginSyncJob</td><td>Creates a SQL Agent job to automatically synchronize logins in an AlwaysOn Availability Group.</td></tr>
+	<tr><td class="psdb-st-ov-fn">New-sqmAlwaysOnLoginSyncJob</td><td>Creates a SQL Agent job to automatically synchronize logins in an AlwaysOn Availability Group.</td></tr>
 	<tr><td class="psdb-st-ov-fn">New-sqmAvailabilityGroup</td><td>Creates an AlwaysOn Availability Group on an existing Windows Server Failover Cluster (WSFC).</td></tr>
 	<tr><td class="psdb-st-ov-fn">New-sqmBackupMaintenanceJob</td><td>Creates a SQL Agent job with two steps that implement the full dynamic backup maintenance workflow.</td></tr>
 	<tr><td class="psdb-st-ov-fn">New-sqmCertificateRequest</td><td>Creates a new certificate signing request (CSR) for SQL Server TLS.</td></tr>

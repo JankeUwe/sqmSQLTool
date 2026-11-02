@@ -13,7 +13,7 @@ function Test-sqmLoggingPath
 {
 	[CmdletBinding()]
 	param (
-		[string]$Path = "C:\system\WinSrvLog\MSSQL"
+		[string]$Path = (Join-Path (Get-sqmDefaultWorkRoot) 'Log')
 	)
 	
 	try
