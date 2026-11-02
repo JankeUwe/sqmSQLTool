@@ -1,5 +1,25 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.203.0] - 2026-11-02
+
+### Neu: Get-sqmTsmConfiguration wertet Include/Exclude-Dateien aus und erzeugt einen HTML-Report
+
+Die dsm.opt verweist per `INCLEXCL` auf eine ausgelagerte Datei (z.B. `ie_dsm.opt`). Die Funktion las bisher nur die dsm.opt, und weil
+die Optionen in einer Hashtable landeten, ging bei mehrfach vorkommendem `INCLEXCL` alles bis auf den letzten Eintrag verloren.
+Die Rueckgabe war als Objekt mit Hashtable und Rohzeilen kaum lesbar.
+
+- Alle `INCLEXCL`/`INCLEXCL.*`-Optionen werden verfolgt, relative Namen gegen das Verzeichnis der Optionsdatei aufgeloest, bei
+  `-ComputerName` ueber den Admin-Share (mit `-Credential` wie bei der dsm.opt). `-InclExclPath` uebersteuert die Auswertung.
+- Regeln (`INCLUDE`, `EXCLUDE`, `EXCLUDE.DIR`, `INCLUDE.FILE` usw.) werden mit Zeilennummer, Muster in Anfuehrungszeichen und
+  Managementklasse geparst. Sonstige Zeilen der Include-Datei erscheinen als `OTHER`.
+- Eine nicht lesbare Include-Datei bricht nicht mehr ab: `Found = $false` mit `ErrorMessage`, der Report weist sie rot aus.
+- Neue Rueckgabe-Eigenschaften: `OptionList` (alle Optionen in Dateireihenfolge, auch doppelte), `InclExclFiles`, `InclExclRules`,
+  `ComputerName`, `ReportFile`. Bestehende Eigenschaften bleiben unveraendert.
+- Neu: HTML- und TXT-Report (`-OutputPath`, Standard `<Ausgabepfad>\Get-sqmTsmConfiguration`, `-NoOpen`, `-NoReport`) mit Kacheln
+  (Server, Port, Knoten, Dateien, Regelanzahl), Hinweisen, Verbindungsoptionen, Regeltabelle je Datei und allen Optionen.
+  Das Kennwort wird im Report immer maskiert; ein Klartext-`PASSWORD` in der dsm.opt wird als Hinweis genannt.
+- Neue Unit Tests `TsmConfiguration.Tests.ps1` (6 Tests). Mit einer echten dsm.opt/ie_dsm.opt unter Windows PowerShell 5.1 geprueft.
+  Nicht geprueft: Remote-Zugriff ueber `-ComputerName`/`-Credential` auf die Include-Datei.
 ## [1.9.202.0] - 2026-11-01
 
 ### Neu: Config Drift - alle Konfigurationsoptionen und Trace Flags, Baselines ueber die Zeit
