@@ -34,7 +34,7 @@ function Get-sqmDefaultWorkRoot
 			if ($sqlPath -match '^[A-Za-z]:') { $drive = $sqlPath.Substring(0, 2); break }
 		}
 	}
-	catch { }
+	catch { $drive = $null }
 	if (-not $drive) { $drive = if ($env:SystemDrive) { $env:SystemDrive } else { 'C:' } }
 	return (Join-Path "$drive\" 'sqm')
 }
