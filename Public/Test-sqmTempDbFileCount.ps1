@@ -122,7 +122,7 @@ function Test-sqmTempDbFileCount
             else
             {
                 $status  = 'Warning'
-                $message = "TempDB Datendateien: $fileCount - empfohlen sind $recommendedCount ($logicalCores logische Kerne, max $MaxFiles). Bitte anpassen."
+                $message = "TempDB Datendateien: $fileCount - empfohlen sind $recommendedCount ($logicalCores logische Kerne, max $MaxFiles). Bitte anpassen (Set-sqmTempDbFileCount)."
                 Write-Host "  WARN $message" -ForegroundColor Yellow
             }
 

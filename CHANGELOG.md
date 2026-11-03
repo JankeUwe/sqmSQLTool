@@ -1,5 +1,17 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.215.0] - 2026-11-03
+
+### Neu: Set-sqmTempDbFileCount
+
+Gegenstueck zu `Test-sqmTempDbFileCount`: legt fehlende TempDB-Datendateien online an (`ALTER DATABASE tempdb ADD FILE`, kein Neustart). Ohne `-FileCount` gilt die Empfehlung des Tests:
+min(logische Kerne der Zielinstanz, MaxFiles). Neue Dateien bekommen die Groesse der groessten vorhandenen Datei, dieselbe feste Autogrowth-Schrittweite wie die erste Datei (bei Prozentwachstum
+64 MB, oder `-FileGrowthMB`), liegen im Ordner der ersten Datei (oder `-Path`) und heissen wie bei der Installation (`temp9`, `tempdb_mssql_9.ndf`); belegte Namen und Pfade werden uebersprungen.
+`-EqualizeSize` ruft danach `Set-sqmTempDbFileSize` auf und bringt auch die kleineren vorhandenen Dateien auf dieselbe Groesse. Vorabpruefung: freier Platz auf dem Ziellaufwerk, sonst Abbruch ohne
+Aenderung. `-WhatIf` wird beachtet. Entfernen von Dateien ist bewusst nicht enthalten (eine benutzte Datei laesst sich online nicht leeren, live auf DEV01 bestaetigt: EMPTYFILE scheitert);
+ist die Anzahl schon hoeher als gewuenscht, kommt `Skipped`. 11 Unit-Tests, live gegen SQL Server 2022 (DEV01, Windows PowerShell 5.1): WhatIf, Anlegen, zweiter Lauf = Skipped.
+Die Warnung von `Test-sqmTempDbFileCount` nennt die neue Funktion.
+
 ## [1.9.214.0] - 2026-11-03
 
 ### Behoben: Set-sqmMaxDop meldete Error, obwohl MAXDOP gesetzt war
