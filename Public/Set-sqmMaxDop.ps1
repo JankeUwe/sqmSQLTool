@@ -102,7 +102,8 @@ function Set-sqmMaxDop
 		if ($SqlCredential) { $connArgs['SqlCredential'] = $SqlCredential }
 
 		# Empfehlung bestimmen
-		$cpuCount = (Get-WmiObject -Class Win32_ComputerSystem -ErrorAction Stop).NumberOfLogicalProcessors
+		# CPUs der Zielinstanz (nicht des lokalen Rechners)
+		$cpuCount = [int](Invoke-DbaQuery @connArgs -Query 'SELECT cpu_count AS Cpu FROM sys.dm_os_sys_info' -As PSObject -EnableException).Cpu
 		$result.LogicalCPUs = $cpuCount
 		$targetDop = if ($PSBoundParameters.ContainsKey('MaxDop')) { $MaxDop } else { [math]::Min(8, $cpuCount) }
 		$result.NewMaxDop = $targetDop
@@ -129,14 +130,22 @@ function Set-sqmMaxDop
 			return $result
 		}
 
-		$null = Set-DbaSpConfigure @connArgs -Name 'max degree of parallelism' -Value $targetDop -EnableException
-		if (-not $SkipCostThreshold)
+		# Set-DbaSpConfigure wirft bei unveraendertem Wert ("Value to set is the same as the existing value"):
+		# nur Werte setzen, die sich wirklich aendern.
+		$changed = 0
+		if ($result.PreviousMaxDop -ne $targetDop)
+		{
+			$null = Set-DbaSpConfigure @connArgs -Name 'max degree of parallelism' -Value $targetDop -EnableException
+			$changed++
+		}
+		if (-not $SkipCostThreshold -and $result.PreviousCostThreshold -ne $CostThreshold)
 		{
 			$null = Set-DbaSpConfigure @connArgs -Name 'cost threshold for parallelism' -Value $CostThreshold -EnableException
+			$changed++
 		}
 
 		$result.Status  = 'Success'
-		$result.Message = "Gesetzt: $planMsg"
+		$result.Message = if ($changed -eq 0) { "Keine Aenderung noetig, bereits gesetzt: $planMsg" } else { "Gesetzt: $planMsg" }
 		_Log $result.Message 'INFO'
 	}
 	catch

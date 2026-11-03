@@ -1,5 +1,15 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.214.0] - 2026-11-03
+
+### Behoben: Set-sqmMaxDop meldete Error, obwohl MAXDOP gesetzt war
+
+`Set-DbaSpConfigure -EnableException` wirft "Value to set is the same as the existing value. No work being performed.", sobald ein Wert schon dem Ziel entspricht. Aenderte sich nur MAXDOP
+und stand der Cost Threshold schon auf 50 (oder umgekehrt, oder lief die Funktion ein zweites Mal), brach die Funktion ab und meldete `Status = Error`, obwohl der erste Wert bereits gesetzt war.
+Jetzt wird nur gesetzt, was sich aendert; ist alles schon richtig, kommt `Success` mit "Keine Aenderung noetig".
+Ausserdem werden die logischen CPUs jetzt von der Zielinstanz gelesen (`sys.dm_os_sys_info`) statt vom lokalen Rechner per WMI; bei Remote-Aufruf lag die MAXDOP-Empfehlung sonst auf der CPU-Zahl
+des Admin-Rechners. Live gegen SQL Server 2022 (DEV01, Windows PowerShell 5.1) geprueft: kein Wert geaendert, nur MAXDOP geaendert, beide geaendert.
+
 ## [1.9.213.0] - 2026-11-03
 
 ### Behoben: Test-sqmTempDbFileCount meldete immer 1 logischen Kern
