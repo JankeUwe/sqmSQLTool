@@ -6481,6 +6481,7 @@ Per database: (1) users whose SID matches no login but whose name matches a logi
 - **-ExcludeDatabase** - Databases to exclude, wildcards allowed.
 - **-TargetRecoveryTimeSeconds** - Value for TARGET_RECOVERY_TIME (default: 60).
 - **-IncludeUsersWithoutLogin** - Also drop users deliberately created WITHOUT LOGIN.
+- **-EnableAcceleratedRecovery** - Also switch on Accelerated Database Recovery (step 6, SQL Server 2019+). Off by default: ADR adds a persistent version store that must be monitored. Never switched off by this function.
 - **-SkipOrphanRepair / -SkipUserRemoval / -SkipCompatibilityLevel / -SkipTargetRecoveryTime / -SkipOwner** - Switch off individual steps.
 - **-OutputPath** - Directory for the CSV change log (default: <module OutputPath>\DatabaseStandardization).
 - **-ContinueOnError** - Continue with the next instance on error.

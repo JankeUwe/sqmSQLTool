@@ -1,5 +1,17 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.212.0] - 2026-11-03
+
+### Erweitert: Invoke-sqmDatabaseStandardization - optional Accelerated Database Recovery
+
+Neuer Schalter `-EnableAcceleratedRecovery` (Schritt 6): `ALTER DATABASE ... SET ACCELERATED_DATABASE_RECOVERY = ON`. ADR gehoert bewusst **nicht** zum Standardumfang:
+es legt in jeder Datenbank einen Persistent Version Store (PVS) an, der wachsen kann, wenn eine lange Transaktion oder ein alter Snapshot die Bereinigung blockiert, und es kostet
+bei update-/delete-lastigen Workloads zusaetzliche I/O. Sinnvoll fuer Datenbanken mit langen Transaktionen oder Log-Truncation-Problemen (danach `sys.dm_tran_persistent_version_store_stats`
+beobachten). Ohne den Schalter aendert sich nichts, auch ein bereits eingeschaltetes ADR bleibt unangetastet; ausgeschaltet wird es von der Funktion nie. Datenbanken mit ADR = ON
+stehen als `Skipped` im Ergebnis, ebenso alle Datenbanken auf Servern vor SQL 2019 (die Spalte `is_accelerated_database_recovery_on` wird dort gar nicht erst abgefragt). `-WhatIf`
+wird beachtet; AG-Secondaries, Offline- und Read-only-Datenbanken werden wie bisher uebersprungen. 5 neue Unit-Tests. Live unter Windows PowerShell 5.1 gegen SQL Server 2022
+geprueft (WhatIf, einschalten, zweiter Lauf = Skipped, Lauf ohne Schalter = keine ADR-Zeile).
+
 ## [1.9.211.0] - 2026-11-02
 
 ### Neu: Copy-sqmBackupToArchive

@@ -220,6 +220,70 @@ Describe 'Invoke-sqmDatabaseStandardization - Verhalten' {
 		}
 	}
 
+	It 'schaltet ADR standardmaessig nicht ein' {
+		InModuleScope sqmSQLTool {
+			Set-StdMocks
+
+			$r = Invoke-sqmDatabaseStandardization -SqlInstance 'SQL01' -OutputPath $TestDrive -Confirm:$false
+
+			$r | Where-Object Step -eq 'AcceleratedRecovery' | Should -BeNullOrEmpty
+			$script:stdQueries | Where-Object { $_ -match 'ACCELERATED_DATABASE_RECOVERY =' } | Should -BeNullOrEmpty
+		}
+	}
+
+	It 'schaltet ADR mit -EnableAcceleratedRecovery ein' {
+		InModuleScope sqmSQLTool {
+			Set-StdMocks
+
+			$r = Invoke-sqmDatabaseStandardization -SqlInstance 'SQL01' -OutputPath $TestDrive -EnableAcceleratedRecovery -Confirm:$false
+
+			($r | Where-Object Step -eq 'AcceleratedRecovery').Status | Should -Be 'OK'
+			$script:stdQueries | Where-Object { $_ -match 'ALTER DATABASE \[AppDb\] SET ACCELERATED_DATABASE_RECOVERY = ON;' } | Should -Not -BeNullOrEmpty
+		}
+	}
+
+	It 'laesst eine Datenbank mit eingeschaltetem ADR unberuehrt' {
+		InModuleScope sqmSQLTool {
+			Set-StdMocks
+			$script:stdDbRow | Add-Member -NotePropertyName is_adr_on -NotePropertyValue 1
+
+			$r = Invoke-sqmDatabaseStandardization -SqlInstance 'SQL01' -OutputPath $TestDrive -EnableAcceleratedRecovery -Confirm:$false
+
+			($r | Where-Object Step -eq 'AcceleratedRecovery').Status | Should -Be 'Skipped'
+			$script:stdQueries | Where-Object { $_ -match 'ACCELERATED_DATABASE_RECOVERY =' } | Should -BeNullOrEmpty
+		}
+	}
+
+	It 'meldet ADR auf einem Server vor 2019 als Skipped und fragt die Spalte nicht ab' {
+		InModuleScope sqmSQLTool {
+			Set-StdMocks
+			Mock Invoke-DbaQuery {
+				$script:stdQueries.Add($Query)
+				if ($Query -match 'MICROSOFTVERSION') { return [PSCustomObject]@{ ServerCompatibilityLevel = 140; SaName = 'sa' } }
+				if ($Query -match 'FROM sys\.databases d') { return $script:stdDbRow }
+				if ($Query -match "SELECT 'Schema' AS Kind") { return @() }
+				return $null
+			}
+
+			$r = Invoke-sqmDatabaseStandardization -SqlInstance 'SQL01' -OutputPath $TestDrive -EnableAcceleratedRecovery -Confirm:$false
+
+			($r | Where-Object Step -eq 'AcceleratedRecovery').Status | Should -Be 'Skipped'
+			$script:stdQueries | Where-Object { $_ -match 'is_accelerated_database_recovery_on' } | Should -BeNullOrEmpty
+			$script:stdQueries | Where-Object { $_ -match 'ACCELERATED_DATABASE_RECOVERY =' } | Should -BeNullOrEmpty
+		}
+	}
+
+	It 'aendert ADR unter -WhatIf nicht' {
+		InModuleScope sqmSQLTool {
+			Set-StdMocks
+
+			$r = Invoke-sqmDatabaseStandardization -SqlInstance 'SQL01' -OutputPath $TestDrive -EnableAcceleratedRecovery -WhatIf
+
+			($r | Where-Object Step -eq 'AcceleratedRecovery').Status | Should -Be 'WhatIf'
+			$script:stdQueries | Where-Object { $_ -match 'ACCELERATED_DATABASE_RECOVERY =' } | Should -BeNullOrEmpty
+		}
+	}
+
 	It 'maskiert Namen mit ] und Hochkomma korrekt' {
 		InModuleScope sqmSQLTool {
 			Set-StdMocks

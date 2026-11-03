@@ -2,7 +2,8 @@
 .SYNOPSIS
     Brings one or more user databases to the house standard: orphaned users repaired, users without
     login removed, compatibility level raised to the server's level, TARGET_RECOVERY_TIME set to
-    60 seconds and the owner set to sa.
+    60 seconds and the owner set to sa. Optionally (-EnableAcceleratedRecovery) Accelerated Database
+    Recovery switched on.
 
 .DESCRIPTION
     Typical use: after a restore, a migration or an in-place upgrade. Invoke-sqmRestoreDatabase calls
@@ -39,6 +40,15 @@
       5. DatabaseOwner
          Owner set to the sa account, determined via SID 0x01 (works when sa has been renamed).
 
+      6. AcceleratedRecovery (opt-in, only with -EnableAcceleratedRecovery)
+         ALTER DATABASE ... SET ACCELERATED_DATABASE_RECOVERY = ON. Needs SQL Server 2019 or later;
+         older servers get a Skipped row. ADR is deliberately NOT part of the default standard:
+         it adds a persistent version store (PVS) to every database that can grow when a long
+         transaction or an old snapshot blocks its cleanup, and it costs extra I/O on update/delete
+         heavy workloads. Switch it on for databases with long transactions or log truncation
+         problems, and monitor sys.dm_tran_persistent_version_store_stats afterwards. It is never
+         switched off by this function.
+
     Skipped entirely: databases that are not ONLINE, read-only databases, secondary replicas of an
     availability group (changes there must be made on the primary) and database snapshots.
     System databases are never processed.
@@ -63,6 +73,10 @@
 
 .PARAMETER IncludeUsersWithoutLogin
     Also drop users that were deliberately created WITHOUT LOGIN. Default: they are kept.
+
+.PARAMETER EnableAcceleratedRecovery
+    Also switch on Accelerated Database Recovery (step 6). Default: off, ADR is left as it is.
+    Requires SQL Server 2019 or later. Databases that already have ADR on are reported as Skipped.
 
 .PARAMETER SkipOrphanRepair
     Skip step 1 (re-mapping orphaned users).
@@ -101,13 +115,17 @@
     Invoke-sqmDatabaseStandardization -SqlInstance 'SQL01' -Database 'App*' -SkipCompatibilityLevel
 
 .EXAMPLE
+    # Standard plus Accelerated Database Recovery for one database with long transactions
+    Invoke-sqmDatabaseStandardization -SqlInstance 'SQL01' -Database 'ScomDW' -EnableAcceleratedRecovery
+
+.EXAMPLE
     # Several instances, only failures
     'SQL01','SQL02' | Invoke-sqmDatabaseStandardization -Confirm:$false | Where-Object Status -eq 'Failed'
 
 .NOTES
     Requires: dbatools, Invoke-sqmLogging, Get-sqmDefaultOutputPath, Copy-sqmToCentralPath
     Needs: sysadmin on the instance. SQL Server 2012 or later (authentication_type,
-    TARGET_RECOVERY_TIME, sys.databases.replica_id).
+    TARGET_RECOVERY_TIME, sys.databases.replica_id); step 6 needs SQL Server 2019 or later.
     See also: Set-sqmDatabaseOwner, Invoke-sqmRestoreDatabase, Sync-sqmDatabaseLogins
 #>
 function Invoke-sqmDatabaseStandardization
@@ -128,6 +146,8 @@ function Invoke-sqmDatabaseStandardization
 		[int]$TargetRecoveryTimeSeconds = 60,
 		[Parameter(Mandatory = $false)]
 		[switch]$IncludeUsersWithoutLogin,
+		[Parameter(Mandatory = $false)]
+		[switch]$EnableAcceleratedRecovery,
 		[Parameter(Mandatory = $false)]
 		[switch]$SkipOrphanRepair,
 		[Parameter(Mandatory = $false)]
@@ -203,12 +223,17 @@ SELECT (@@MICROSOFTVERSION / 16777216) * 10 AS ServerCompatibilityLevel,
 				# -------------------------------------------------------------------
 				# 2. Datenbanken ermitteln
 				# -------------------------------------------------------------------
+				# is_accelerated_database_recovery_on gibt es erst ab SQL Server 2019 (Stufe 150);
+				# auf aelteren Servern wuerde die Spalte die ganze Abfrage scheitern lassen.
+				$adrSupported = ($serverCompatLevel -ge 150)
+				$adrColumn = if ($adrSupported) { 'CAST(d.is_accelerated_database_recovery_on AS int)' } else { '0' }
 				$dbRows = @(Invoke-DbaQuery @connParams -Database 'master' -EnableException -ErrorAction Stop -Query @"
 SELECT d.name,
        d.state_desc,
        CAST(d.is_read_only AS int) AS is_read_only,
        d.compatibility_level,
        d.target_recovery_time_in_seconds,
+       $adrColumn AS is_adr_on,
        CAST(CASE WHEN d.owner_sid = 0x01 THEN 1 ELSE 0 END AS int) AS owner_is_sa,
        ISNULL(SUSER_SNAME(d.owner_sid), '<unbekannt: ' + CONVERT(varchar(200), d.owner_sid, 1) + '>') AS owner_name,
        CAST(CASE WHEN d.replica_id IS NOT NULL AND EXISTS (
@@ -248,7 +273,7 @@ ORDER BY d.name
 				Invoke-sqmLogging -Message ("[$instance] $($dbRows.Count) Datenbank(en) zu pruefen.") -FunctionName $functionName -Level "INFO"
 
 				# -------------------------------------------------------------------
-				# 3. Pro Datenbank die fuenf Schritte
+				# 3. Pro Datenbank die Schritte
 				# -------------------------------------------------------------------
 				foreach ($db in $dbRows)
 				{
@@ -524,6 +549,36 @@ COMMIT TRANSACTION;
 						else
 						{
 							& $addRow 'DatabaseOwner' $dbName $currentOwner $saName 'WhatIf' "Wuerde gesetzt."
+						}
+					}
+
+					# ---- Schritt 6: Accelerated Database Recovery (nur auf Wunsch) ----
+					if ($EnableAcceleratedRecovery)
+					{
+						if (-not $adrSupported)
+						{
+							& $addRow 'AcceleratedRecovery' $dbName $null $null 'Skipped' "ADR gibt es erst ab SQL Server 2019 (Server-Stufe $serverCompatLevel)."
+						}
+						elseif ([int]$db.is_adr_on -eq 1)
+						{
+							& $addRow 'AcceleratedRecovery' $dbName 'ON' 'ON' 'Skipped' "ADR ist bereits eingeschaltet."
+						}
+						elseif ($PSCmdlet.ShouldProcess("[$instance] $dbName", "ACCELERATED_DATABASE_RECOVERY OFF -> ON"))
+						{
+							try
+							{
+								Invoke-DbaQuery @connParams -Database 'master' -EnableException -ErrorAction Stop -Query "ALTER DATABASE $dbQuoted SET ACCELERATED_DATABASE_RECOVERY = ON;"
+								& $addRow 'AcceleratedRecovery' $dbName 'OFF' 'ON' 'OK' "Eingeschaltet. Persistent Version Store ueberwachen (sys.dm_tran_persistent_version_store_stats)."
+							}
+							catch
+							{
+								& $addRow 'AcceleratedRecovery' $dbName 'OFF' 'ON' 'Failed' $_.Exception.Message
+								if ($EnableException) { throw }
+							}
+						}
+						else
+						{
+							& $addRow 'AcceleratedRecovery' $dbName 'OFF' 'ON' 'WhatIf' "Wuerde eingeschaltet."
 						}
 					}
 				}
