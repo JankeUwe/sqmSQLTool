@@ -97,8 +97,9 @@ function Test-sqmTempDbFileCount
             }
 
             # Logische CPU-Kerne ermitteln (max MaxFiles)
-            $logicalCores = ($server.Processors | Measure-Object).Count
-            if ($logicalCores -eq 0)
+            # SMO liefert Server.Processors als Zahl (nicht als Collection): kein Measure-Object.Count (ergaebe immer 1)
+            $logicalCores = [int]$server.Processors
+            if ($logicalCores -le 0)
             {
                 # Fallback: WMI lokal
                 $logicalCores = (Get-CimInstance Win32_Processor |

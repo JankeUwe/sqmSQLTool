@@ -1,5 +1,13 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.213.0] - 2026-11-03
+
+### Behoben: Test-sqmTempDbFileCount meldete immer 1 logischen Kern
+
+`Server.Processors` liefert in SMO eine Zahl, keine Collection. `($server.Processors | Measure-Object).Count` ergibt bei einer einzelnen Zahl immer 1, daher war die empfohlene
+Dateianzahl auf jedem Server 1 (z.B. "empfohlen sind 1 (1 logische Kerne)" bei 4 Kernen), waehrend `Get-sqmTempDbRecommendation` und der Health-Report korrekt 4 nannten.
+Jetzt wird der Wert direkt als `[int]` gelesen; der WMI-Fallback greift bei 0.
+
 ## [1.9.212.0] - 2026-11-03
 
 ### Erweitert: Invoke-sqmDatabaseStandardization - optional Accelerated Database Recovery
