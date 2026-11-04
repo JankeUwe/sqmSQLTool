@@ -1297,6 +1297,31 @@ Copy-sqmBackupToArchive -Destination "\fileserver\sqlarchiv" -Period Month -What
 New-sqmAgentCommandJob -SqlInstance "SQL01" -JobName "Archiv_Monatsende" -ScheduleType Daily -ScheduleTime "05:00" -Command @{ FunctionName = "Copy-sqmBackupToArchive"; Parameters = @{ Destination = "\fileserver\sqlarchiv"; Period = "Month" }; PrimaryOnly = $true }
 ```
 
+### Copy-sqmBackupFile
+
+Copies the newest backup file of an Ola Hallengren backup folder from either AG node to a target, optionally under another name. The Agent job decides when it runs, the function knows no date. Source is the Ola root (`F:\...\Usr-DB\SERVER$AG`) plus `-Database`; below it `<Database>\FULL`, `\DIFF` or `\LOG` is searched with a wildcard, because Ola appends date and time to the name. The newest file by modification time across both nodes wins (the local one on a tie). Copies through a temporary file and a rename, so no half file ever carries the final name. An existing identical target is `UpToDate`, a differing one is `Exists` unless `-Overwrite` is given. An unreachable other node aborts, because the newer file might sit there.
+
+**Parameters:**
+
+- **-SourcePath** - Ola root directory (local path with drive letter). Use single quotes because of the `$` in the name.
+- **-Database** - Database(s); the name is also the sub-folder under `-SourcePath`.
+- **-BackupType** - `Full` (default), `Diff` and/or `Log`. One file per database and type.
+- **-SourceFile** - File name wildcard, overrides the default (Full/Diff `*.bak`, Log `*.trn`).
+- **-TargetPath** / **-TargetFile** - Target folder and optional file name (default: the source name). Both accept `{Database}` and `{Type}`.
+- **-Overwrite** - Replace a differing existing target (temporary file and rename).
+- **-AvailabilityGroupName** / **-PartnerServer** - Restrict or fix the other nodes.
+- **-SqlInstance** / **-SqlCredential** - Instance used to find the replicas.
+- **-WhatIf** / **-Confirm** - Show what would be copied.
+- **-EnableException** - Throw after all entries were processed.
+
+**Examples (3):**
+
+```powershell
+Copy-sqmBackupFile -SourcePath 'F:\Daten\MSSQLSERVER\Backup\Usr-DB\SERVER1$AG1' -Database arenap01_HST -TargetPath '\\fs\archiv\arena' -WhatIf
+Copy-sqmBackupFile -SourcePath 'F:\Daten\MSSQLSERVER\Backup\Usr-DB\SERVER1$AG1' -Database arenap01_HST -TargetPath '\\fs\archiv\arena' -TargetFile '{Database}_Weekly.bak' -Overwrite
+Copy-sqmBackupFile -SourcePath 'F:\Daten\MSSQLSERVER\Backup\Usr-DB\SERVER1$AG1' -Database DB1,DB2 -BackupType Full,Log -TargetPath '\\fs\archiv\{Database}'
+```
+
 ### Copy-sqmBackupToAgPeer
 
 Copies node-local backup files to the same path on the other Always On replicas, so the new primary has them after a failover. Give it only the source directory: the partner servers are read from `sys.availability_replicas`, the target is the partner's admin share with the same path (`G:\Backup\Anonym` -> `\<Partner>\G$\Backup\Anonym`). Uses robocopy with `/XO` and never `/MIR` or `/PURGE`, so a newer file on the partner is never overwritten or deleted. Run it as a step after the backup and as a catch-up job (Sat/Sun morning) with `New-sqmAgentCommandJob` and `PrimaryOnly = $true`; on a secondary the step does nothing.
@@ -1305,6 +1330,7 @@ Copies node-local backup files to the same path on the other Always On replicas,
 
 - **-SourcePath** - Local directory with the backups (drive letter required).
 - **-Filter** - File patterns. Default: `*.bak` (so `.tmp` files of a running backup are skipped).
+- **-Recurse** - Also copy sub-folders and keep the folder structure on the partner (robocopy `/E`), for Ola layouts like `<Server$AG>\<Database>\FULL`.
 - **-AvailabilityGroupName** - Only use the partners of this AG. Default: all AGs of the instance.
 - **-PartnerServer** - Fix the partner computer names instead of reading them from the AG.
 - **-SqlInstance** / **-SqlCredential** - Instance used to read the replicas.

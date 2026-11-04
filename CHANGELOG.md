@@ -1,5 +1,24 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.216.0] - 2026-11-04
+
+### Neu: Copy-sqmBackupFile
+
+Kopiert die neueste Backup-Datei eines Ola-Backup-Verzeichnisses von einem der beiden AG-Knoten nach Ziel, optional unter anderem Namen. Wann das passiert,
+steuert der Agent-Job (Zeitplan, Wochentag); die Funktion kennt kein Datum. Quelle ist das Ola-Stammverzeichnis (`F:\...\Usr-DB\SERVER$AG`) plus `-Database`; darunter wird
+`<Datenbank>\FULL`, `\DIFF` oder `\LOG` per Platzhalter durchsucht (Ola haengt Datum und Uhrzeit an den Namen). Standardmuster: Full und Diff `*.bak`, Log `*.trn`, mit `-SourceFile`
+ueberschreibbar. Der Quellpfad ist auf beiden Knoten gleich: lokal wird direkt gesucht, auf den anderen Replikaten (aus `sys.availability_replicas`) ueber die Admin-Freigabe; gewaehlt wird die
+Datei mit dem neuesten Aenderungszeitpunkt, bei Gleichstand die lokale. Bei gestripten Backups ist das die neueste einzelne Datei. `-BackupType Full,Diff,Log` waehlt, ob nur Full oder auch Log
+mitgenommen wird (je Typ eine Datei). Ziel: `-TargetPath` und optional `-TargetFile`, ohne Dateiname bleibt der Quellname; beide kennen `{Database}` und `{Type}`. Kopiert wird ueber eine
+temporaere Datei und Umbenennen, damit nie eine halbe Datei unter dem Endnamen liegt. Existiert das Ziel: identisch (Groesse und Zeitpunkt) = `UpToDate`, abweichend = `Exists`, ausser mit
+`-Overwrite`. Ein nicht erreichbarer anderer Knoten bricht ab, weil dort die neuere Datei liegen koennte. 18 Unit-Tests. Live unter Windows PowerShell 5.1 mit Ola-Namen (`$` im Pfad),
+Platzhalter-Zielname, zweitem Lauf, Overwrite und Log geprueft. Noch nicht gegen ein echtes AG-Paar gelaufen.
+
+### Neu: Copy-sqmBackupToAgPeer -Recurse
+
+Ola legt die Backups in Unterordnern ab (`<Verzeichnis>\<Server$AG>\<Datenbank>\FULL`). Ohne `-Recurse` kopierte die Funktion nur die Dateien direkt im angegebenen Verzeichnis und
+haette diese Struktur nicht erfasst. Mit `-Recurse` (robocopy `/E`) werden Unterordner samt Struktur auf die Partner kopiert; geloescht wird weiterhin nichts.
+
 ## [1.9.215.0] - 2026-11-03
 
 ### Neu: Set-sqmTempDbFileCount

@@ -36,6 +36,10 @@
     Dateimuster. Standard: *.bak. Dateien mit anderer Endung (z. B. *.tmp aus einem noch laufenden Backup) werden
     nicht kopiert.
 
+.PARAMETER Recurse
+    Auch Unterverzeichnisse mitkopieren und die Ordnerstruktur auf dem Partner erhalten (robocopy /E). Fuer Ola-Backups, die unter
+    <Verzeichnis>\<Server$AG>\<Datenbank>\FULL liegen. Leere Unterordner werden mit angelegt; geloescht wird auch hier nichts.
+
 .PARAMETER AvailabilityGroupName
     Nur die Partner dieser Availability Group verwenden. Ohne Angabe: Partner aller AGs der Instanz.
 
@@ -54,6 +58,11 @@
     Copy-sqmBackupToAgPeer -SourcePath 'G:\Backup\Anonym' -Filter '*_anonym*.bak' -WhatIf
 
     Zeigt, wohin kopiert wuerde, ohne etwas zu kopieren.
+
+.EXAMPLE
+    Copy-sqmBackupToAgPeer -SourcePath 'F:\Daten\MSSQLSERVER\Backup\Usr-DB' -Recurse
+
+    Ola-Backups mit Unterordnern (Server$AG\Datenbank\FULL) samt Ordnerstruktur auf die anderen Replikate.
 
 .EXAMPLE
     # Zusaetzlicher Step im vorhandenen Backup-Job, arbeitet nur auf dem Primary
@@ -99,6 +108,9 @@ function Copy-sqmBackupToAgPeer
 
 		[Parameter(Mandatory = $false)]
 		[string]$AvailabilityGroupName,
+
+		[Parameter(Mandatory = $false)]
+		[switch]$Recurse,
 
 		[Parameter(Mandatory = $false)]
 		[string[]]$PartnerServer,
@@ -183,6 +195,7 @@ function Copy-sqmBackupToAgPeer
 				# /XO: nichts Neueres ueberschreiben, kein /MIR und kein /PURGE: nach einem Failover kann der Partner den
 				# juengeren Stand haben. /NP /NDL: kurze Ausgabe fuer das Jobprotokoll.
 				$roboArgs = @($SourcePath, $target) + $Filter + @('/XO', '/R:3', '/W:10', '/NP', '/NDL')
+				if ($Recurse) { $roboArgs += '/E' }
 				$robo = Invoke-sqmRobocopy -Arguments $roboArgs
 				$entry.ExitCode = $robo.ExitCode
 

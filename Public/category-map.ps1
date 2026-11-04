@@ -11,6 +11,7 @@ $categoryMap = @{
     'Compare-sqmConfigBaseline'           = 'Configuration Management'
     'Compare-sqmServerConfiguration'      = 'Configuration Management'
     'Complete-sqmListenerMigration'       = 'Always On & Availability Groups'
+    'Copy-sqmBackupFile'                  = 'Backup & Recovery'
     'Copy-sqmBackupToAgPeer'              = 'Backup & Recovery'
     'Copy-sqmBackupToArchive'             = 'Backup & Recovery'
     'Copy-sqmLogins'                      = 'Login & User Security'

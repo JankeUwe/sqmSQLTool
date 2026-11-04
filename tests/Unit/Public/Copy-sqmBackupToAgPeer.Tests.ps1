@@ -74,6 +74,18 @@ Describe 'Copy-sqmBackupToAgPeer' {
 			}
 		}
 
+		It 'haengt mit -Recurse /E an und ohne -Recurse nicht (Ola-Unterordner)' {
+			InModuleScope sqmSQLTool -Parameters @{ Src = $script:srcPath } {
+				param ($Src)
+				Copy-sqmBackupToAgPeer -SqlInstance 'NODE1' -SourcePath $Src | Out-Null
+				@($script:roboCalls[0]) | Should -Not -Contain '/E'
+				$script:roboCalls.Clear()
+				Copy-sqmBackupToAgPeer -SqlInstance 'NODE1' -SourcePath $Src -Recurse | Out-Null
+				@($script:roboCalls[0]) | Should -Contain '/E'
+				@($script:roboCalls[0]) | Should -Not -Contain '/MIR'
+			}
+		}
+
 		It 'meldet UpToDate, wenn robocopy nichts kopiert hat (Exitcode 0)' {
 			InModuleScope sqmSQLTool -Parameters @{ Src = $script:srcPath } {
 				param ($Src)
