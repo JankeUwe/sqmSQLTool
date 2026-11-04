@@ -1,5 +1,15 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.218.0] - 2026-11-04
+
+### Neu: Test-sqmTdpConfiguration
+
+Variante von `Test-sqmTdpBackup` ganz ohne SQL-Server-Zugriff: prueft nur die TDP-Konfiguration und die TDP-Logs, lokal oder ueber die Admin-Freigabe eines anderen Computers (`-ComputerName`), und nennt zu jedem Befund einen Loesungshinweis. Konfiguration: `BackupPlan.json` (vorhanden, gueltiges JSON, keine Platzhalter, gueltige Wochentage, ein FULL-Tag, Datenbanken gewaehlt, keine Duplikate), `tdpsqlc.exe`, `dsm.opt` (TCPServeraddress), `tdpsql.cfg`, `TdpBackup.config`, CMD-Wrapper (gibt den Exit-Code weiter, findet `Backup-TdpFull.ps1`), Log-Verzeichnis. Logs: neueste Wrapper-Logs (FAILED oder unvollstaendig), Datenbank-Logs und `tdpsql.log` mit ANS/ACN/ACO-Meldungen der letzten `-LogDays` Tage (E = Warning, S = Critical). `-TestTsmServer` testet TCP zum TSM-Server (nur lokal). Nicht abgedeckt, weil es SQL braucht: Agent-Job, Tracking-Tabellen, Backup-Alter in msdb; dafuer bleibt `Test-sqmTdpBackup`. 11 Unit-Tests, die SQL-Zugriff ausdruecklich verbieten.
+
+### Geaendert: Test-sqmTdpBackup
+
+Die Datei- und Log-Pruefung liegt jetzt im privaten Baustein `Invoke-sqmTdpFileCheck`, den beide Funktionen nutzen. Verhalten von `Test-sqmTdpBackup` unveraendert (24 Tests gruen).
+
 ## [1.9.217.0] - 2026-11-04
 
 ### Neu: Test-sqmTdpBackup

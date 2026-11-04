@@ -1216,6 +1216,43 @@ Test-sqmTdpBackup -SqlInstance "SQL01"
 Test-sqmTdpBackup -SqlInstance "SQL01" -TdpDir 'D:\Tivoli\TDPSql' -TestTsmServer
 ```
 
+### Test-sqmTdpConfiguration
+
+File-only variant of `Test-sqmTdpBackup` without any SQL Server access: checks the TDP configuration and the TDP logs, locally or through the administrative share of a remote computer, and gives a fix hint for every finding.
+
+    Configuration: BackupPlan.json (exists, valid JSON, no unreplaced <placeholders>, valid English day names, a FULL day,
+    databases selected, no duplicates), tdpsqlc.exe, dsm.opt (TCPServeraddress), tdpsql.cfg, TdpBackup.config, CMD wrapper
+    (passes the exit code on, finds Backup-TdpFull.ps1), log directory.
+    Logs: newest wrapper logs (FAILED / unfinished), per-database TDP logs and tdpsql.log: ANS/ACN/ACO messages of the last
+    days (E = Warning, S = Critical), hints for ANS1017E, ANS1025E, ANS1035S.
+    TSM server: -TestTsmServer, TCP connect to TCPServeraddress/TCPPort from dsm.opt (local only).
+    Not covered (needs SQL): Agent job, tracking tables, backup age in msdb - use Test-sqmTdpBackup.
+
+**Parameters:**
+
+- **-ComputerName** - Computer running the TDP client (default: local). Remote via `\<computer>\C$`.
+- **-TdpDir** - TDP directory. Default: C:\Program Files\Tivoli\TSM\TDPSql
+- **-ConfigPath** - BackupPlan.json. Default: <TdpDir>\BackupPlan.json
+- **-LogFilesToScan** - Number of newest logs scanned. Default: 5.
+- **-LogDays** - Only messages of the last N days count. Default: 7.
+- **-TestTsmServer** - TCP test of the TSM server from dsm.opt (local only).
+- **-OutputPath** / **-NoOpen** / **-NoReport** - Report directory (default <OutputPath config>\TdpConfiguration), do not open, do not write files.
+- **-ContinueOnError** / **-EnableException** - Error handling.
+
+**Examples (3):**
+
+```powershell
+Test-sqmTdpConfiguration
+```
+
+```powershell
+(Test-sqmTdpConfiguration -ComputerName SQL01 -NoReport).Findings | Where-Object Severity -ne 'Info'
+```
+
+```powershell
+Test-sqmTdpConfiguration -TdpDir 'D:\Tivoli\TDPSql' -TestTsmServer
+```
+
 ### Test-sqmBackupIntegrity
 
 Verifies one or more backup files using RESTORE VERIFYONLY.

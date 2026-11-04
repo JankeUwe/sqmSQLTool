@@ -17,7 +17,7 @@
 	RootModule			   = 'sqmSQLTool.psm1'
 	
 	# Version number of this module.
-	ModuleVersion		   = '1.9.217.0'
+	ModuleVersion		   = '1.9.218.0'
 	
 	# ID used to uniquely identify this module
 	GUID				   = 'c4b10ba2-aee2-4d8d-ad86-a6e97c346ba6'
@@ -284,6 +284,7 @@
 		'Test-sqmSsasDirectoryPermissions',
 		'Test-sqmSSISPackageCompatibility',
 		'Test-sqmTdpBackup',
+		'Test-sqmTdpConfiguration',
 		'Test-sqmTempDbFileCount',
 		'Test-sqmTsmConnection',
 		'Uninstall-sqmDb2Driver',
