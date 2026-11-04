@@ -1,5 +1,13 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.217.0] - 2026-11-04
+
+### Neu: Test-sqmTdpBackup
+
+Prueft die TDP-Backup-Loesung (Agent-Job `TDP_Backup_Daily`, CMD-Wrapper, `Backup-TdpFull.ps1`, `BackupPlan.json`, Tracking-Tabellen in master, TDP/TSM-Clientdateien) von Ende zu Ende und nennt zu jedem Befund einen Loesungshinweis (Schwere Critical, Warning, Info; Info aendert den Gesamtstatus nicht). Die Funktion vertraut keiner einzelnen Quelle, weil manche Fehler in den ueblichen Stellen keine Spur hinterlassen (der Job meldet Erfolg, gesichert wurde nichts).
+Bereiche: **Agent** (Dienst laeuft, Job vorhanden und aktiv, aktiver Zeitplan, CmdExec-Step, Proxy aktiv, letzter Lauf ok und nicht ueberfaellig, haengender Lauf, fehlgeschlagene Laeufe der letzten Tage), **Tracking** (Tabellen und Prozeduren in master; BackupLog wird bei jedem Job-Lauf beschrieben, sonst "Job erfolgreich, Skript hat nichts getan"), **Plan** (TDP_BackupPlan gefuellt; Plan-Datenbank ohne BackupStatus-Zeile wird wegen des INNER JOIN nie gesichert; verschwundene Datenbanken; Benutzerdatenbanken ausserhalb des Plans; JSON gegen Tabelle), **Backups** (Alter des neuesten TDP-Backups je Datenbank aus msdb ueber `device_type = 7`, unabhaengig von den Tracking-Tabellen; Grenzen aus dem Zeitplan der `BackupPlan.json` abgeleitet; Folgefehler laut BackupStatus mit Fehlermeldung; SUCCESS im BackupLog ohne passendes Backup in msdb; Nicht-TDP-Full neuer als das TDP-Full, weil die Differentials dann am fremden Full haengen und die Wiederherstellung aus TSM scheitert; Differential ohne Full; FULL-Recovery ohne Log-Backup, da das TDP-Skript nur Full/Diff sichert), **Dateien** (tdpsqlc.exe, dsm.opt, tdpsql.cfg, TdpBackup.config; BackupPlan.json gueltig, ohne Platzhalter, gueltige Wochentage, keine Duplikate; Wrapper gibt den Exit-Code weiter und findet `Backup-TdpFull.ps1`), **Logs** (Wrapper-Logs mit FAILED oder unvollstaendig, ANS/ACN/ACO-Meldungen mit Endbuchstabe E oder S in den TDP-Logs und `tdpsql.log` der letzten 7 Tage; Hinweise fuer ANS1017E, ANS1025E, ANS1035S), **TSM-Server** (`-TestTsmServer`: TCP-Test gegen TCPServeraddress/TCPPort aus dsm.opt, nur lokal).
+Dateien einer Remote-Instanz werden ueber die Admin-Freigabe des Hosts gelesen (Host aus `ComputerNamePhysicalNetBIOS`, auch bei Listener-Verbindung). Bericht als TXT, CSV und HTML, `-NoReport` liefert nur das Objekt (`Findings`, `DatabaseRows`). 24 Unit-Tests.
+
 ## [1.9.216.0] - 2026-11-04
 
 ### Neu: Copy-sqmBackupFile

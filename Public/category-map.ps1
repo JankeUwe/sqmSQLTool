@@ -175,6 +175,7 @@ $categoryMap = @{
     'Test-InternetConnectivity'           = 'Module & Update Management'
     'Test-sqmBackupIntegrity'             = 'Backup & Recovery'
     'Test-sqmBackupStatus'                = 'Backup & Recovery'
+    'Test-sqmTdpBackup'                   = 'Backup & Recovery'
     'Get-sqmBackupExcludeReport'          = 'Backup & Recovery'
     'Test-sqmCostThreshold'               = 'Performance Analysis & Optimization'
     'Test-sqmDistributedAgReadiness'      = 'Always On & Availability Groups'

@@ -1172,6 +1172,50 @@ Test-sqmBackupStatus -SqlInstance "SQL01" -MaxFullOnlyAgeDays 8 -MaxFullAgeHours
 ```powershell
 (Test-sqmBackupStatus -SqlInstance "SQL01" -NoOpen).DetailRows | Where-Object Status -in 'Warning','Critical'
 
+### Test-sqmTdpBackup
+
+Checks the TDP (IBM Spectrum Protect for SQL) backup solution end to end and reports every problem with a fix hint. Cross-checks several sources because some failures leave no trace in the usual places (the job reports success although nothing was backed up).
+
+    Areas: Agent (service, job enabled, schedule, CmdExec step, proxy, last run, overdue, hanging run, failed runs),
+    Tracking (master tables/procedures, BackupLog written by every job run), Plan (TDP_BackupPlan, plan database without
+    BackupStatus row = never backed up, vanished databases, user databases not in the plan, JSON against table),
+    Backups (age of the newest TDP backup from msdb device_type 7, limits derived from the BackupPlan.json schedule;
+    consecutive failures; SUCCESS logged without a matching msdb backup; non-TDP full newer than the TDP full;
+    differential without full; FULL recovery without log backup), Files (tdpsqlc.exe, dsm.opt, tdpsql.cfg,
+    TdpBackup.config, BackupPlan.json valid/no placeholders/valid days, wrapper passes the exit code on and finds
+    Backup-TdpFull.ps1), Logs (wrapper logs FAILED/unfinished, ANS/ACN/ACO E/S messages of the last 7 days),
+    TSM server (-TestTsmServer, TCP connect, local only). Severity: Critical, Warning, Info (Info does not change
+    the overall status). Files of a remote instance are read through the administrative share.
+
+**Parameters:**
+
+- **-SqlInstance** / **-SqlCredential** - Instance(s) and credential.
+- **-TdpDir** - TDP directory on the host. Default: C:\Program Files\Tivoli\TSM\TDPSql
+- **-JobName** - Agent job. Default: TDP_Backup_Daily
+- **-ConfigPath** - BackupPlan.json. Default: <TdpDir>\BackupPlan.json
+- **-MaxFullAgeDays** / **-MaxAnyAgeHours** - Age limits; 0 (default) = derived from the schedule plus -MarginHours (fallback 8 days / 26 h).
+- **-MarginHours** - Tolerance on derived limits. Default: 12.
+- **-HistoryDays** - Job and msdb history window. Default: 35.
+- **-LogFilesToScan** - Number of newest logs scanned. Default: 5.
+- **-TestTsmServer** - TCP test of the TSM server from dsm.opt (local only).
+- **-ExcludeDatabase** - Databases not to check (wildcards).
+- **-OutputPath** / **-NoOpen** / **-NoReport** - Report directory (default <OutputPath config>\TdpBackup), do not open, do not write files.
+- **-ContinueOnError** / **-EnableException** - Error handling.
+
+**Examples (3):**
+
+```powershell
+Test-sqmTdpBackup -SqlInstance "SQL01"
+```
+
+```powershell
+(Test-sqmTdpBackup -SqlInstance "SQL01" -NoReport).Findings | Where-Object Severity -ne 'Info'
+```
+
+```powershell
+Test-sqmTdpBackup -SqlInstance "SQL01" -TdpDir 'D:\Tivoli\TDPSql' -TestTsmServer
+```
+
 ### Test-sqmBackupIntegrity
 
 Verifies one or more backup files using RESTORE VERIFYONLY.
