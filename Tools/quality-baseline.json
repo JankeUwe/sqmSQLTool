@@ -1,10 +1,10 @@
 {
     "comment":  "Ratsche fuer Tools/Test-QualityGate.ps1. Nur ueber das Skript aendern, siehe CONSTRAINTS.md.",
     "metrics":  {
-                    "PssaWarnings":  849,
+                    "PssaWarnings":  848,
                     "EmptyCatch":  114,
                     "SuppressMessage":  0,
-                    "WmiCmdlets":  8,
+                    "WmiCmdlets":  7,
                     "DbaStopWithoutException":  180,
                     "PublicWithoutTest":  72,
                     "BareShouldThrow":  33,
