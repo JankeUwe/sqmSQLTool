@@ -1,5 +1,11 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.219.0] - 2026-11-04
+
+### Neu: Test-sqmTdpBackup faellt ohne SQL-Zugriff auf die Dateipruefung zurueck
+
+Ist die Instanz per SQL nicht erreichbar (Login, Port, Dienst gestoppt), bricht `Test-sqmTdpBackup` nicht mehr ab, sondern prueft ueber `Test-sqmTdpConfiguration` Konfiguration und Logs auf dem Host der Instanz. Der SQL-Fehler erscheint als eigener kritischer Befund (Kategorie SQL) mit dem Hinweis, dass Agent-Job, Tracking-Tabellen und Backup-Alter in diesem Lauf nicht geprueft wurden; das Ergebnisobjekt hat `SqlReachable = $false`, der Gesamtstatus ist dadurch immer Critical, `DatabaseRows` ist leer. Der Host stammt aus dem Instanznamen; bei einem Listener-Namen kann das ein anderer Rechner sein als der, auf dem TDP laeuft (dann `Test-sqmTdpConfiguration -ComputerName` direkt aufrufen). `-NoFileFallback` stellt das alte Verhalten her (Verbindungsfehler wird geworfen). `Test-sqmTdpConfiguration` bekommt dafuer `-AdditionalFinding`, damit der SQL-Befund im Bericht steht. Ergebnisobjekt von `Test-sqmTdpBackup` hat neu `SqlReachable`. 4 neue Tests.
+
 ## [1.9.218.0] - 2026-11-04
 
 ### Neu: Test-sqmTdpConfiguration

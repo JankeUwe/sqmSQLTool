@@ -95,6 +95,13 @@
 .PARAMETER NoReport
     Do not write report files, only return the result object.
 
+.PARAMETER NoFileFallback
+    By default, an instance that cannot be reached over SQL is not an error: the function falls
+    back to the file-only check (Test-sqmTdpConfiguration) on the instance's host, adds a Critical
+    finding "SQL Server not reachable" and sets SqlReachable = $false. The host is taken from the
+    instance name (a listener name may not be the machine that runs TDP). With -NoFileFallback
+    the connection error is thrown instead.
+
 .PARAMETER ContinueOnError
     Continue with the next instance on error.
 
@@ -160,6 +167,8 @@ function Test-sqmTdpBackup
 		[switch]$NoOpen,
 		[Parameter(Mandatory = $false)]
 		[switch]$NoReport,
+		[Parameter(Mandatory = $false)]
+		[switch]$NoFileFallback,
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
@@ -380,7 +389,42 @@ GROUP BY b.database_name;
 				Invoke-sqmLogging -Message "[$instance] Pruefe TDP-Backup ..." -FunctionName $functionName -Level "INFO"
 
 				# ------------------------------------------------------------------ Umgebung
-				$env1 = @(_Q 'env')
+				try { $env1 = @(_Q 'env') }
+				catch
+				{
+					if ($NoFileFallback) { throw }
+					$sqlError = $_.Exception.Message
+					Invoke-sqmLogging -Message "[$instance] SQL nicht erreichbar, pruefe nur Dateien und Logs: $sqlError" -FunctionName $functionName -Level "WARNING"
+					$fbHost = (($instance -split '\\')[0] -split ',')[0]
+					$sqlFinding = [PSCustomObject]@{
+						SqlInstance = $instance
+						Severity    = 'Critical'
+						Category    = 'SQL'
+						Database    = ''
+						Message     = "SQL Server nicht erreichbar, nur Datei- und Log-Pruefung moeglich: $(_Short $sqlError 250)"
+						Hint        = 'Instanzname, Port, Credential und Dienst pruefen. Agent-Job, Tracking-Tabellen und Backup-Alter in msdb sind in diesem Lauf NICHT geprueft.'
+					}
+					$cfgR = Test-sqmTdpConfiguration -ComputerName $fbHost -TdpDir $TdpDir -ConfigPath $ConfigPath -LogFilesToScan $LogFilesToScan -TestTsmServer:$TestTsmServer -AdditionalFinding $sqlFinding -OutputPath $OutputPath -NoOpen:$NoOpen -NoReport:$NoReport
+					$allInstanceResults.Add([PSCustomObject]@{
+							SqlInstance     = $instance
+							HostName        = $fbHost
+							Timestamp       = $cfgR.Timestamp
+							Status          = $cfgR.Status
+							SqlReachable    = $false
+							CriticalCount   = $cfgR.CriticalCount
+							WarningCount    = $cfgR.WarningCount
+							InfoCount       = $cfgR.InfoCount
+							LimitSource     = 'nicht ermittelt (kein SQL)'
+							MaxFullAgeHours = $null
+							MaxAnyAgeHours  = $null
+							Findings        = $cfgR.Findings
+							DatabaseRows    = @()
+							TxtFile         = $cfgR.TxtFile
+							CsvFile         = $cfgR.CsvFile
+							HtmlFile        = $cfgR.HtmlFile
+						})
+					continue
+				}
 				$now = if ($env1.Count -gt 0 -and -not ($env1[0].ServerNow -is [DBNull])) { [datetime]$env1[0].ServerNow } else { Get-Date }
 				$hostName = if ($env1.Count -gt 0 -and -not ($env1[0].HostName -is [DBNull]) -and $env1[0].HostName) { [string]$env1[0].HostName } else { (($instance -split '\\')[0] -split ',')[0] }
 				$isLocal = ($hostName -ieq $env:COMPUTERNAME) -or ($hostName -in @('.', 'localhost', '(local)'))
@@ -846,6 +890,7 @@ GROUP BY b.database_name;
 						HostName      = $hostName
 						Timestamp     = $timestamp
 						Status        = $overall
+						SqlReachable  = $true
 						CriticalCount = $cnt.Critical
 						WarningCount  = $cnt.Warning
 						InfoCount     = $cnt.Info

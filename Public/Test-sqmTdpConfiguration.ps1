@@ -57,6 +57,10 @@
 .PARAMETER NoReport
     Do not write report files, only return the result object.
 
+.PARAMETER AdditionalFinding
+    Findings the caller already collected (Test-sqmTdpBackup passes its "SQL Server not reachable"
+    finding when it falls back to this file-only check). They are merged into the result and report.
+
 .PARAMETER ContinueOnError
     Continue with the next computer on error.
 
@@ -104,6 +108,8 @@ function Test-sqmTdpConfiguration
 		[Parameter(Mandatory = $false)]
 		[switch]$NoReport,
 		[Parameter(Mandatory = $false)]
+		[object[]]$AdditionalFinding,
+		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
@@ -129,12 +135,13 @@ function Test-sqmTdpConfiguration
 				$now = Get-Date
 
 				$fc = Invoke-sqmTdpFileCheck -Instance $hostName -TdpDir $TdpDir -ConfigPath $ConfigPath -HostName $hostName -IsLocal $isLocal -Now $now -LogFilesToScan $LogFilesToScan -TestTsmServer:$TestTsmServer -LogDays $LogDays
+				$allFindings = @(@($AdditionalFinding | Where-Object { $_ }) + @($fc.Findings))
 
 				$cnt = @{ }
-				foreach ($s in 'Critical', 'Warning', 'Info') { $cnt[$s] = @($fc.Findings | Where-Object Severity -eq $s).Count }
+				foreach ($s in 'Critical', 'Warning', 'Info') { $cnt[$s] = @($allFindings | Where-Object Severity -eq $s).Count }
 				$overall = if ($cnt.Critical -gt 0) { 'Critical' } elseif ($cnt.Warning -gt 0) { 'Warning' } else { 'OK' }
 				$sevOrder = @{ Critical = 0; Warning = 1; Info = 2 }
-				$sorted = @($fc.Findings | Sort-Object @{ e = { $sevOrder[$_.Severity] } }, Category)
+				$sorted = @($allFindings | Sort-Object @{ e = { $sevOrder[$_.Severity] } }, Category)
 
 				$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 				$safeHost = $hostName -replace '[\\/:*?"<>|]', '_'

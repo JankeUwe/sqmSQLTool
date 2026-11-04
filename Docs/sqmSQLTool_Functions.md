@@ -1200,6 +1200,7 @@ Checks the TDP (IBM Spectrum Protect for SQL) backup solution end to end and rep
 - **-TestTsmServer** - TCP test of the TSM server from dsm.opt (local only).
 - **-ExcludeDatabase** - Databases not to check (wildcards).
 - **-OutputPath** / **-NoOpen** / **-NoReport** - Report directory (default <OutputPath config>\TdpBackup), do not open, do not write files.
+- **-NoFileFallback** - Throw when SQL is not reachable. Default: fall back to the file-only check (`Test-sqmTdpConfiguration`) on the instance's host, add a Critical finding `SQL Server not reachable` and set `SqlReachable = $false`.
 - **-ContinueOnError** / **-EnableException** - Error handling.
 
 **Examples (3):**

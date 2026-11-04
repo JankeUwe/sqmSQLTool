@@ -292,11 +292,35 @@ Describe 'Test-sqmTdpBackup' {
         $r2.TxtFile | Should -BeNullOrEmpty
     }
 
-    It 'liefert bei SQL-Fehler Status Error und wirft ohne -ContinueOnError' {
+    It 'wirft bei SQL-Fehler mit -NoFileFallback und liefert mit -ContinueOnError Status Error' {
         Mock -ModuleName sqmSQLTool Invoke-DbaQuery { throw 'login failed' }
-        $global:TdpFx = New-TdpFixture -TdpDir $script:TestRoot
-        { Test-sqmTdpBackup -SqlInstance 'SQL01' -TdpDir $script:TestRoot -NoReport -NoOpen } | Should -Throw -ExpectedMessage '*login failed*'
-        $r = Test-sqmTdpBackup -SqlInstance 'SQL01' -TdpDir $script:TestRoot -NoReport -NoOpen -ContinueOnError
+        { Test-sqmTdpBackup -SqlInstance 'SQL01' -TdpDir $script:TestRoot -NoReport -NoOpen -NoFileFallback } | Should -Throw -ExpectedMessage '*login failed*'
+        $r = Test-sqmTdpBackup -SqlInstance 'SQL01' -TdpDir $script:TestRoot -NoReport -NoOpen -NoFileFallback -ContinueOnError
         $r.Status | Should -Be 'Error'
+    }
+
+    It 'faellt bei nicht erreichbarem SQL auf die Dateipruefung zurueck und meldet den SQL-Fehler kritisch' {
+        Mock -ModuleName sqmSQLTool Invoke-DbaQuery { throw 'login failed' }
+        $r = Test-sqmTdpBackup -SqlInstance "$($env:COMPUTERNAME)\INST1" -TdpDir $script:TestRoot -NoReport -NoOpen
+        $r.SqlReachable | Should -BeFalse
+        $r.Status | Should -Be 'Critical'
+        $f = $r.Findings | Where-Object Category -eq 'SQL'
+        $f.Severity | Should -Be 'Critical'
+        $f.Message | Should -Match 'login failed'
+        $r.DatabaseRows | Should -BeNullOrEmpty
+        # die Dateipruefung lief wirklich (gesunder Aufbau: nur der SQL-Befund ist uebrig)
+        @($r.Findings | Where-Object Category -ne 'SQL' | Where-Object Severity -ne 'Info') | Should -BeNullOrEmpty
+    }
+
+    It 'findet beim Fallback auch Dateifehler' {
+        Mock -ModuleName sqmSQLTool Invoke-DbaQuery { throw 'login failed' }
+        Remove-Item (Join-Path $script:TestRoot 'tdpsqlc.exe')
+        $r = Test-sqmTdpBackup -SqlInstance $env:COMPUTERNAME -TdpDir $script:TestRoot -NoReport -NoOpen
+        ($r.Findings | Where-Object Message -match 'tdpsqlc.exe').Severity | Should -Be 'Critical'
+        ($r.Findings | Where-Object Category -eq 'SQL') | Should -Not -BeNullOrEmpty
+    }
+
+    It 'meldet SqlReachable bei erreichbarem SQL' {
+        (Invoke-Tdp).SqlReachable | Should -BeTrue
     }
 }
