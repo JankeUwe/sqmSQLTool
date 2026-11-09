@@ -428,6 +428,59 @@
 	$common = [System.Management.Automation.PSCmdlet]::CommonParameters +
 	[System.Management.Automation.PSCmdlet]::OptionalCommonParameters
 
+	# [hashtable]/[hashtable[]] parameters (e.g. New-sqmAgentCommandJob -Command) cannot be bound from
+	# plain text. Accept either a hashtable literal (@{FunctionName='X'; Parameters=@{...}}) or a plain
+	# command line ("Copy-sqmBackupToAgPeer -SourcePath F:\x -Recurse"; several steps separated by ';')
+	# and convert it to @{ FunctionName; Parameters } entries. Static values only - nothing is executed.
+	$convertToHashtableParam = {
+		param([string]$Text)
+		$tokens = $null; $errs = $null
+		$ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$tokens, [ref]$errs)
+		if ($errs -and $errs.Count -gt 0) { throw "Cannot parse input: $($errs[0].Message)" }
+		$getValue = {
+			param($node)
+			if ($node -is [System.Management.Automation.Language.StringConstantExpressionAst]) { return $node.Value }
+			if ($node -is [System.Management.Automation.Language.ExpandableStringExpressionAst]) { return $node.SafeGetValue() }
+			if ($node -is [System.Management.Automation.Language.VariableExpressionAst])
+			{
+				switch ($node.VariablePath.UserPath.ToLower()) { 'true' { return $true } 'false' { return $false } 'null' { return $null } }
+				throw "Variable '`$$($node.VariablePath.UserPath)' is not allowed here (only `$true/`$false/`$null)."
+			}
+			return $node.SafeGetValue()
+		}
+		$result = [System.Collections.Generic.List[hashtable]]::new()
+		foreach ($st in $ast.EndBlock.Statements)
+		{
+			$expr = if ($st -is [System.Management.Automation.Language.PipelineAst] -and $st.PipelineElements.Count -eq 1) { $st.PipelineElements[0] } else { $null }
+			if ($expr -is [System.Management.Automation.Language.CommandExpressionAst])
+			{
+				$val = $expr.Expression.SafeGetValue()
+				foreach ($v in @($val)) { $result.Add([hashtable]$v) }
+			}
+			elseif ($expr -is [System.Management.Automation.Language.CommandAst])
+			{
+				$els = @($expr.CommandElements)
+				$entry = @{ FunctionName = [string]$els[0].Value; Parameters = @{ } }
+				for ($i = 1; $i -lt $els.Count; $i++)
+				{
+					$el = $els[$i]
+					if ($el -isnot [System.Management.Automation.Language.CommandParameterAst]) { throw "Unexpected positional value '$($el.Extent.Text)' - use -Name value." }
+					if ($el.Argument) { $entry.Parameters[$el.ParameterName] = & $getValue $el.Argument }
+					elseif (($i + 1) -lt $els.Count -and $els[$i + 1] -isnot [System.Management.Automation.Language.CommandParameterAst])
+					{
+						$i++
+						$entry.Parameters[$el.ParameterName] = & $getValue $els[$i]
+					}
+					else { $entry.Parameters[$el.ParameterName] = $true }
+				}
+				$result.Add($entry)
+			}
+			else { throw "Unsupported input: $($st.Extent.Text)" }
+		}
+		if ($result.Count -eq 0) { throw 'No command found.' }
+		return , $result.ToArray()
+	}
+
 	# Build the command preview from the inputs ------------------------------------
 	$buildCommand = {
 		if (-not $script:guiState.Command) { return $null }
@@ -463,7 +516,30 @@
 					# PowerShell, becomes a one-element array containing the whole string instead of
 					# two separate database names (see the matching fix in the Run button handler).
 					$pType = $script:guiState.Command.Parameters[$pname].ParameterType
-					if ($pType.IsArray)
+					if ($pType -eq [hashtable] -or $pType -eq [hashtable[]])
+					{
+						# Show the converted literal so the preview is copy-paste runnable.
+						try
+						{
+							$entries = & $convertToHashtableParam $val
+							$lit = foreach ($e in $entries)
+							{
+								$pp = foreach ($k in $e.Parameters.Keys)
+								{
+									$v = $e.Parameters[$k]
+									$vt = if ($v -is [bool]) { "`$$($v.ToString().ToLower())" }
+									elseif ($v -is [System.Array]) { '@(' + (($v | ForEach-Object { "'" + ($_ -replace "'", "''") + "'" }) -join ',') + ')' }
+									elseif ($v -is [int] -or $v -is [long] -or $v -is [double]) { "$v" }
+									else { "'" + ([string]$v -replace "'", "''") + "'" }
+									"$k = $vt"
+								}
+								"@{ FunctionName = '$($e.FunctionName)'; Parameters = @{ $($pp -join '; ') } }"
+							}
+							$parts.Add("-$pname " + $(if (@($lit).Count -gt 1) { '@(' + (@($lit) -join ', ') + ')' } else { $lit }))
+						}
+						catch { $parts.Add("-$pname <invalid: $($_.Exception.Message)>") }
+					}
+					elseif ($pType.IsArray)
 					{
 						$items = @($val -split '\s*[,;]\s*' | Where-Object { $_ -ne '' })
 						$quoted = $items | ForEach-Object { if ($_ -match '[\s'']') { "'" + ($_ -replace "'", "''") + "'" } else { $_ } }
@@ -1070,7 +1146,20 @@
 						# Split comma/semicolon-separated input into a real array for array-typed
 						# parameters - see matching comment in $buildCommand for why this is needed.
 						$pType = $script:guiState.Command.Parameters[$pname].ParameterType
-						if ($pType.IsArray)
+						if ($pType -eq [hashtable] -or $pType -eq [hashtable[]])
+						{
+							try
+							{
+								$converted = & $convertToHashtableParam $ctrl.Text
+								$params[$pname] = if ($pType -eq [hashtable]) { $converted[0] } else { [hashtable[]]$converted }
+							}
+							catch
+							{
+								[System.Windows.Forms.MessageBox]::Show("Parameter -${pname}: $($_.Exception.Message)`n`nExpected: FunctionName -Param value ... (steps separated by ';') or @{ FunctionName = '...'; Parameters = @{ ... } }", 'Invalid input', 'OK', 'Warning') | Out-Null
+								return
+							}
+						}
+						elseif ($pType.IsArray)
 						{
 							$params[$pname] = @($ctrl.Text -split '\s*[,;]\s*' | Where-Object { $_ -ne '' })
 						}

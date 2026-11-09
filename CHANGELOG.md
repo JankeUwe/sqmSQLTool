@@ -1,5 +1,11 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.220.0] - 2026-11-09
+
+### Behoben: GUI uebergab Hashtable-Parameter als Text
+
+Parameter vom Typ `[hashtable]` oder `[hashtable[]]` (z. B. `-Command` bei `New-sqmAgentCommandJob`) wurden im GUI als reiner Text gebunden und scheiterten mit "cannot convert ... to hashtable[]". Das Feld nimmt jetzt eine Befehlszeile (`Funktion -Parameter Wert -Switch`, mehrere Schritte mit `;` getrennt) oder ein Hashtable-Literal entgegen und baut daraus `@{ FunctionName; Parameters }`. Es werden nur feste Werte gelesen (Variablen ausser `$true`, `$false`, `$null` werden abgelehnt), nichts wird ausgefuehrt. Die Vorschau zeigt den fertigen Aufruf, bei ungueltiger Eingabe erscheint eine Meldung.
+
 ## [1.9.219.0] - 2026-11-04
 
 ### Neu: Test-sqmTdpBackup faellt ohne SQL-Zugriff auf die Dateipruefung zurueck
