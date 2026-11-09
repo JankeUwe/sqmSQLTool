@@ -1,5 +1,11 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.221.0] - 2026-11-09
+
+### Behoben: Invoke-sqmLogShrink bricht bei READ_ONLY-Datenbanken nicht mehr mit Fehler ab
+
+Bei einer schreibgeschuetzten Datenbank schlug DBCC SHRINKFILE auf dem Log fehl, was korrekt, aber unerwuenscht als Fehler gemeldet wurde. Solche Datenbanken werden jetzt erkannt und mit Status `Skipped` uebersprungen.
+
 ## [1.9.220.0] - 2026-11-09
 
 ### Behoben: GUI uebergab Hashtable-Parameter als Text

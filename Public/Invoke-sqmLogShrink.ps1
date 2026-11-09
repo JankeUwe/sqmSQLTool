@@ -283,6 +283,14 @@ function Invoke-sqmLogShrink
 						continue
 					}
 
+					if ($db.IsReadOnly -or $db.ReadOnly)
+					{
+						$msg = "Datenbank '$dbName' ist READ_ONLY. Log-Shrink nicht moeglich, uebersprungen."
+						Invoke-sqmLogging -Message $msg -FunctionName $functionName -Level "INFO"
+						$results.Add((New-sqmLogShrinkResult -Db $dbName -Status 'Skipped' -Message $msg))
+						continue
+					}
+
 					$allFiles = Get-DbaDbFile @connParams -Database $dbName -ErrorAction Stop
 					$logFiles = $allFiles | Where-Object { $_.TypeDescription -eq 'LOG' }
 
