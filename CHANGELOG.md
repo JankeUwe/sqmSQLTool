@@ -1,5 +1,11 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.222.0] - 2026-11-10
+
+### Behoben: New-sqmAgentCommandJob -AppendStep scheitert nicht mehr an doppelten Stepnamen
+
+Beim Anhaengen desselben Befehls an einen vorhandenen Job brach die Funktion mit "StepName existiert bereits" ab, weil der abgeleitete Stepname (= Funktionsname) nur innerhalb von `-Command` auf Eindeutigkeit geprueft wurde. Bei `-AppendStep` werden jetzt die vorhandenen Steps des Jobs mit einbezogen: abgeleitete Namen bekommen einen Zaehler (`Name_2`, `Name_3`, ...), ein ausdruecklich per `StepName` vergebener Name, der schon existiert, ergibt eine klare Fehlermeldung. Da die Parameterdatei (.clixml) den Stepnamen enthaelt, ueberschreiben sich gleiche Befehle dadurch auch nicht mehr gegenseitig.
+
 ## [1.9.221.0] - 2026-11-09
 
 ### Behoben: Invoke-sqmLogShrink bricht bei READ_ONLY-Datenbanken nicht mehr mit Fehler ab

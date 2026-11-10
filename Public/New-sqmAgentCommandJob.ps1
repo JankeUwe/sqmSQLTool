@@ -45,8 +45,9 @@ Name of the Agent job. Mandatory.
 One or more hashtables describing a step, in execution order. Each entry:
     FunctionName  - mandatory, must be an exported sqmSQLTool function.
     Parameters    - optional hashtable forwarded to the function via splatting. Default: @{}.
-    StepName      - optional. Default: the function name (de-duplicated with a counter if the
-                    same function appears more than once in -Command).
+    StepName      - optional. Default: the function name, de-duplicated with a counter (_2, _3, ...)
+                    if the name already occurs in -Command or, with -AppendStep, in the existing
+                    job. An explicitly given StepName that already exists is an error.
     PrimaryOnly   - optional $true: the step only works on the AG primary. On a secondary it
                     ends with success without calling the function, so the same job can be
                     installed on every replica and follows a failover. Checks the replica of
@@ -213,6 +214,15 @@ function New-sqmAgentCommandJob
 			$resolved = [System.Collections.Generic.List[PSCustomObject]]::new()
 			$usedStepNames = @{}
 
+			# Bei -AppendStep: vorhandene Stepnamen des Jobs vorbelegen, sonst scheitert das Anhaengen
+			# desselben Befehls mit "StepName existiert bereits".
+			$existingStepNames = @{}
+			if ($AppendStep)
+			{
+				$preSteps = Get-DbaAgentJobStep @connParams -Job $JobName -ErrorAction SilentlyContinue
+				foreach ($ps in @($preSteps)) { if ($ps -and $ps.Name) { $existingStepNames[[string]$ps.Name] = $true } }
+			}
+
 			foreach ($entry in $Command)
 			{
 				if (-not $entry.ContainsKey('FunctionName') -or [string]::IsNullOrWhiteSpace([string]$entry['FunctionName']))
@@ -229,16 +239,29 @@ function New-sqmAgentCommandJob
 
 				$stepParams = if ($entry.ContainsKey('Parameters') -and $entry['Parameters']) { $entry['Parameters'] } else { @{} }
 
-				$stepName = if ($entry.ContainsKey('StepName') -and $entry['StepName']) { [string]$entry['StepName'] } else { $fn }
-				if ($usedStepNames.ContainsKey($stepName))
+				$explicitName = ($entry.ContainsKey('StepName') -and $entry['StepName'])
+				$baseName = if ($explicitName) { [string]$entry['StepName'] } else { $fn }
+				$stepName = $baseName
+
+				if ($explicitName)
 				{
-					$usedStepNames[$stepName]++
-					$stepName = "$stepName`_$($usedStepNames[$stepName])"
+					# Ausdruecklich vergebener Name: Kollision ist ein Fehler, nicht still umbenennen.
+					if ($usedStepNames.ContainsKey($stepName) -or $existingStepNames.ContainsKey($stepName))
+					{
+						throw "StepName '$stepName' existiert bereits im Job '$JobName' bzw. doppelt in -Command. Anderen StepName waehlen."
+					}
 				}
 				else
 				{
-					$usedStepNames[$stepName] = 1
+					# Abgeleiteter Name: Zaehler anhaengen, bis er weder in -Command noch im Job vorkommt.
+					$n = 1
+					while ($usedStepNames.ContainsKey($stepName) -or $existingStepNames.ContainsKey($stepName))
+					{
+						$n++
+						$stepName = "$baseName`_$n"
+					}
 				}
+				$usedStepNames[$stepName] = 1
 
 				$resolved.Add([PSCustomObject]@{
 					FunctionName = $fn
