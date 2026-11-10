@@ -141,6 +141,28 @@ Describe 'Export-sqmDatabaseLogins' {
         Test-Path (Join-Path $script:Out 'DatabaseLogins_Other_SQL01_20200101000000.sql') | Should -BeTrue
     }
 
+    It '-LatestCopy schreibt zusaetzlich eine _latest-Datei mit gleichem Inhalt, die -KeepLatest nicht zaehlt und der Import-Verzeichnismodus ignoriert' {
+        $r = Export-sqmDatabaseLogins -SqlInstance 'SQL01' -Database 'Sales' -OutputPath $script:Out -LatestCopy -KeepLatest 1 -Confirm:$false
+        $latest = Join-Path $script:Out 'DatabaseLogins_Sales_SQL01_latest.sql'
+        $r.LatestFile | Should -Be $latest
+        (Get-Content $latest -Raw) | Should -Be (Get-Content $r.OutputFile -Raw)
+        Get-ChildItem $script:Out -Filter '*.tmp' | Should -BeNullOrEmpty
+        Start-Sleep -Seconds 1
+        Export-sqmDatabaseLogins -SqlInstance 'SQL01' -Database 'Sales' -OutputPath $script:Out -LatestCopy -KeepLatest 1 -Confirm:$false | Out-Null
+        Test-Path $latest | Should -BeTrue
+        @(Get-ChildItem $script:Out -Filter 'DatabaseLogins_Sales_SQL01_2*.sql').Count | Should -Be 1
+        $found = & (Get-Module sqmSQLTool) { param($d) Get-sqmDatabaseLoginsFile -Directory $d -Database 'Sales' } $script:Out
+        @($found).File | Should -Not -Contain $latest
+        @($found).Count | Should -Be 1
+    }
+
+    It '-LatestCopy mit vollem Dateipfad warnt und legt keine _latest-Datei an' {
+        $f = Join-Path $script:Out 'x.sql'
+        $r = Export-sqmDatabaseLogins -SqlInstance 'SQL01' -Database 'Sales' -OutputPath $f -LatestCopy -Confirm:$false -WarningAction SilentlyContinue
+        $r.LatestFile | Should -BeNullOrEmpty
+        Test-Path $f | Should -BeTrue
+    }
+
     It '-WhatIf schreibt keine Datei' {
         $r = Export-sqmDatabaseLogins -SqlInstance 'SQL01' -Database 'Sales' -OutputPath "$script:Out\x.sql" -WhatIf
         $r.Status | Should -Be 'WhatIf'

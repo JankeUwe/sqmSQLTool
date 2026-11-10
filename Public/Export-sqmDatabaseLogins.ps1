@@ -71,6 +71,15 @@ exports for the same database and source instance in that directory and delete t
 (they contain password hashes, so letting them pile up is not harmless). Which files belong
 together is decided by the file header, not the file name. 0 keeps everything. Default: 5.
 
+.PARAMETER LatestCopy
+Only with a directory as -OutputPath: after the timestamped file is written, additionally write the
+same content as "DatabaseLogins_<Database>_<SqlInstance>_latest.sql" (constant name, overwritten on
+every run, written via ".tmp" and renamed like the main file). Meant for copy jobs and other tools
+that need a fixed file name; the history of timestamped files stays untouched and -KeepLatest never
+counts or deletes the _latest file. Import-sqmDatabaseLogins can read it directly via -InputPath
+<full path of the _latest file>. Directory mode of the import ignores it (it only looks at files
+with a timestamp), so it never selects the _latest copy by accident.
+
 .PARAMETER Login
 Restricts the export to these login names (wildcards allowed). Without this, every SQL-auth login
 backing a user of -Database is exported (after the sysadmin/system exclusion above).
@@ -106,6 +115,12 @@ Scheduled export via the AG listener: writes a new timestamped file on every run
 the three newest Frontarena exports from that source in \\Share\Handover. On the Test side,
 Import-sqmDatabaseLogins -InputPath <copied directory> picks the newest one.
 
+.EXAMPLE
+Export-sqmDatabaseLogins -SqlInstance 'ProdAgListener' -Database 'Frontarena' -OutputPath '\\Share\Handover' -LatestCopy
+
+Writes the timestamped file (history) and additionally DatabaseLogins_Frontarena_<Instance>_latest.sql
+under a constant name, e.g. for a copy job or Import-sqmDatabaseLogins -InputPath <that file>.
+
 .NOTES
 Prerequisites : dbatools, Invoke-sqmLogging
 Counterpart   : Import-sqmDatabaseLogins (applies the generated file against the destination).
@@ -131,6 +146,8 @@ function Export-sqmDatabaseLogins
 		[Parameter(Mandatory = $false)]
 		[ValidateRange(0, 1000)]
 		[int]$KeepLatest = 5,
+		[Parameter(Mandatory = $false)]
+		[switch]$LatestCopy,
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
 	)
@@ -362,6 +379,37 @@ END
 				Invoke-sqmLogging -Message "Export geschrieben: $finalOutputFile ($($blocks.Count) Login(s))." -FunctionName $functionName -Level 'INFO'
 				Write-Host "Export-sqmDatabaseLogins: $($blocks.Count) Login(s) nach '$finalOutputFile' geschrieben (sysadmin ausgeschlossen: $excludedSysadminCount)." -ForegroundColor Green
 
+				# ---- 7b. Optional: konstante _latest-Kopie ----
+				$latestFile = $null
+				if ($LatestCopy)
+				{
+					if ($isDirectory)
+					{
+						try
+						{
+							$latestFile = Join-Path $OutputPath "DatabaseLogins_${safeDb}_${safeInst}_latest.sql"
+							$latestTmp = "$latestFile.tmp"
+							[System.IO.File]::Copy($finalOutputFile, $latestTmp, $true)
+							if ([System.IO.File]::Exists($latestFile)) { [System.IO.File]::Delete($latestFile) }
+							[System.IO.File]::Move($latestTmp, $latestFile)
+							Invoke-sqmLogging -Message "Konstante Kopie geschrieben: $latestFile" -FunctionName $functionName -Level 'INFO'
+						}
+						catch
+						{
+							$warnMsg = "_latest-Kopie konnte nicht geschrieben werden: $($_.Exception.Message)"
+							Invoke-sqmLogging -Message $warnMsg -FunctionName $functionName -Level 'WARNING'
+							Write-Warning $warnMsg
+							$latestFile = $null
+						}
+					}
+					else
+					{
+						$warnMsg = "-LatestCopy wirkt nur mit einem Verzeichnis als -OutputPath (bei einem vollen Dateipfad ist der Name ohnehin konstant)."
+						Invoke-sqmLogging -Message $warnMsg -FunctionName $functionName -Level 'WARNING'
+						Write-Warning $warnMsg
+					}
+				}
+
 				# ---- 8. Aeltere Exporte derselben Datenbank/Quelle entfernen ----
 				$removedFiles = @()
 				if ($isDirectory -and $KeepLatest -gt 0)
@@ -397,6 +445,7 @@ END
 					SourceInstance		  = $SqlInstance
 					Database			  = $Database
 					OutputFile			  = $finalOutputFile
+					LatestFile			  = $latestFile
 					LoginCount		      = $blocks.Count
 					ExcludedSysadminCount = $excludedSysadminCount
 					RemovedOldFiles	      = $removedFiles

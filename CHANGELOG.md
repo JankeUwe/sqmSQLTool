@@ -1,5 +1,11 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.224.0] - 2026-11-10
+
+### Neu: Export-sqmDatabaseLogins -LatestCopy schreibt zusaetzlich eine Datei mit festem Namen
+
+Mit einem Verzeichnis als `-OutputPath` entsteht weiterhin je Lauf eine Datei mit Zeitstempel (Historie, `-KeepLatest`). Neu: `-LatestCopy` schreibt zusaetzlich `DatabaseLogins_<Datenbank>_<Instanz>_latest.sql` mit demselben Inhalt unter konstantem Namen, atomar ueber `.tmp`. Gedacht fuer Kopierjobs und Fremdtools sowie `Import-sqmDatabaseLogins -InputPath <Pfad der _latest-Datei>`. `-KeepLatest` zaehlt und loescht die _latest-Datei nie, der Verzeichnismodus des Imports ignoriert sie (nur Dateien mit Zeitstempel). Mit einem vollen Dateipfad als `-OutputPath` wirkt der Schalter nicht (Warnung). Ergebnis hat neu `LatestFile`. 2 neue Tests.
+
 ## [1.9.223.0] - 2026-11-10
 
 ### Neu: New-sqmAgentCommandJob legt den Job auf allen AlwaysOn-Replicas an
