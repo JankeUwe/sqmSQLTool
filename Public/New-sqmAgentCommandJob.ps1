@@ -76,6 +76,15 @@ Day of month (1-28) for -ScheduleType Monthly. Default: 1.
 .PARAMETER StartJob
 Start the job immediately after creating/extending it.
 
+.PARAMETER SkipAlwaysOnPropagation
+By default, when $SqlInstance is a member of an Availability Group, the same job (steps, schedule)
+is created on ALL other replicas as well, so it exists on every node and follows a failover. Use
+this switch to create the job on $SqlInstance only. On the other replicas an existing job of the
+same name is replaced (as with -Force); with -AppendStep the step(s) are appended there, and if the
+job does not exist on a replica yet, it is created there with the new step(s) only (warning).
+Parameters.SqlInstance entries that equal -SqlInstance are replaced by the replica's own name per
+node. Combine with PrimaryOnly = $true for steps that must only work on the current primary.
+
 .PARAMETER EnableException
 Throw exceptions immediately instead of logging and returning a result object.
 
@@ -162,6 +171,9 @@ function New-sqmAgentCommandJob
 
 		[Parameter(Mandatory = $false)]
 		[switch]$StartJob,
+
+		[Parameter(Mandatory = $false)]
+		[switch]$SkipAlwaysOnPropagation,
 
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
@@ -518,6 +530,84 @@ exit 0
 			$modeText = if ($AppendStep) { 'AppendStep' } else { 'NewJob' }
 			Invoke-sqmLogging -Message "$functionName fuer Job '$JobName' abgeschlossen ($($createdSteps.Count) Step(s), Mode: $modeText)." -FunctionName $functionName -Level 'INFO'
 
+			# ------------------------------------------------------------------
+			# 7. AlwaysOn: Job auf allen anderen Replicas anlegen, damit er auf jedem Knoten existiert
+			#    und einem Failover folgt (gleiches Muster wie New-sqmOlaUsrDbBackupJob).
+			# ------------------------------------------------------------------
+			$replicaResults = [System.Collections.Generic.List[PSCustomObject]]::new()
+			if (-not $SkipAlwaysOnPropagation)
+			{
+				$secondaries = @()
+				try
+				{
+					$secondaries = @(Invoke-DbaQuery @connParams -Database master -EnableException -Query "SELECT r.replica_server_name FROM sys.availability_replicas r WHERE r.replica_server_name <> @@SERVERNAME" |
+						Where-Object { $_.replica_server_name })
+				}
+				catch
+				{
+					Invoke-sqmLogging -Message "AlwaysOn-Replicas nicht ermittelbar, nur $SqlInstance bearbeitet: $($_.Exception.Message)" -FunctionName $functionName -Level 'WARNING'
+				}
+
+				foreach ($sec in $secondaries)
+				{
+					$secName = [string]$sec.replica_server_name
+					try
+					{
+						# -Command je Replica klonen; SqlInstance-Werte, die auf diesen Knoten zeigen, auf den
+						# jeweiligen Replica-Namen umbiegen (sonst fragt der Job auf Knoten B Knoten A).
+						$secCommand = foreach ($c in $Command)
+						{
+							$cc = $c.Clone()
+							if ($cc.ContainsKey('Parameters') -and $cc['Parameters'])
+							{
+								$cp = $cc['Parameters'].Clone()
+								if ($cp.ContainsKey('SqlInstance') -and [string]$cp['SqlInstance'] -eq $SqlInstance) { $cp['SqlInstance'] = $secName }
+								$cc['Parameters'] = $cp
+							}
+							$cc
+						}
+
+						$secConn = @{ SqlInstance = $secName }
+						if ($SqlCredential) { $secConn['SqlCredential'] = $SqlCredential }
+						$secHasJob = [bool](Get-DbaAgentJob @secConn -Job $JobName -ErrorAction SilentlyContinue)
+
+						$secParams = @{
+							SqlInstance             = $secName
+							JobName                 = $JobName
+							Command                 = @($secCommand)
+							SkipAlwaysOnPropagation = $true
+							ScheduleType            = $ScheduleType
+							ScheduleTime            = $ScheduleTime
+							ScheduleDayOfMonth      = $ScheduleDayOfMonth
+							EnableException         = $true
+						}
+						if ($ScheduleDays)    { $secParams['ScheduleDays'] = $ScheduleDays }
+						if ($SqlCredential)   { $secParams['SqlCredential'] = $SqlCredential }
+						if ($StartJob)        { $secParams['StartJob'] = $true }
+						if ($AppendStep -and $secHasJob) { $secParams['AppendStep'] = $true }
+						elseif ($AppendStep)
+						{
+							Write-Warning "Job '$JobName' existiert auf Replica '$secName' nicht - wird dort nur mit dem neuen Step angelegt."
+							Invoke-sqmLogging -Message "AlwaysOn: Job '$JobName' fehlt auf '$secName', wird nur mit den neuen Steps angelegt." -FunctionName $functionName -Level 'WARNING'
+						}
+						else { $secParams['Force'] = $true }
+
+						Invoke-sqmLogging -Message "AlwaysOn: Propagiere Job '$JobName' auf Replica '$secName'." -FunctionName $functionName -Level 'INFO'
+						$sr = New-sqmAgentCommandJob @secParams
+						$replicaResults.Add([PSCustomObject]@{ SqlInstance = $secName; Status = 'Success'; Steps = $sr.Steps; Message = $null })
+					}
+					catch
+					{
+						$m = "AlwaysOn: Propagierung auf '$secName' fehlgeschlagen: $($_.Exception.Message)"
+						Invoke-sqmLogging -Message $m -FunctionName $functionName -Level 'ERROR'
+						Write-Warning $m
+						$replicaResults.Add([PSCustomObject]@{ SqlInstance = $secName; Status = 'Failed'; Steps = @(); Message = $_.Exception.Message })
+					}
+				}
+			}
+
+			$overall = if ($replicaResults | Where-Object { $_.Status -eq 'Failed' }) { 'PartialSuccess' } else { 'Success' }
+
 			return [PSCustomObject]@{
 				SqlInstance  = $SqlInstance
 				JobName      = $JobName
@@ -525,7 +615,8 @@ exit 0
 				Steps        = $createdSteps
 				ScheduleName = $scheduleName
 				Started      = $started
-				Status       = 'Success'
+				Replicas     = $replicaResults
+				Status       = $overall
 				Timestamp    = Get-Date
 			}
 		}

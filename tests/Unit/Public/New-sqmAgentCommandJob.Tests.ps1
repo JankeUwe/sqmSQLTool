@@ -58,3 +58,30 @@ Describe 'New-sqmAgentCommandJob - Stepnamen bei -AppendStep' {
         $r.Message | Should -Match 'existiert bereits'
     }
 }
+
+Describe 'New-sqmAgentCommandJob - AlwaysOn-Propagierung' {
+
+    BeforeEach {
+        Mock -ModuleName sqmSQLTool Invoke-DbaQuery {
+            if ($Query -match 'availability_replicas') { [PSCustomObject]@{ replica_server_name = 'NODE2' } }
+            else { [PSCustomObject]@{ HostName = $env:COMPUTERNAME; InstanceName = 'MSSQLSERVER' } }
+        }
+        Mock -ModuleName sqmSQLTool Get-DbaAgentJob { $null }
+        Mock -ModuleName sqmSQLTool New-Item { }
+        Mock -ModuleName sqmSQLTool Invoke-sqmLogging { }
+    }
+
+    It 'legt den Job auch auf dem anderen Replica an und biegt SqlInstance dorthin um' {
+        $r = New-sqmAgentCommandJob -SqlInstance 'NODE1' -JobName 'J1' -WhatIf -Command @{
+            FunctionName = 'Get-sqmDiskSpaceReport'; Parameters = @{ SqlInstance = 'NODE1' } }
+        $r.Status | Should -Be 'Success'
+        $r.Replicas.SqlInstance | Should -Be 'NODE2'
+        $r.Replicas.Status | Should -Be 'Success'
+        Should -Invoke -ModuleName sqmSQLTool Get-DbaAgentJob -ParameterFilter { $SqlInstance.ComputerName -eq 'NODE2' } -Times 2 -Exactly
+    }
+
+    It 'bearbeitet mit -SkipAlwaysOnPropagation nur die angegebene Instanz' {
+        $r = New-sqmAgentCommandJob -SqlInstance 'NODE1' -JobName 'J1' -WhatIf -SkipAlwaysOnPropagation -Command @{ FunctionName = 'Get-sqmDiskSpaceReport' }
+        @($r.Replicas).Count | Should -Be 0
+    }
+}

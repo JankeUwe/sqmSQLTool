@@ -1,5 +1,11 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.223.0] - 2026-11-10
+
+### Neu: New-sqmAgentCommandJob legt den Job auf allen AlwaysOn-Replicas an
+
+Ist die Instanz Mitglied einer Availability Group, wird der Job (Steps, Zeitplan, `-StartJob`) jetzt automatisch auch auf allen anderen Replicas angelegt, damit er auf jedem Knoten erscheint und einem Failover folgt. `-SkipAlwaysOnPropagation` beschraenkt auf die angegebene Instanz. Auf den Replicas wird ein vorhandener gleichnamiger Job ersetzt; mit `-AppendStep` werden die Steps dort angehaengt (fehlt der Job dort, wird er nur mit den neuen Steps angelegt, mit Warnung). `Parameters.SqlInstance`-Werte, die der angegebenen Instanz entsprechen, werden pro Knoten auf dessen Namen umgesetzt. Fuer Steps, die nur auf dem Primary arbeiten sollen, `PrimaryOnly = $true` setzen. Ergebnis hat neu `Replicas`; scheitert ein Replica, ist `Status` = `PartialSuccess`. 2 neue Tests.
+
 ## [1.9.222.0] - 2026-11-10
 
 ### Behoben: New-sqmAgentCommandJob -AppendStep scheitert nicht mehr an doppelten Stepnamen
