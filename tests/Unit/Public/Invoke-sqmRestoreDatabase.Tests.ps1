@@ -384,3 +384,82 @@ Describe 'Invoke-sqmRestoreDatabase - AG-Erkennung' {
         }
     }
 }
+
+Describe 'Invoke-sqmRestoreDatabase OFFLINE statt SINGLE_USER (1.9.225.0)' {
+
+    It 'setzt die Datenbank vor dem Restore OFFLINE und nicht SINGLE_USER' {
+        InModuleScope sqmSQLTool {
+            $fakeBackup = Join-Path ([System.IO.Path]::GetTempPath()) 'sqmRestoreTest_offline.bak'
+            Set-Content -Path $fakeBackup -Value 'dummy' -Encoding Ascii
+            $db = [PSCustomObject]@{ UserAccess = [Microsoft.SqlServer.Management.Smo.DatabaseUserAccess]::Multiple; ActiveConnections = 2 } | Add-Member -MemberType ScriptMethod -Name Refresh -Value { } -PassThru
+
+            Mock Invoke-sqmLogging { }
+            Mock Connect-DbaInstance { [PSCustomObject]@{ Name = 'SQL01'; Databases = @{ amb = $db } } }
+            Mock Get-sqmDatabaseAgMembership { [PSCustomObject]@{ IsAgDatabase = $false; HadrEnabled = $false } }
+            Mock Invoke-DbaQuery { $null }
+            Mock Invoke-sqmDatabaseStandardization { }
+            Mock Restore-DbaDatabase { [PSCustomObject]@{ Database = 'amb'; RestoreComplete = $true } }
+
+            $result = Invoke-sqmRestoreDatabase -SqlInstance 'SQL01' -BackupFile $fakeBackup `
+                -DatabaseName 'amb' -NoUserExport -Confirm:$false
+
+            Should -Invoke Invoke-DbaQuery -Times 1 -ParameterFilter { $Query -match 'SET OFFLINE WITH ROLLBACK IMMEDIATE' }
+            Should -Invoke Invoke-DbaQuery -Times 0 -ParameterFilter { $Query -match 'SET SINGLE_USER' }
+            ($result | Where-Object Action -eq 'SetOffline').Status | Should -Be 'Success'
+            ($result | Where-Object Action -eq 'RestoreStep').Status | Should -Be 'Success'
+            # Restore erfolgreich -> kein ONLINE-Notfall-Reset noetig
+            Should -Invoke Invoke-DbaQuery -Times 0 -ParameterFilter { $Query -match 'SET ONLINE' }
+
+            Remove-Item $fakeBackup -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'faellt auf SINGLE_USER zurueck, wenn OFFLINE nicht moeglich ist' {
+        InModuleScope sqmSQLTool {
+            $fakeBackup = Join-Path ([System.IO.Path]::GetTempPath()) 'sqmRestoreTest_offline_fallback.bak'
+            Set-Content -Path $fakeBackup -Value 'dummy' -Encoding Ascii
+            $db = [PSCustomObject]@{ UserAccess = [Microsoft.SqlServer.Management.Smo.DatabaseUserAccess]::Multiple; ActiveConnections = 2 } | Add-Member -MemberType ScriptMethod -Name Refresh -Value { } -PassThru
+
+            Mock Invoke-sqmLogging { }
+            Mock Connect-DbaInstance { [PSCustomObject]@{ Name = 'SQL01'; Databases = @{ amb = $db } } }
+            Mock Get-sqmDatabaseAgMembership { [PSCustomObject]@{ IsAgDatabase = $false; HadrEnabled = $false } }
+            Mock Invoke-DbaQuery { $null }
+            Mock Invoke-DbaQuery -ParameterFilter { $Query -match 'SET OFFLINE' } -MockWith { throw 'ALTER DATABASE statement not allowed' }
+            Mock Invoke-sqmDatabaseStandardization { }
+            Mock Restore-DbaDatabase { [PSCustomObject]@{ Database = 'amb'; RestoreComplete = $true } }
+
+            $result = Invoke-sqmRestoreDatabase -SqlInstance 'SQL01' -BackupFile $fakeBackup `
+                -DatabaseName 'amb' -NoUserExport -Confirm:$false
+
+            Should -Invoke Invoke-DbaQuery -Times 1 -ParameterFilter { $Query -match 'SET SINGLE_USER WITH ROLLBACK IMMEDIATE' }
+            ($result | Where-Object Action -eq 'SetSingleUser').Status | Should -Be 'Success'
+            ($result | Where-Object Action -eq 'RestoreStep').Status | Should -Be 'Success'
+
+            Remove-Item $fakeBackup -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'setzt die Datenbank wieder ONLINE, wenn der Restore fehlschlaegt' {
+        InModuleScope sqmSQLTool {
+            $fakeBackup = Join-Path ([System.IO.Path]::GetTempPath()) 'sqmRestoreTest_offline_fail.bak'
+            Set-Content -Path $fakeBackup -Value 'dummy' -Encoding Ascii
+            $db = [PSCustomObject]@{ UserAccess = [Microsoft.SqlServer.Management.Smo.DatabaseUserAccess]::Multiple; ActiveConnections = 2 } | Add-Member -MemberType ScriptMethod -Name Refresh -Value { } -PassThru
+
+            Mock Invoke-sqmLogging { }
+            Mock Connect-DbaInstance { [PSCustomObject]@{ Name = 'SQL01'; Databases = @{ amb = $db } } }
+            Mock Get-sqmDatabaseAgMembership { [PSCustomObject]@{ IsAgDatabase = $false; HadrEnabled = $false } }
+            Mock Invoke-DbaQuery { $null }
+            Mock Invoke-sqmDatabaseStandardization { }
+            Mock Restore-DbaDatabase { throw 'Backup set is damaged.' }
+
+            $result = Invoke-sqmRestoreDatabase -SqlInstance 'SQL01' -BackupFile $fakeBackup `
+                -DatabaseName 'amb' -NoUserExport -Confirm:$false
+
+            ($result | Where-Object Action -eq 'RestoreStep').Status | Should -Be 'Failed'
+            Should -Invoke Invoke-DbaQuery -Times 1 -ParameterFilter { $Query -match 'SET ONLINE' }
+            ($result | Where-Object Action -eq 'SetOnline').Status | Should -Be 'Success'
+
+            Remove-Item $fakeBackup -ErrorAction SilentlyContinue
+        }
+    }
+}

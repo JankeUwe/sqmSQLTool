@@ -1,5 +1,11 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.225.0] - 2026-11-12
+
+### Fix: Invoke-sqmRestoreDatabase setzt die Datenbank vor dem Restore OFFLINE statt SINGLE_USER
+
+SINGLE_USER hat eine prinzipbedingte Luecke: Sobald die eigene Verbindung geschlossen ist, ist der einzige Verbindungs-Slot frei, und jede Fremdsession (Monitoring, Connection-Pool, Agent) kann ihn vor `Restore-DbaDatabase` belegen ("Exclusive access could not be obtained"). Der Retry mit `Stop-DbaProcess` konnte gegen schnell reconnectende Sessions verlieren. Jetzt wird die Datenbank per `SET OFFLINE WITH ROLLBACK IMMEDIATE` gesperrt: eine OFFLINE-Datenbank nimmt keine Verbindungen an, es gibt keinen Slot zu stehlen. Nach dem Restore ist sie ONLINE/MULTI_USER. Schlaegt OFFLINE fehl, bleibt SINGLE_USER als Rueckfall. Scheitert der Restore, wird die Datenbank wieder ONLINE gesetzt. Gegen SQL Server 2025 mit vier dauerhaft reconnectenden Fremdsessions verifiziert.
+
 ## [1.9.224.0] - 2026-11-10
 
 ### Neu: Export-sqmDatabaseLogins -LatestCopy schreibt zusaetzlich eine Datei mit festem Namen

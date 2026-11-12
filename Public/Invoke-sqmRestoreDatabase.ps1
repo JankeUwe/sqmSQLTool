@@ -181,8 +181,10 @@ Optional: When set, the last restore is also performed with NORECOVERY (e.g. whe
 additional backups are to be applied manually).
 
 .PARAMETER ForceSingleUser
-Forces the database into single-user mode before the restore (even if no active connections
-are detected). By default only switches when there are active connections.
+Forces the database out of reach of other sessions before the restore (even if no active
+connections are detected). By default only done when there are active connections. Since
+1.9.225.0 the database is set OFFLINE (no session can sneak in, unlike SINGLE_USER); if that is
+not possible it falls back to SINGLE_USER. If the restore fails, the database is set ONLINE again.
 
 .PARAMETER NoRejoinAvailabilityGroup
 Optional: Whenever the function has determined the database should be AG-managed (it was already
@@ -384,6 +386,7 @@ function Invoke-sqmRestoreDatabase
 		$workInstance = $null
 		$secondaryInstances = @()
 		$wasSingleUser = $false
+		$wasOffline = $false
 		$originalDbStatus = $null
 		$restoreSucceeded = $false
 
@@ -959,11 +962,31 @@ function Invoke-sqmRestoreDatabase
 				{
 					try
 					{
-						$singleUserQuery = "ALTER DATABASE [$finalDbName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;"
-						Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database master -Query $singleUserQuery -EnableException -ErrorAction Stop
-						$wasSingleUser = $true
-						Invoke-sqmLogging -Message "Datenbank '$finalDbName' jetzt im Single-User-Modus." -FunctionName $functionName -Level "INFO"
-						$results += [PSCustomObject]@{ Action = "SetSingleUser"; Status = "Success"; Message = "Datenbank in Single-User versetzt." }
+						# 1.9.225.0: Primaer OFFLINE statt SINGLE_USER. SINGLE_USER hat prinzipbedingt eine
+						# Luecke: der einzige Verbindungs-Slot ist frei, sobald unsere Verbindung zu ist, und
+						# jede Fremdsession (Monitoring, Pool, Agent) kann ihn zwischen SET SINGLE_USER und
+						# Restore-DbaDatabase belegen -> "Exclusive access could not be obtained". Eine
+						# OFFLINE-Datenbank nimmt gar keine Verbindungen an, es gibt keinen Slot zu stehlen.
+						# RESTORE ... WITH REPLACE laeuft ueber eine OFFLINE-Datenbank (auf SQL 2025 mit
+						# T-SQL und Restore-DbaDatabase verifiziert); danach ist sie ONLINE/MULTI_USER.
+						# Schlaegt OFFLINE fehl, bleibt der bisherige SINGLE_USER-Weg als Rueckfall.
+						try
+						{
+							Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database master `
+								-Query "ALTER DATABASE [$finalDbName] SET OFFLINE WITH ROLLBACK IMMEDIATE;" -EnableException -ErrorAction Stop
+							$wasOffline = $true
+							Invoke-sqmLogging -Message "Datenbank '$finalDbName' jetzt OFFLINE (keine Fremdverbindung mehr moeglich)." -FunctionName $functionName -Level "INFO"
+							$results += [PSCustomObject]@{ Action = "SetOffline"; Status = "Success"; Message = "Datenbank OFFLINE gesetzt, der Restore laeuft ohne Verbindungs-Slot." }
+						}
+						catch
+						{
+							Invoke-sqmLogging -Message "OFFLINE nicht moeglich ($($_.Exception.Message)) - Rueckfall auf SINGLE_USER." -FunctionName $functionName -Level "WARNING"
+							$singleUserQuery = "ALTER DATABASE [$finalDbName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;"
+							Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database master -Query $singleUserQuery -EnableException -ErrorAction Stop
+							$wasSingleUser = $true
+							Invoke-sqmLogging -Message "Datenbank '$finalDbName' jetzt im Single-User-Modus." -FunctionName $functionName -Level "INFO"
+							$results += [PSCustomObject]@{ Action = "SetSingleUser"; Status = "Success"; Message = "Datenbank in Single-User versetzt." }
+						}
 					}
 					catch
 					{
@@ -1241,6 +1264,23 @@ function Invoke-sqmRestoreDatabase
 		}
 		finally
 		{
+			# ---- OFFLINE-Sicherung: scheiterte der Restore, darf die Datenbank nicht OFFLINE bleiben ----
+			if ($wasOffline -and -not $restoreSucceeded)
+			{
+				try
+				{
+					Invoke-DbaQuery -SqlInstance $workInstance -SqlCredential $SqlCredential -Database master `
+						-Query "ALTER DATABASE [$finalDbName] SET ONLINE;" -EnableException -ErrorAction Stop
+					Invoke-sqmLogging -Message "Restore nicht erfolgreich - Datenbank '$finalDbName' wieder ONLINE gesetzt." -FunctionName $functionName -Level "WARNING"
+					$results += [PSCustomObject]@{ Action = "SetOnline"; Status = "Success"; Message = "Restore fehlgeschlagen, Datenbank wieder ONLINE gesetzt." }
+				}
+				catch
+				{
+					Invoke-sqmLogging -Message "Datenbank '$finalDbName' konnte nach fehlgeschlagenem Restore nicht ONLINE gesetzt werden: $($_.Exception.Message)" -FunctionName $functionName -Level "ERROR"
+					$results += [PSCustomObject]@{ Action = "SetOnline"; Status = "Failed"; Message = "Datenbank ggf. OFFLINE/Restoring: $($_.Exception.Message)" }
+				}
+			}
+
 			# ---- 10. Datenbank wieder in die AG aufnehmen (inkl. Seeding der Secondaries) ----
 			# Laeuft bewusst im finally-Block: sobald der Restore selbst erfolgreich war
 			# ($restoreSucceeded), MUSS der Rejoin versucht werden - auch wenn einer der
