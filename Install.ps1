@@ -25,6 +25,12 @@
 .PARAMETER Source
     Source directory of the module. Defaults to the script's own directory.
 
+.PARAMETER SkipDbatoolsUpdateCheck
+    Ueberspringt die PSGallery-Abfrage nach einer neueren dbatools-Version. Die Abfrage ist eine
+    Netzabfrage und dauert je nach Netz/Proxy 15-30 s und mehr; ohne den Schalter laeuft sie hoechstens
+    einmal in 24 Stunden. Nicht betroffen: fehlendes dbatools wird weiterhin installiert, und am
+    Standort mit Freigabelaufwerk wird dbatools von dort synchronisiert.
+
 .PARAMETER Destination
     Explicit destination path. Overrides -Scope when specified.
 
@@ -49,7 +55,8 @@ param(
     [ValidateSet('CurrentUser', 'AllUsers')]
     [string]$Scope       = '',          # auto-detected below
     [string]$Source      = $PSScriptRoot,
-    [string]$Destination = ''
+    [string]$Destination = '',
+    [switch]$SkipDbatoolsUpdateCheck    # PSGallery-Abfrage nach neuer dbatools-Version ueberspringen
 )
 
 # ---------------------------------------------------------------------------
@@ -368,10 +375,39 @@ if ($siteModulesShare) {
         Write-Warning "  Synchronisation unvollstaendig - bitte den Zustand von '$targetModulesRoot' manuell pruefen."
     }
 } elseif ($dbatoolsInScope) {
-    Write-Host "  dbatools $dbatoolsInstalledVersion im passenden Scope vorhanden. Pruefe auf neuere Version..." -ForegroundColor Gray
+    # Find-Module ist eine Netzabfrage gegen PSGallery und dauert je nach Netz/Proxy 15-30 s und mehr
+    # (hier gemessen: 17-23 s, auch beim zweiten Aufruf), bei gesperrtem Zugriff bis zum Timeout.
+    # Lokal kostet die Pruefung dagegen Millisekunden. Deshalb: einmal pro Tag abfragen, das Ergebnis
+    # merken, und mit -SkipDbatoolsUpdateCheck ganz ueberspringen.
+    $checkStampFile = Join-Path $env:ProgramData 'MSSQLTools\dbatools-update-check.json'
+    $recentLatest = $null
+    if (-not $SkipDbatoolsUpdateCheck -and (Test-Path $checkStampFile)) {
+        try {
+            $stamp = Get-Content $checkStampFile -Raw | ConvertFrom-Json
+            if (([datetime]$stamp.CheckedAt) -gt (Get-Date).AddHours(-24) -and [string]$stamp.MaxVersion -eq [string]$dbatoolsMaxVersion) {
+                $recentLatest = [version]$stamp.LatestVersion
+            }
+        } catch { }
+    }
+    if ($SkipDbatoolsUpdateCheck) {
+        Write-Host "  dbatools $dbatoolsInstalledVersion im passenden Scope vorhanden. Update-Abfrage uebersprungen (-SkipDbatoolsUpdateCheck)." -ForegroundColor Gray
+    } elseif ($recentLatest -and $dbatoolsInstalledVersion -and $dbatoolsInstalledVersion -ge $recentLatest) {
+        Write-Host "  dbatools $dbatoolsInstalledVersion im passenden Scope vorhanden, in den letzten 24 h als aktuell geprueft - PSGallery-Abfrage uebersprungen." -ForegroundColor Gray
+    } else {
+    Write-Host "  dbatools $dbatoolsInstalledVersion im passenden Scope vorhanden. Pruefe auf neuere Version (PSGallery-Abfrage, kann je nach Netz dauern; Ueberspringen: -SkipDbatoolsUpdateCheck)..." -ForegroundColor Gray
+    $galleryWatch = [Diagnostics.Stopwatch]::StartNew()
     try {
         $latest = Find-Module dbatools -Repository PSGallery -MaximumVersion $dbatoolsMaxVersion -ErrorAction Stop |
             Sort-Object -Property { [version]$_.Version } -Descending | Select-Object -First 1
+        Write-Host ("  PSGallery-Abfrage dauerte {0:N1} s." -f $galleryWatch.Elapsed.TotalSeconds) -ForegroundColor Gray
+        if ($latest) {
+            try {
+                $stampDir = Split-Path $checkStampFile
+                if (-not (Test-Path $stampDir)) { New-Item -ItemType Directory -Path $stampDir -Force -ErrorAction Stop | Out-Null }
+                [pscustomobject]@{ CheckedAt = (Get-Date).ToString('o'); LatestVersion = [string]$latest.Version; MaxVersion = [string]$dbatoolsMaxVersion } |
+                    ConvertTo-Json | Set-Content -LiteralPath $checkStampFile -Encoding UTF8 -ErrorAction Stop
+            } catch { }
+        }
         if ($latest -and (-not $dbatoolsInstalledVersion -or [version]$latest.Version -gt $dbatoolsInstalledVersion)) {
             Write-Host "  Neuere Version verfuegbar: $($latest.Version) (installiert: $dbatoolsInstalledVersion) - aktualisiere..." -ForegroundColor Yellow
             Install-Module dbatools -Scope $Scope -RequiredVersion $latest.Version -Force -AllowClobber -ErrorAction Stop
@@ -383,6 +419,8 @@ if ($siteModulesShare) {
         Write-Warning "  Konnte PSGallery nicht nach einer neueren dbatools-Version abfragen (evtl. keine Internet-/PSGallery-Verbindung): $_"
         Write-Warning "  Installiert ist aktuell: dbatools $dbatoolsInstalledVersion. Bei Verdacht auf Versionsprobleme manuell pruefen/aktualisieren:"
         Write-Warning "    Update-Module dbatools -Force   (oder auf einer abgeschotteten Instanz: von einem Freigabelaufwerk/Offline-Repository sideloaden)"
+        Write-Warning ("    Die fehlgeschlagene Abfrage hat {0:N1} s gedauert; kuenftig mit -SkipDbatoolsUpdateCheck ueberspringen." -f $galleryWatch.Elapsed.TotalSeconds)
+    }
     }
 } else {
     Write-Host "  dbatools fehlt im Scope '$Scope' - installiere von der PSGallery..." -ForegroundColor Yellow

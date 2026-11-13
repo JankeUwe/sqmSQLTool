@@ -1,5 +1,15 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.227.0] - 2026-11-13
+
+### Neu: Get-sqmUnencryptedConnection - unverschluesselte Verbindungen und die Instanzen, die sie annehmen
+
+Liest je Instanz ForceEncryption (und ab SQL Server 2022 ForceStrictEncryption) aus `sys.dm_server_registry` und die aktuell offenen Verbindungen mit `encrypt_option = 'FALSE'` aus `sys.dm_exec_connections`. Gleiche Verbindungen (Login, Host, Programm, Client-Adresse, Transport, Authentifizierung) werden mit Anzahl, Session-IDs und aeltester Anmeldung zusammengefasst; Remote-Verbindungen sind Warning, lokale nur mit `-IncludeLocal` (Info), Shared Memory nie. `-InstanceSummary` liefert je Instanz, ob sie unverschluesselt annimmt. Unter Linux ist ForceEncryption nicht lesbar; eine beobachtete unverschluesselte Remote-Verbindung gilt dann als Beweis, dass die Instanz annimmt. Fehlt VIEW SERVER STATE, wird das Ergebnis als nicht belastbar gekennzeichnet (sonst waere nur die eigene Verbindung sichtbar und "nichts gefunden" falsch). Bericht als HTML/TXT/CSV. Der Bericht ist eine Momentaufnahme; vor dem Einschalten von ForceEncryption zu verschiedenen Zeiten wiederholen. 8 neue Tests.
+
+### Install.ps1: dbatools-Pruefung kann uebersprungen werden und laeuft hoechstens einmal pro Tag
+
+Die Wartezeit kommt von der Abfrage nach einer neueren dbatools-Version (`Find-Module` gegen PSGallery), nicht von der lokalen Pruefung: gemessen 17 bis 23 s je Aufruf, die lokale Versionspruefung dauerte 19 ms. Neu: `-SkipDbatoolsUpdateCheck` ueberspringt die Abfrage; ohne den Schalter wird sie nur einmal in 24 Stunden gestellt (Merker in `%ProgramData%\MSSQLTools\dbatools-update-check.json`) und zeigt ihre Dauer an. Fehlendes dbatools wird weiter installiert, am Standort mit Freigabelaufwerk wird weiter von dort synchronisiert.
+
 ## [1.9.226.0] - 2026-11-13
 
 ### Neu: Get-sqmProviderInventory - Server-Inventar als eine HTML-Datei mit eingebautem Viewer
