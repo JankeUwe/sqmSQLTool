@@ -1,5 +1,13 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.226.0] - 2026-11-13
+
+### Neu: Get-sqmProviderInventory - Server-Inventar als eine HTML-Datei mit eingebautem Viewer
+
+Fuer Auslagerungen und Provider-Anfragen: Die Funktion laeuft lokal auf dem Server und schreibt EINE selbsttragende HTML-Datei je Server (OS, CPU/RAM, Platten, SQL-Version/Edition/Ausbau, Datenbanken mit Groesse, Compat, Recovery und Backupdauer, Lastwerte, HA/DR, Abhaengigkeiten, Komponenten, optional Agent-Jobs, dazu Logins, DB-User, Rollen und Rechte). Die Datei braucht weder PowerShell noch Excel noch Internet, nur einen Browser. Im Viewer werden die HTML-Dateien weiterer Server per Drag and Drop zusammengefuehrt, Anwendung und Obergruppe je Server gepflegt (einzeln oder fuer markierte Server), die Security-Daten ein- und ausgeblendet (System-Logins und sysadmin-Mitglieder standardmaessig ausgefiltert), Servernamen anonymisiert und das Ergebnis als CSV, Excel (.xlsx) oder als reduzierte **Provider-HTML ohne Security-Daten** exportiert. Ein Pruefbericht meldet fehlende Zuordnungen, nicht erreichbare Instanzen, Lesefehler, alte Scans und ungescannte AlwaysOn-Partnerknoten. Ein zweiter Scan fuer den Security-Teil ist nie noetig.
+
+Der Scan ist rein lesend, speichert keine Job-Step-Befehle (nur externe Referenzen) und kommt ohne dbatools aus. Die HTML-Datei des Scans enthaelt die Security-Daten und ist nur fuer den internen Gebrauch; weitergegeben wird die Provider-HTML oder der Excel-Export. Ersetzt das eigenstaendige Skriptpaar sqmProviderInventory (Scan plus Merge nach Excel). 6 neue Tests.
+
 ## [1.9.225.0] - 2026-11-12
 
 ### Fix: Invoke-sqmRestoreDatabase setzt die Datenbank vor dem Restore OFFLINE statt SINGLE_USER
