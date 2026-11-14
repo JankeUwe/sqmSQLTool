@@ -1,5 +1,13 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.229.0] - 2026-11-14
+
+### Erweitert: Distributed-AG-Vorabpruefung fuer Autoseed und der Assistent fuer laengere Pausen
+
+Test-sqmDistributedAgMigrationPrerequisite prueft jetzt zusaetzlich, was ein Seeding erst nach dem Start scheitern laesst: TDE-Zertifikate auf dem Ziel (gleicher Thumbprint, sonst Blocker), den Seeding-Modus aller Ziel-Replikate (muss AUTOMATIC sein, sonst Blocker), fruehere fehlgeschlagene Seeding-Laeufe auf dem Ziel, den freien Platz der Log-Volumes auf der Quelle (das Log kann waehrend des Seedings nicht abgeschnitten werden), FILESTREAM- und In-Memory-Dateien sowie bei mehreren Ziel-Replikaten den Hinweis, CREATE ANY DATABASE dort von Hand zu vergeben (das Recht ist nicht abfragbar). Fehlende Dateipfade auf dem Ziel sind unter SQL Server 2016 ein Blocker (Pfade muessen identisch sein), sonst eine Warnung. Bei manuellem Seeding entfallen die Autoseed-Pruefungen. Pruefungsnamen und Gruppen gibt es jetzt auch auf Englisch (NameEn, CategoryEn). Die neuen Abfragen wurden gegen SQL Server 2025 auf Syntax und Objektnamen geprueft; gegen eine echte AG liefen sie im Labor nicht.
+
+Show-sqmDistributedAgGui: Eine Woche zwischen dem ersten Seeding und dem Cutover ist abgedeckt. Die Startseite zeigt den Zustandsordner (fuer ein Fortsetzen auf einem anderen Rechner `-StatePath` auf eine Freigabe setzen), die Meldung bei einer Sperre nennt den Pfad der Sperrdatei, die Datenbankliste wird bei jeder Aktualisierung der Synchronisationsseite neu gelesen (neue Datenbanken erscheinen im Protokoll), der Startzeitpunkt der Listener-Wartezeit wird im Zustand gespeichert und das Failover verlangt eine dritte Bestaetigung, dass Logins, Agent-Jobs und Linked Server uebertragen sind. 8 neue Tests.
+
 ## [1.9.228.0] - 2026-11-14
 
 ### Neu: Show-sqmDistributedAgGui - Assistent fuer die Migration auf einen neuen AlwaysOn-Cluster

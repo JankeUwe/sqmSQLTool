@@ -290,7 +290,11 @@ Describe 'Test-sqmDistributedAgMigrationPrerequisite' {
         Mock Invoke-DbaQuery -ModuleName sqmSQLTool {
             switch -Regex ($Query)
             {
-                'SERVERPROPERTY' { return [PSCustomObject]@{ ProductVersion = '16.0.4135.4'; Edition = 'Enterprise Edition (64-bit)'; IsHadrEnabled = 1; Collation = 'Latin1_General_CI_AS'; IsSysadmin = 1 } }
+                'SERVERPROPERTY' { return [PSCustomObject]@{ ProductVersion = $(if ("$SqlInstance" -eq 'T1' -and $global:PreTgtVer) { $global:PreTgtVer } else { '16.0.4135.4' }); Edition = 'Enterprise Edition (64-bit)'; IsHadrEnabled = 1; Collation = 'Latin1_General_CI_AS'; IsSysadmin = 1 } }
+                'dm_database_encryption_keys' { return @($global:PreTde) }
+                'FROM sys.certificates' { return @($global:PreCerts) }
+                'seeding_mode_desc' { if ($global:PreReplicas) { return @($global:PreReplicas) } else { return [PSCustomObject]@{ replica_server_name = 'T1'; seeding_mode_desc = 'AUTOMATIC' } } }
+                'dm_hadr_automatic_seeding' { return @($global:PreSeedFail) }
                 'dm_hadr_availability_group_states' { return [PSCustomObject]@{ name = $SqlParameters.n; is_distributed = 0; primary_replica = "$SqlInstance"; role_desc = $(if ($global:PreRole) { $global:PreRole } else { 'PRIMARY' }); synchronization_health_desc = 'HEALTHY' } }
                 'replica_server_name IN' { return @() }
                 'WHERE name = @n' { return @() }
@@ -299,16 +303,16 @@ Describe 'Test-sqmDistributedAgMigrationPrerequisite' {
                 'sys.master_files mf\s+JOIN' { return @([PSCustomObject]@{ DatabaseName = 'AppDb'; physical_name = 'D:\Data\AppDb.mdf'; SizeMB = 100 }) }
                 'FROM sys.databases' { return @() }
                 'adc.database_name AS name' { return @() }
-                'xp_fileexist' { return [PSCustomObject]@{ IsDir = 1 } }
+                'xp_fileexist' { return [PSCustomObject]@{ IsDir = $(if ($global:PreNoPath) { 0 } else { 1 }) } }
                 'dm_os_volume_stats' { return @([PSCustomObject]@{ volume_mount_point = 'D:\'; AvailableMB = 500000 }) }
                 'dm_server_services' { return [PSCustomObject]@{ service_account = 'CORP\svc' } }
                 'server_permissions' { return [PSCustomObject]@{ Grantee = 'CORP\svc' } }
-                default { return $null }
+                default { return @() }
             }
         }
         $script:pre = @{ SourceInstance = 'S1'; SourceAgName = 'AG1'; TargetInstance = 'T1'; TargetAgName = 'AG2' }
     }
-    AfterEach { Remove-Variable PreRole -Scope Global -ErrorAction SilentlyContinue }
+    AfterEach { Remove-Variable PreRole, PreTgtVer, PreTde, PreCerts, PreReplicas, PreSeedFail, PreNoPath -Scope Global -ErrorAction SilentlyContinue }
 
     It 'erlaubt die Migration bei gesunder Ausgangslage' {
         $r = Test-sqmDistributedAgMigrationPrerequisite @script:pre
@@ -372,6 +376,50 @@ Describe 'Test-sqmDistributedAgMigrationPrerequisite' {
         $r = Test-sqmDistributedAgMigrationPrerequisite @script:pre
         ($r.Blockers | Where-Object { $_.Id -eq 'tgt.dbclash' }).Count | Should -Be 1
     }
+    It 'blockiert, wenn ein TDE-Zertifikat auf dem Ziel fehlt' {
+        $global:PreTde = @([PSCustomObject]@{ DatabaseName = 'AppDb'; Thumbprint = 'AAAA' })
+        $global:PreCerts = @([PSCustomObject]@{ Thumbprint = 'BBBB' })
+        $r = Test-sqmDistributedAgMigrationPrerequisite @script:pre
+        $b = $r.Blockers | Where-Object { $_.Id -eq 'src.tde' }
+        $b.MessageDe | Should -Match 'AppDb'
+        $r.CanProceed | Should -BeFalse
+    }
+    It 'akzeptiert TDE, wenn das Zertifikat auf dem Ziel vorhanden ist' {
+        $global:PreTde = @([PSCustomObject]@{ DatabaseName = 'AppDb'; Thumbprint = 'AAAA' })
+        $global:PreCerts = @([PSCustomObject]@{ Thumbprint = 'AAAA' })
+        $r = Test-sqmDistributedAgMigrationPrerequisite @script:pre
+        ($r.Checks | Where-Object { $_.Id -eq 'src.tde' }).Status | Should -Be 'Pass'
+    }
+    It 'blockiert bei einem Ziel-Replikat ohne AUTOMATIC Seeding' {
+        $global:PreReplicas = @([PSCustomObject]@{ replica_server_name = 'T1'; seeding_mode_desc = 'AUTOMATIC' }, [PSCustomObject]@{ replica_server_name = 'T2'; seeding_mode_desc = 'MANUAL' })
+        $r = Test-sqmDistributedAgMigrationPrerequisite @script:pre
+        ($r.Blockers | Where-Object { $_.Id -eq 'tgt.seedmode' }).MessageDe | Should -Match 'T2'
+    }
+    It 'warnt bei mehreren Ziel-Replikaten wegen CREATE ANY DATABASE' {
+        $global:PreReplicas = @([PSCustomObject]@{ replica_server_name = 'T1'; seeding_mode_desc = 'AUTOMATIC' }, [PSCustomObject]@{ replica_server_name = 'T2'; seeding_mode_desc = 'AUTOMATIC' })
+        $r = Test-sqmDistributedAgMigrationPrerequisite @script:pre
+        ($r.Warnings | Where-Object { $_.Id -eq 'tgt.createany' }).RemedyDe | Should -Match 'GRANT CREATE ANY DATABASE'
+    }
+    It 'warnt vor frueheren Seeding-Fehlern auf dem Ziel' {
+        $global:PreSeedFail = @([PSCustomObject]@{ DatabaseName = 'AppDb' }, [PSCustomObject]@{ DatabaseName = 'FremdDb' })
+        $r = Test-sqmDistributedAgMigrationPrerequisite @script:pre
+        $w = $r.Warnings | Where-Object { $_.Id -eq 'tgt.seedfail' }
+        $w.MessageDe | Should -Match 'AppDb'
+        $w.MessageDe | Should -Not -Match 'FremdDb'
+    }
+    It 'prueft die Seeding-Zusatzpunkte bei manuellem Seeding nicht' {
+        $global:PreReplicas = @([PSCustomObject]@{ replica_server_name = 'T2'; seeding_mode_desc = 'MANUAL' })
+        $r = Test-sqmDistributedAgMigrationPrerequisite @script:pre -SeedingMode Manual -BackupPath '\\fs\bak'
+        ($r.Checks | Where-Object { $_.Id -eq 'tgt.seedmode' }).Count | Should -Be 0
+    }
+    It 'fehlende Pfade sind unter SQL 2016 ein Blocker, sonst eine Warnung' {
+        $global:PreNoPath = $true
+        $r22 = Test-sqmDistributedAgMigrationPrerequisite @script:pre
+        ($r22.Checks | Where-Object { $_.Id -eq 'tgt.paths' }).Status | Should -Be 'Warn'
+        $global:PreTgtVer = '13.0.6300.2'
+        $r16 = Test-sqmDistributedAgMigrationPrerequisite @script:pre
+        ($r16.Checks | Where-Object { $_.Id -eq 'tgt.paths' }).Status | Should -Be 'Fail'
+    }
     It 'verlangt bei manuellem Seeding einen Backup-Pfad' {
         $r = Test-sqmDistributedAgMigrationPrerequisite @script:pre -SeedingMode Manual
         ($r.Blockers | Where-Object { $_.Id -eq 'seed.path' }).Count | Should -Be 1
@@ -396,6 +444,9 @@ Describe 'GUI-Oberflaeche' {
                 foreach ($p in 0..9) { & $api.Go $p; $pid2 = $api.State.Flow[$p]; if (-not $api.Pages[$pid2].Visible) { throw "Seite $p nicht sichtbar" } }
                 if (($api.State.Flow -join ',') -ne '0,1,2,3,4,5,6,8,7,9') { throw 'Reihenfolge Failover vor Listener fehlt' }
                 & $api.Apply
+                if (-not $api.Controls.chkO3) { throw 'Checkbox Logins fehlt' }
+                & $api.Go 7
+                if ($api.Controls.btnFailover.Enabled) { throw 'Failover darf ohne Bestaetigungen nicht aktiv sein' }
             }
             catch { $script:guiErr += $_.Exception.Message }
             $api.State.PJob = $null; $api.State.Started = $false

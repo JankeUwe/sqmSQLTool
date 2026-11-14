@@ -110,7 +110,8 @@
 	& $def 'w_new' 'Neue Migration starten' 'Start a new migration'
 	& $def 'w_resume' 'Eine unterbrochene Migration fortsetzen' 'Resume an interrupted migration'
 	& $def 'w_ops' 'Betrieb: Zustand prüfen, Failover oder Rollback einer bestehenden Distributed AG' 'Operations: check status, fail over or roll back an existing Distributed AG'
-	& $def 'w_noresume' 'Keine gespeicherten Migrationen gefunden.' 'No saved migrations found.'
+	& $def 'w_noresume' 'Keine gespeicherten Migrationen gefunden in: {0}' 'No saved migrations found in: {0}'
+	& $def 'w_statedir' 'Zustandsordner: {0} (für ein Fortsetzen auf einem anderen Rechner -StatePath auf eine Freigabe setzen)' 'State folder: {0} (to resume on another machine set -StatePath to a share)'
 	& $def 'w_corrupt' '(Datei beschädigt)' '(file damaged)'
 	& $def 'w_prereq' 'Sie benötigen: sysadmin auf beiden Seiten, einen vorbereiteten Ziel-Cluster mit leerer Ziel-AG, Netzverbindung zwischen den Clustern (Endpoint-Port) und dbatools.' 'You need: sysadmin on both sides, a prepared target cluster with an empty target AG, a network connection between the clusters (endpoint port) and dbatools.'
 	& $def 'd_src' 'Quell-AG (alt)' 'Source AG (old)'
@@ -141,7 +142,7 @@
 	& $def 'c_pick' 'Bitte eine Gruppe auswählen.' 'Please select a group.'
 	& $def 'c_loaded' 'Bitte zuerst die Verbindung testen.' 'Please test the connection first.'
 	& $def 'c_nodag' 'Keine Distributed AG gefunden.' 'No Distributed AG found.'
-	& $def 'c_locked' 'Diese Migration wird bereits bearbeitet von {0} auf {1} (seit {2}). Zwei Assistenten dürfen nicht gleichzeitig arbeiten.' 'This migration is already being processed by {0} on {1} (since {2}). Two wizards must not work at the same time.'
+	& $def 'c_locked' 'Diese Migration wird bereits bearbeitet von {0} auf {1} (seit {2}). Zwei Assistenten dürfen nicht gleichzeitig arbeiten. Sperrdatei: {3}. Arbeitet sicher niemand mehr daran, löschen Sie diese Datei.' 'This migration is already being processed by {0} on {1} (since {2}). Two wizards must not work at the same time. Lock file: {3}. If you are sure nobody is working on it any more, delete this file.'
 
 	# Seite 2
 	& $def 'f_dagname' 'Name der Distributed AG' 'Name of the Distributed AG'
@@ -236,6 +237,7 @@
 	# Seite 8
 	& $def 'o_check1' 'Die Anwendungen sind gestoppt oder über die Unterbrechung informiert' 'The applications are stopped or informed about the interruption'
 	& $def 'o_check2' 'Ich weiß, dass beide Seiten nach dem Failover auf SYNCHRONOUS_COMMIT stehen' 'I know that both sides stay on SYNCHRONOUS_COMMIT after the failover'
+	& $def 'o_check3' 'Logins, Agent-Jobs und Linked Server sind auf den neuen Cluster übertragen (z. B. mit Sync-sqmLoginsToAlwaysOn)' 'Logins, Agent jobs and linked servers have been transferred to the new cluster (for example with Sync-sqmLoginsToAlwaysOn)'
 	& $def 'o_confirm' 'Zur Bestätigung geben Sie den Namen der Distributed AG ein:' 'To confirm, enter the name of the Distributed AG:'
 	& $def 'o_go' 'Failover jetzt ausführen' 'Run failover now'
 	& $def 'o_rb' 'Rollback zum alten Cluster' 'Roll back to the old cluster'
@@ -534,6 +536,7 @@
 				Mode = $S.Mode; Page = $S.StatePage; Config = $S.Config; DbList = $S.DbList
 				UnitDone = @($S.UnitDone.Keys); ListenerA = $S.ListenerA; ListenerC = $S.ListenerC
 				FailoverDone = $S.FailoverDone; RolledBack = $S.RolledBack; Started = $S.Started
+				WaitUntil = $(if ($S.WaitUntil) { $S.WaitUntil.ToString('s') } else { '' })
 				SourceFqdn = $S.Config.SourceFqdn; TargetFqdn = $S.Config.TargetFqdn
 			}
 			$a = @{ State = $st }
@@ -920,13 +923,18 @@
 	$UI.chkO2.Size = New-Object System.Drawing.Size(770, 24)
 	$p8.Controls.Add($UI.chkO2)
 	& $Reg $UI.chkO2 'o_check2'
-	$UI.lOConfirm = & $mkLabel $p8 'o_confirm' 0 148 600 20
-	$UI.txtOConfirm = & $mkText $p8 0 170 380 'Top,Left'
-	$UI.btnFailover = & $mkButton $p8 'o_go' 0 208 240 $true
-	$UI.btnRollback = & $mkButton $p8 'o_rb' 252 208 240
+	$UI.chkO3 = New-Object System.Windows.Forms.CheckBox
+	$UI.chkO3.Location = New-Object System.Drawing.Point(0, 136)
+	$UI.chkO3.Size = New-Object System.Drawing.Size(770, 24)
+	$p8.Controls.Add($UI.chkO3)
+	& $Reg $UI.chkO3 'o_check3'
+	$UI.lOConfirm = & $mkLabel $p8 'o_confirm' 0 174 600 20
+	$UI.txtOConfirm = & $mkText $p8 0 196 380 'Top,Left'
+	$UI.btnFailover = & $mkButton $p8 'o_go' 0 234 240 $true
+	$UI.btnRollback = & $mkButton $p8 'o_rb' 252 234 240
 	$UI.btnRollback.Visible = $false
-	$UI.lvFo = & $mkList $p8 0 252 780 160 @('x_step', 'x_state', 'x_detail') @(300, 110, 340)
-	$UI.lblFo = & $mkLabel $p8 '' 0 420 780 40 $true 'Top,Left,Right'
+	$UI.lvFo = & $mkList $p8 0 278 780 150 @('x_step', 'x_state', 'x_detail') @(300, 110, 340)
+	$UI.lblFo = & $mkLabel $p8 '' 0 436 780 40 $true 'Top,Left,Right'
 
 	# ---------- Seite 9: Abschluss ----------
 	$p9 = & $mkPage
@@ -1266,7 +1274,8 @@
 		}
 		$S.ResumeStates = $states
 		$UI.rbResume.Enabled = ($states.Count -gt 0)
-		$UI.lblNoResume.Text = $(if ($states.Count -eq 0) { (& $Tr 'w_noresume') } else { '' })
+		$shownDir = if ($S.StateDir) { $S.StateDir } else { Get-sqmDagStateDirectory }
+		$UI.lblNoResume.Text = $(if ($states.Count -eq 0) { (& $Tr 'w_noresume' @($shownDir)) } else { (& $Tr 'w_statedir' @($shownDir)) })
 		if ($states.Count -gt 0 -and $UI.cmbResume.SelectedIndex -lt 0) { $UI.cmbResume.SelectedIndex = 0 }
 	}
 
@@ -1318,6 +1327,7 @@
 				if (-not $UI.txtLname.Text.Trim()) { $UI.txtLname.Text = $S.Config.ListenerName }
 				if (-not $UI.txtLport7.Text.Trim()) { $UI.txtLport7.Text = [string]$S.Config.ListenerPort }
 				& $RenderInstruction
+				if ($S.ListenerA -and $S.WaitUntil) { $tmrWait.Start() }
 				& $UpdateListenerUi
 			}
 			8
@@ -1638,6 +1648,17 @@ if ($c.SeedingMode -eq 'Automatic' -and -not $err) { try { $seed = @(Get-sqmDagS
 			return
 		}
 		$snap = @($res.Snapshot)
+		$live = @($snap | ForEach-Object { $_.DatabaseName } | Where-Object { $_ } | Sort-Object -Unique)
+		if ($live.Count -gt 0)
+		{
+			$added = @($live | Where-Object { $S.DbList -notcontains $_ })
+			if ($added.Count -gt 0 -and $S.DbList.Count -gt 0)
+			{
+				& $Log "Neue Datenbank(en) seit der Vorabprüfung in der Quell-AG: $($added -join ', ')" 'WARN'
+				$UI.lblSyncPoll.Text += $(if ($S.Lang -eq 'de') { "  Neu seit Start: $($added -join ', ')" } else { "  New since start: $($added -join ', ')" })
+			}
+			$S.DbList = $live
+		}
 		$UI.lvSync.BeginUpdate()
 		$UI.lvSync.Items.Clear()
 		foreach ($r in ($snap | Where-Object { -not ($_.IsLocal -eq $true -or $_.IsLocal -eq 1) }))
@@ -1760,7 +1781,7 @@ Invoke-sqmDagMigrationUnit -Unit $unit -Config $c -SqlCredential $cred
 		if ((& $Cur) -ne 8) { return }
 		$name = [string]$S.Config.DistributedAgName
 		$typed = ($UI.txtOConfirm.Text.Trim() -eq $name -and $name)
-		$UI.btnFailover.Enabled = (-not $S.Busy -and $S.SyncReady -and $UI.chkO1.Checked -and $UI.chkO2.Checked -and $typed -and -not ($S.FailoverDone -and -not $S.RolledBack))
+		$UI.btnFailover.Enabled = (-not $S.Busy -and $S.SyncReady -and $UI.chkO1.Checked -and $UI.chkO2.Checked -and $UI.chkO3.Checked -and $typed -and -not ($S.FailoverDone -and -not $S.RolledBack))
 		$UI.btnRollback.Visible = ($S.FailoverDone -and -not $S.RolledBack)
 		$UI.btnRollback.Enabled = (-not $S.Busy)
 		$UI.lblOState.Text = $(if ($S.SyncReady) { (& $Tr 'y_ready') } else { (& $Tr 'o_notready') + ' ' + $S.SyncReasons })
@@ -1922,7 +1943,7 @@ Invoke-sqmDagMigrationUnit -Unit $unit -Config $c -SqlCredential $cred
 	$UI.txtLname.Add_TextChanged({ & $Guard { & $RenderInstruction } })
 	$tmrWait.Add_Tick({ & $Guard { if ((& $Cur) -eq 7) { & $UpdateListenerUi } } })
 
-	foreach ($cb in @($UI.chkO1, $UI.chkO2)) { $cb.Add_CheckedChanged({ & $Guard { & $UpdateFailoverUi } }) }
+	foreach ($cb in @($UI.chkO1, $UI.chkO2, $UI.chkO3)) { $cb.Add_CheckedChanged({ & $Guard { & $UpdateFailoverUi } }) }
 	$UI.txtOConfirm.Add_TextChanged({ & $Guard { & $UpdateFailoverUi } })
 	$UI.btnFailover.Add_Click({
 			& $Guard {
@@ -1997,7 +2018,7 @@ Invoke-sqmDagMigrationUnit -Unit $unit -Config $c -SqlCredential $cred
 		$lk = Enter-sqmDagMigrationLock @a
 		if (-not $lk.Acquired)
 		{
-			[void][System.Windows.Forms.MessageBox]::Show((& $Tr 'c_locked' @($lk.OwnerUser, $lk.OwnerHost, $lk.Since)), (& $Tr 'title'), 'OK', 'Warning')
+			[void][System.Windows.Forms.MessageBox]::Show((& $Tr 'c_locked' @($lk.OwnerUser, $lk.OwnerHost, $lk.Since, $lk.LockFile)), (& $Tr 'title'), 'OK', 'Warning')
 			return $false
 		}
 		$S.Lock = $lk
@@ -2036,6 +2057,7 @@ Invoke-sqmDagMigrationUnit -Unit $unit -Config $c -SqlCredential $cred
 							$UI.txtListener.Text = [string]$cf.ListenerName
 							$S.DbList = @($st.DbList)
 							$S.ListenerA = [bool]$st.ListenerA; $S.ListenerC = [bool]$st.ListenerC
+							if ($st.WaitUntil) { try { $S.WaitUntil = [datetime]::Parse([string]$st.WaitUntil) } catch { Write-Verbose $_.Exception.Message } }
 							$S.FailoverDone = [bool]$st.FailoverDone; $S.RolledBack = [bool]$st.RolledBack
 							$S.Started = [bool]$st.Started
 							$S.ResumePage = [int]$st.Page

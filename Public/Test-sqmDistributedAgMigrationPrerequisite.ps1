@@ -95,6 +95,9 @@
 			@('^Dateipfade auf dem Ziel vorhanden$', 'File paths exist on the target'), @('^Freier Platz auf dem Ziel$', 'Free space on the target'),
 			@('^Zielprüfungen$', 'Target checks'), @('^Port (\d+) auf \[(.*)\]$', 'Port $1 on [$2]'),
 			@('^Backup-Pfad angegeben$', 'Backup path specified'), @('^Backup-Pfad ist UNC$', 'Backup path is UNC'), @('^Backup-Pfad erreichbar$', 'Backup path reachable'),
+			@('^TDE-Zertifikate auf dem Ziel$', 'TDE certificates on the target'), @('^Seeding-Modus der Ziel-Replikate$', 'Seeding mode of the target replicas'),
+			@('^CREATE ANY DATABASE auf Ziel-Replikaten$', 'CREATE ANY DATABASE on target replicas'), @('^Log-Platz auf der Quelle$', 'Log space on the source'),
+			@('^Frühere Seeding-Fehler auf dem Ziel$', 'Earlier seeding failures on the target'), @('^FILESTREAM und In-Memory$', 'FILESTREAM and In-Memory'),
 			@('^Quelle \((.*)\)$', 'Source ($1)'), @('^Ziel \((.*)\)$', 'Target ($1)'), @('^Ziel$', 'Target'), @('^Lokal$', 'Local'),
 			@('^Netzwerk$', 'Network'), @('^Endpoint-Berechtigung$', 'Endpoint permission'), @('^Quelle gegen Ziel$', 'Source versus target')
 		)
@@ -303,7 +306,7 @@ WHERE ag.name = @n AND drs.is_local = 1
 					"Nicht synchron oder suspendiert: $badNames" "Not synchronizing or suspended: $badNames" 'Datenbewegung fortsetzen und Synchronisation abwarten.' 'Resume data movement and wait for synchronization.'
 
 				$srcFiles = @(& $q $inst @"
-SELECT DB_NAME(mf.database_id) AS DatabaseName, mf.physical_name, CAST(mf.size AS bigint) * 8 / 1024 AS SizeMB
+SELECT DB_NAME(mf.database_id) AS DatabaseName, mf.physical_name, mf.type_desc AS FileType, CAST(mf.size AS bigint) * 8 / 1024 AS SizeMB
 FROM sys.master_files mf
 JOIN sys.availability_databases_cluster adc ON adc.database_name = DB_NAME(mf.database_id)
 JOIN sys.availability_groups ag ON ag.group_id = adc.group_id
@@ -379,8 +382,11 @@ JOIN sys.availability_groups ag ON ag.group_id = adc.group_id WHERE ag.name = @n
 					$r = & $q $TargetInstance 'DECLARE @t TABLE (FileExists int, IsDir int, ParentExists int); INSERT @t EXEC master.dbo.xp_fileexist @d; SELECT IsDir FROM @t' @{ d = $d } | Select-Object -First 1
 					if (-not $r -or $r.IsDir -ne 1) { $missing += $d }
 				}
-				& $add 'tgt.paths' 'Ziel' 'Dateipfade auf dem Ziel vorhanden' 'Warning' ($missing.Count -eq 0) 'Alle Quellpfade existieren auf dem Ziel.' 'All source paths exist on the target.' `
-					"Auf dem Ziel fehlen: $($missing -join '; ')" "Missing on the target: $($missing -join '; ')" 'Pfade anlegen. Ab SQL 2017 nutzt Autoseed sonst die Standardpfade des Ziels.' 'Create the paths. From SQL 2017 autoseed otherwise uses the default paths of the target.'
+				$tgtMajor = 0
+				try { $tgtMajor = ([version]$info['tgt'].ProductVersion).Major } catch { Write-Verbose $_.Exception.Message }
+				$pathSeverity = if ($tgtMajor -eq 13) { 'Blocker' } else { 'Warning' }
+				& $add 'tgt.paths' 'Ziel' 'Dateipfade auf dem Ziel vorhanden' $pathSeverity ($missing.Count -eq 0) 'Alle Quellpfade existieren auf dem Ziel.' 'All source paths exist on the target.' `
+					"Auf dem Ziel fehlen: $($missing -join '; ')" "Missing on the target: $($missing -join '; ')" 'Pfade auf dem Ziel anlegen, sonst kann das Autoseed scheitern (unter SQL Server 2016 müssen die Pfade identisch sein).' 'Create the paths on the target, otherwise autoseed can fail (on SQL Server 2016 the paths must be identical).'
 
 				$vols = @(& $q $TargetInstance @"
 SELECT DISTINCT vs.volume_mount_point, vs.available_bytes / 1048576 AS AvailableMB
@@ -400,6 +406,107 @@ FROM sys.master_files mf CROSS APPLY sys.dm_os_volume_stats(mf.database_id, mf.f
 		{
 			$err = Resolve-sqmDagError -Message $_.Exception.Message
 			& $add 'tgt.dbcheck' 'Ziel' 'Zielprüfungen' 'Warning' $false "Prüfung unvollständig: $($err.CauseDe)" "Check incomplete: $($err.CauseEn)" $err.FixDe $err.FixEn
+		}
+	}
+
+	# ---- Zusatzpruefungen fuer das Seeding ----
+	if ($info['src'] -and $info['tgt'] -and $srcDatabases.Count -gt 0)
+	{
+		$catSrc = "Quelle ($SourceInstance)"
+		$srcNames = @($srcDatabases | ForEach-Object { $_.DatabaseName })
+
+		# TDE: Das Zertifikat muss auf dem Ziel mit gleichem Thumbprint vorhanden sein
+		try
+		{
+			$tde = @(& $q $SourceInstance @"
+SELECT DB_NAME(k.database_id) AS DatabaseName, CONVERT(varchar(100), k.encryptor_thumbprint, 2) AS Thumbprint
+FROM sys.dm_database_encryption_keys k
+JOIN sys.availability_databases_cluster adc ON adc.database_name = DB_NAME(k.database_id)
+JOIN sys.availability_groups ag ON ag.group_id = adc.group_id
+WHERE ag.name = @n AND k.encryptor_type = 'CERTIFICATE'
+"@ @{ n = $SourceAgName })
+			$tgtCerts = @(& $q $TargetInstance 'SELECT CONVERT(varchar(100), thumbprint, 2) AS Thumbprint FROM sys.certificates' $null | ForEach-Object { $_.Thumbprint })
+			$noCert = @($tde | Where-Object { $tgtCerts -notcontains $_.Thumbprint } | ForEach-Object { $_.DatabaseName })
+			if ($tde.Count -eq 0)
+			{
+				& $add 'src.tde' $catSrc 'TDE-Zertifikate auf dem Ziel' 'Blocker' $true 'Keine TDE-verschlüsselten Datenbanken.' 'No TDE encrypted databases.' '' ''
+			}
+			else
+			{
+				& $add 'src.tde' $catSrc 'TDE-Zertifikate auf dem Ziel' 'Blocker' ($noCert.Count -eq 0) "Alle $($tde.Count) TDE-Zertifikate sind auf dem Ziel vorhanden." "All $($tde.Count) TDE certificates exist on the target." `
+					"TDE-Zertifikat fehlt auf dem Ziel für: $($noCert -join ', ')" "TDE certificate missing on the target for: $($noCert -join ', ')" 'Zertifikat und privaten Schlüssel auf das Ziel übertragen (Backup und Restore des Zertifikats), dann erneut prüfen.' 'Transfer the certificate and its private key to the target (certificate backup and restore), then check again.'
+			}
+		}
+		catch
+		{
+			$err = Resolve-sqmDagError -Message $_.Exception.Message
+			& $add 'src.tde' $catSrc 'TDE-Zertifikate auf dem Ziel' 'Warning' $false "TDE-Prüfung unvollständig: $($err.CauseDe)" "TDE check incomplete: $($err.CauseEn)" $err.FixDe $err.FixEn
+		}
+
+		# FILESTREAM und In-Memory
+		$fs = @($srcFiles | Where-Object { $_.FileType -eq 'FILESTREAM' } | ForEach-Object { $_.DatabaseName } | Sort-Object -Unique)
+		& $add 'src.filestream' $catSrc 'FILESTREAM und In-Memory' 'Warning' ($fs.Count -eq 0) 'Keine FILESTREAM- oder In-Memory-Dateien.' 'No FILESTREAM or In-Memory files.' `
+			"Dateien vom Typ FILESTREAM oder In-Memory in: $($fs -join ', ')" "FILESTREAM or In-Memory files in: $($fs -join ', ')" 'Das Seeding dieser Datenbanken vorab auf einem Testsystem prüfen.' 'Test the seeding of these databases on a test system first.'
+
+		if ($SeedingMode -eq 'Automatic')
+		{
+			# Seeding-Modus der Ziel-Replikate (die Ziel-AG seedet ihre Secondaries selbst)
+			try
+			{
+				$tgtRep = @(& $q $TargetInstance @"
+SELECT ar.replica_server_name, ar.seeding_mode_desc
+FROM sys.availability_replicas ar
+JOIN sys.availability_groups ag ON ag.group_id = ar.group_id
+WHERE ag.name = @n
+"@ @{ n = $TargetAgName })
+				$notAuto = @($tgtRep | Where-Object { $_.seeding_mode_desc -ne 'AUTOMATIC' } | ForEach-Object { $_.replica_server_name })
+				& $add 'tgt.seedmode' 'Ziel' 'Seeding-Modus der Ziel-Replikate' 'Blocker' ($notAuto.Count -eq 0) "Alle $($tgtRep.Count) Ziel-Replikat(e) stehen auf AUTOMATIC." "All $($tgtRep.Count) target replica(s) are set to AUTOMATIC." `
+					"Nicht auf AUTOMATIC: $($notAuto -join ', ')" "Not set to AUTOMATIC: $($notAuto -join ', ')" 'Auf der Ziel-AG je Replikat SEEDING_MODE = AUTOMATIC setzen (ALTER AVAILABILITY GROUP ... MODIFY REPLICA) oder manuelles Seeding wählen.' 'Set SEEDING_MODE = AUTOMATIC per replica on the target AG (ALTER AVAILABILITY GROUP ... MODIFY REPLICA) or choose manual seeding.'
+				if ($tgtRep.Count -gt 1)
+				{
+					& $add 'tgt.createany' 'Ziel' 'CREATE ANY DATABASE auf Ziel-Replikaten' 'Warning' $false '' '' `
+						"Die Ziel-AG hat $($tgtRep.Count) Replikate. Das Recht CREATE ANY DATABASE wird nur auf dem Ziel-Primary gesetzt und lässt sich nicht abfragen." "The target AG has $($tgtRep.Count) replicas. CREATE ANY DATABASE is only granted on the target primary and cannot be queried." `
+						'Auf jedem weiteren Ziel-Replikat ausführen: ALTER AVAILABILITY GROUP [Ziel-AG] GRANT CREATE ANY DATABASE.' 'Run on every other target replica: ALTER AVAILABILITY GROUP [target AG] GRANT CREATE ANY DATABASE.'
+				}
+			}
+			catch
+			{
+				$err = Resolve-sqmDagError -Message $_.Exception.Message
+				& $add 'tgt.seedmode' 'Ziel' 'Seeding-Modus der Ziel-Replikate' 'Warning' $false "Prüfung unvollständig: $($err.CauseDe)" "Check incomplete: $($err.CauseEn)" $err.FixDe $err.FixEn
+			}
+
+			# Fruehere Seeding-Fehler auf dem Ziel
+			try
+			{
+				$failed = @(& $q $TargetInstance @"
+SELECT adc.database_name AS DatabaseName
+FROM sys.dm_hadr_automatic_seeding s
+LEFT JOIN sys.availability_databases_cluster adc ON adc.group_database_id = s.ag_db_id
+WHERE s.current_state = 'FAILED'
+"@ $null | Where-Object { $srcNames -contains $_.DatabaseName } | ForEach-Object { $_.DatabaseName } | Sort-Object -Unique)
+				& $add 'tgt.seedfail' 'Ziel' 'Frühere Seeding-Fehler auf dem Ziel' 'Warning' ($failed.Count -eq 0) 'Keine fehlgeschlagenen Seeding-Läufe gefunden.' 'No failed seeding runs found.' `
+					"Fehlgeschlagenes Seeding für: $($failed -join ', ')" "Failed seeding for: $($failed -join ', ')" 'Ursache klären (sys.dm_hadr_automatic_seeding, Fehlerprotokoll des Ziels) und Reste auf dem Ziel entfernen.' 'Find the cause (sys.dm_hadr_automatic_seeding, error log of the target) and remove leftovers on the target.'
+			}
+			catch { Write-Verbose $_.Exception.Message }
+
+			# Log-Platz auf der Quelle (Heuristik: das Log kann waehrend des Seedings nicht abgeschnitten werden)
+			try
+			{
+				$logVols = @(& $q $SourceInstance @"
+SELECT DISTINCT vs.volume_mount_point, vs.available_bytes / 1048576 AS AvailableMB
+FROM sys.master_files mf CROSS APPLY sys.dm_os_volume_stats(mf.database_id, mf.file_id) vs
+WHERE mf.type_desc = 'LOG'
+"@ $null)
+				$tight = @()
+				foreach ($v in $logVols)
+				{
+					$logSize = ($srcFiles | Where-Object { $_.FileType -eq 'LOG' -and $_.physical_name -like "$($v.volume_mount_point)*" } | Measure-Object -Property SizeMB -Sum).Sum
+					if ($logSize -and [double]$v.AvailableMB -lt $logSize) { $tight += "$($v.volume_mount_point) (Logs $([math]::Round($logSize)) MB, frei $($v.AvailableMB) MB)" }
+				}
+				& $add 'src.logspace' $catSrc 'Log-Platz auf der Quelle' 'Warning' ($tight.Count -eq 0) 'Auf den Log-Volumes ist mindestens so viel frei wie die Logs belegen.' 'The log volumes have at least as much free space as the logs use.' `
+					"Wenig freier Platz für Log-Wachstum: $($tight -join '; ')" "Little free space for log growth: $($tight -join '; ')" 'Während des Seedings kann das Log nicht abgeschnitten werden. Platz schaffen oder das Seeding in einer ruhigen Zeit starten.' 'The log cannot be truncated during seeding. Free up space or start the seeding during a quiet period.'
+			}
+			catch { Write-Verbose $_.Exception.Message }
 		}
 	}
 
