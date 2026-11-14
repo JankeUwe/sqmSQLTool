@@ -79,6 +79,29 @@
 	$checks = [System.Collections.Generic.List[PSCustomObject]]::new()
 	$dagName = if ($DistributedAgName) { $DistributedAgName } else { "$($SourceAgName)_$($TargetAgName)" }
 
+	# Englische Bezeichnungen fuer Pruefungsname und Gruppe (die Meldungen selbst liegen zweisprachig vor).
+	$trEn = {
+		param ([string]$Text)
+		$map = @(
+			@('^Verbindung$', 'Connection'), @('^sysadmin-Rechte$', 'sysadmin permission'), @('^SQL-Version$', 'SQL version'),
+			@('^Edition$', 'Edition'), @('^Always On aktiviert$', 'Always On enabled'), @('^AG \[(.*)\] vorhanden$', 'AG [$1] exists'),
+			@('^Normale AG$', 'Regular AG'), @('^Knoten ist PRIMARY$', 'Node is PRIMARY'), @('^AG gesund$', 'AG healthy'),
+			@('^Nicht bereits in anderer Distributed AG$', 'Not already in another Distributed AG'), @('^Name \[(.*)\] frei$', 'Name [$1] free'),
+			@('^Distributed AG frei$', 'Distributed AG free'), @('^Endpoint vorhanden und gestartet$', 'Endpoint exists and started'),
+			@('^Endpoint-Port (\d+)$', 'Endpoint port $1'), @('^Endpoint-Rolle$', 'Endpoint role'),
+			@('^Datenbanken in der AG$', 'Databases in the AG'), @('^Datenbanken synchron$', 'Databases synchronizing'),
+			@('^Datenbankabfrage$', 'Database query'), @('^Versionen kompatibel$', 'Versions compatible'), @('^Serverkollation$', 'Server collation'),
+			@('^CONNECT für (.*) auf (.*)$', 'CONNECT for $1 on $2'), @('^Datenbanknamen auf dem Ziel frei$', 'Database names on the target free'),
+			@('^Dateipfade auf dem Ziel vorhanden$', 'File paths exist on the target'), @('^Freier Platz auf dem Ziel$', 'Free space on the target'),
+			@('^Zielprüfungen$', 'Target checks'), @('^Port (\d+) auf \[(.*)\]$', 'Port $1 on [$2]'),
+			@('^Backup-Pfad angegeben$', 'Backup path specified'), @('^Backup-Pfad ist UNC$', 'Backup path is UNC'), @('^Backup-Pfad erreichbar$', 'Backup path reachable'),
+			@('^Quelle \((.*)\)$', 'Source ($1)'), @('^Ziel \((.*)\)$', 'Target ($1)'), @('^Ziel$', 'Target'), @('^Lokal$', 'Local'),
+			@('^Netzwerk$', 'Network'), @('^Endpoint-Berechtigung$', 'Endpoint permission'), @('^Quelle gegen Ziel$', 'Source versus target')
+		)
+		foreach ($m in $map) { if ($Text -match $m[0]) { return ($Text -replace $m[0], $m[1]) } }
+		return $Text
+	}
+
 	$add = {
 		# Zwei Aufrufformen: 4 Texte (Meldung de/en, Lösung de/en) oder 6 Texte
 		# (Meldung bei Erfolg de/en, Meldung bei Fehler de/en, Lösung de/en).
@@ -95,7 +118,7 @@
 			$msgDe = $T1; $msgEn = $T2; $fixDe = $T3; $fixEn = $T4
 		}
 		$c = [PSCustomObject]@{
-			Id = $Id; Category = $Category; Name = $Name; Severity = $Severity; Status = $status
+			Id = $Id; Category = $Category; CategoryEn = (& $trEn $Category); Name = $Name; NameEn = (& $trEn $Name); Severity = $Severity; Status = $status
 			MessageDe = $msgDe; MessageEn = $msgEn
 			RemedyDe = $(if ($Pass) { '' } else { $fixDe }); RemedyEn = $(if ($Pass) { '' } else { $fixEn })
 		}

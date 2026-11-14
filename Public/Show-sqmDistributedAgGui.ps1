@@ -8,8 +8,8 @@
     Fuehrt Schritt fuer Schritt durch die Migration:
     Verbinden, Konfigurieren, Vorabpruefung (Test-sqmDistributedAgMigrationPrerequisite), Zusammenfassung mit
     Trockenlauf, Ausfuehrung (New-sqmDistributedAvailabilityGroup, Add-sqmDatabaseToDistributedAg),
-    Synchronisation ueberwachen, Listener-Umzug (Invoke-sqmListenerMigrationPrep, Complete-sqmListenerMigration),
-    Failover (Invoke-sqmDistributedFailover) und Abschluss mit Bericht.
+    Synchronisation ueberwachen, Failover (Invoke-sqmDistributedFailover),
+    danach Listener-Umzug (Invoke-sqmListenerMigrationPrep, Complete-sqmListenerMigration) und Abschluss mit Bericht.
 
     Die Oberflaeche ruft ausschliesslich die vorhandenen Funktionen auf. Alle Aktionen laufen in einem
     Hintergrund-Runspace, die Oberflaeche bleibt bedienbar. Der Fortschritt wird in einer Zustandsdatei
@@ -234,7 +234,7 @@
 	& $def 'l_instr' "Bitte auf dem Ziel-Cluster die Listener-Ressource anlegen:`r`n`r`nAG: {0}`r`nListener-DNS-Name: {1}`r`nPort: {2}`r`nIP-Adresse(n): {3}`r`n`r`nVorgehen:`r`n1. Auf dem alten Cluster ist die Listener-Ressource bereits aus der AG entfernt. Die Rolle darf jetzt gelöscht werden.`r`n2. Auf dem Ziel-Cluster einen Client-Access-Point mit demselben DNS-Namen und der IP-Adresse anlegen und der AG-Rolle zuordnen.`r`n3. Sicherstellen, dass die Ressource online ist und der DNS-Name auflöst.`r`n4. Rückmeldung an das DBA-Team." "Please create the listener resource on the target cluster:`r`n`r`nAG: {0}`r`nListener DNS name: {1}`r`nPort: {2}`r`nIP address(es): {3}`r`n`r`nProcedure:`r`n1. On the old cluster the listener resource has already been removed from the AG. The role may be deleted now.`r`n2. On the target cluster create a client access point with the same DNS name and IP address and assign it to the AG role.`r`n3. Make sure the resource is online and the DNS name resolves.`r`n4. Report back to the DBA team."
 
 	# Seite 8
-	& $def 'o_check1' 'Alle betroffenen Anwendungen und Teams sind über die kurze Unterbrechung informiert' 'All affected applications and teams are informed about the short interruption'
+	& $def 'o_check1' 'Die Anwendungen sind gestoppt oder über die Unterbrechung informiert' 'The applications are stopped or informed about the interruption'
 	& $def 'o_check2' 'Ich weiß, dass beide Seiten nach dem Failover auf SYNCHRONOUS_COMMIT stehen' 'I know that both sides stay on SYNCHRONOUS_COMMIT after the failover'
 	& $def 'o_confirm' 'Zur Bestätigung geben Sie den Namen der Distributed AG ein:' 'To confirm, enter the name of the Distributed AG:'
 	& $def 'o_go' 'Failover jetzt ausführen' 'Run failover now'
@@ -278,12 +278,12 @@
 	$fMono = New-Object System.Drawing.Font('Consolas', 9)
 
 	$S = @{
-		Lang = $Language; Page = 0; Flow = @(0..9); Mode = 'New'; Cred = $null
+		Lang = $Language; Page = 0; Flow = @(0, 1, 2, 3, 4, 5, 6, 8, 7, 9); Mode = 'New'; Cred = $null
 		Connected = $false; ConnSig = ''; AgRoles = @{ }; SrcFqdn = ''; TgtFqdn = ''; DagList = @()
 		Config = @{ }; Checks = $null; PreflightRan = $false; Warnings = 0; Blockers = 0; DbList = @()
 		Texts = [System.Collections.Generic.List[object]]::new()
 		Job = $null; PJob = $null; OnStep = $null; OnDone = $null; Busy = $false
-		Units = @(); UnitIndex = 0; UnitDone = @{ }; Lock = $null; StatePage = 0
+		Units = @(); UnitIndex = 0; UnitDone = @{ }; Lock = $null; StatePage = 0; StatePos = 0
 		SyncReady = $false; SyncReasons = ''; ListenerA = $false; ListenerC = $false; ListenerInfo = $null
 		WaitUntil = $null; FailoverDone = $false; RolledBack = $false; Started = $false; Aborted = $false
 		ResumePage = -1; StateDir = $StatePath; ReportDir = ''; LastPoll = $null; LogLines = [System.Collections.Generic.List[string]]::new()
@@ -946,13 +946,14 @@
 	# =====================================================================
 	$RefreshSteps = {
 		$curId = & $Cur
-		for ($i = 0; $i -lt 10; $i++)
+		for ($k = 0; $k -lt 10; $k++)
 		{
-			$l = $stepLabels[$i]
-			$inFlow = ($S.Flow -contains $i)
+			$l = $stepLabels[$k]
+			$inFlow = ($k -lt $S.Flow.Count)
 			$l.Visible = $inFlow
 			if (-not $inFlow) { continue }
-			$pos = [array]::IndexOf($S.Flow, $i)
+			$i = [int]$S.Flow[$k]
+			$pos = $k
 			$name = & $Tr "s$i"
 			if ($i -eq $curId)
 			{
@@ -1024,7 +1025,7 @@
 		foreach ($k in $Pages.Keys) { $Pages[$k].Visible = ($k -eq $i) }
 		$lblTitle.Text = (& $Tr "h$i")
 		$lblSub.Text = (& $Tr "h$($i)s")
-		$S.StatePage = [math]::Max($S.StatePage, $i)
+		if ($S.Page -ge $S.StatePos) { $S.StatePos = $S.Page; $S.StatePage = $i }
 		& $UpdateNav
 		& $OnEnter $i
 		& $UpdateNav
@@ -1139,8 +1140,8 @@
 		}
 		$n++
 		$lines.Add($(if ($de) { "$n. Synchronisation überwachen, bis alle Datenbanken bereit sind." } else { "$n. Monitor synchronization until all databases are ready." })); $n++
-		$lines.Add($(if ($de) { "$n. Listener auf den neuen Cluster umziehen (mit Cluster-/AD-Team)." } else { "$n. Move the listener to the new cluster (with the cluster/AD team)." })); $n++
-		$lines.Add($(if ($de) { "$n. Geplantes Failover auf den neuen Cluster. Rollback bleibt möglich." } else { "$n. Planned failover to the new cluster. Rollback stays possible." }))
+		$lines.Add($(if ($de) { "$n. Geplantes Failover auf den neuen Cluster. Rollback bleibt möglich." } else { "$n. Planned failover to the new cluster. Rollback stays possible." })); $n++
+		$lines.Add($(if ($de) { "$n. Listener auf den neuen Cluster umziehen (mit Cluster-/AD-Team)." } else { "$n. Move the listener to the new cluster (with the cluster/AD team)." }))
 		return ($lines -join "`r`n")
 	}
 	$SqlPreview = {
@@ -1175,20 +1176,22 @@
 		{
 			foreach ($ck in $S.Checks.Checks)
 			{
-				if (-not $groups.ContainsKey($ck.Category))
+				$catShown = if ($de) { $ck.Category } else { $ck.CategoryEn }
+				$nameShown = if ($de) { $ck.Name } else { $ck.NameEn }
+				if (-not $groups.ContainsKey($catShown))
 				{
-					$g = New-Object System.Windows.Forms.ListViewGroup($ck.Category, $ck.Category)
+					$g = New-Object System.Windows.Forms.ListViewGroup($catShown, $catShown)
 					[void]$UI.lvCheck.Groups.Add($g)
-					$groups[$ck.Category] = $g
+					$groups[$catShown] = $g
 				}
 				$stTxt = switch ($ck.Status) { 'Pass' { & $Tr 'p_ok' } 'Warn' { & $Tr 'p_warn' } default { & $Tr 'p_fail' } }
 				$msg = if ($de) { $ck.MessageDe } else { $ck.MessageEn }
 				$fix = if ($de) { $ck.RemedyDe } else { $ck.RemedyEn }
 				$it = New-Object System.Windows.Forms.ListViewItem($stTxt)
-				[void]$it.SubItems.Add([string]$ck.Name)
+				[void]$it.SubItems.Add([string]$nameShown)
 				[void]$it.SubItems.Add([string]$msg)
 				[void]$it.SubItems.Add([string]$fix)
-				$it.Group = $groups[$ck.Category]
+				$it.Group = $groups[$catShown]
 				$it.ForeColor = switch ($ck.Status) { 'Pass' { $cOk } 'Warn' { $cWarn } default { $cErr } }
 				[void]$UI.lvCheck.Items.Add($it)
 			}
@@ -2018,7 +2021,7 @@ Invoke-sqmDagMigrationUnit -Unit $unit -Config $c -SqlCredential $cred
 								[void][System.Windows.Forms.MessageBox]::Show($(if ($S.Lang -eq 'de') { "Die Zustandsdatei ist beschädigt und kann nicht geladen werden:`r`n$($st.StateFile)" } else { "The state file is damaged and cannot be loaded:`r`n$($st.StateFile)" }), (& $Tr 'title'), 'OK', 'Warning')
 								return
 							}
-							$S.Mode = 'New'; $S.Flow = @(0..9)
+							$S.Mode = 'New'; $S.Flow = @(0, 1, 2, 3, 4, 5, 6, 8, 7, 9)
 							$cf = $st.Config
 							$UI.txtSrcInst.Text = [string]$cf.SourceInstance
 							$UI.txtTgtInst.Text = [string]$cf.TargetInstance
@@ -2039,7 +2042,7 @@ Invoke-sqmDagMigrationUnit -Unit $unit -Config $c -SqlCredential $cred
 							$S.ResumeAg = @($cf.SourceAgName, $cf.TargetAgName)
 							& $Log "Fortsetzen: [$($cf.SourceAgName)] -> [$($cf.TargetAgName)], Seite $($st.Page)"
 						}
-						else { $S.Mode = 'New'; $S.Flow = @(0..9) }
+						else { $S.Mode = 'New'; $S.Flow = @(0, 1, 2, 3, 4, 5, 6, 8, 7, 9) }
 					}
 					1
 					{

@@ -317,6 +317,13 @@ Describe 'Test-sqmDistributedAgMigrationPrerequisite' {
         $r.SourceDatabases | Should -Contain 'AppDb'
         $r.DistributedAgName | Should -Be 'AG1_AG2'
     }
+    It 'liefert englische Namen und Gruppen fuer jede Pruefung' {
+        $r = Test-sqmDistributedAgMigrationPrerequisite @script:pre
+        ($r.Checks | Where-Object { -not $_.NameEn -or -not $_.CategoryEn }).Count | Should -Be 0
+        ($r.Checks | Where-Object { $_.Id -eq 'src.hadr' }).NameEn | Should -Be 'Always On enabled'
+        ($r.Checks | Where-Object { $_.Id -eq 'src.connect' }).CategoryEn | Should -Be 'Source (S1)'
+        ($r.Checks | Where-Object { $_.NameEn -match 'Verbindung|vorhanden|Datenbanken|Rechte' }).Count | Should -Be 0
+    }
     It 'blockiert, wenn der Knoten nicht PRIMARY ist' {
         $global:PreRole = 'SECONDARY'
         $r = Test-sqmDistributedAgMigrationPrerequisite @script:pre
@@ -386,7 +393,8 @@ Describe 'GUI-Oberflaeche' {
                 $api.State.PJob = 1
                 $api.State.Config = @{ SourceInstance = 'a'; TargetInstance = 'b'; SourceAgName = 'x'; TargetAgName = 'y'; DistributedAgName = 'x_y'; SeedingMode = 'Automatic'; ListenerPort = 1433 }
                 $api.State.PreflightRan = $true
-                foreach ($p in 0..9) { & $api.Go $p; if (-not $api.Pages[$p].Visible) { throw "Seite $p nicht sichtbar" } }
+                foreach ($p in 0..9) { & $api.Go $p; $pid2 = $api.State.Flow[$p]; if (-not $api.Pages[$pid2].Visible) { throw "Seite $p nicht sichtbar" } }
+                if (($api.State.Flow -join ',') -ne '0,1,2,3,4,5,6,8,7,9') { throw 'Reihenfolge Failover vor Listener fehlt' }
                 & $api.Apply
             }
             catch { $script:guiErr += $_.Exception.Message }
