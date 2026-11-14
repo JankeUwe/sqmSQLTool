@@ -1,5 +1,33 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.228.0] - 2026-11-14
+
+### Neu: Show-sqmDistributedAgGui - Assistent fuer die Migration auf einen neuen AlwaysOn-Cluster
+
+Eine GUI im Stil eines Windows-Assistenten fuehrt durch die Migration per Distributed AG: Verbinden (Quelle und Ziel, Windows- oder SQL-Anmeldung, AG-Auswahl aus der Live-Abfrage), Konfiguration mit Live-Pruefung jedes Feldes, Vorabpruefung, Zusammenfassung mit T-SQL-Vorschau und Trockenlauf, Ausfuehrung, Synchronisation, Listener-Umzug, Failover mit Rollback und Abschluss. Modi: Neue Migration, Fortsetzen einer unterbrochenen Migration und Betrieb (Health, Failover, Rollback einer bestehenden Distributed AG). Deutsch und Englisch, umschaltbar.
+
+Alle Aktionen laufen in einem Hintergrund-Runspace, das Fenster bleibt bedienbar. Fehler werden mit Ursache, Loesungsvorschlag und technischer Meldung angezeigt; je Schritt gibt es Wiederholen, Ueberspringen (nur bei "existiert bereits") und Abbrechen. Der Stand wird ohne Kennwoerter als JSON gespeichert, eine Sperrdatei verhindert zwei Assistenten auf derselben Migration (verwaiste Sperren werden uebernommen). Das Failover ist gesperrt, bis alle Datenbanken bereit sind, und verlangt die Eingabe des DAG-Namens. Der Listener-Umzug erzwingt Reihenfolge und Wartezeit und erzeugt die Anweisung fuer das Cluster-/AD-Team zum Kopieren. Das Entfernen der Distributed AG nach der Migration wird nur als T-SQL zum Kopieren angeboten, nicht automatisch ausgefuehrt.
+
+### Neu: Test-sqmDistributedAgMigrationPrerequisite - rein lesende Vorabpruefung
+
+Prueft je Seite Erreichbarkeit, sysadmin, SQL-Version und Edition, Always On, AG vorhanden und PRIMARY, AG gesund, Konflikte mit anderen Distributed AGs, Endpoint (Status, Port, Rolle), CONNECT-Recht des Dienstkontos der Gegenseite, Datenbankzustand, Namenskollisionen, Dateipfade und freien Platz auf dem Ziel, DNS und Port der FQDNs sowie den Backup-Pfad bei manuellem Seeding. Jede Pruefung liefert Schweregrad (Blocker oder Warnung), Meldung und Loesung in Deutsch und Englisch.
+
+### Fix: Invoke-sqmDistributedFailover fuehrt das Failover einer Distributed AG nach dem dokumentierten Ablauf aus
+
+Bisher lief `ALTER AVAILABILITY GROUP [DAG] FAILOVER`; fuer eine Distributed AG ist das nicht der vorgesehene Weg, und weil `Invoke-DbaQuery -ErrorAction Stop` bei Fehlern nicht wirft, meldete die Funktion trotzdem SUCCESS. Jetzt: beide Seiten auf SYNCHRONOUS_COMMIT, warten bis SYNCHRONIZED, alten Primary auf SECONDARY, auf dem Ziel `FORCE_FAILOVER_ALLOW_DATA_LOSS` (sicher, weil synchron). Kommt die Synchronisation nicht zustande, wird auf ASYNCHRONOUS_COMMIT zurueckgesetzt und nichts umgeschaltet; scheitert der Schritt nach dem Umschalten des alten Primary, nennt die Fehlermeldung den Rettungsbefehl. Neuer Parameter `-TargetInstance` (Instanz des Forwarders, Pflicht) und `-SyncTimeoutSeconds`. Rollback: gleiche Funktion mit vertauschten Instanzen. Die Bereitschaftspruefung stuetzt sich nicht mehr auf Test-sqmDistributedAgReadiness (dessen Check 3 liest eine nicht vorhandene DMV), sondern auf den Datenbank-Replikationszustand mit Queue-Grenzen.
+
+### Fix: Distributed-AG-Funktionen melden Fehler jetzt wirklich
+
+In New-sqmDistributedAvailabilityGroup, Add-sqmDatabaseToDistributedAg, Complete-sqmListenerMigration, Move-sqmAlwaysOnListener, Invoke-sqmListenerMigrationPrep und Invoke-sqmDistributedFailover fehlte an jedem `Invoke-DbaQuery` das `-EnableException`; Fehler wurden verschluckt und die Funktion meldete Erfolg. New-sqmDistributedAvailabilityGroup und Add-sqmDatabaseToDistributedAg riefen ausserdem `ShouldProcess` nie auf, ein `-WhatIf` hat also real ausgefuehrt. Beides ist behoben.
+
+### Erweitert: New-sqmDistributedAvailabilityGroup, Add-sqmDatabaseToDistributedAg, Complete-sqmListenerMigration
+
+- New-sqmDistributedAvailabilityGroup: `-DistributedAgName` (bisher fest `<Quelle>_<Ziel>`) und `-EndpointPort` (bisher fest 5022 in der LISTENER_URL). Wiederaufnahme: bestehende Distributed AG und bereits erfolgter Join werden uebersprungen.
+- Add-sqmDatabaseToDistributedAg: mit `-SourceAvailabilityGroupName` und `-TargetAvailabilityGroupName` der richtige Ablauf (Datenbank in die Quell-AG, bei Manual Backup/Restore NORECOVERY und Join an die Ziel-AG statt an den Namen der Distributed AG, bei Automatic Seeding nur Quell-AG). Ohne die neuen Parameter bleibt das bisherige Verhalten.
+- Complete-sqmListenerMigration: `-ListenerPort` (bisher fest 1433).
+
+Die Schrittmeldungen der Funktionen kommen ueber den Information-Stream (Tag `sqmStep`) und werden von der GUI angezeigt. Das Failover mit der neuen Reihenfolge und der Listener-Umzug wurden im Labor nicht gegen zwei echte Cluster getestet (keine zwei WSFC-Cluster vorhanden); gegen SQL Server 2022 verifiziert sind die T-SQL-Abfragen (Syntax und Objektnamen), die Vorabpruefung und die GUI-Kette bis zur Fehleranzeige. 62 neue Tests.
+
 ## [1.9.227.0] - 2026-11-13
 
 ### Neu: Get-sqmUnencryptedConnection - unverschluesselte Verbindungen und die Instanzen, die sie annehmen

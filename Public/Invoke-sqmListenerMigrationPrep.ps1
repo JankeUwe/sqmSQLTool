@@ -106,7 +106,7 @@ LEFT JOIN sys.availability_group_listener_ip_port aglil ON aglil.listener_id = a
 WHERE agl.group_id = (SELECT group_id FROM sys.availability_groups WHERE name = @AgName)
 "@
 
-			$listeners = Invoke-DbaQuery @connParams -Query $getListenerQuery -SqlParameters @{ AgName = $AvailabilityGroupName } -ErrorAction Stop
+			$listeners = Invoke-DbaQuery -EnableException @connParams -Query $getListenerQuery -SqlParameters @{ AgName = $AvailabilityGroupName } -ErrorAction Stop
 
 			if (-not $listeners)
 			{
@@ -147,7 +147,7 @@ WHERE adc.group_id = (SELECT group_id FROM sys.availability_groups WHERE name = 
 ORDER BY DB_NAME(adc.database_id)
 "@
 
-			$dbStatusBefore = Invoke-DbaQuery @connParams -Query $dbStatusBeforeQuery -SqlParameters @{ AgName = $AvailabilityGroupName } -ErrorAction Stop
+			$dbStatusBefore = Invoke-DbaQuery -EnableException @connParams -Query $dbStatusBeforeQuery -SqlParameters @{ AgName = $AvailabilityGroupName } -ErrorAction Stop
 
 			$onlineCount = ($dbStatusBefore | Where-Object { $_.database_state_desc -eq 'ONLINE' } | Measure-Object).Count
 			Invoke-sqmLogging -Message "DB Status BEFORE removal: $onlineCount / $($dbStatusBefore.Count) online" -FunctionName $functionName -Level "INFO"
@@ -164,12 +164,12 @@ ORDER BY DB_NAME(adc.database_id)
 			Invoke-sqmLogging -Message "!!! REMOVING listener from AG [$AvailabilityGroupName]" -FunctionName $functionName -Level "WARNING"
 
 			$removeListenerSql = "ALTER AVAILABILITY GROUP [$AvailabilityGroupName] REMOVE LISTENER N'$listenerDns'"
-			Invoke-DbaQuery @connParams -Query $removeListenerSql -ErrorAction Stop
+			Invoke-DbaQuery -EnableException @connParams -Query $removeListenerSql -ErrorAction Stop
 
 			Start-Sleep -Seconds 3
 
 			# Step 4: Verify DB status AFTER removal
-			$dbStatusAfter = Invoke-DbaQuery @connParams -Query $dbStatusBeforeQuery -SqlParameters @{ AgName = $AvailabilityGroupName } -ErrorAction Stop
+			$dbStatusAfter = Invoke-DbaQuery -EnableException @connParams -Query $dbStatusBeforeQuery -SqlParameters @{ AgName = $AvailabilityGroupName } -ErrorAction Stop
 
 			$onlineCountAfter = ($dbStatusAfter | Where-Object { $_.database_state_desc -eq 'ONLINE' } | Measure-Object).Count
 			$recoveryCount = ($dbStatusAfter | Where-Object { $_.database_state_desc -ne 'ONLINE' } | Measure-Object).Count

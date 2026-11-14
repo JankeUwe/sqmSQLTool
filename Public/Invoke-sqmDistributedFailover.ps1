@@ -1,35 +1,44 @@
 ﻿<#
 .SYNOPSIS
-    Initiates failover of a Distributed AlwaysOn AG.
+    Initiates failover of a Distributed AlwaysOn AG (planned, without data loss).
 
 .DESCRIPTION
-    Performs a controlled failover from the primary Distributed AG to the secondary AG.
+    Performs the documented planned failover of a Distributed AG from the global primary to the forwarder:
 
-    Process:
-    1. Validates failover readiness (all replicas SYNCHRONIZED)
-    2. Initiates failover on the secondary AG (makes it primary)
-    3. Previous primary becomes secondary
-    4. Logs all changes
-    5. Exports detailed report
+    1. Checks that all databases are synchronizing, none is suspended and the queues are small
+    2. Sets both availability groups of the Distributed AG to SYNCHRONOUS_COMMIT
+    3. Waits until every database is SYNCHRONIZED
+    4. Sets the Distributed AG on the global primary to the SECONDARY role
+    5. Runs FORCE_FAILOVER_ALLOW_DATA_LOSS on the forwarder (safe, because both sides are synchronized)
+    6. Verifies the new roles and writes a report
+
+    ALTER AVAILABILITY GROUP ... FAILOVER is not valid for a Distributed AG, therefore this function
+    uses the procedure above. If the synchronization does not complete within SyncTimeoutSeconds the
+    availability mode is set back to ASYNCHRONOUS_COMMIT and nothing is failed over.
 
     Requires explicit confirmation unless -Force is used.
 
 .PARAMETER SqlInstance
-    Primary SQL Server instance. Default: current computer name.
+    SQL Server instance hosting the CURRENT global primary of the Distributed AG. Default: current computer name.
+
+.PARAMETER TargetInstance
+    SQL Server instance hosting the forwarder (primary of the other AG), the future primary. Required.
 
 .PARAMETER SqlCredential
-    Optional PSCredential for the connection.
+    Optional PSCredential for both connections.
 
 .PARAMETER AvailabilityGroupName
     Name of the Distributed AG to failover. Required.
+
+.PARAMETER SyncTimeoutSeconds
+    Maximum time to wait for SYNCHRONIZED after switching to synchronous commit. Default 600.
 
 .PARAMETER Force
     Skip confirmation dialog.
 
 .PARAMETER Rollback
-    Rollback zum urspruenglichen Primary. Ueberspringt den Readiness-Check.
-    Verwenden wenn nach einem Failover Probleme auftreten und das alte System
-    wieder als Primary benoetigt wird.
+    Rollback zum urspruenglichen Primary. Ablauf wie beim Failover, die Richtung ergibt sich aus
+    SqlInstance (aktueller Primary) und TargetInstance (altes System).
 
 .PARAMETER WhatIf
     Shows what would be done without actually performing the failover.
@@ -41,14 +50,14 @@
     Throw exceptions immediately.
 
 .EXAMPLE
-    Invoke-sqmDistributedFailover -SqlInstance "SQL01" -AvailabilityGroupName "MyDAG" -Force
+    Invoke-sqmDistributedFailover -SqlInstance "SQL01" -TargetInstance "NEW01" -AvailabilityGroupName "MyDAG" -Force
 
 .EXAMPLE
-    Invoke-sqmDistributedFailover -SqlInstance "SQL01" -AvailabilityGroupName "MyDAG" -WhatIf
+    Invoke-sqmDistributedFailover -SqlInstance "SQL01" -TargetInstance "NEW01" -AvailabilityGroupName "MyDAG" -WhatIf
 
 .EXAMPLE
-    # Rollback zum alten System nach fehlgeschlagenem Failover:
-    Invoke-sqmDistributedFailover -SqlInstance "SQL01" -AvailabilityGroupName "MyDAG" -Rollback -Force
+    # Rollback: SqlInstance ist jetzt das neue System (aktueller Primary), TargetInstance das alte
+    Invoke-sqmDistributedFailover -SqlInstance "NEW01" -TargetInstance "SQL01" -AvailabilityGroupName "MyDAG" -Rollback -Force
 
 .NOTES
     Author:       MSSQLTools
@@ -61,10 +70,15 @@ function Invoke-sqmDistributedFailover
 	param (
 		[Parameter(Mandatory = $false, ValueFromPipeline = $true)]
 		[string]$SqlInstance = $env:COMPUTERNAME,
+		[Parameter(Mandatory = $false)]
+		[string]$TargetInstance,
 		[Parameter(Mandatory = $true)]
 		[string]$AvailabilityGroupName,
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
+		[Parameter(Mandatory = $false)]
+		[ValidateRange(30, 86400)]
+		[int]$SyncTimeoutSeconds = 600,
 		[Parameter(Mandatory = $false)]
 		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'DistributedFailover'),
 		[Parameter(Mandatory = $false)]
@@ -90,141 +104,198 @@ function Invoke-sqmDistributedFailover
 	{
 		$connParams = @{ SqlInstance = $SqlInstance }
 		if ($SqlCredential) { $connParams['SqlCredential'] = $SqlCredential }
+		$targetParams = @{ SqlInstance = $TargetInstance }
+		if ($SqlCredential) { $targetParams['SqlCredential'] = $SqlCredential }
+
+		$isRollback = $Rollback.IsPresent
+		$direction = if ($isRollback) { "ROLLBACK" } else { "FAILOVER" }
+		$modeChanged = $false
+		$rolesSwitched = $false
+		$steps = [System.Collections.Generic.List[PSCustomObject]]::new()
+		$note = {
+			param ($Step, $Status, $Details)
+			$steps.Add([PSCustomObject]@{ Step = $Step; Status = $Status; Details = $Details })
+			Write-Information -MessageData ([PSCustomObject]@{ Step = $Step; Status = $Status }) -Tags 'sqmStep'
+		}
 
 		try
 		{
-			$isRollback = $Rollback.IsPresent
-			$direction = if ($isRollback) { "ROLLBACK" } else { "FAILOVER" }
+			if (-not $TargetInstance)
+			{
+				throw "TargetInstance fehlt: Fuer das Failover einer Distributed AG werden beide Seiten benoetigt (Instanz des Forwarders)."
+			}
 
-			# Step 1: Validiere Failover-Bereitschaft (nur beim normalen Failover, nicht Rollback)
+			# Step 1: Beide AGs der Distributed AG und ihre Rolle ermitteln
+			$dagInfo = @(Invoke-DbaQuery -EnableException @connParams -Query @"
+SELECT ar.replica_server_name AS AgName, ars.is_local AS IsLocal
+FROM sys.availability_groups ag
+JOIN sys.availability_replicas ar ON ar.group_id = ag.group_id
+LEFT JOIN sys.dm_hadr_availability_replica_states ars ON ars.replica_id = ar.replica_id
+WHERE ag.name = @n AND ag.is_distributed = 1
+"@ -SqlParameters @{ n = $AvailabilityGroupName })
+
+			if ($dagInfo.Count -ne 2)
+			{
+				throw "Distributed AG '$AvailabilityGroupName' auf [$SqlInstance] nicht gefunden oder unvollstaendig ($($dagInfo.Count) statt 2 Mitglieder)."
+			}
+			$localAg = ($dagInfo | Where-Object { $_.IsLocal -eq $true -or $_.IsLocal -eq 1 } | Select-Object -First 1).AgName
+			$remoteAg = ($dagInfo | Where-Object { $_.AgName -ne $localAg } | Select-Object -First 1).AgName
+			if (-not $localAg -or -not $remoteAg)
+			{
+				throw "Lokale AG der Distributed AG konnte auf [$SqlInstance] nicht bestimmt werden. Ist [$SqlInstance] der aktuelle globale Primary?"
+			}
+			& $note 'Pruefe Distributed AG' 'OK' "Lokal [$localAg] -> Ziel [$remoteAg]"
+
+			# Step 2: Bereitschaft (nicht beim Rollback)
 			if (-not $isRollback)
 			{
-				$readinessTest = Test-sqmDistributedAgReadiness @connParams -EnableException:$true
-
-				if ($readinessTest.ReadinessScore -lt 75)
+				$snap = Get-sqmDagSyncSnapshot @connParams -DagName $AvailabilityGroupName
+				$ready = Test-sqmDagFailoverReady -Snapshot $snap
+				if (-not $ready.Ready)
 				{
-					$errMsg = "Failover NICHT empfohlen. Readiness Score: $($readinessTest.ReadinessScore)/100. Details: $($readinessTest.CheckResults | Out-String)"
-					Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
-					throw $errMsg
+					throw "Failover NICHT empfohlen: $($ready.Reasons -join ' | ')"
 				}
+				& $note 'Bereitschaft' 'OK' "$($ready.DatabaseCount) Datenbank(en) bereit"
 			}
 			else
 			{
-				Invoke-sqmLogging -Message "ROLLBACK-Modus: Readiness-Check wird uebersprungen." -FunctionName $functionName -Level "WARNING"
+				Invoke-sqmLogging -Message "ROLLBACK-Modus: Bereitschaftspruefung wird uebersprungen." -FunctionName $functionName -Level "WARNING"
 			}
-
-			# Step 2: Hole Secondary AG Info (SQL 2016 kompatibel - ohne dm_hadr_distributed_ag_replica_member_status)
-			$secondaryQuery = @"
-SELECT TOP 1
-    ar.replica_server_name AS SecondaryReplicaServer,
-    ag2.name AS SecondaryAgName
-FROM sys.availability_groups ag
-JOIN sys.availability_replicas ar ON ar.group_id = ag.group_id
-JOIN sys.dm_hadr_availability_replica_states ars ON ars.replica_id = ar.replica_id
-JOIN sys.availability_groups ag2 ON ag2.group_id = ar.group_id
-WHERE ag.name = @AgName
-  AND ag.is_distributed = 1
-  AND ars.role_desc = 'SECONDARY'
-"@
-			$secondaryInfo = Invoke-DbaQuery @connParams -Query $secondaryQuery -SqlParameters @{ AgName = $AvailabilityGroupName } -ErrorAction Stop
-
-			if (-not $secondaryInfo)
-			{
-				throw "Distributed AG '$AvailabilityGroupName' nicht gefunden oder kein Secondary erkannt."
-			}
-
-			$secondaryAgName = $secondaryInfo.SecondaryAgName
-			$secondaryServer = $secondaryInfo.SecondaryReplicaServer
 
 			# Step 3: Bestaetigung (wenn nicht -Force)
-			$actionDesc = if ($isRollback) { "ROLLBACK - Zurueck zum alten System" } else { "Failover zum neuen System" }
-
-			if (-not $Force)
+			$timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+			if ((-not $Force -or $WhatIfPreference) -and -not $PSCmdlet.ShouldProcess("$AvailabilityGroupName ($SqlInstance -> $TargetInstance)", "$direction durchfuehren"))
 			{
-				if (-not $PSCmdlet.ShouldProcess($AvailabilityGroupName, "$direction durchfuehren"))
-				{
-					Invoke-sqmLogging -Message "$direction abgebrochen durch Benutzer" -FunctionName $functionName -Level "INFO"
-					return [PSCustomObject]@{
-						Status = 'CANCELLED'
-						Message = "$direction abgebrochen"
-						Timestamp = Get-Date
-					}
+				Invoke-sqmLogging -Message "$direction abgebrochen durch Benutzer/WhatIf" -FunctionName $functionName -Level "INFO"
+				return [PSCustomObject]@{
+					Status = $(if ($WhatIfPreference) { 'WHATIF' } else { 'CANCELLED' })
+					Message = "$direction abgebrochen"
+					Timestamp = Get-Date
+					Steps = $steps
 				}
 			}
 
-			# Step 4: Fuehre Failover / Rollback durch
-			$timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-			Invoke-sqmLogging -Message "Starte $direction [$AvailabilityGroupName] - $actionDesc" -FunctionName $functionName -Level "WARNING"
+			Invoke-sqmLogging -Message "Starte $direction [$AvailabilityGroupName] [$localAg] -> [$remoteAg]" -FunctionName $functionName -Level "WARNING"
 
-			# Bug Fix: Korrekte Failover-Syntax (kein FORCE_FAILOVER_ALLOW_DATA_LOSS!)
-			$failoverSql = "ALTER AVAILABILITY GROUP [$AvailabilityGroupName] FAILOVER"
-			Invoke-DbaQuery @connParams -Query $failoverSql -ErrorAction Stop
+			# Step 4: Beide Seiten auf SYNCHRONOUS_COMMIT
+			$modeSql = "ALTER AVAILABILITY GROUP [$AvailabilityGroupName] MODIFY AVAILABILITY GROUP ON N'$localAg' WITH (AVAILABILITY_MODE = SYNCHRONOUS_COMMIT), N'$remoteAg' WITH (AVAILABILITY_MODE = SYNCHRONOUS_COMMIT)"
+			Invoke-DbaQuery -EnableException @connParams -Query $modeSql
+			$modeChanged = $true
+			Invoke-DbaQuery -EnableException @targetParams -Query $modeSql
+			& $note 'Synchronous Commit' 'OK' 'Beide Seiten auf SYNCHRONOUS_COMMIT'
 
-			# Step 5: Verifikation
+			# Step 5: Auf SYNCHRONIZED warten
+			$deadline = (Get-Date).AddSeconds($SyncTimeoutSeconds)
+			$synced = $false
+			do
+			{
+				$snap = Get-sqmDagSyncSnapshot @connParams -DagName $AvailabilityGroupName
+				$rem = @($snap | Where-Object { -not ($_.IsLocal -eq $true -or $_.IsLocal -eq 1) })
+				$synced = ($rem.Count -gt 0 -and @($rem | Where-Object { $_.SyncState -ne 'SYNCHRONIZED' }).Count -eq 0)
+				if (-not $synced) { Start-Sleep -Seconds 3 }
+			}
+			until ($synced -or (Get-Date) -gt $deadline)
+
+			if (-not $synced)
+			{
+				throw "Die Datenbanken wurden innerhalb von $SyncTimeoutSeconds Sekunden nicht SYNCHRONIZED. Es wurde nichts umgeschaltet."
+			}
+			& $note 'Synchronisiert' 'OK' 'Alle Datenbanken SYNCHRONIZED'
+
+			# Step 6: Alten Primary auf SECONDARY, dann Forwarder hochstufen
+			Invoke-DbaQuery -EnableException @connParams -Query "ALTER AVAILABILITY GROUP [$AvailabilityGroupName] SET (ROLE = SECONDARY)"
+			$rolesSwitched = $true
+			& $note 'Alter Primary Secondary' 'OK' "[$localAg] ist Secondary"
+
+			Invoke-DbaQuery -EnableException @targetParams -Query "ALTER AVAILABILITY GROUP [$AvailabilityGroupName] FORCE_FAILOVER_ALLOW_DATA_LOSS"
+			& $note 'Neuer Primary' 'OK' "[$remoteAg] ist Primary"
+
+			# Step 7: Verifikation
 			Start-Sleep -Seconds 3
-
-			$verifyQuery = @"
-SELECT
-    ag.name,
-    ar.replica_server_name,
-    ars.role_desc,
-    ars.synchronization_health_desc
+			$postFailoverStatus = @(Invoke-DbaQuery -EnableException @targetParams -Query @"
+SELECT ag.name, ar.replica_server_name, ars.role_desc, ars.synchronization_health_desc
 FROM sys.availability_groups ag
 JOIN sys.availability_replicas ar ON ar.group_id = ag.group_id
 JOIN sys.dm_hadr_availability_replica_states ars ON ars.replica_id = ar.replica_id
-WHERE ag.name = @AgName
-"@
-			$postFailoverStatus = Invoke-DbaQuery @connParams -Query $verifyQuery -SqlParameters @{ AgName = $AvailabilityGroupName } -ErrorAction Stop
+WHERE ag.name = @n
+"@ -SqlParameters @{ n = $AvailabilityGroupName })
+			$newPrimary = $postFailoverStatus | Where-Object { $_.role_desc -eq 'PRIMARY' -and $_.replica_server_name -eq $remoteAg }
+			if (-not $newPrimary)
+			{
+				throw "Nach dem Umschalten ist [$remoteAg] nicht als PRIMARY sichtbar. Zustand auf beiden Seiten pruefen."
+			}
+			& $note 'Verifikation' 'OK' "Rollen: $((($postFailoverStatus | ForEach-Object { "$($_.replica_server_name)=$($_.role_desc)" }) -join ', '))"
 
-			# Step 6: Erstelle Report
-			$reportFile = Join-Path -Path $OutputPath -ChildPath "Distributed-AG-Failover-$AvailabilityGroupName-$([datetime]::Now.ToString('yyyy-MM-dd-HHmm')).txt"
-
+			# Step 8: Report
+			$reportFile = Join-Path -Path $OutputPath -ChildPath "Distributed-AG-$direction-$AvailabilityGroupName-$([datetime]::Now.ToString('yyyy-MM-dd-HHmm')).txt"
 			$reportContent = @(
 				"================================================================"
-				"sqmSQLTool - Distributed AG Failover Report"
+				"sqmSQLTool - Distributed AG $direction Report"
 				"================================================================"
 				"Timestamp       : $timestamp"
-				"Primary AG      : $AvailabilityGroupName"
-				"Secondary AG    : $secondaryAgName"
-				"Target Server   : $secondaryServer"
-				"Failover Status : SUCCESS"
-				"================================================================`n"
-				"POST-FAILOVER REPLICA STATUS:"
-				"-" * 80
+				"Distributed AG  : $AvailabilityGroupName"
+				"Alter Primary   : $localAg ($SqlInstance)"
+				"Neuer Primary   : $remoteAg ($TargetInstance)"
+				"Status          : SUCCESS"
+				"================================================================"
+				"HINWEIS: Beide Seiten stehen weiter auf SYNCHRONOUS_COMMIT (Voraussetzung fuer ein Rollback)."
+				"================================================================"
 			)
-
 			foreach ($row in $postFailoverStatus)
 			{
-				$reportContent += "$($row.replica_server_name.PadRight(20)) Role: $($row.role_desc.PadRight(12)) Sync: $($row.synchronization_health_desc)"
+				$reportContent += "$("$($row.replica_server_name)".PadRight(20)) Role: $("$($row.role_desc)".PadRight(12)) Sync: $($row.synchronization_health_desc)"
 			}
-
 			$reportContent -join "`n" | Out-File -FilePath $reportFile -Encoding UTF8 -Force
 
-			Invoke-sqmLogging -Message "Failover abgeschlossen. Report: $reportFile" -FunctionName $functionName -Level "INFO"
+			Invoke-sqmLogging -Message "$direction abgeschlossen. Report: $reportFile" -FunctionName $functionName -Level "INFO"
 
 			return [PSCustomObject]@{
 				Status = 'SUCCESS'
 				Direction = $direction
 				SqlInstance = $SqlInstance
+				TargetInstance = $TargetInstance
 				PrimaryAg = $AvailabilityGroupName
-				SecondaryAg = $secondaryAgName
-				SecondaryServer = $secondaryServer
+				OldPrimaryAg = $localAg
+				NewPrimaryAg = $remoteAg
+				SecondaryAg = $localAg
+				SecondaryServer = $SqlInstance
 				Timestamp = $timestamp
 				PostFailoverStatus = $postFailoverStatus
+				Steps = $steps
 				ReportFile = $reportFile
 			}
 		}
 		catch
 		{
-			$errMsg = "Fehler beim Failover: $($_.Exception.Message)"
+			$errMsg = "Fehler beim ${direction}: $($_.Exception.Message)"
+
+			# Aufraeumen: noch nicht umgeschaltet -> Modus zurueck auf ASYNCHRONOUS_COMMIT
+			$recovery = ''
+			if ($modeChanged -and -not $rolesSwitched -and $localAg -and $remoteAg)
+			{
+				$asyncSql = "ALTER AVAILABILITY GROUP [$AvailabilityGroupName] MODIFY AVAILABILITY GROUP ON N'$localAg' WITH (AVAILABILITY_MODE = ASYNCHRONOUS_COMMIT), N'$remoteAg' WITH (AVAILABILITY_MODE = ASYNCHRONOUS_COMMIT)"
+				try
+				{
+					Invoke-DbaQuery -EnableException @connParams -Query $asyncSql
+					Invoke-DbaQuery -EnableException @targetParams -Query $asyncSql
+					$recovery = ' Der Verfuegbarkeitsmodus wurde auf ASYNCHRONOUS_COMMIT zurueckgesetzt, es wurde nichts umgeschaltet.'
+				}
+				catch { $recovery = " ACHTUNG: Zuruecksetzen auf ASYNCHRONOUS_COMMIT ist fehlgeschlagen ($($_.Exception.Message)); beide Seiten manuell pruefen." }
+			}
+			elseif ($rolesSwitched)
+			{
+				$recovery = " KRITISCH: Der alte Primary ist bereits SECONDARY, der neue aber nicht bestaetigt. Auf [$TargetInstance] ausfuehren: ALTER AVAILABILITY GROUP [$AvailabilityGroupName] FORCE_FAILOVER_ALLOW_DATA_LOSS (oder auf [$SqlInstance]: ALTER AVAILABILITY GROUP [$AvailabilityGroupName] SET (ROLE = PRIMARY))."
+			}
+			$errMsg += $recovery
 			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 
-			if ($EnableException) { throw }
+			if ($EnableException) { throw $errMsg }
 
 			return [PSCustomObject]@{
 				Status = 'FAILED'
 				Error = $errMsg
 				Timestamp = Get-Date
+				Steps = $steps
 			}
 		}
 	}

@@ -28,6 +28,9 @@
 .PARAMETER ListenerName
     DNS name of the listener to be added (must match new cluster resource).
 
+.PARAMETER ListenerPort
+    TCP port of the listener to be added. Default: 1433.
+
 .PARAMETER OutputPath
     Output directory for completion report. Default: C:\System\WinSrvLog\MSSQL
 
@@ -58,6 +61,9 @@ function Complete-sqmListenerMigration
 		[Parameter(Mandatory = $true)]
 		[string]$ListenerName,
 		[Parameter(Mandatory = $false)]
+		[ValidateRange(1, 65535)]
+		[int]$ListenerPort = 1433,
+		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
 		[Parameter(Mandatory = $false)]
 		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'ListenerMigration'),
@@ -87,7 +93,7 @@ function Complete-sqmListenerMigration
 			Invoke-sqmLogging -Message "Validiere AG [$AvailabilityGroupName] auf [$SqlInstance]" -FunctionName $functionName -Level "INFO"
 
 			$agCheckQuery = "SELECT COUNT(*) AS C FROM sys.availability_groups WHERE name = @AgName"
-			$agCheck = Invoke-DbaQuery @connParams -Query $agCheckQuery -SqlParameters @{ AgName = $AvailabilityGroupName } -ErrorAction Stop
+			$agCheck = Invoke-DbaQuery -EnableException @connParams -Query $agCheckQuery -SqlParameters @{ AgName = $AvailabilityGroupName } -ErrorAction Stop
 
 			if ([int]$agCheck.C -eq 0)
 			{
@@ -108,7 +114,7 @@ WHERE adc.group_id = (SELECT group_id FROM sys.availability_groups WHERE name = 
 ORDER BY DB_NAME(adc.database_id)
 "@
 
-			$dbStatusBefore = Invoke-DbaQuery @connParams -Query $dbStatusBeforeQuery -SqlParameters @{ AgName = $AvailabilityGroupName } -ErrorAction Stop
+			$dbStatusBefore = Invoke-DbaQuery -EnableException @connParams -Query $dbStatusBeforeQuery -SqlParameters @{ AgName = $AvailabilityGroupName } -ErrorAction Stop
 
 			$recoveryCountBefore = ($dbStatusBefore | Where-Object { $_.database_state_desc -ne 'ONLINE' } | Measure-Object).Count
 
@@ -148,7 +154,7 @@ EXEC xp_regread N'HKEY_LOCAL_MACHINE',
 
 			try
 			{
-				$clusterName = Invoke-DbaQuery @connParams -Query $clusterListenerQuery -ErrorAction SilentlyContinue
+				$clusterName = Invoke-DbaQuery -EnableException @connParams -Query $clusterListenerQuery -ErrorAction SilentlyContinue
 			}
 			catch
 			{
@@ -172,7 +178,7 @@ EXEC xp_regread N'HKEY_LOCAL_MACHINE',
 			Invoke-sqmLogging -Message "!!! ADDING listener to AG [$AvailabilityGroupName]" -FunctionName $functionName -Level "WARNING"
 
 			# Add listener WITHOUT specifying IP - SQL Server will discover from cluster
-			$addListenerSql = "ALTER AVAILABILITY GROUP [$AvailabilityGroupName] ADD LISTENER N'$ListenerName' (PORT = 1433)"
+			$addListenerSql = "ALTER AVAILABILITY GROUP [$AvailabilityGroupName] ADD LISTENER N'$ListenerName' (PORT = $ListenerPort)"
 
 			try
 			{
@@ -194,7 +200,7 @@ WHERE group_id = (SELECT group_id FROM sys.availability_groups WHERE name = @AgN
 AND dns_name = @DnsName
 "@
 
-			$listenerVerify = Invoke-DbaQuery @connParams -Query $verifyListenerQuery -SqlParameters @{ AgName = $AvailabilityGroupName; DnsName = $ListenerName } -ErrorAction Stop
+			$listenerVerify = Invoke-DbaQuery -EnableException @connParams -Query $verifyListenerQuery -SqlParameters @{ AgName = $AvailabilityGroupName; DnsName = $ListenerName } -ErrorAction Stop
 
 			if ([int]$listenerVerify.C -eq 0)
 			{
@@ -202,7 +208,7 @@ AND dns_name = @DnsName
 			}
 
 			# Step 8: Verify DB status AFTER listener addition
-			$dbStatusAfter = Invoke-DbaQuery @connParams -Query $dbStatusBeforeQuery -SqlParameters @{ AgName = $AvailabilityGroupName } -ErrorAction Stop
+			$dbStatusAfter = Invoke-DbaQuery -EnableException @connParams -Query $dbStatusBeforeQuery -SqlParameters @{ AgName = $AvailabilityGroupName } -ErrorAction Stop
 
 			$onlineCountAfter = ($dbStatusAfter | Where-Object { $_.database_state_desc -eq 'ONLINE' } | Measure-Object).Count
 			$recoveryCountAfter = ($dbStatusAfter | Where-Object { $_.database_state_desc -ne 'ONLINE' } | Measure-Object).Count

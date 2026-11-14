@@ -39,6 +39,12 @@
     'Automatic' (default) = AutoSeed enabled
     'Manual' = Manual backup/restore required for new databases
 
+.PARAMETER DistributedAgName
+    Name of the Distributed AG. Default: <PrimaryAgName>_<SecondaryAgName>.
+
+.PARAMETER EndpointPort
+    TCP port of the database mirroring endpoint on both sides (used in LISTENER_URL). Default: 5022.
+
 .PARAMETER OutputPath
     Output directory for detailed logs. Default: C:\System\WinSrvLog\MSSQL
 
@@ -90,6 +96,13 @@ function New-sqmDistributedAvailabilityGroup
 		[ValidateSet('Automatic', 'Manual')]
 		[string]$SeedingMode = 'Automatic',
 		[Parameter(Mandatory = $false)]
+		[ValidatePattern('^[^\[\]''";\r\n]+$')]
+		[ValidateLength(1, 128)]
+		[string]$DistributedAgName,
+		[Parameter(Mandatory = $false)]
+		[ValidateRange(1024, 65535)]
+		[int]$EndpointPort = 5022,
+		[Parameter(Mandatory = $false)]
 		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'DistributedAG'),
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
@@ -117,6 +130,22 @@ function New-sqmDistributedAvailabilityGroup
 		}
 
 		$steps = [System.Collections.Generic.List[PSCustomObject]]::new()
+		$dagName = if ($DistributedAgName) { $DistributedAgName } else { "$($PrimaryAgName)_$($SecondaryAgName)" }
+
+		# Trockenlauf: keine Aenderung am System, nur die geplanten Schritte melden.
+		if (-not $PSCmdlet.ShouldProcess("$PrimaryInstance -> $SecondaryInstance", "Distributed AG [$dagName] erstellen"))
+		{
+			return [PSCustomObject]@{
+				Status            = 'WHATIF'
+				PrimaryInstance   = $PrimaryInstance
+				PrimaryAgName     = $PrimaryAgName
+				SecondaryInstance = $SecondaryInstance
+				SecondaryAgName   = $SecondaryAgName
+				DistributedAgName = $dagName
+				SeedingMode       = $SeedingMode
+				Steps             = $steps
+			}
+		}
 
 		try
 		{
@@ -134,7 +163,7 @@ FROM sys.availability_groups ag
 JOIN sys.dm_hadr_availability_replica_states ars ON ars.group_id = ag.group_id
 WHERE ag.name = @AgName AND ars.is_local = 1
 "@
-			$primaryAg = Invoke-DbaQuery @primaryConnParams -Query $primaryAgQuery -SqlParameters @{ AgName = $PrimaryAgName } -ErrorAction Stop
+			$primaryAg = Invoke-DbaQuery -EnableException @primaryConnParams -Query $primaryAgQuery -SqlParameters @{ AgName = $PrimaryAgName } -ErrorAction Stop
 
 			if (-not $primaryAg)
 			{
@@ -156,7 +185,7 @@ WHERE ag.name = @AgName AND ars.is_local = 1
 			Invoke-sqmLogging -Message "Validiere Secondary AG [$SecondaryAgName] auf [$SecondaryInstance]" -FunctionName $functionName -Level "INFO"
 
 			$secondaryAgQuery = "SELECT name, ars.role_desc FROM sys.availability_groups ag JOIN sys.dm_hadr_availability_replica_states ars ON ars.group_id = ag.group_id WHERE ag.name = @AgName AND ars.is_local = 1"
-			$secondaryAg = Invoke-DbaQuery @secondaryConnParams -Query $secondaryAgQuery -SqlParameters @{ AgName = $SecondaryAgName } -ErrorAction Stop
+			$secondaryAg = Invoke-DbaQuery -EnableException @secondaryConnParams -Query $secondaryAgQuery -SqlParameters @{ AgName = $SecondaryAgName } -ErrorAction Stop
 
 			if (-not $secondaryAg)
 			{
@@ -170,7 +199,7 @@ WHERE ag.name = @AgName AND ars.is_local = 1
 			})
 
 			# Step 3: Create Distributed AG on primary
-			Invoke-sqmLogging -Message "Erstelle Distributed AG [$PrimaryAgName-$SecondaryAgName]" -FunctionName $functionName -Level "INFO"
+			Invoke-sqmLogging -Message "Erstelle Distributed AG [$dagName]" -FunctionName $functionName -Level "INFO"
 
 			$seedingModeSql = if ($EnableAutoSeed -or $SeedingMode -eq 'Automatic') { 'AUTOMATIC' } else { 'MANUAL' }
 
@@ -186,8 +215,8 @@ BEGIN
 END
 GRANT CONNECT ON ENDPOINT::[$EndpointName] TO [$ServiceAccount]
 "@
-				Invoke-DbaQuery @primaryConnParams -Query $grantSql -ErrorAction Stop
-				Invoke-DbaQuery @secondaryConnParams -Query $grantSql -ErrorAction Stop
+				Invoke-DbaQuery -EnableException @primaryConnParams -Query $grantSql -ErrorAction Stop
+				Invoke-DbaQuery -EnableException @secondaryConnParams -Query $grantSql -ErrorAction Stop
 
 				$steps.Add([PSCustomObject]@{
 					Step = 'Grant Endpoint Access'
@@ -198,34 +227,45 @@ GRANT CONNECT ON ENDPOINT::[$EndpointName] TO [$ServiceAccount]
 
 			# Step 3b: Distributed AG erstellen mit FQDN
 			$createDagSql = @"
-CREATE AVAILABILITY GROUP [$($PrimaryAgName)_$($SecondaryAgName)]
+CREATE AVAILABILITY GROUP [$dagName]
 WITH (DISTRIBUTED)
 AVAILABILITY GROUP ON
     N'$PrimaryAgName' WITH
-        (LISTENER_URL = N'TCP://$($PrimaryFqdn):5022',
+        (LISTENER_URL = N'TCP://$($PrimaryFqdn):$EndpointPort',
          AVAILABILITY_MODE = ASYNCHRONOUS_COMMIT,
          FAILOVER_MODE = MANUAL,
          SEEDING_MODE = $seedingModeSql),
     N'$SecondaryAgName' WITH
-        (LISTENER_URL = N'TCP://$($SecondaryFqdn):5022',
+        (LISTENER_URL = N'TCP://$($SecondaryFqdn):$EndpointPort',
          AVAILABILITY_MODE = ASYNCHRONOUS_COMMIT,
          FAILOVER_MODE = MANUAL,
          SEEDING_MODE = $seedingModeSql)
 "@
 
-			Invoke-DbaQuery @primaryConnParams -Query $createDagSql -ErrorAction Stop
+			# Idempotenz: existiert die Distributed AG schon (Wiederaufnahme nach Abbruch), nicht erneut anlegen.
+			$dagExistsPrimary = Invoke-DbaQuery -EnableException @primaryConnParams -Query 'SELECT COUNT(*) AS C FROM sys.availability_groups WHERE is_distributed = 1 AND name = @n' -SqlParameters @{ n = $dagName }
+			if ([int]$dagExistsPrimary.C -gt 0)
+			{
+				$steps.Add([PSCustomObject]@{ Step = 'Create Distributed AG'; Status = 'SKIPPED'; Details = "[$dagName] existiert bereits auf [$PrimaryInstance]" })
+				Write-Information -MessageData ([PSCustomObject]@{ Step = 'Create Distributed AG'; Status = 'SKIPPED' }) -Tags 'sqmStep'
+			}
+			else
+			{
+				Invoke-DbaQuery -EnableException @primaryConnParams -Query $createDagSql -ErrorAction Stop
 
-			$steps.Add([PSCustomObject]@{
-				Step = 'Create Distributed AG'
-				Status = 'OK'
-				Details = "SeedingMode=$seedingModeSql PrimaryFqdn=$PrimaryFqdn SecondaryFqdn=$SecondaryFqdn"
-			})
+				$steps.Add([PSCustomObject]@{
+					Step = 'Create Distributed AG'
+					Status = 'OK'
+					Details = "SeedingMode=$seedingModeSql PrimaryFqdn=$PrimaryFqdn SecondaryFqdn=$SecondaryFqdn"
+				})
+				Write-Information -MessageData ([PSCustomObject]@{ Step = 'Create Distributed AG'; Status = 'OK' }) -Tags 'sqmStep'
+			}
 
 			# Step 3c: GRANT CREATE ANY DATABASE auf Secondary AG fuer AutoSeed
 			if ($seedingModeSql -eq 'AUTOMATIC')
 			{
 				$grantCreateSql = "ALTER AVAILABILITY GROUP [$SecondaryAgName] GRANT CREATE ANY DATABASE"
-				Invoke-DbaQuery @secondaryConnParams -Query $grantCreateSql -ErrorAction Stop
+				Invoke-DbaQuery -EnableException @secondaryConnParams -Query $grantCreateSql -ErrorAction Stop
 
 				$steps.Add([PSCustomObject]@{
 					Step = 'Grant Create Any Database'
@@ -238,35 +278,45 @@ AVAILABILITY GROUP ON
 			Invoke-sqmLogging -Message "Registriere Secondary AG [$SecondaryAgName] in Distributed AG" -FunctionName $functionName -Level "INFO"
 
 			$joinSecondaryDagSql = @"
-ALTER AVAILABILITY GROUP [$($PrimaryAgName)_$($SecondaryAgName)] JOIN
+ALTER AVAILABILITY GROUP [$dagName] JOIN
 AVAILABILITY GROUP ON
 	N'$PrimaryAgName' WITH (
-		LISTENER_URL = N'TCP://$($PrimaryFqdn):5022',
+		LISTENER_URL = N'TCP://$($PrimaryFqdn):$EndpointPort',
 		AVAILABILITY_MODE = ASYNCHRONOUS_COMMIT,
 		FAILOVER_MODE = MANUAL,
 		SEEDING_MODE = $seedingModeSql
 	),
 	N'$SecondaryAgName' WITH (
-		LISTENER_URL = N'TCP://$($SecondaryFqdn):5022',
+		LISTENER_URL = N'TCP://$($SecondaryFqdn):$EndpointPort',
 		AVAILABILITY_MODE = ASYNCHRONOUS_COMMIT,
 		FAILOVER_MODE = MANUAL,
 		SEEDING_MODE = $seedingModeSql
 	)
 "@
 
-			Invoke-DbaQuery @secondaryConnParams -Query $joinSecondaryDagSql -ErrorAction Stop
+			$dagExistsSecondary = Invoke-DbaQuery -EnableException @secondaryConnParams -Query 'SELECT COUNT(*) AS C FROM sys.availability_groups WHERE is_distributed = 1 AND name = @n' -SqlParameters @{ n = $dagName }
+			if ([int]$dagExistsSecondary.C -gt 0)
+			{
+				$steps.Add([PSCustomObject]@{ Step = 'Register Secondary AG'; Status = 'SKIPPED'; Details = "Secondary AG ist bereits Mitglied von [$dagName]" })
+				Write-Information -MessageData ([PSCustomObject]@{ Step = 'Register Secondary AG'; Status = 'SKIPPED' }) -Tags 'sqmStep'
+			}
+			else
+			{
+				Invoke-DbaQuery -EnableException @secondaryConnParams -Query $joinSecondaryDagSql -ErrorAction Stop
 
-			$steps.Add([PSCustomObject]@{
-				Step = 'Register Secondary AG'
-				Status = 'OK'
-				Details = "Secondary AG joined Distributed AG"
-			})
+				$steps.Add([PSCustomObject]@{
+					Step = 'Register Secondary AG'
+					Status = 'OK'
+					Details = "Secondary AG joined Distributed AG"
+				})
+				Write-Information -MessageData ([PSCustomObject]@{ Step = 'Register Secondary AG'; Status = 'OK' }) -Tags 'sqmStep'
+			}
 
 			# Step 4: Verify creation
 			Start-Sleep -Seconds 5
 
-			$verifyQuery = "SELECT COUNT(*) AS C FROM sys.availability_groups WHERE is_distributed = 1"
-			$dagCount = Invoke-DbaQuery @primaryConnParams -Query $verifyQuery -ErrorAction Stop
+			$verifyQuery = "SELECT COUNT(*) AS C FROM sys.availability_groups WHERE is_distributed = 1 AND name = @n"
+			$dagCount = Invoke-DbaQuery -EnableException @primaryConnParams -Query $verifyQuery -SqlParameters @{ n = $dagName } -ErrorAction Stop
 
 			if ([int]$dagCount.C -eq 0)
 			{
@@ -324,7 +374,7 @@ AVAILABILITY GROUP ON
 				PrimaryAgName = $PrimaryAgName
 				SecondaryInstance = $SecondaryInstance
 				SecondaryAgName = $SecondaryAgName
-				DistributedAgName = "$($PrimaryAgName)_$($SecondaryAgName)"
+				DistributedAgName = $dagName
 				SeedingMode = $seedingModeSql
 				Timestamp = Get-Date
 				Steps = $steps

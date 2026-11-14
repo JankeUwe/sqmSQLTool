@@ -124,7 +124,7 @@ LEFT JOIN sys.availability_group_listener_ip_port aglil ON aglil.listener_id = a
 WHERE agl.group_id = (SELECT group_id FROM sys.availability_groups WHERE name = @AgName)
 "@
 
-			$listenerInfo = Invoke-DbaQuery @sourceConnParams -Query $getListenerQuery -SqlParameters @{ AgName = $SourceAgName } -ErrorAction Stop
+			$listenerInfo = Invoke-DbaQuery -EnableException @sourceConnParams -Query $getListenerQuery -SqlParameters @{ AgName = $SourceAgName } -ErrorAction Stop
 
 			if (-not $listenerInfo)
 			{
@@ -140,7 +140,7 @@ WHERE agl.group_id = (SELECT group_id FROM sys.availability_groups WHERE name = 
 
 			# Step 2: Validate target AG exists
 			$targetAgQuery = "SELECT COUNT(*) AS C FROM sys.availability_groups WHERE name = @AgName"
-			$targetAgCheck = Invoke-DbaQuery @targetConnParams -Query $targetAgQuery -SqlParameters @{ AgName = $TargetAgName } -ErrorAction Stop
+			$targetAgCheck = Invoke-DbaQuery -EnableException @targetConnParams -Query $targetAgQuery -SqlParameters @{ AgName = $TargetAgName } -ErrorAction Stop
 
 			if ([int]$targetAgCheck.C -eq 0)
 			{
@@ -153,7 +153,7 @@ WHERE agl.group_id = (SELECT group_id FROM sys.availability_groups WHERE name = 
 				Invoke-sqmLogging -Message "Entferne Listener von [$SourceAgName]" -FunctionName $functionName -Level "WARNING"
 
 				$removeListenerSql = "ALTER AVAILABILITY GROUP [$SourceAgName] REMOVE LISTENER N'$listenerDns'"
-				Invoke-DbaQuery @sourceConnParams -Query $removeListenerSql -ErrorAction Stop
+				Invoke-DbaQuery -EnableException @sourceConnParams -Query $removeListenerSql -ErrorAction Stop
 
 				Start-Sleep -Seconds 2
 			}
@@ -165,7 +165,7 @@ WHERE agl.group_id = (SELECT group_id FROM sys.availability_groups WHERE name = 
 ALTER AVAILABILITY GROUP [$TargetAgName]
 ADD LISTENER N'$listenerDns' ( WITH IP ( (N'$listenerIp', N'$listenerSubnet') ), PORT = $listenerPort)
 "@
-			Invoke-DbaQuery @targetConnParams -Query $createListenerSql -ErrorAction Stop
+			Invoke-DbaQuery -EnableException @targetConnParams -Query $createListenerSql -ErrorAction Stop
 
 			# Step 5: Verify listener exists on target
 			Start-Sleep -Seconds 3
@@ -182,7 +182,7 @@ LEFT JOIN sys.availability_group_listener_ip_port aglil ON aglil.listener_id = a
 WHERE agl.group_id = (SELECT group_id FROM sys.availability_groups WHERE name = @AgName) AND agl.dns_name = @DnsName
 "@
 
-			$verifyListener = Invoke-DbaQuery @targetConnParams -Query $verifyQuery -SqlParameters @{ AgName = $TargetAgName; DnsName = $listenerDns } -ErrorAction Stop
+			$verifyListener = Invoke-DbaQuery -EnableException @targetConnParams -Query $verifyQuery -SqlParameters @{ AgName = $TargetAgName; DnsName = $listenerDns } -ErrorAction Stop
 
 			if (-not $verifyListener)
 			{
