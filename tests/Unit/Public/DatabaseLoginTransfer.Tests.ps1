@@ -79,8 +79,12 @@ Describe 'Export-sqmDatabaseLogins' {
         $sql = Get-Content $r.OutputFile -Raw
         $sql | Should -Match 'PASSWORD = 0x0200DEADBEEF HASHED'
         $sql | Should -Match 'SID = 0xAABBCC00'
-        $sql | Should -Match 'CHECK_POLICY = OFF, CHECK_EXPIRATION = OFF, DEFAULT_DATABASE = \[Sales\]'
-        $sql | Should -Match 'CHECK_POLICY = ON, CHECK_EXPIRATION = OFF, DEFAULT_DATABASE = \[master\]'
+        # HASHED ist mit CHECK_POLICY = ON nicht erlaubt: CREATE immer mit OFF, danach ALTER auf Quell-Flags
+        $sql | Should -Not -Match 'HASHED[^;]*CHECK_POLICY = ON'
+        $sql | Should -Match 'HASHED, SID = 0x[0-9A-F]+, CHECK_POLICY = OFF, CHECK_EXPIRATION = OFF, DEFAULT_DATABASE = \[Sales\]'
+        $sql | Should -Match 'HASHED, SID = 0x[0-9A-F]+, CHECK_POLICY = OFF, CHECK_EXPIRATION = OFF, DEFAULT_DATABASE = \[master\]'
+        $sql | Should -Match 'WITH CHECK_POLICY = ON, CHECK_EXPIRATION = OFF;'
+        $sql | Should -Match 'WITH CHECK_POLICY = OFF;\s+ALTER LOGIN \S+ WITH PASSWORD = 0x[0-9A-F]+ HASHED;'
         $sql | Should -Not -Match 'OtherDb'
     }
 

@@ -1,5 +1,11 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.230.0] - 2026-11-16
+
+### Behoben: Export-sqmDatabaseLogins - "Ein HASHED-Kennwort kann nicht fuer einen Anmeldenamen festgelegt werden, fuer den CHECK_POLICY aktiviert ist"
+
+Das erzeugte Skript setzte den Passwort-Hash und CHECK_POLICY = ON in einem einzigen ALTER LOGIN. SQL Server lehnt das ab, sobald das Login auf dem Ziel schon existiert und dort CHECK_POLICY aktiv ist; beim Import brach der Block mit dem Fehler 15128 ab. Jetzt schaltet der Block fuer die Aenderung zuerst CHECK_EXPIRATION und CHECK_POLICY aus, setzt den Hash und stellt danach die Flags der Quelle wieder her (derselbe Ablauf wie im Login-Sync fuer AlwaysOn). CREATE LOGIN legt das Login mit OFF/OFF an und setzt die Flags anschliessend per ALTER LOGIN. Gegen SQL Server 2022 geprueft: der alte ALTER scheitert mit genau dieser Meldung, der neue Ablauf behaelt Hash, SID und Flags bei.
+
 ## [1.9.229.0] - 2026-11-14
 
 ### Erweitert: Distributed-AG-Vorabpruefung fuer Autoseed und der Assistent fuer laengere Pausen

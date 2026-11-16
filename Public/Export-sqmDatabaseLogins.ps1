@@ -310,7 +310,12 @@ WHERE sp.type = 'S' AND sp.name IN ($inClause)
 IF EXISTS (SELECT 1 FROM sys.server_principals WHERE sid = $sidHex)
 BEGIN
     IF EXISTS (SELECT 1 FROM sys.server_principals WHERE sid = $sidHex AND name = N'$nameLit')
-        ALTER LOGIN [$idLit] WITH PASSWORD = $hashHex HASHED, CHECK_POLICY = $checkPolicy, CHECK_EXPIRATION = $checkExpiration;
+    BEGIN
+        ALTER LOGIN [$idLit] WITH CHECK_EXPIRATION = OFF;
+        ALTER LOGIN [$idLit] WITH CHECK_POLICY = OFF;
+        ALTER LOGIN [$idLit] WITH PASSWORD = $hashHex HASHED;
+        ALTER LOGIN [$idLit] WITH CHECK_POLICY = $checkPolicy, CHECK_EXPIRATION = $checkExpiration;
+    END
     ELSE
         PRINT N'UEBERSPRUNGEN: SID $sidHex gehoert bereits zu einem anders benannten Login (Quelle: $nameLit).';
 END
@@ -321,12 +326,14 @@ BEGIN
     ELSE
     BEGIN
         DROP LOGIN [$idLit];
-        CREATE LOGIN [$idLit] WITH PASSWORD = $hashHex HASHED, SID = $sidHex, CHECK_POLICY = $checkPolicy, CHECK_EXPIRATION = $checkExpiration, DEFAULT_DATABASE = [$defaultDbIdent];
+        CREATE LOGIN [$idLit] WITH PASSWORD = $hashHex HASHED, SID = $sidHex, CHECK_POLICY = OFF, CHECK_EXPIRATION = OFF, DEFAULT_DATABASE = [$defaultDbIdent];
+        ALTER LOGIN [$idLit] WITH CHECK_POLICY = $checkPolicy, CHECK_EXPIRATION = $checkExpiration;
     END
 END
 ELSE
 BEGIN
-    CREATE LOGIN [$idLit] WITH PASSWORD = $hashHex HASHED, SID = $sidHex, CHECK_POLICY = $checkPolicy, CHECK_EXPIRATION = $checkExpiration, DEFAULT_DATABASE = [$defaultDbIdent];
+    CREATE LOGIN [$idLit] WITH PASSWORD = $hashHex HASHED, SID = $sidHex, CHECK_POLICY = OFF, CHECK_EXPIRATION = OFF, DEFAULT_DATABASE = [$defaultDbIdent];
+    ALTER LOGIN [$idLit] WITH CHECK_POLICY = $checkPolicy, CHECK_EXPIRATION = $checkExpiration;
 END
 "@
 				$blocks.Add($block)
