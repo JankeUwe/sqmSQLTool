@@ -46,12 +46,26 @@
 
 .PARAMETER ServerRole
     Expected server role membership, e.g. "SQL_Inventory_RO_Basic". Without this parameter
-    the role check is skipped and only permissions are evaluated.
+    the role check is skipped and only permissions are evaluated. If the role is the standard
+    role of Install-sqmDiscoveryRole (SQL_ServiceNow_Discovery), its own permissions are also
+    compared against the standard definition, so a role that someone trimmed afterwards shows up.
 
 .PARAMETER RequiredLevel
     The DiscoveryLevel the account is supposed to reach. Anything below it is reported as a
     finding. Default: Databases (server plus database listing), which is what a CMDB
     inventory normally needs.
+
+.PARAMETER CheckWmi
+    Additionally checks the Windows side on the host of every instance: "Enable Account" and
+    "Remote Enable" on Root\CIMv2 and Root\Microsoft\SqlServer\ComputerManagement*, membership
+    in "Distributed COM Users", and the state of Remote Registry. This is the part of a discovery
+    scan that goes through WMI and that no SQL role can cover. Needs local administrator rights on
+    the host. A missing WMI right counts as a failed check, because the server data then stays
+    empty. The host name is taken from the instance name; for AG listeners or cluster network
+    names check the node names.
+
+.PARAMETER WmiCredential
+    Credential for the WMI check on remote hosts (default: the current user).
 
 .PARAMETER SqlCredential
     PSCredential for the SQL connection. This is the DBA's own connection, not the
@@ -88,6 +102,14 @@
 
     Requires the account to also reach the DMVs (port, CPU/RAM, cluster and AG topology).
 
+.EXAMPLE
+    Test-sqmDiscoveryAccess -SqlInstance SQL01, SQL02 -LoginName "CORP\svc_servicenow" `
+        -ServerRole SQL_ServiceNow_Discovery -RequiredLevel Full -CheckWmi
+
+    Verifies the setup done by Install-sqmDiscoveryRole and Set-sqmDiscoveryWmiAccess:
+    login, role membership, the role's own permissions (drift against the standard definition)
+    and the WMI/DCOM rights on the hosts.
+
 .NOTES
     Requires: dbatools, Invoke-sqmLogging
     Read-only. The function changes nothing on the instances it checks.
@@ -111,6 +133,10 @@ function Test-sqmDiscoveryAccess
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$SqlCredential,
 		[Parameter(Mandatory = $false)]
+		[switch]$CheckWmi,
+		[Parameter(Mandatory = $false)]
+		[System.Management.Automation.PSCredential]$WmiCredential,
+		[Parameter(Mandatory = $false)]
 		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'DiscoveryAccess'),
 		[Parameter(Mandatory = $false)]
 		[switch]$NoOpen,
@@ -132,6 +158,7 @@ function Test-sqmDiscoveryAccess
 		}
 
 		$allResults = [System.Collections.Generic.List[PSCustomObject]]::new()
+		$standardRole = (Get-sqmDiscoveryDefinition).RoleName
 
 		# Rangfolge der Stufen, damit "erreicht" gegen "gefordert" vergleichbar wird.
 		$levelRank = @{
@@ -220,6 +247,11 @@ SELECT
     ViewServerState     = CASE WHEN EXISTS (SELECT 1 FROM Perm WHERE permission_name IN ('VIEW SERVER STATE', 'VIEW SERVER PERFORMANCE STATE') AND state_desc = 'DENY') THEN 0
                                WHEN EXISTS (SELECT 1 FROM Perm WHERE permission_name IN ('VIEW SERVER STATE', 'VIEW SERVER PERFORMANCE STATE') AND state_desc LIKE 'GRANT%') THEN 1
                                ELSE 0 END,
+    RoleGrants          = ISNULL(STUFF((SELECT DISTINCT ', ' + sp.permission_name
+                                        FROM sys.server_permissions sp
+                                        WHERE sp.class = 100 AND sp.state_desc LIKE 'GRANT%'
+                                          AND sp.grantee_principal_id = (SELECT principal_id FROM sys.server_principals WHERE name = @role AND type = 'R')
+                                        FOR XML PATH('')), 1, 2, ''), ''),
     GrantedPermissions  = ISNULL(STUFF((SELECT DISTINCT ', ' + permission_name
                                         FROM Perm WHERE state_desc LIKE 'GRANT%'
                                         FOR XML PATH('')), 1, 2, ''), ''),
@@ -256,6 +288,10 @@ SELECT
 				ViewAnyDefinition  = $false
 				ViewServerState    = $false
 				GrantedPermissions = ''
+				RoleMissingPermissions = @()
+				WmiChecked		   = $false
+				WmiOk			   = $null
+				WmiHost			   = ''
 				DiscoveryLevel	   = 'None'
 				RequiredLevel	   = $RequiredLevel
 				MeetsRequirement   = $false
@@ -305,6 +341,20 @@ SELECT
 					$row.InServerRole = ($data.InServerRole -eq 1)
 				}
 
+				# Abgleich mit Install-sqmDiscoveryRole: hat die Standardrolle noch alle Rechte
+				# der Definition? Eine andere Rolle (z. B. SQL_Inventory_RO_Basic) hat bewusst
+				# andere Rechte und wird nicht verglichen.
+				if ($row.RoleExists -and $ServerRole -eq $standardRole)
+				{
+					$granted = @(([string]$data.RoleGrants) -split ',\s*' | Where-Object { $_ })
+					$expected = @((Get-sqmDiscoveryDefinition -MajorVersion ([int]$data.MajorVersion)).ServerPermissions)
+					# VIEW SERVER STATE schliesst VIEW SERVER PERFORMANCE STATE ein
+					$row.RoleMissingPermissions = @($expected | Where-Object {
+						$e = $_
+						-not ($granted -contains $e -or ($e -eq 'VIEW SERVER PERFORMANCE STATE' -and $granted -contains 'VIEW SERVER STATE'))
+					})
+				}
+
 				# --- Stufe bestimmen -------------------------------------------------------
 				# Die Serverdaten holt eine agentenlose Discovery ueber Registry und WMI,
 				# dafuer ist auf SQL-Ebene ueberhaupt kein Login noetig. Erst ab der
@@ -344,6 +394,11 @@ SELECT
 						elseif (-not $row.InServerRole) { $findings.Add("Login ist nicht Mitglied der Serverrolle '$ServerRole'.") }
 					}
 
+					if ($row.RoleMissingPermissions.Count -gt 0)
+					{
+						$findings.Add("Serverrolle '$ServerRole' hat nicht mehr alle Standardrechte, es fehlt: $($row.RoleMissingPermissions -join ', '). Install-sqmDiscoveryRole stellt sie wieder her.")
+					}
+
 					# Der Haertungsfall: ohne VIEW ANY DATABASE meldet SQL Server keinen
 					# Fehler, das Konto sieht nur noch master und tempdb.
 					if (-not $row.ViewAnyDatabase)
@@ -370,9 +425,42 @@ SELECT
 					}
 				}
 
+				# --- WMI/DCOM auf dem Host (nur auf Wunsch, braucht lokale Adminrechte) ------
+				if ($CheckWmi)
+				{
+					$wmiHost = Get-sqmDiscoveryHostName -SqlInstance $instance
+					$row.WmiHost = $wmiHost
+					try
+					{
+						$wmiState = Get-sqmDiscoveryWmiState -ComputerName $wmiHost -Account $LoginName `
+							-Definition (Get-sqmDiscoveryDefinition -MajorVersion ([int]$data.MajorVersion)) -Credential $WmiCredential
+						$row.WmiChecked = $true
+						$row.WmiOk      = [bool]$wmiState.Ok
+						foreach ($n in @($wmiState.Namespaces | Where-Object { -not $_.Ok }))
+						{
+							$findings.Add("WMI: dem Konto fehlen 'Enable Account' und 'Remote Enable' auf $($n.Namespace) (Host $wmiHost). Set-sqmDiscoveryWmiAccess -Mode Apply setzt sie.")
+						}
+						if (-not $wmiState.DcomMember)
+						{
+							$findings.Add("WMI: Konto ist nicht Mitglied der lokalen Gruppe 'Distributed COM Users' auf $wmiHost.")
+						}
+						if ($wmiState.RemoteRegistryStart -eq 'Disabled' -or ($wmiState.RemoteRegistryState -and $wmiState.RemoteRegistryState -ne 'Running'))
+						{
+							$findings.Add("Hinweis: Remote Registry auf $wmiHost ist $($wmiState.RemoteRegistryState) / $($wmiState.RemoteRegistryStart). Standardmaessig darf nur ein Administrator oder Backup Operator remote auf die Registry zugreifen.")
+						}
+					}
+					catch
+					{
+						$row.WmiChecked = $true
+						$row.WmiOk      = $false
+						$findings.Add("WMI-Pruefung auf $wmiHost nicht moeglich: $($_.Exception.Message)")
+					}
+				}
+
 				$row.Findings = $findings.ToArray()
 
 				$row.Status = if (-not $row.MeetsRequirement) { 'Fehler' }
+							  elseif ($CheckWmi -and $row.WmiOk -ne $true) { 'Fehler' }
 							  elseif ($findings.Count -gt 0)  { 'Warnung' }
 							  else						      { 'OK' }
 
@@ -443,7 +531,8 @@ SELECT
 					$txt.Add("    Login vorhanden: $(if ($r.LoginExists) { "ja ($($r.LoginType))" } else { 'NEIN' })   deaktiviert: $(if ($r.IsDisabled) { 'ja' } else { 'nein' })   sysadmin: $(if ($r.IsSysadmin) { 'JA' } else { 'nein' })")
 					$txt.Add("    Rollenmitglied '$ServerRole': $roleTxt")
 					$txt.Add("    VIEW ANY DATABASE: $(if ($r.ViewAnyDatabase) { 'ja' } else { 'NEIN' })   VIEW ANY DEFINITION: $(if ($r.ViewAnyDefinition) { 'ja' } else { 'nein' })   VIEW SERVER STATE: $(if ($r.ViewServerState) { 'ja' } else { 'nein' })")
-					if ($r.ServerRoles)        { $txt.Add("    Serverrollen: $($r.ServerRoles)") }
+						if ($r.WmiChecked) { $txt.Add("    WMI/DCOM auf $($r.WmiHost): $(if ($r.WmiOk) { 'ok' } else { 'FEHLT' })") }
+						if ($r.ServerRoles)        { $txt.Add("    Serverrollen: $($r.ServerRoles)") }
 					if ($r.GrantedPermissions) { $txt.Add("    Effektive GRANTs: $($r.GrantedPermissions)") }
 				}
 				foreach ($f in $r.Findings) { $txt.Add("    - $f") }
@@ -472,14 +561,14 @@ SELECT
 				}
 				else { '<span class="ok">keine</span>' }
 
-				$rowsHtml += "<tr><td>$(_Enc $r.SqlInstance)</td><td class='$cls'>$($r.Status)</td><td>$(_Enc $r.DiscoveryLevel)</td><td>$loginCell</td><td>$roleCell</td><td>$(& $yn $r.ViewAnyDatabase)</td><td>$(& $yn $r.ViewAnyDefinition)</td><td>$(& $yn $r.ViewServerState)</td><td>$(if ($r.IsSysadmin) { "<span class='crit'>JA</span>" } else { 'nein' })</td><td>$findingsHtml</td></tr>`n"
+				$rowsHtml += "<tr><td>$(_Enc $r.SqlInstance)</td><td class='$cls'>$($r.Status)</td><td>$(_Enc $r.DiscoveryLevel)</td><td>$loginCell</td><td>$roleCell</td><td>$(& $yn $r.ViewAnyDatabase)</td><td>$(& $yn $r.ViewAnyDefinition)</td><td>$(& $yn $r.ViewServerState)</td><td>$(if ($r.IsSysadmin) { "<span class='crit'>JA</span>" } else { 'nein' })</td>$(if ($CheckWmi) { '<td>' + $(if ($r.WmiOk) { "<span class='ok'>ok</span>" } else { "<span class='crit'>fehlt</span>" }) + '</td>' })<td>$findingsHtml</td></tr>`n"
 			}
 
 			$bodyHtml = @"
 <p>Konto: <strong>$(_Enc $LoginName)</strong>$(if ($ServerRole) { " | Erwartete Rolle: <strong>$(_Enc $ServerRole)</strong>" }) | Geforderte Stufe: <strong>$(_Enc $RequiredLevel)</strong></p>
 <p>Instanzen: <strong>$($allResults.Count)</strong> &nbsp;|&nbsp; <span class="ok">OK: $countOk</span> &nbsp;|&nbsp; <span class="warn">Warnung: $countWarn</span> &nbsp;|&nbsp; <span class="crit">Fehler: $countErr</span></p>
 <table>
-<tr><th>Instanz</th><th>Status</th><th>Stufe</th><th>Login</th><th>in Rolle</th><th>VIEW ANY DATABASE</th><th>VIEW ANY DEFINITION</th><th>VIEW SERVER STATE</th><th>sysadmin</th><th>Befunde</th></tr>
+<tr><th>Instanz</th><th>Status</th><th>Stufe</th><th>Login</th><th>in Rolle</th><th>VIEW ANY DATABASE</th><th>VIEW ANY DEFINITION</th><th>VIEW SERVER STATE</th><th>sysadmin</th>$(if ($CheckWmi) { '<th>WMI/DCOM</th>' })<th>Befunde</th></tr>
 $rowsHtml
 </table>
 "@

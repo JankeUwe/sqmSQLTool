@@ -1,5 +1,21 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.231.0] - 2026-11-18
+
+### Neu: Install-sqmDiscoveryRole und Set-sqmDiscoveryWmiAccess - Rolle und WMI-Rechte fuer das ServiceNow-Dienstkonto
+
+Der ServiceNow-Scan fuer SQL Server scheiterte teilweise still: Auf der SQL-Seite fehlten Rechte, auf der Windows-Seite reichte WMI nicht aus. Beide Seiten lassen sich jetzt aus dem Modul einrichten und mit `Test-sqmDiscoveryAccess` pruefen.
+
+`Install-sqmDiscoveryRole` legt die Serverrolle `SQL_ServiceNow_Discovery` an (Name per `-RoleName` aenderbar) und vergibt genau das, was die Abfragen des Patterns "MSSql DB On Windows" brauchen: `VIEW ANY DEFINITION` (Katalogsichten wie `sys.master_files` und die AG-Sichten; ohne das Recht kommen null Zeilen statt eines Fehlers zurueck), `VIEW ANY DATABASE` (explizit, damit eine Haertung von `public` den Scan nicht trifft) und `VIEW SERVER STATE` fuer die DMVs (ab SQL Server 2022 das feinere `VIEW SERVER PERFORMANCE STATE`). Kein sysadmin, kein db_owner, kein Zugriff auf Nutzdaten. Mit `-LoginName` wird das Konto aufgenommen; ein fehlendes Windows-Login wird angelegt, ein fehlendes SQL-Login nicht. Wiederholbar (die GRANTs stellen auch ein spaeter entzogenes Recht wieder her), `-WhatIf` und Serverliste per Pipeline.
+
+`Set-sqmDiscoveryWmiAccess` setzt die Windows-Seite: auf `Root\CIMv2` und allen `Root\Microsoft\SqlServer\ComputerManagement*`-Namespaces die Rechte "Enable Account" und "Remote Enable" (nur fuer den Namespace und seine Unter-Namespaces, Eintraege anderer Konten bleiben unveraendert; "Execute Methods" nur mit `-AllowExecuteMethods`) und die Mitgliedschaft in der lokalen Gruppe "Distributed COM Users". Remote Registry wird nur gemeldet (Zustand, Starttyp), nie geaendert. Modi `Check` (Standard, aendert nichts), `Apply` und `Remove` (Rueckweg), `-WhatIf`, mehrere Rechner, `-Credential` fuer Remote. Nutzt CIM statt WMI-Cmdlets, laeuft also unter Windows PowerShell 5.1 und PowerShell 7. Braucht lokale Administratorrechte auf dem Zielrechner.
+
+### Erweitert: Test-sqmDiscoveryAccess - Abgleich mit dem Einrichten
+
+Die Definition, was ein Discovery-Konto braucht, steht jetzt an einer einzigen Stelle (privat: `Get-sqmDiscoveryDefinition`) und wird von allen drei Funktionen benutzt, Einrichten und Pruefen koennen also nicht auseinanderlaufen. Neu in `Test-sqmDiscoveryAccess`: Ist `-ServerRole` die Standardrolle `SQL_ServiceNow_Discovery`, wird auch die Rolle selbst gegen die Definition verglichen (`RoleMissingPermissions`, Befund mit Hinweis auf `Install-sqmDiscoveryRole`); eine andere Rolle wie `SQL_Inventory_RO_Basic` hat bewusst andere Rechte und wird nicht verglichen. Mit `-CheckWmi` (und `-WmiCredential`) wird zusaetzlich die WMI/DCOM-Seite auf dem Host der Instanz geprueft; fehlende WMI-Rechte zaehlen als Fehler, weil die Serverdaten sonst leer bleiben, eine nicht erreichbare WMI-Seite wird als Befund gemeldet statt abzubrechen. Der Bericht hat dafuer eine eigene Spalte.
+
+Geprueft: 29 neue Unit-Tests (Definition, Rollenanlage idempotent und mit -WhatIf, Drift der Rolle, WMI gemockt) und live gegen SQL Server 2022 unter Windows PowerShell 5.1: Rolle anlegen, zweiter Lauf ohne Aenderung, Abfragen der Pattern-Tabellen als Rollenmitglied, Drift nach `REVOKE VIEW ANY DEFINITION` erkannt und per Install repariert. Nicht live geprueft: das Schreiben der WMI-Namespace-Rechte (braucht lokale Administratorrechte, hier nur gemockt getestet) und echte Availability Groups (HADR war im Labor aus; es gab keinen Berechtigungsfehler, aber auch keine AG-Zeilen).
+
 ## [1.9.230.0] - 2026-11-16
 
 ### Behoben: Export-sqmDatabaseLogins - "Ein HASHED-Kennwort kann nicht fuer einen Anmeldenamen festgelegt werden, fuer den CHECK_POLICY aktiviert ist"

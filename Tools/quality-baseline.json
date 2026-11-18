@@ -6,7 +6,7 @@
                     "SuppressMessage":  0,
                     "WmiCmdlets":  7,
                     "DbaStopWithoutException":  151,
-                    "PublicWithoutTest":  70,
+                    "PublicWithoutTest":  69,
                     "BareShouldThrow":  33,
                     "SkippedTests":  2,
                     "CoveragePercent":  29.03
