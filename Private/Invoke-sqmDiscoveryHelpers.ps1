@@ -64,6 +64,22 @@ function Get-sqmDiscoveryAccountSid
 	[PSCustomObject]@{ Sid = $sid; Binary = $bin }
 }
 
+function Resolve-sqmDiscoveryLoginName
+{
+	<# Bringt einen Kontonamen ohne Domaene (svc_x oder svc_x@corp.local) in die Form DOMAIN\Name, indem er
+	   auf dem ausfuehrenden Rechner ueber die SID aufgeloest wird. Gibt $null zurueck, wenn das kein
+	   Windows-Konto ist (dann nie raten). #>
+	[CmdletBinding()]
+	param ([Parameter(Mandatory = $true)][string]$Account)
+
+	try
+	{
+		$sid = (New-Object System.Security.Principal.NTAccount($Account)).Translate([System.Security.Principal.SecurityIdentifier])
+		return $sid.Translate([System.Security.Principal.NTAccount]).Value
+	}
+	catch { return $null }
+}
+
 function Open-sqmDiscoveryCimSession
 {
 	<# $null fuer den lokalen Rechner (kein DCOM/WinRM noetig), sonst eine CimSession. #>

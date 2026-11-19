@@ -1,5 +1,13 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.232.0] - 2026-11-19
+
+### Behoben: Install-sqmDiscoveryRole - "Login existiert nicht und ist kein Windows-Konto" bei Konten ohne Domaene
+
+`Install-sqmDiscoveryRole -LoginName 'svc_servicenow'` brach ab, wenn das Login auf dem Server noch fehlte: Ein Name ohne Backslash wurde pauschal als SQL-Login behandelt, das die Funktion nie anlegt. Legte man das Windows-Login vorher von Hand an, lief alles durch. Jetzt wird ein Name ohne Domaene (`svc_x` oder `svc_x@corp.local`) auf dem ausfuehrenden Rechner als Windows-Konto aufgeloest (SID, danach zurueck in `DOMAIN\Name`), das Login mit dem aufgeloesten Namen angelegt und das Ergebnis in `LoginName` gemeldet. Existiert der aufgeloeste Name schon als Login, wird er nur aufgenommen. Laesst sich der Name nicht als Windows-Konto aufloesen, bleibt es beim Abbruch, jetzt mit einer Meldung, die `DOMAIN\Name` empfiehlt; ein SQL-Login wird weiterhin nie angelegt. Ausserdem werden Leerzeichen am Anfang und Ende von `-LoginName` und `-RoleName` abgeschnitten (kopierte Namen mit Leerzeichen am Ende galten als anderer Kontoname).
+
+Geprueft: 2 neue Unit-Tests (Aufloesung, Leerzeichen) und der geaenderte Test fuer das nicht aufloesbare Konto, Quality Gate OK, die Aufloesung unter Windows PowerShell 5.1 mit einem lokalen Konto und einem nicht vorhandenen Namen. Nicht geprueft: das Anlegen eines Domaenenkontos gegen einen echten Server (das Labor hat keine Domaene); die Aufloesung nutzt die Domaene des ausfuehrenden Rechners, nicht die des Zielservers.
+
 ## [1.9.231.0] - 2026-11-18
 
 ### Neu: Install-sqmDiscoveryRole und Set-sqmDiscoveryWmiAccess - Rolle und WMI-Rechte fuer das ServiceNow-Dienstkonto

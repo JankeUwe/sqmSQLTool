@@ -130,11 +130,33 @@ Describe 'Install-sqmDiscoveryRole' {
 		}
 	}
 
-	It 'legt ein fehlendes SQL-Login nicht an' {
+	It 'legt ein fehlendes SQL-Login nicht an (Name nicht als Windows-Konto aufloesbar)' {
 		InModuleScope sqmSQLTool {
+			Mock Resolve-sqmDiscoveryLoginName { $null }
 			{ Install-sqmDiscoveryRole -SqlInstance 'SQL01' -LoginName 'snow_sql' } |
-				Should -Throw -ExpectedMessage "*kein Windows-Konto*"
+				Should -Throw -ExpectedMessage "*nicht als Windows-Konto aufloesen*"
 			($script:queries -join "`n") | Should -Not -Match 'CREATE LOGIN'
+		}
+	}
+
+	It 'loest einen Namen ohne Domaene auf und legt das Windows-Login an' {
+		InModuleScope sqmSQLTool {
+			Mock Resolve-sqmDiscoveryLoginName { 'CORP\svc_snow' }
+			$r = Install-sqmDiscoveryRole -SqlInstance 'SQL01' -LoginName 'svc_snow'
+			$r.Status | Should -Be 'OK'
+			$r.LoginCreated | Should -BeTrue
+			$r.LoginName | Should -Be 'CORP\svc_snow'
+			$sql = $script:queries -join "`n"
+			$sql | Should -Match 'CREATE LOGIN \[CORP\\svc_snow\] FROM WINDOWS'
+			$sql | Should -Match 'ADD MEMBER \[CORP\\svc_snow\]'
+		}
+	}
+
+	It 'schneidet Leerzeichen am Rand des Kontonamens ab' {
+		InModuleScope sqmSQLTool {
+			$r = Install-sqmDiscoveryRole -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow '
+			$r.Status | Should -Be 'OK'
+			($script:queries -join "`n") | Should -Match 'CREATE LOGIN \[CORP\\svc_snow\] FROM WINDOWS'
 		}
 	}
 

@@ -33,8 +33,11 @@
 
 .PARAMETER LoginName
     The service account, e.g. "CORP\svc_servicenow". A missing Windows login is created, a missing
-    SQL login is not (the function will not invent a password). Without this parameter only the
-    role is created.
+    SQL login is not (the function will not invent a password). A name without domain
+    ("svc_servicenow" or "svc_servicenow@corp.local") is resolved as a Windows account on the
+    computer running the function and created as DOMAIN\Name; if it does not resolve, the function
+    stops and asks for DOMAIN\Name. Leading and trailing blanks are removed. Without this
+    parameter only the role is created.
 
 .PARAMETER RoleName
     Name of the server role. Default: SQL_ServiceNow_Discovery. One role per service account is
@@ -96,6 +99,10 @@ function Install-sqmDiscoveryRole
 			Invoke-sqmLogging -Message $errMsg -FunctionName $functionName -Level "ERROR"
 			throw $errMsg
 		}
+
+		# Leerzeichen am Rand (Copy and Paste) wuerden sonst als Teil des Kontonamens behandelt
+		if ($LoginName) { $LoginName = $LoginName.Trim() }
+		if ($RoleName) { $RoleName = $RoleName.Trim() }
 
 		$defaultRole = (Get-sqmDiscoveryDefinition).RoleName
 		if ([string]::IsNullOrWhiteSpace($RoleName)) { $RoleName = $defaultRole }
@@ -169,20 +176,40 @@ SELECT
 
 				if ($LoginName)
 				{
-					if ($state.LoginExists -ne 1)
-					{
-						if ($LoginName -match '\\')
+						if ($state.LoginExists -ne 1)
 						{
-							Invoke-DbaQuery -SqlInstance $instance -SqlCredential $SqlCredential -Database master -EnableException `
-								-Query "CREATE LOGIN $(_Q $LoginName) FROM WINDOWS;"
-							$row.LoginCreated = $true
-							$state.LoginExists = 1
+							$createName = $LoginName
+							if ($createName -notmatch '\\')
+							{
+								# Name ohne Domaene (svc_x oder svc_x@corp.local): als Windows-Konto aufloesen
+								$resolved = Resolve-sqmDiscoveryLoginName -Account $createName
+								if ($resolved)
+								{
+									$createName = $resolved
+									# der aufgeloeste Name kann schon als Login vorhanden sein
+									$exists = Invoke-DbaQuery -SqlInstance $instance -SqlCredential $SqlCredential -Database master -As PSObject -EnableException `
+										-Query "SELECT CASE WHEN EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'$(_S $createName)' AND type IN ('U','G')) THEN 1 ELSE 0 END AS LoginExists"
+									if ($exists.LoginExists -eq 1) { $state.LoginExists = 1; $LoginName = $createName; $row.LoginName = $createName }
+								}
+							}
+
+							if ($state.LoginExists -ne 1)
+							{
+								if ($createName -match '\\')
+								{
+									Invoke-DbaQuery -SqlInstance $instance -SqlCredential $SqlCredential -Database master -EnableException `
+										-Query "CREATE LOGIN $(_Q $createName) FROM WINDOWS;"
+									$row.LoginCreated = $true
+									$row.LoginName = $createName
+									$LoginName = $createName
+									$state.LoginExists = 1
+								}
+								else
+								{
+									throw "Login '$LoginName' existiert nicht auf dem Server und liess sich auf diesem Rechner nicht als Windows-Konto aufloesen. Konto als DOMAIN\Name angeben. Ein SQL-Login wird nicht automatisch angelegt."
+								}
+							}
 						}
-						else
-						{
-							throw "Login '$LoginName' existiert nicht und ist kein Windows-Konto (DOMAIN\Name). Ein SQL-Login wird nicht automatisch angelegt."
-						}
-					}
 					if ($state.IsMember -ne 1 -or $row.LoginCreated)
 					{
 						Invoke-DbaQuery -SqlInstance $instance -SqlCredential $SqlCredential -Database master -EnableException `
