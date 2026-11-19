@@ -1,5 +1,13 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.234.0] - 2026-11-19
+
+### Behoben: Test-sqmDiscoveryAccess - "Login existiert nicht" bei einem Konto ohne Domaene
+
+Auf einem Kundenserver legte `Install-sqmDiscoveryRole -LoginName SVCDPSNOWDISCO` das Login korrekt als `DOMAIN\SVCDPSNOWDISCO` an (seit 1.9.232.0). Danach meldete `Test-sqmDiscoveryAccess -LoginName SVCDPSNOWDISCO` "Login existiert nicht", Rollenmitgliedschaft und Rechte erschienen leer und der Status war Fehler, weil die Pruefung den Namen woertlich suchte. Jetzt wird ein Name ohne Domaene (`svc_x`) je Instanz zuerst auf dem Server gesucht (genau dieser Name, sonst genau ein Login der Form `DOMAIN\svc_x`) und erst danach auf dem ausfuehrenden Rechner als Windows-Konto aufgeloest; der aufgeloeste Name steht in `LoginName` und wird auch fuer die WMI-Pruefung benutzt. Gibt es mehrere Treffer (`A\svc_x`, `B\svc_x`), wird nicht geraten, sondern ein Befund "nicht eindeutig" gemeldet. Leerzeichen am Rand des Namens werden abgeschnitten.
+
+Geprueft: 3 neue Unit-Tests (Fund auf dem Server, Aufloesung auf dem Rechner, mehrdeutiger Name), Quality Gate OK. Nicht live geprueft: der Aufruf gegen einen Server mit Domaenenkonto (das Labor hat keine Domaene); der Fehler wurde aus der Ausgabe des Kundenlaufs nachvollzogen.
+
 ## [1.9.233.0] - 2026-11-19
 
 ### Erweitert: Install-sqmDiscoveryRole fuer ServiceNow, Qualys und SCOM, mit Pruefung von Policy-Based Management

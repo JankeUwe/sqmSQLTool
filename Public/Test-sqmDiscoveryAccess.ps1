@@ -159,6 +159,7 @@ function Test-sqmDiscoveryAccess
 
 		$allResults = [System.Collections.Generic.List[PSCustomObject]]::new()
 		$standardProducts = @(Get-sqmDiscoveryProductList)
+		$loginAsGiven = $LoginName.Trim()
 
 		# Rangfolge der Stufen, damit "erreicht" gegen "gefordert" vergleichbar wird.
 		$levelRank = @{
@@ -308,6 +309,29 @@ SELECT
 					continue
 				}
 
+				# Konto ohne Domaene (svc_x): zuerst auf dem Server suchen (genau dieser Name, sonst genau ein
+				# Login der Form DOMAIN\svc_x), danach auf diesem Rechner als Windows-Konto aufloesen.
+				$LoginName = $loginAsGiven
+				$row.LoginName = $LoginName
+				$nameNotes = [System.Collections.Generic.List[string]]::new()
+				if ($LoginName -notmatch '\\')
+				{
+					$lookupSql = "SELECT name FROM sys.server_principals WHERE type IN ('U','G','S') AND (name = N'$(_EscapeSql $LoginName)' OR RIGHT(name, $($LoginName.Length + 1)) = N'\$(_EscapeSql $LoginName)')"
+					$candidates = @(Invoke-DbaQuery -SqlInstance $instance -SqlCredential $SqlCredential -Database master -Query $lookupSql -As PSObject -EnableException |
+							Where-Object { $_ -and $_.name } | ForEach-Object { [string]$_.name })
+					if ($candidates -notcontains $LoginName)
+					{
+						if ($candidates.Count -eq 1) { $LoginName = $candidates[0]; Write-Verbose "Konto '$loginAsGiven' ohne Domaene wurde als Login '$LoginName' gefunden." }
+						elseif ($candidates.Count -gt 1) { $nameNotes.Add("Der Name '$loginAsGiven' ist nicht eindeutig (gefunden: $($candidates -join ', ')). Bitte als DOMAIN\Name angeben.") }
+						else
+						{
+							$resolvedName = Resolve-sqmDiscoveryLoginName -Account $LoginName
+							if ($resolvedName) { $LoginName = $resolvedName; Write-Verbose "Konto '$loginAsGiven' ohne Domaene wurde als '$LoginName' aufgeloest." }
+						}
+					}
+					$row.LoginName = $LoginName
+				}
+
 				$query = [string]::Format($sqlTemplate, (_EscapeSql $LoginName), (_EscapeSql $ServerRole))
 
 				$data = Invoke-DbaQuery -SqlInstance $instance -SqlCredential $SqlCredential `
@@ -319,6 +343,7 @@ SELECT
 				}
 
 				$findings = [System.Collections.Generic.List[string]]::new()
+				foreach ($note in $nameNotes) { $findings.Add($note) }
 
 				$row.Reachable		   = $true
 				$row.ProductVersion    = [string]$data.ProductVersion

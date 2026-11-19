@@ -476,6 +476,47 @@ Describe 'Test-sqmDiscoveryAccess - Abgleich mit der Standarddefinition' {
 		}
 	}
 
+	It 'findet ein Konto ohne Domaene als DOMAIN\Name auf dem Server' {
+		InModuleScope sqmSQLTool -Parameters @{ Out = $script:TestDir } {
+			$script:sqls = [System.Collections.Generic.List[string]]::new()
+			Mock Invoke-DbaQuery {
+				$script:sqls.Add([string]$Query)
+				if ($Query -match 'RIGHT\(name') { return [PSCustomObject]@{ name = 'CORP\svc_snow' } }
+				$script:row
+			}
+			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'svc_snow ' -ServerRole 'SnowDisco' -OutputPath $Out -NoOpen
+			$r.LoginName | Should -Be 'CORP\svc_snow'
+			$r.LoginExists | Should -BeTrue
+			$r.Status | Should -Be 'OK'
+			($script:sqls | Select-Object -Last 1) | Should -Match 'CORP\\svc_snow'
+		}
+	}
+
+	It 'loest ein Konto ohne Domaene auf diesem Rechner auf, wenn der Server keinen Treffer hat' {
+		InModuleScope sqmSQLTool -Parameters @{ Out = $script:TestDir } {
+			Mock Resolve-sqmDiscoveryLoginName { 'CORP\svc_snow' }
+			Mock Invoke-DbaQuery {
+				if ($Query -match 'RIGHT\(name') { return $null }
+				$script:row
+			}
+			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'svc_snow' -ServerRole 'SnowDisco' -OutputPath $Out -NoOpen
+			$r.LoginName | Should -Be 'CORP\svc_snow'
+			Should -Invoke Resolve-sqmDiscoveryLoginName -Times 1
+		}
+	}
+
+	It 'meldet einen nicht eindeutigen Namen ohne Domaene als Befund und raet nicht' {
+		InModuleScope sqmSQLTool -Parameters @{ Out = $script:TestDir } {
+			Mock Invoke-DbaQuery {
+				if ($Query -match 'RIGHT\(name') { return @([PSCustomObject]@{ name = 'A\svc_snow' }, [PSCustomObject]@{ name = 'B\svc_snow' }) }
+				$script:row
+			}
+			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'svc_snow' -ServerRole 'SnowDisco' -OutputPath $Out -NoOpen
+			$r.LoginName | Should -Be 'svc_snow'
+			($r.Findings -join ' ') | Should -Match 'nicht eindeutig'
+		}
+	}
+
 	It 'findet ein nachtraeglich entzogenes Recht der Standardrolle' {
 		InModuleScope sqmSQLTool -Parameters @{ Out = $script:TestDir } {
 			$script:row.RoleGrants = 'VIEW ANY DATABASE, VIEW SERVER PERFORMANCE STATE'
