@@ -1,5 +1,19 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.233.0] - 2026-11-19
+
+### Erweitert: Install-sqmDiscoveryRole fuer ServiceNow, Qualys und SCOM, mit Pruefung von Policy-Based Management
+
+Die Rolle fuer das ServiceNow-Konto reichte fuer Qualys und SCOM nicht aus. Gemessen auf SQL Server 2025: Ein Login mit den ServiceNow-Rechten besteht die sieben Pruefabfragen aus dem Qualys-Dokument, wird aber bei `sys.traces`, `sys.sysaltfiles`, `xp_loginconfig` und den msdb-Proxy-Objekten abgewiesen; SCOM braucht zusaetzlich Rechte in master und msdb sowie einen Benutzer in jeder Datenbank. `Install-sqmDiscoveryRole` kennt deshalb jetzt drei Produkte (`-Product ServiceNow|Qualys|SCOM`), jedes mit festem Rollennamen: `SnowDisco`, `Qualis_Scan`, `SCOM_Scan`. `-RoleName` bietet diese Namen per Tab-Vervollstaendigung an und akzeptiert jeden anderen Namen; ein angebotener Name ohne `-Product` waehlt das Produkt, ein freier Name ohne `-Product` bedeutet ServiceNow.
+
+Qualys (nach "MS SQL Server 2005-2019", Restricted, Schritt 3b mit den optionalen Rechten): Serverrolle mit ALTER TRACE, VIEW SERVER STATE, VIEW ANY DEFINITION; in master eine Datenbankrolle mit SELECT auf neun Katalogsichten (auch `sys.trace_events` und `sys.traces`) und EXECUTE auf `xp_loginconfig`; in msdb EXECUTE auf `sp_enum_login_for_proxy` und `sp_enum_proxy_for_subsystem`, SELECT auf `sysproxies` und `sysproxylogin`. SCOM (nach dem Low-Privilege-Skript des SQL-Server-Management-Packs, Agent-Variante): VIEW ANY DATABASE, VIEW ANY DEFINITION, VIEW SERVER STATE; in master `xp_readerrorlog`, `xp_instance_regread` und drei Katalogsichten; in msdb die Job-, Zeitplan- und Log-Shipping-Tabellen, drei Prozeduren und die Mitgliedschaft in SQLAgentReaderRole; Benutzer und Datenbankrolle in jeder online befindlichen, beschreibbaren Datenbank (bei einer AG nur auf dem Primary). Der Rollenname gilt fuer Server- und Datenbankrolle. Ein GRANT auf ein fehlendes Objekt (aeltere Version) stoppt die uebrigen nicht, er erscheint in `Warnings` und der Status ist `Warnung`.
+
+Die Standardrolle heisst jetzt `SnowDisco` (vorher `SQL_ServiceNow_Discovery`); eine bereits angelegte alte Rolle bleibt bestehen und muss bei Bedarf von Hand entfernt werden. `Test-sqmDiscoveryAccess` vergleicht jede der drei Standardrollen gegen die Definition ihres Produkts.
+
+Policy-Based Management: Eine aktive Policy mit "On change: prevent" laesst den Server-Trigger `syspolicy_server_trigger` CREATE LOGIN, ALTER SERVER ROLE und GRANT zurueckrollen. `Install-sqmDiscoveryRole` prueft das vorab (rein T-SQL), meldet die Policy-Namen in `BlockingPolicies` und deaktiviert, nur wenn Policy und Trigger aktiv sind, ausschliesslich diesen Trigger fuer die Dauer der Einrichtung; ein finally-Block schaltet ihn auch nach einem Fehler wieder ein. Die Policies selbst werden nicht veraendert. `-SkipPolicyHandling` laesst PBM unberuehrt.
+
+Geprueft: 15 neue Unit-Tests, Quality Gate OK; live auf SQL Server 2025: alle drei Produkte und ein freier Rollenname angelegt, zweiter Lauf ohne Aenderung, danach die sieben Qualys-Pruefabfragen und die optionalen Kontrollen als Login der jeweiligen Rolle (Qualys-Rolle: alle 15 bestanden), die SCOM-Abfragen (xp_readerrorlog, sp_help_job, sysjobs_view, index_physical_stats und weitere) bestanden. Nicht live geprueft: der Trigger-Pfad von PBM (die Linux-Instanz legt eine "On change: prevent"-Policy an, erzeugt aber den Trigger nicht; nur gemockt getestet), das Anlegen von Domaenenkonten und echte Availability Groups. Die Pruefung der Datenbankebene fehlt noch in `Test-sqmDiscoveryAccess` (es vergleicht die Serverrechte der Rolle).
+
 ## [1.9.232.0] - 2026-11-19
 
 ### Behoben: Install-sqmDiscoveryRole - "Login existiert nicht und ist kein Windows-Konto" bei Konten ohne Domaene

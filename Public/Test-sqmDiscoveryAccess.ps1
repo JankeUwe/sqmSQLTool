@@ -47,7 +47,7 @@
 .PARAMETER ServerRole
     Expected server role membership, e.g. "SQL_Inventory_RO_Basic". Without this parameter
     the role check is skipped and only permissions are evaluated. If the role is the standard
-    role of Install-sqmDiscoveryRole (SQL_ServiceNow_Discovery), its own permissions are also
+    role of Install-sqmDiscoveryRole (SnowDisco, Qualis_Scan or SCOM_Scan), its own permissions are also
     compared against the standard definition, so a role that someone trimmed afterwards shows up.
 
 .PARAMETER RequiredLevel
@@ -104,7 +104,7 @@
 
 .EXAMPLE
     Test-sqmDiscoveryAccess -SqlInstance SQL01, SQL02 -LoginName "CORP\svc_servicenow" `
-        -ServerRole SQL_ServiceNow_Discovery -RequiredLevel Full -CheckWmi
+        -ServerRole SnowDisco -RequiredLevel Full -CheckWmi
 
     Verifies the setup done by Install-sqmDiscoveryRole and Set-sqmDiscoveryWmiAccess:
     login, role membership, the role's own permissions (drift against the standard definition)
@@ -158,7 +158,7 @@ function Test-sqmDiscoveryAccess
 		}
 
 		$allResults = [System.Collections.Generic.List[PSCustomObject]]::new()
-		$standardRole = (Get-sqmDiscoveryDefinition).RoleName
+		$standardProducts = @(Get-sqmDiscoveryProductList)
 
 		# Rangfolge der Stufen, damit "erreicht" gegen "gefordert" vergleichbar wird.
 		$levelRank = @{
@@ -344,10 +344,11 @@ SELECT
 				# Abgleich mit Install-sqmDiscoveryRole: hat die Standardrolle noch alle Rechte
 				# der Definition? Eine andere Rolle (z. B. SQL_Inventory_RO_Basic) hat bewusst
 				# andere Rechte und wird nicht verglichen.
-				if ($row.RoleExists -and $ServerRole -eq $standardRole)
+				$standardProduct = $standardProducts | Where-Object { $_.RoleName -eq $ServerRole } | Select-Object -First 1
+				if ($row.RoleExists -and $standardProduct)
 				{
 					$granted = @(([string]$data.RoleGrants) -split ',\s*' | Where-Object { $_ })
-					$expected = @((Get-sqmDiscoveryDefinition -MajorVersion ([int]$data.MajorVersion)).ServerPermissions)
+					$expected = @((Get-sqmDiscoveryDefinition -MajorVersion ([int]$data.MajorVersion) -Product $standardProduct.Product).ServerPermissions)
 					# VIEW SERVER STATE schliesst VIEW SERVER PERFORMANCE STATE ein
 					$row.RoleMissingPermissions = @($expected | Where-Object {
 						$e = $_

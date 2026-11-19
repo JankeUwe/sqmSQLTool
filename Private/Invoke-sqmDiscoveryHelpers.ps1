@@ -5,38 +5,164 @@
 # damit Einrichten und Pruefen nicht auseinanderlaufen koennen.
 # =============================================================================
 
+function Get-sqmDiscoveryProductList
+{
+	<# Die angebotenen Produkte mit ihrem festen Standard-Rollennamen. Eine freie Eingabe von -RoleName
+	   bleibt moeglich, die Namen hier sind nur das Angebot. #>
+	[CmdletBinding()]
+	param ()
+
+	@(
+		[PSCustomObject]@{ Product = 'ServiceNow'; RoleName = 'SnowDisco' }
+		[PSCustomObject]@{ Product = 'Qualys'; RoleName = 'Qualis_Scan' }
+		[PSCustomObject]@{ Product = 'SCOM'; RoleName = 'SCOM_Scan' }
+	)
+}
+
 function Get-sqmDiscoveryDefinition
 {
 	<#
 	.SYNOPSIS
-	    Liefert die Rechte, die ein read-only Discovery-Konto (z. B. ServiceNow) braucht.
+	    Liefert die Rechte, die ein read-only Scan-Konto eines Produkts (ServiceNow, Qualys, SCOM) braucht.
 	.DESCRIPTION
 	    Einzige Quelle der Wahrheit fuer Install-sqmDiscoveryRole (setzt sie),
 	    Set-sqmDiscoveryWmiAccess (setzt die WMI-Seite) und Test-sqmDiscoveryAccess (prueft sie).
+
+	    Quellen: ServiceNow = gemessene Abfragen des Patterns "MSSql DB On Windows"; Qualys = "MS SQL Server
+	    2005-2019" Authenticated Scanning (Restricted/Read-only, Schritt 3b mit den optionalen Rechten und
+	    dem msdb-Teil); SCOM = Microsoft Learn "SQL Server Management Pack: Low-Privilege Monitoring"
+	    (Agent-Skript).
+
+	    DatabaseGrants: je Datenbank die GRANTs an die gleichnamige Datenbankrolle. DatabaseScope 'Eligible'
+	    (SCOM) heisst: Benutzer und Rolle in jeder online, schreibbaren Datenbank ausser tempdb, bei einer
+	    AG nur auf dem Primary.
 	#>
 	[CmdletBinding()]
 	param (
 		[Parameter(Mandatory = $false)]
-		[int]$MajorVersion = 0
+		[int]$MajorVersion = 0,
+		[Parameter(Mandatory = $false)]
+		[ValidateSet('ServiceNow', 'Qualys', 'SCOM')]
+		[string]$Product = 'ServiceNow'
 	)
 
-	# Ab SQL Server 2022 gibt es VIEW SERVER PERFORMANCE STATE als feineres Recht fuer die DMVs.
-	$statePermission = if ($MajorVersion -ge 16) { 'VIEW SERVER PERFORMANCE STATE' } else { 'VIEW SERVER STATE' }
+	$roleName = (Get-sqmDiscoveryProductList | Where-Object { $_.Product -eq $Product }).RoleName
+	$databaseGrants = @()
+	$databaseScope = 'None'
+	$msdbRoleMembership = @()
+
+	switch ($Product)
+	{
+		'ServiceNow'
+		{
+			# Ab SQL Server 2022 gibt es VIEW SERVER PERFORMANCE STATE als feineres Recht fuer die DMVs.
+			$statePermission = if ($MajorVersion -ge 16) { 'VIEW SERVER PERFORMANCE STATE' } else { 'VIEW SERVER STATE' }
+			# ViewAnyDefinition: Katalogsichten (sys.master_files, sys.availability_groups, Listener).
+			#                    Ohne das kommen 0 Zeilen zurueck, kein Fehler.
+			# ViewAnyDatabase:   Standardmaessig ueber public; explizit, damit eine Haertung nicht greift.
+			# State:             sys.dm_exec_sessions, sys.dm_os_schedulers, sys.dm_hadr_availability_group_states
+			$serverPermissions = @('VIEW ANY DEFINITION', 'VIEW ANY DATABASE', $statePermission)
+		}
+		'Qualys'
+		{
+			# Qualys nennt VIEW SERVER STATE ausdruecklich (Control 10615); es schliesst die feinere
+			# Berechtigung ein, daher gilt es auch ab SQL Server 2022.
+			$serverPermissions = @('ALTER TRACE', 'VIEW SERVER STATE', 'VIEW ANY DEFINITION')
+			$databaseScope = 'Fixed'
+			$databaseGrants = @(
+				[PSCustomObject]@{
+					Database = 'master'
+					Grants   = @(
+						'SELECT ON sys.all_objects', 'SELECT ON sys.configurations', 'SELECT ON sys.databases',
+						'SELECT ON sys.database_permissions', 'SELECT ON sys.syslogins', 'SELECT ON sys.trace_events',
+						'SELECT ON sys.traces', 'SELECT ON sys.sysaltfiles', 'SELECT ON sys.server_principals',
+						'EXECUTE ON sys.xp_loginconfig'
+					)
+				}
+				[PSCustomObject]@{
+					Database = 'msdb'
+					Grants   = @(
+						'EXECUTE ON dbo.sp_enum_login_for_proxy', 'EXECUTE ON dbo.sp_enum_proxy_for_subsystem',
+						'SELECT ON dbo.sysproxies', 'SELECT ON dbo.sysproxylogin'
+					)
+				}
+			)
+		}
+		'SCOM'
+		{
+			$serverPermissions = @('VIEW ANY DATABASE', 'VIEW ANY DEFINITION', 'VIEW SERVER STATE')
+			$databaseScope = 'Eligible'
+			$databaseGrants = @(
+				[PSCustomObject]@{
+					Database = 'master'
+					Grants   = @(
+						'EXECUTE ON sys.xp_readerrorlog', 'EXECUTE ON sys.xp_instance_regread',
+						'SELECT ON sys.indexes', 'SELECT ON sys.tables', 'SELECT ON sys.dm_db_index_physical_stats'
+					)
+				}
+				[PSCustomObject]@{
+					Database = 'msdb'
+					Grants   = @(
+						'SELECT ON dbo.sysjobschedules', 'SELECT ON dbo.sysschedules', 'SELECT ON dbo.syscategories',
+						'SELECT ON dbo.sysjobs_view', 'SELECT ON dbo.sysjobactivity', 'SELECT ON dbo.sysjobhistory',
+						'SELECT ON dbo.syssessions', 'SELECT ON dbo.log_shipping_primary_databases',
+						'SELECT ON dbo.log_shipping_secondary_databases', 'SELECT ON dbo.log_shipping_monitor_history_detail',
+						'SELECT ON dbo.log_shipping_monitor_secondary', 'SELECT ON dbo.log_shipping_monitor_primary',
+						'EXECUTE ON dbo.sp_help_job', 'EXECUTE ON dbo.agent_datetime', 'EXECUTE ON dbo.SQLAGENT_SUSER_SNAME'
+					)
+				}
+			)
+			# Die Datenbankrolle wird zusaetzlich Mitglied dieser festen msdb-Rolle.
+			$msdbRoleMembership = @('SQLAgentReaderRole')
+		}
+	}
 
 	[PSCustomObject]@{
-		RoleName          = 'SQL_ServiceNow_Discovery'
-		# ViewAnyDefinition: Katalogsichten (sys.master_files, sys.availability_groups, Listener).
-		#                    Ohne das kommen 0 Zeilen zurueck, kein Fehler.
-		# ViewAnyDatabase:   Standardmaessig ueber public; explizit, damit eine Haertung nicht greift.
-		# State:             sys.dm_exec_sessions, sys.dm_os_schedulers, sys.dm_hadr_availability_group_states
-		ServerPermissions = @('VIEW ANY DEFINITION', 'VIEW ANY DATABASE', $statePermission)
-		WmiNamespaces     = @('Root\CIMv2')
-		WmiNamespaceRoot  = 'Root\Microsoft\SqlServer'
-		WmiNamespaceLike  = 'ComputerManagement*'
+		Product            = $Product
+		RoleName           = $roleName
+		ServerPermissions  = $serverPermissions
+		DatabaseScope      = $databaseScope
+		DatabaseGrants     = $databaseGrants
+		MsdbRoleMembership = $msdbRoleMembership
+		WmiNamespaces      = @('Root\CIMv2')
+		WmiNamespaceRoot   = 'Root\Microsoft\SqlServer'
+		WmiNamespaceLike   = 'ComputerManagement*'
 		# Enable Account (0x1) + Remote Enable (0x20); Execute Methods (0x2) nur auf Wunsch
-		WmiAccessMask     = [uint32]0x21
-		WmiMethodExecute  = [uint32]0x2
-		DcomGroup         = 'Distributed COM Users'
+		WmiAccessMask      = [uint32]0x21
+		WmiMethodExecute   = [uint32]0x2
+		DcomGroup          = 'Distributed COM Users'
+	}
+}
+
+function Get-sqmDiscoveryPolicyBlocker
+{
+	<# Prueft, ob Policy-Based Management CREATE LOGIN / ALTER SERVER ROLE / GRANT blockieren kann:
+	   aktivierte Policies mit "On change: prevent" (execution_mode 1) und der Server-Trigger
+	   syspolicy_server_trigger. Rein T-SQL (die dbatools-PBM-Befehle laufen unter PowerShell 7 nicht).
+	   Liefert $null, wenn PBM auf der Instanz nicht lesbar ist. #>
+	[CmdletBinding()]
+	param (
+		[Parameter(Mandatory = $true)][string]$SqlInstance,
+		[System.Management.Automation.PSCredential]$SqlCredential
+	)
+
+	try
+	{
+		$p = @{ SqlInstance = $SqlInstance; Database = 'master'; As = 'PSObject'; EnableException = $true }
+		if ($SqlCredential) { $p.SqlCredential = $SqlCredential }
+		$policies = @(Invoke-DbaQuery @p -Query "SELECT name FROM msdb.dbo.syspolicy_policies WHERE is_enabled = 1 AND execution_mode = 1 ORDER BY name;")
+		$trigger = @(Invoke-DbaQuery @p -Query "SELECT name, is_disabled FROM sys.server_triggers WHERE name = N'syspolicy_server_trigger';")
+		$triggerActive = ($trigger.Count -gt 0 -and [int]$trigger[0].is_disabled -eq 0)
+		[PSCustomObject]@{
+			Policies      = @($policies | ForEach-Object { [string]$_.name })
+			TriggerActive = $triggerActive
+			Blocking      = ($policies.Count -gt 0 -and $triggerActive)
+		}
+	}
+	catch
+	{
+		Write-Verbose "PBM-Zustand auf '$SqlInstance' nicht lesbar: $($_.Exception.Message)"
+		return $null
 	}
 }
 
