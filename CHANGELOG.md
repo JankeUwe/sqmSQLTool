@@ -1,5 +1,17 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.235.0] - 2026-11-19
+
+### Erweitert: Install-sqmDiscoveryRole setzt bei ServiceNow die WMI/DCOM-Seite gleich mit; Einrichten und Pruefen suchen das Konto gleich
+
+Beim Kundenlauf mussten drei Befehle nacheinander laufen (WMI, Rolle, Pruefung) und die Pruefung fand ein Konto ohne Domaene nicht, das die Einrichtung angelegt hatte. Beides ist jetzt einheitlich.
+
+`Install-sqmDiscoveryRole` ruft bei ServiceNow nach den SQL-Rechten `Set-sqmDiscoveryWmiAccess -Mode Apply` fuer den Host der Instanz auf (neu: `-Wmi Auto|Apply|Skip`, Standard `Auto` = ServiceNow ja, Qualys und SCOM nein; `-Wmi Apply` erzwingt es fuer jedes Produkt, `-Wmi Skip` schaltet es ab; `-WmiCredential` fuer einen entfernten Host). Das Ergebnis steht in `WmiStatus` und `WmiMessage`. Ein Fehler bei WMI (zum Beispiel fehlende lokale Administratorrechte) nimmt die schon gesetzten SQL-Rechte nicht zurueck: Der Status ist `Warnung`, die Meldung nennt den Befehl fuer den manuellen Aufruf. Ohne `-LoginName` gibt es kein Konto und der Schritt wird uebersprungen. Bei einer Availability Group gilt der Host des angegebenen Namens, die Rechte muessen je Knoten gesetzt werden.
+
+Die Suche nach einem Konto ohne Domaene (`svc_x` oder `svc_x@corp.local`) ist jetzt eine gemeinsame Funktion fuer `Install-sqmDiscoveryRole` und `Test-sqmDiscoveryAccess`: zuerst genau dieser Name auf dem Server, sonst genau ein Login der Form `DOMAIN\svc_x`, sonst die Aufloesung auf dem ausfuehrenden Rechner. Mehrere Treffer (`A\svc_x`, `B\svc_x`) fuehren zu einem Abbruch bei der Einrichtung und zu einem Befund in der Pruefung, es wird nicht geraten. Dadurch legt die Einrichtung kein zweites Login an, wenn der Server die Domaene des Kontos anders kennt als der ausfuehrende Rechner.
+
+Geprueft: 7 neue Unit-Tests (WMI-Standard, Apply, Skip, WMI-Fehler, ohne Login, Suche auf dem Server, mehrdeutiger Name), Quality Gate OK; live auf SQL Server 2025 der Fehlerpfad (ein SQL-Login ist kein Windows-Konto: SQL-Rechte gesetzt, Status Warnung, WmiStatus Error) und die Pruefung mit einem Namen mit Leerzeichen am Ende. Nicht live geprueft: der erfolgreiche WMI-Aufruf aus der Einrichtung heraus (braucht ein Domaenenkonto und lokale Administratorrechte; `Set-sqmDiscoveryWmiAccess` selbst lief beim Kunden mit Status OK).
+
 ## [1.9.234.0] - 2026-11-19
 
 ### Behoben: Test-sqmDiscoveryAccess - "Login existiert nicht" bei einem Konto ohne Domaene

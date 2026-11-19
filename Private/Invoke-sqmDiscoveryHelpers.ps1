@@ -206,6 +206,38 @@ function Resolve-sqmDiscoveryLoginName
 	catch { return $null }
 }
 
+function Find-sqmDiscoveryLogin
+{
+	<# Findet das Login zu einem Namen. Mit Backslash gilt der Name, wie er ist. Ohne Backslash (svc_x oder
+	   svc_x@corp.local): zuerst genau dieser Name auf dem Server, sonst genau ein Login der Form
+	   DOMAIN\svc_x, sonst die Aufloesung als Windows-Konto auf diesem Rechner.
+	   Source: AsGiven, Exact, Server, Resolved, Ambiguous (mehrere DOMAIN\svc_x, es wird nicht geraten)
+	   oder None. Install-sqmDiscoveryRole und Test-sqmDiscoveryAccess nutzen dieselbe Suche. #>
+	[CmdletBinding()]
+	param (
+		[Parameter(Mandatory = $true)][string]$SqlInstance,
+		[System.Management.Automation.PSCredential]$SqlCredential,
+		[Parameter(Mandatory = $true)][string]$Name
+	)
+
+	$given = $Name.Trim()
+	if ($given -match '\\') { return [PSCustomObject]@{ Name = $given; Source = 'AsGiven'; Candidates = @() } }
+
+	$lit = $given -replace "'", "''"
+	$p = @{ SqlInstance = $SqlInstance; Database = 'master'; As = 'PSObject'; EnableException = $true }
+	if ($SqlCredential) { $p.SqlCredential = $SqlCredential }
+	$candidates = @(Invoke-DbaQuery @p -Query "SELECT name FROM sys.server_principals WHERE type IN ('U','G','S') AND (name = N'$lit' OR RIGHT(name, $($given.Length + 1)) = N'\$lit')" |
+			Where-Object { $_ -and $_.name } | ForEach-Object { [string]$_.name })
+
+	if ($candidates -contains $given) { return [PSCustomObject]@{ Name = $given; Source = 'Exact'; Candidates = $candidates } }
+	if ($candidates.Count -eq 1) { return [PSCustomObject]@{ Name = $candidates[0]; Source = 'Server'; Candidates = $candidates } }
+	if ($candidates.Count -gt 1) { return [PSCustomObject]@{ Name = $given; Source = 'Ambiguous'; Candidates = $candidates } }
+
+	$resolved = Resolve-sqmDiscoveryLoginName -Account $given
+	if ($resolved) { return [PSCustomObject]@{ Name = $resolved; Source = 'Resolved'; Candidates = @() } }
+	return [PSCustomObject]@{ Name = $given; Source = 'None'; Candidates = @() }
+}
+
 function Open-sqmDiscoveryCimSession
 {
 	<# $null fuer den lokalen Rechner (kein DCOM/WinRM noetig), sonst eine CimSession. #>

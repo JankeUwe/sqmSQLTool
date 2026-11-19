@@ -126,6 +126,7 @@ Describe 'Install-sqmDiscoveryRole' {
 	BeforeEach {
 		InModuleScope sqmSQLTool {
 			Mock Get-sqmDiscoveryPolicyBlocker { $null }
+			Mock Set-sqmDiscoveryWmiAccess { [PSCustomObject]@{ Status = 'OK'; Message = 'WMI/DCOM vollstaendig' } }
 			$script:dbatoolsAvailable = $true
 			$script:queries = [System.Collections.Generic.List[string]]::new()
 			Mock Invoke-sqmLogging { }
@@ -347,6 +348,83 @@ Describe 'Install-sqmDiscoveryRole' {
 			$r.PolicyTriggerDisabled | Should -BeFalse
 			($script:queries -join "`n") | Should -Not -Match 'TRIGGER'
 			Should -Invoke Get-sqmDiscoveryPolicyBlocker -Times 0
+		}
+	}
+
+	It 'ServiceNow: setzt die WMI/DCOM-Seite gleich mit, auf dem Host der Instanz' {
+		InModuleScope sqmSQLTool {
+			$r = Install-sqmDiscoveryRole -SqlInstance 'SQL01\INST1' -LoginName 'CORP\svc_snow' -Confirm:$false
+			$r.Status | Should -Be 'OK'
+			$r.WmiStatus | Should -Be 'OK'
+			Should -Invoke Set-sqmDiscoveryWmiAccess -Times 1 -Exactly -ParameterFilter { $Account -eq 'CORP\svc_snow' -and $Mode -eq 'Apply' -and $ComputerName -eq 'SQL01' }
+		}
+	}
+
+	It 'Qualys und SCOM: WMI nur mit -Wmi Apply' {
+		InModuleScope sqmSQLTool {
+			Install-sqmDiscoveryRole -SqlInstance 'SQL01' -Product Qualys -LoginName 'CORP\q' -Confirm:$false | Out-Null
+			Should -Invoke Set-sqmDiscoveryWmiAccess -Times 0 -Exactly
+			$r = Install-sqmDiscoveryRole -SqlInstance 'SQL01' -Product Qualys -LoginName 'CORP\q' -Wmi Apply -Confirm:$false
+			$r.WmiStatus | Should -Be 'OK'
+			Should -Invoke Set-sqmDiscoveryWmiAccess -Times 1 -Exactly
+		}
+	}
+
+	It '-Wmi Skip laesst die WMI-Seite aus, auch bei ServiceNow' {
+		InModuleScope sqmSQLTool {
+			$r = Install-sqmDiscoveryRole -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow' -Wmi Skip -Confirm:$false
+			$r.WmiStatus | Should -Be 'NotRun'
+			Should -Invoke Set-sqmDiscoveryWmiAccess -Times 0 -Exactly
+		}
+	}
+
+	It 'ein WMI-Fehler nimmt die SQL-Rechte nicht zurueck und erscheint als Warnung' {
+		InModuleScope sqmSQLTool {
+			Mock Set-sqmDiscoveryWmiAccess { throw 'Zugriff verweigert' }
+			$r = Install-sqmDiscoveryRole -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow' -Confirm:$false
+			$r.Status | Should -Be 'Warnung'
+			$r.WmiStatus | Should -Be 'Error'
+			($r.Warnings -join ' ') | Should -Match 'Zugriff verweigert'
+			$r.Granted | Should -Contain 'VIEW ANY DEFINITION'
+			$r.MemberAdded | Should -BeTrue
+		}
+	}
+
+	It 'ohne -LoginName gibt es keine WMI-Rechte zu setzen' {
+		InModuleScope sqmSQLTool {
+			$r = Install-sqmDiscoveryRole -SqlInstance 'SQL01' -Confirm:$false
+			$r.WmiStatus | Should -Be 'Skipped'
+			Should -Invoke Set-sqmDiscoveryWmiAccess -Times 0 -Exactly
+		}
+	}
+
+	It 'ein Name ohne Domaene wird zuerst auf dem Server gesucht, ein vorhandenes Login wird nicht noch einmal angelegt' {
+		InModuleScope sqmSQLTool {
+			Mock Invoke-DbaQuery {
+				$script:queries.Add([string]$Query)
+				if ($Query -match 'ProductMajorVersion') { return [PSCustomObject]@{ MajorVersion = 15 } }
+				if ($Query -match 'RIGHT\(name') { return [PSCustomObject]@{ name = 'CORP\svc_snow' } }
+				if ($Query -match 'RoleExists') { return [PSCustomObject]@{ RoleExists = 1; LoginExists = 1; IsMember = 0 } }
+			}
+			$r = Install-sqmDiscoveryRole -SqlInstance 'SQL01' -LoginName 'svc_snow' -Confirm:$false
+			$r.LoginName | Should -Be 'CORP\svc_snow'
+			$r.LoginCreated | Should -BeFalse
+			$r.MemberAdded | Should -BeTrue
+			($script:queries -join "`n") | Should -Not -Match 'CREATE LOGIN'
+			($script:queries -join "`n") | Should -Match 'ADD MEMBER \[CORP\\svc_snow\]'
+		}
+	}
+
+	It 'ein mehrdeutiger Name ohne Domaene bricht ab und raet nicht' {
+		InModuleScope sqmSQLTool {
+			Mock Invoke-DbaQuery {
+				$script:queries.Add([string]$Query)
+				if ($Query -match 'ProductMajorVersion') { return [PSCustomObject]@{ MajorVersion = 15 } }
+				if ($Query -match 'RIGHT\(name') { return @([PSCustomObject]@{ name = 'A\svc_snow' }, [PSCustomObject]@{ name = 'B\svc_snow' }) }
+			}
+			{ Install-sqmDiscoveryRole -SqlInstance 'SQL01' -LoginName 'svc_snow' -Confirm:$false } |
+				Should -Throw -ExpectedMessage '*nicht eindeutig*A\svc_snow, B\svc_snow*'
+			($script:queries -join "`n") | Should -Not -Match 'CREATE LOGIN|ADD MEMBER'
 		}
 	}
 

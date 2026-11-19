@@ -69,6 +69,16 @@
 .PARAMETER SkipPolicyHandling
     Do not check or switch the Policy-Based Management trigger.
 
+.PARAMETER Wmi
+    Auto (default), Apply or Skip. The WMI/DCOM side that a SQL role cannot cover (Root\CIMv2, the SQL Server
+    ComputerManagement namespaces, Distributed COM Users) is set by Set-sqmDiscoveryWmiAccess -Mode Apply on the
+    host of the instance. Auto means: for ServiceNow yes, for Qualys and SCOM no. Apply forces it for any product,
+    Skip turns it off. Needs -LoginName and local administrator rights on the host. A failure there is reported in
+    WmiStatus and Warnings and does not undo the SQL rights. For an availability group run it per node.
+
+.PARAMETER WmiCredential
+    PSCredential for the WMI/DCOM step on a remote host.
+
 .PARAMETER ContinueOnError
     Continue with the next instance on error instead of throwing.
 
@@ -115,6 +125,11 @@ function Install-sqmDiscoveryRole
 		[System.Management.Automation.PSCredential]$SqlCredential,
 		[Parameter(Mandatory = $false)]
 		[switch]$SkipPolicyHandling,
+		[Parameter(Mandatory = $false)]
+		[ValidateSet('Auto', 'Apply', 'Skip')]
+		[string]$Wmi = 'Auto',
+		[Parameter(Mandatory = $false)]
+		[System.Management.Automation.PSCredential]$WmiCredential,
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
@@ -169,6 +184,8 @@ function Install-sqmDiscoveryRole
 				MemberAdded         = $false
 				BlockingPolicies    = @()
 				PolicyTriggerDisabled = $false
+				WmiStatus           = 'NotRun'
+				WmiMessage          = ''
 				Warnings            = @()
 				Status              = 'Error'
 				Message             = ''
@@ -207,6 +224,18 @@ function Install-sqmDiscoveryRole
 					}
 				}
 
+				# Konto ohne Domaene (svc_x oder svc_x@corp.local): dieselbe Suche wie Test-sqmDiscoveryAccess,
+				# damit Einrichten und Pruefen den Namen gleich behandeln (zuerst der Server, dann dieser Rechner).
+				if ($LoginName -and $LoginName -notmatch '\\')
+				{
+					$found = Find-sqmDiscoveryLogin -SqlInstance $instance -SqlCredential $SqlCredential -Name $LoginName
+					if ($found.Source -eq 'Ambiguous')
+					{
+						throw "Der Name '$LoginName' ist nicht eindeutig (gefunden: $($found.Candidates -join ', ')). Konto als DOMAIN\Name angeben."
+					}
+					if ($found.Source -ne 'None') { $LoginName = $found.Name; $row.LoginName = $found.Name }
+				}
+
 				# Zustand lesen: was gibt es schon?
 				$state = Invoke-DbaQuery -SqlInstance $instance -SqlCredential $SqlCredential -Database master -As PSObject -EnableException -Query @"
 SELECT
@@ -237,36 +266,16 @@ SELECT
 				{
 					if ($state.LoginExists -ne 1)
 					{
-						$createName = $LoginName
-						if ($createName -notmatch '\\')
+						if ($LoginName -match '\\')
 						{
-							# Name ohne Domaene (svc_x oder svc_x@corp.local): als Windows-Konto aufloesen
-							$resolved = Resolve-sqmDiscoveryLoginName -Account $createName
-							if ($resolved)
-							{
-								$createName = $resolved
-								# der aufgeloeste Name kann schon als Login vorhanden sein
-								$exists = Invoke-DbaQuery -SqlInstance $instance -SqlCredential $SqlCredential -Database master -As PSObject -EnableException `
-									-Query "SELECT CASE WHEN EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'$(_S $createName)' AND type IN ('U','G')) THEN 1 ELSE 0 END AS LoginExists"
-								if ($exists.LoginExists -eq 1) { $state.LoginExists = 1; $LoginName = $createName; $row.LoginName = $createName }
-							}
+							Invoke-DbaQuery -SqlInstance $instance -SqlCredential $SqlCredential -Database master -EnableException `
+								-Query "CREATE LOGIN $(_Q $LoginName) FROM WINDOWS;"
+							$row.LoginCreated = $true
+							$state.LoginExists = 1
 						}
-
-						if ($state.LoginExists -ne 1)
+						else
 						{
-							if ($createName -match '\\')
-							{
-								Invoke-DbaQuery -SqlInstance $instance -SqlCredential $SqlCredential -Database master -EnableException `
-									-Query "CREATE LOGIN $(_Q $createName) FROM WINDOWS;"
-								$row.LoginCreated = $true
-								$row.LoginName = $createName
-								$LoginName = $createName
-								$state.LoginExists = 1
-							}
-							else
-							{
-								throw "Login '$LoginName' existiert nicht auf dem Server und liess sich auf diesem Rechner nicht als Windows-Konto aufloesen. Konto als DOMAIN\Name angeben. Ein SQL-Login wird nicht automatisch angelegt."
-							}
+							throw "Login '$LoginName' existiert nicht auf dem Server und liess sich auf diesem Rechner nicht als Windows-Konto aufloesen. Konto als DOMAIN\Name angeben. Ein SQL-Login wird nicht automatisch angelegt."
 						}
 					}
 					if ($state.IsMember -ne 1 -or $row.LoginCreated)
@@ -343,6 +352,38 @@ WHERE db.database_id <> 2 AND db.user_access = 0 AND db.state = 0 AND db.is_read
 							-Query "ALTER ROLE $(_Q $RoleName) ADD MEMBER $(_Q $userName);"
 					}
 				}
+				# WMI/DCOM-Seite: bei ServiceNow gleich mit (Standard), sonst nur mit -Wmi Apply. Ein Fehler hier
+				# nimmt die schon gesetzten SQL-Rechte nicht zurueck, er erscheint als Warnung.
+				$wmiRun = ($Wmi -eq 'Apply') -or ($Wmi -eq 'Auto' -and $Product -eq 'ServiceNow')
+				if ($wmiRun)
+				{
+					if (-not $LoginName)
+					{
+						$row.WmiStatus = 'Skipped'
+						$row.WmiMessage = 'Ohne -LoginName gibt es kein Konto fuer die WMI-Rechte.'
+					}
+					else
+					{
+						try
+						{
+							$wmiHost = Get-sqmDiscoveryHostName -SqlInstance $instance
+							$wmiParams = @{ Account = $LoginName; ComputerName = $wmiHost; Mode = 'Apply'; Confirm = $false; EnableException = $true }
+							if ($WmiCredential) { $wmiParams.Credential = $WmiCredential }
+							$wmiResult = @(Set-sqmDiscoveryWmiAccess @wmiParams) | Select-Object -First 1
+							$row.WmiStatus = [string]$wmiResult.Status
+							$row.WmiMessage = [string]$wmiResult.Message
+							if ($wmiResult.Status -ne 'OK') { $warnings.Add("WMI/DCOM auf '$wmiHost': $($wmiResult.Message)") }
+						}
+						catch
+						{
+							$row.WmiStatus = 'Error'
+							$row.WmiMessage = $_.Exception.Message
+							$warnings.Add("WMI/DCOM konnte nicht gesetzt werden: $($_.Exception.Message) (von Hand: Set-sqmDiscoveryWmiAccess -Account '$LoginName' -ComputerName <Host> -Mode Apply)")
+							Invoke-sqmLogging -Message "[$instance] WMI/DCOM fehlgeschlagen: $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
+						}
+					}
+				}
+
 				$row.DatabasesConfigured = @($targetDbs)
 				$row.Warnings = @($warnings)
 
