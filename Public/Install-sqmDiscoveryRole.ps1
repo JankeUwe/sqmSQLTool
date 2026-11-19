@@ -69,6 +69,12 @@
 .PARAMETER SkipPolicyHandling
     Do not check or switch the Policy-Based Management trigger.
 
+.PARAMETER SkipVerification
+    After the changes the function runs Test-sqmDiscoveryAccess for the account (role, product and required level
+    Full of this run, with -CheckWmi when the WMI step ran) and reports the outcome in VerifyStatus, VerifyLevel,
+    VerifyFindings and Verification. A failed check turns the Status into Warnung, it does not undo anything.
+    -SkipVerification turns the check off. Without -LoginName there is nothing to check.
+
 .PARAMETER Wmi
     Auto (default), Apply or Skip. The WMI/DCOM side that a SQL role cannot cover (Root\CIMv2, the SQL Server
     ComputerManagement namespaces, Distributed COM Users) is set by Set-sqmDiscoveryWmiAccess -Mode Apply on the
@@ -125,6 +131,8 @@ function Install-sqmDiscoveryRole
 		[System.Management.Automation.PSCredential]$SqlCredential,
 		[Parameter(Mandatory = $false)]
 		[switch]$SkipPolicyHandling,
+		[Parameter(Mandatory = $false)]
+		[switch]$SkipVerification,
 		[Parameter(Mandatory = $false)]
 		[ValidateSet('Auto', 'Apply', 'Skip')]
 		[string]$Wmi = 'Auto',
@@ -186,6 +194,10 @@ function Install-sqmDiscoveryRole
 				PolicyTriggerDisabled = $false
 				WmiStatus           = 'NotRun'
 				WmiMessage          = ''
+				VerifyStatus        = 'NotRun'
+				VerifyLevel         = ''
+				VerifyFindings      = @()
+				Verification        = $null
 				Warnings            = @()
 				Status              = 'Error'
 				Message             = ''
@@ -381,6 +393,41 @@ WHERE db.database_id <> 2 AND db.user_access = 0 AND db.state = 0 AND db.is_read
 							$warnings.Add("WMI/DCOM konnte nicht gesetzt werden: $($_.Exception.Message) (von Hand: Set-sqmDiscoveryWmiAccess -Account '$LoginName' -ComputerName <Host> -Mode Apply)")
 							Invoke-sqmLogging -Message "[$instance] WMI/DCOM fehlgeschlagen: $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
 						}
+					}
+				}
+
+				# Automatische Pruefung nach dem Setzen: dieselbe Funktion, die man von Hand aufrufen wuerde, mit der
+				# Rolle und dem Produkt dieses Laufs und (wenn WMI gesetzt wurde) mit -CheckWmi. Ein Befund aendert nichts
+				# an den gesetzten Rechten, er macht den Status zur Warnung.
+				if (-not $SkipVerification -and $LoginName)
+				{
+					try
+					{
+						$verifyParams = @{
+							SqlInstance = $instance; LoginName = $LoginName; ServerRole = $RoleName; Product = $Product
+							RequiredLevel = 'Full'; NoOpen = $true; Confirm = $false; EnableException = $true
+						}
+						if ($SqlCredential) { $verifyParams.SqlCredential = $SqlCredential }
+						if ($wmiRun)
+						{
+							$verifyParams.CheckWmi = $true
+							if ($WmiCredential) { $verifyParams.WmiCredential = $WmiCredential }
+						}
+						$verify = @(Test-sqmDiscoveryAccess @verifyParams) | Select-Object -First 1
+						$row.Verification = $verify
+						$row.VerifyStatus = [string]$verify.Status
+						$row.VerifyLevel = [string]$verify.DiscoveryLevel
+						$row.VerifyFindings = @($verify.Findings)
+						if ($verify.Status -in @('Fehler', 'Error') -or -not $verify.MeetsRequirement)
+						{
+							$warnings.Add("Pruefung: Stufe '$($verify.DiscoveryLevel)', Status $($verify.Status): $(@($verify.Findings) -join ' | ')")
+						}
+					}
+					catch
+					{
+						$row.VerifyStatus = 'Error'
+						$warnings.Add("Die automatische Pruefung konnte nicht laufen: $($_.Exception.Message)")
+						Invoke-sqmLogging -Message "[$instance] Pruefung fehlgeschlagen: $($_.Exception.Message)" -FunctionName $functionName -Level "WARNING"
 					}
 				}
 

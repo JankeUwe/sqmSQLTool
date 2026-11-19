@@ -1,5 +1,15 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.236.0] - 2026-11-19
+
+### Erweitert: Install-sqmDiscoveryRole prueft nach dem Setzen automatisch
+
+Nach den SQL-Rechten und (bei ServiceNow) der WMI/DCOM-Seite ruft `Install-sqmDiscoveryRole` jetzt `Test-sqmDiscoveryAccess` fuer das Konto auf, mit der Rolle und dem Produkt dieses Laufs, der Stufe Full und, wenn der WMI-Schritt lief, mit `-CheckWmi`. Das Ergebnis steht im Ausgabeobjekt: `VerifyStatus`, `VerifyLevel`, `VerifyFindings` und das vollstaendige Pruefobjekt in `Verification`. Verfehlt die Pruefung die Stufe oder meldet sie einen Fehler, wird der Status `Warnung` und die Befunde stehen in `Warnings`; die gesetzten Rechte bleiben unveraendert. Ein reiner Hinweis (zum Beispiel "Remote Registry ist gestoppt") bei erfuellter Stufe laesst den Status auf `OK`. `-SkipVerification` schaltet die Pruefung ab; ohne `-LoginName` gibt es nichts zu pruefen. `Set-sqmDiscoveryWmiAccess` liest den Zustand nach einer Aenderung immer frisch und meldet daraus Status und Ok, braucht also keine zweite Pruefung.
+
+`Test-sqmDiscoveryAccess` hat dafuer den neuen Parameter `-Product` (ServiceNow, Qualys, SCOM): Die Rolle wird dann auch bei einem freien Rollennamen gegen die Rechte dieses Produkts verglichen. Ohne `-Product` gilt wie bisher der Standardname (SnowDisco, Qualis_Scan, SCOM_Scan).
+
+Geprueft: 9 neue Unit-Tests (Aufruf mit Rolle, Produkt, Stufe und -CheckWmi, Reihenfolge nach den Rechten, Qualys ohne CheckWmi, freier Rollenname, Skip und ohne Login, Befund, reiner Hinweis, Fehler der Pruefung selbst, `-Product` im Test), Quality Gate OK; live auf SQL Server 2025: Qualys und SCOM melden Pruefung OK auf Stufe Full, bei ServiceNow mit einem SQL-Login erscheint der WMI-Fehler als Befund und Status Warnung. Nicht live geprueft: der Erfolgsfall mit Domaenenkonto und WMI.
+
 ## [1.9.235.0] - 2026-11-19
 
 ### Erweitert: Install-sqmDiscoveryRole setzt bei ServiceNow die WMI/DCOM-Seite gleich mit; Einrichten und Pruefen suchen das Konto gleich

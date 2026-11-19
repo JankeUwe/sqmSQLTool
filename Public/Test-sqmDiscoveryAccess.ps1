@@ -44,6 +44,10 @@
     separate job - use Test-sqmLoginGroupAccess for that, it needs a reachable domain
     controller.
 
+.PARAMETER Product
+    ServiceNow, Qualys or SCOM. The role is compared against the rights of this product even if -ServerRole is a free
+    name. Without it the product follows from the standard role names (SnowDisco, Qualis_Scan, SCOM_Scan).
+
 .PARAMETER ServerRole
     Expected server role membership, e.g. "SQL_Inventory_RO_Basic". Without this parameter
     the role check is skipped and only permissions are evaluated. If the role is the standard
@@ -127,6 +131,9 @@ function Test-sqmDiscoveryAccess
 		[string]$LoginName,
 		[Parameter(Mandatory = $false)]
 		[string]$ServerRole,
+		[Parameter(Mandatory = $false)]
+		[ValidateSet('ServiceNow', 'Qualys', 'SCOM')]
+		[string]$Product,
 		[Parameter(Mandatory = $false)]
 		[ValidateSet('ServerOnly', 'Databases', 'DatabaseDetails', 'Full')]
 		[string]$RequiredLevel = 'Databases',
@@ -361,7 +368,8 @@ SELECT
 				# Abgleich mit Install-sqmDiscoveryRole: hat die Standardrolle noch alle Rechte
 				# der Definition? Eine andere Rolle (z. B. SQL_Inventory_RO_Basic) hat bewusst
 				# andere Rechte und wird nicht verglichen.
-				$standardProduct = $standardProducts | Where-Object { $_.RoleName -eq $ServerRole } | Select-Object -First 1
+				# Mit -Product wird gegen dieses Produkt verglichen (auch bei freiem Rollennamen), sonst ueber den Standardnamen
+				$standardProduct = if ($Product) { $standardProducts | Where-Object { $_.Product -eq $Product } | Select-Object -First 1 } else { $standardProducts | Where-Object { $_.RoleName -eq $ServerRole } | Select-Object -First 1 }
 				if ($row.RoleExists -and $standardProduct)
 				{
 					$granted = @(([string]$data.RoleGrants) -split ',\s*' | Where-Object { $_ })

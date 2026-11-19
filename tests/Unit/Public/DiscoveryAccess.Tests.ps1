@@ -127,6 +127,7 @@ Describe 'Install-sqmDiscoveryRole' {
 		InModuleScope sqmSQLTool {
 			Mock Get-sqmDiscoveryPolicyBlocker { $null }
 			Mock Set-sqmDiscoveryWmiAccess { [PSCustomObject]@{ Status = 'OK'; Message = 'WMI/DCOM vollstaendig' } }
+			Mock Test-sqmDiscoveryAccess { [PSCustomObject]@{ Status = 'OK'; DiscoveryLevel = 'Full'; MeetsRequirement = $true; Findings = @() } }
 			$script:dbatoolsAvailable = $true
 			$script:queries = [System.Collections.Generic.List[string]]::new()
 			Mock Invoke-sqmLogging { }
@@ -428,6 +429,79 @@ Describe 'Install-sqmDiscoveryRole' {
 		}
 	}
 
+	It 'prueft nach dem Setzen automatisch, mit Rolle, Produkt, Stufe Full und -CheckWmi bei ServiceNow' {
+		InModuleScope sqmSQLTool {
+			$r = Install-sqmDiscoveryRole -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow' -Confirm:$false
+			$r.VerifyStatus | Should -Be 'OK'
+			$r.VerifyLevel | Should -Be 'Full'
+			$r.Status | Should -Be 'OK'
+			Should -Invoke Test-sqmDiscoveryAccess -Times 1 -Exactly -ParameterFilter {
+				$LoginName -eq 'CORP\svc_snow' -and $ServerRole -eq 'SnowDisco' -and $Product -eq 'ServiceNow' -and $RequiredLevel -eq 'Full' -and $CheckWmi
+			}
+		}
+	}
+
+	It 'die Pruefung laeuft nach den Rechten, nicht davor' {
+		InModuleScope sqmSQLTool {
+			Mock Test-sqmDiscoveryAccess { $script:queries.Add('<<VERIFY>>'); [PSCustomObject]@{ Status = 'OK'; DiscoveryLevel = 'Full'; MeetsRequirement = $true; Findings = @() } }
+			Install-sqmDiscoveryRole -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow' -Confirm:$false | Out-Null
+			$arr = $script:queries.ToArray()
+			[array]::IndexOf($arr, '<<VERIFY>>') | Should -BeGreaterThan ([array]::FindIndex($arr, [Predicate[string]] { param ($q) $q -match 'ADD MEMBER' }))
+		}
+	}
+
+	It 'Qualys: Pruefung ohne -CheckWmi, solange WMI nicht gesetzt wurde' {
+		InModuleScope sqmSQLTool {
+			Install-sqmDiscoveryRole -SqlInstance 'SQL01' -Product Qualys -LoginName 'CORP\q' -Confirm:$false | Out-Null
+			Should -Invoke Test-sqmDiscoveryAccess -Times 1 -Exactly -ParameterFilter { $Product -eq 'Qualys' -and -not $CheckWmi }
+		}
+	}
+
+	It 'ein freier Rollenname wird gegen das Produkt dieses Laufs geprueft' {
+		InModuleScope sqmSQLTool {
+			Install-sqmDiscoveryRole -SqlInstance 'SQL01' -Product SCOM -RoleName 'Mon_Scan' -LoginName 'CORP\m' -Confirm:$false | Out-Null
+			Should -Invoke Test-sqmDiscoveryAccess -Times 1 -Exactly -ParameterFilter { $ServerRole -eq 'Mon_Scan' -and $Product -eq 'SCOM' }
+		}
+	}
+
+	It '-SkipVerification und fehlendes -LoginName lassen die Pruefung aus' {
+		InModuleScope sqmSQLTool {
+			(Install-sqmDiscoveryRole -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow' -SkipVerification -Confirm:$false).VerifyStatus | Should -Be 'NotRun'
+			(Install-sqmDiscoveryRole -SqlInstance 'SQL01' -Confirm:$false).VerifyStatus | Should -Be 'NotRun'
+			Should -Invoke Test-sqmDiscoveryAccess -Times 0 -Exactly
+		}
+	}
+
+	It 'ein Befund der Pruefung macht den Status zur Warnung und nennt die Befunde' {
+		InModuleScope sqmSQLTool {
+			Mock Test-sqmDiscoveryAccess { [PSCustomObject]@{ Status = 'Fehler'; DiscoveryLevel = 'ServerOnly'; MeetsRequirement = $false; Findings = @('VIEW SERVER STATE fehlt.') } }
+			$r = Install-sqmDiscoveryRole -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow' -Confirm:$false
+			$r.Status | Should -Be 'Warnung'
+			$r.VerifyStatus | Should -Be 'Fehler'
+			$r.VerifyFindings | Should -Contain 'VIEW SERVER STATE fehlt.'
+			($r.Warnings -join ' ') | Should -Match 'VIEW SERVER STATE fehlt'
+		}
+	}
+
+	It 'ein bloss hinweisender Befund (Status Warnung, Anforderung erfuellt) laesst den Status auf OK' {
+		InModuleScope sqmSQLTool {
+			Mock Test-sqmDiscoveryAccess { [PSCustomObject]@{ Status = 'Warnung'; DiscoveryLevel = 'Full'; MeetsRequirement = $true; Findings = @('Hinweis: Remote Registry ist Stopped.') } }
+			$r = Install-sqmDiscoveryRole -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow' -Confirm:$false
+			$r.Status | Should -Be 'OK'
+			$r.VerifyFindings.Count | Should -Be 1
+		}
+	}
+
+	It 'eine Pruefung, die selbst scheitert, wird als Warnung gemeldet und stoppt die Einrichtung nicht' {
+		InModuleScope sqmSQLTool {
+			Mock Test-sqmDiscoveryAccess { throw 'Verbindung verloren' }
+			$r = Install-sqmDiscoveryRole -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow' -Confirm:$false
+			$r.Status | Should -Be 'Warnung'
+			$r.VerifyStatus | Should -Be 'Error'
+			$r.MemberAdded | Should -BeTrue
+		}
+	}
+
 	It 'laesst ] im Rollennamen nicht zu, damit er nie in das T-SQL gelangt' {
 		InModuleScope sqmSQLTool {
 			{ Install-sqmDiscoveryRole -SqlInstance 'SQL01' -RoleName 'a]b' } |
@@ -595,6 +669,15 @@ Describe 'Test-sqmDiscoveryAccess - Abgleich mit der Standarddefinition' {
 		}
 	}
 
+	It 'mit -Product wird eine Rolle mit freiem Namen gegen die Rechte des Produkts verglichen' {
+		InModuleScope sqmSQLTool -Parameters @{ Out = $script:TestDir } {
+			$script:row.RoleGrants = 'VIEW ANY DATABASE, VIEW SERVER PERFORMANCE STATE'
+			$ohne = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'CORP\svc' -ServerRole 'Mon_Scan' -OutputPath $Out -NoOpen
+			$ohne.RoleMissingPermissions.Count | Should -Be 0
+			$mit = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'CORP\svc' -ServerRole 'Mon_Scan' -Product ServiceNow -OutputPath $Out -NoOpen
+			$mit.RoleMissingPermissions | Should -Contain 'VIEW ANY DEFINITION'
+		}
+	}
 	It 'findet ein nachtraeglich entzogenes Recht der Standardrolle' {
 		InModuleScope sqmSQLTool -Parameters @{ Out = $script:TestDir } {
 			$script:row.RoleGrants = 'VIEW ANY DATABASE, VIEW SERVER PERFORMANCE STATE'
