@@ -74,3 +74,81 @@ Describe 'ConvertTo-sqmProviderInventoryHtml' {
     }
     }
 }
+
+Describe 'Get-sqmProviderInventoryHostInstance' {
+    BeforeAll {
+        $script:svc = @(
+            [pscustomobject]@{ Name = 'MSSQLSERVER'; State = 'Running' },
+            [pscustomobject]@{ Name = 'MSSQL$INST1'; State = 'Running' },
+            [pscustomobject]@{ Name = 'MSSQL$OLD'; State = 'Stopped' },
+            [pscustomobject]@{ Name = 'SQLAgent$INST1'; State = 'Running' },
+            [pscustomobject]@{ Name = 'Spooler'; State = 'Running' }
+        )
+    }
+
+    It 'findet alle laufenden Instanzen eines Remote-Hosts und ueberspringt gestoppte' {
+        InModuleScope sqmSQLTool -Parameters @{ svc = $script:svc } {
+            param($svc)
+            Mock New-CimSessionOption { 'opt' } -RemoveParameterType 'Protocol'
+            Mock New-CimSession { 'sess' } -RemoveParameterType 'SessionOption'
+            Mock Remove-CimSession { }
+            Mock Get-CimInstance { $svc } -RemoveParameterType 'CimSession'
+            Mock Write-Warning { }
+            $r = Get-sqmProviderInventoryHostInstance -HostName 'REMOTE01'
+            @($r).Count | Should -Be 2
+            $r.target | Should -Contain 'REMOTE01'
+            $r.target | Should -Contain 'REMOTE01\INST1'
+            $r.name | Should -Contain 'INST1'
+            Should -Invoke Write-Warning -Times 1 -ParameterFilter { $Message -match 'OLD' }
+        }
+    }
+
+    It 'faellt bei WSMan-Fehler auf DCOM zurueck' {
+        InModuleScope sqmSQLTool -Parameters @{ svc = $script:svc } {
+            param($svc)
+            Mock New-CimSessionOption { $Protocol } -RemoveParameterType 'Protocol'
+            Mock New-CimSession { if ($SessionOption -eq 'Wsman') { throw 'wsman down' }; 'sess' } -RemoveParameterType 'SessionOption'
+            Mock Remove-CimSession { }
+            Mock Get-CimInstance { $svc } -RemoveParameterType 'CimSession'
+            Mock Write-Warning { }
+            $r = Get-sqmProviderInventoryHostInstance -HostName 'REMOTE01'
+            @($r).Count | Should -Be 2
+            Should -Invoke New-CimSession -Times 2
+        }
+    }
+
+    It 'liefert $null, wenn der Host per CIM nicht erreichbar ist' {
+        InModuleScope sqmSQLTool {
+            Mock New-CimSessionOption { 'opt' } -RemoveParameterType 'Protocol'
+            Mock New-CimSession { throw 'nicht erreichbar' } -RemoveParameterType 'SessionOption'
+            Mock Remove-CimSession { }
+            Get-sqmProviderInventoryHostInstance -HostName 'REMOTE01' | Should -BeNullOrEmpty
+            Should -Invoke New-CimSession -Times 2
+        }
+    }
+
+    It 'liefert ein leeres Array, wenn der Host keinen SQL-Dienst hat (Listener)' {
+        InModuleScope sqmSQLTool {
+            Mock New-CimSessionOption { 'opt' } -RemoveParameterType 'Protocol'
+            Mock New-CimSession { 'sess' } -RemoveParameterType 'SessionOption'
+            Mock Remove-CimSession { }
+            Mock Get-CimInstance { [pscustomobject]@{ Name = 'Spooler'; State = 'Running' } } -RemoveParameterType 'CimSession'
+            $r = Get-sqmProviderInventoryHostInstance -HostName 'AGLISTENER'
+            $null -ne $r | Should -BeTrue
+            @($r).Count | Should -Be 0
+        }
+    }
+
+    It 'nutzt lokal kein CIM-Session-Objekt und den lokalen Computernamen' {
+        InModuleScope sqmSQLTool -Parameters @{ svc = $script:svc } {
+            param($svc)
+            Mock New-CimSession { throw 'darf nicht aufgerufen werden' }
+            Mock Get-CimInstance { $svc } -RemoveParameterType 'CimSession'
+            Mock Write-Warning { }
+            $r = Get-sqmProviderInventoryHostInstance -HostName 'localhost'
+            $r.target | Should -Contain $env:COMPUTERNAME
+            $r.target | Should -Contain ($env:COMPUTERNAME + '\INST1')
+            Should -Invoke New-CimSession -Times 0
+        }
+    }
+}

@@ -1,5 +1,17 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.237.0] - 2026-11-23
+
+### Erweitert: Get-sqmProviderInventory erkennt bei einem Host-Namen automatisch alle Instanzen
+
+Bisher erkannte die Funktion alle Instanzen nur auf dem lokalen Rechner. Bei `-SqlInstance SQL01` wurde nur die Standardinstanz von SQL01 verbunden, benannte Instanzen auf demselben Host fehlten. Jetzt liefert ein reiner Host-Name alle laufenden SQL-Instanzen dieses Hosts: Die Dienstliste wird per CIM gelesen (lokal direkt, remote ueber WSMan, bei Fehler ueber DCOM, mit der Windows-Identitaet des Aufrufers; `-SqlCredential` ist ein SQL-Login und wird dafuer nicht verwendet) und jede Instanz wird gescannt. `HOST\INST` und `HOST,Port` gelten weiter als genau diese Instanz. Ist der Host per CIM nicht erreichbar, gibt es eine Warnung und der Name wird wie angegeben als Standardinstanz verwendet; hat der Name keinen SQL-Dienst (AG-Listener, FCI-Name), wird er ebenfalls wie angegeben verbunden. Gestoppte Instanzen werden mit Warnung uebersprungen. Die Erkennung steckt in der privaten Funktion `Get-sqmProviderInventoryHostInstance`.
+
+Korrigiert: `DatabaseCount` im Ausgabeobjekt zaehlte bei einer nicht erreichbaren Instanz einen Phantomeintrag mit; es zaehlen jetzt nur verbundene Instanzen.
+
+Hinweis: Betriebssystem- und Hardwaredaten stammen weiterhin vom Rechner, auf dem die Funktion laeuft, nicht vom Remote-Host. Bei einem eingeschraenkten SQL-Login (ohne Zugriff auf die einzelnen Datenbanken) stehen die Server-Daten im Ergebnis, die Datenbanken fehlen oder sind leer; die Ursache steht je Datenbank im Tab "Pruefbericht".
+
+Geprueft: 5 neue Unit-Tests (alle Instanzen, gestoppte uebersprungen, WSMan-nach-DCOM-Rueckfall, Host nicht erreichbar, Listener ohne SQL-Dienst, lokal ohne Session), Quality Gate; live von DEV03 gegen DEV01: Instanz per CIM gefunden, 21 Datenbanken gescannt. Nicht live geprueft: ein Remote-Host mit mehreren Instanzen.
+
 ## [1.9.236.0] - 2026-11-19
 
 ### Erweitert: Install-sqmDiscoveryRole prueft nach dem Setzen automatisch

@@ -25,9 +25,12 @@
     permissions). Do not hand it to third parties. Use the viewer's provider export instead.
 
 .PARAMETER SqlInstance
-    Instance(s) to scan, e.g. "SQL01", "SQL01\INST1", "AGLISTENER". Default: all running SQL Server
-    instances found as services on this computer. For clustered instances (FCI) pass the virtual
-    network name explicitly.
+    Host(s) or instance(s) to scan. A bare host name ("SQL01") automatically discovers ALL running
+    SQL Server instances on that host (service list via CIM, local or remote) and scans each one.
+    "SQL01\INST1" or "SQL01,1434" scans exactly that instance. If the host cannot be queried via CIM
+    (or has no SQL service, e.g. AG listener / FCI virtual name), the name is used as given.
+    Default: all running instances on this computer. Note: OS/hardware data is still collected
+    from the computer running the function.
 
 .PARAMETER SqlCredential
     SQL login if Windows authentication is not possible. Default: Windows authentication.
@@ -916,17 +919,36 @@ function Get-sqmProviderInventory
 	$targets = @()
 	if ($SqlInstance)
 	{
-		foreach ($si in $SqlInstance) { $targets += [pscustomobject]@{ target = $si; name = $si } }
+		foreach ($si in $SqlInstance)
+		{
+			# explicit instance ("HOST\INST") or host,port: use as given. Bare host name: discover all instances of that host.
+			if ($si -match '[\\,]')
+			{
+				$targets += [pscustomobject]@{ target = $si; name = $si }
+				continue
+			}
+			$discovered = Get-sqmProviderInventoryHostInstance -HostName $si
+			if ($null -eq $discovered)
+			{
+				Write-Warning "Instances of '$si' could not be discovered (CIM not reachable). Using '$si' as given (default instance). Pass 'HOST\INSTANCE' for named instances."
+				$targets += [pscustomobject]@{ target = $si; name = $si }
+			}
+			elseif (@($discovered).Count -eq 0)
+			{
+				# no SQL service on that name (e.g. AG listener, FCI virtual name): connect as given
+				$targets += [pscustomobject]@{ target = $si; name = $si }
+			}
+			else
+			{
+				Write-Information "  $si : $(@($discovered).Count) instance(s) found: $((@($discovered) | ForEach-Object { $_.target }) -join ', ')" -InformationAction Continue
+				$targets += @($discovered)
+			}
+		}
 	}
 	else
 	{
-		$svcRows = @(Get-CimInstance -ClassName Win32_Service | Where-Object { $_.Name -eq 'MSSQLSERVER' -or $_.Name -like 'MSSQL$*' })
-		foreach ($s in $svcRows)
-		{
-			if ($s.State -ne 'Running') { Write-Warning "Service $($s.Name) is $($s.State), skipped."; continue }
-			if ($s.Name -eq 'MSSQLSERVER') { $targets += [pscustomobject]@{ target = $env:COMPUTERNAME; name = 'MSSQLSERVER' } }
-			else { $targets += [pscustomobject]@{ target = ($env:COMPUTERNAME + '\' + $s.Name.Substring(6)); name = $s.Name.Substring(6) } }
-		}
+		$discovered = Get-sqmProviderInventoryHostInstance -HostName $env:COMPUTERNAME
+		if ($discovered) { $targets += @($discovered) }
 	}
 	if ($targets.Count -eq 0) { Write-Warning 'No SQL Server instance found. Use -SqlInstance for clustered instances.' }
 
@@ -974,7 +996,7 @@ function Get-sqmProviderInventory
 	return [pscustomobject][ordered]@{
 		ComputerName  = $env:COMPUTERNAME
 		Instances     = @($instances).Count
-		DatabaseCount = @($instances | ForEach-Object { @($_.databases).Count } | Measure-Object -Sum).Sum
+		DatabaseCount = @($instances | Where-Object { $_.connected } | ForEach-Object { @($_.databases | Where-Object { $_ }).Count } | Measure-Object -Sum).Sum
 		ErrorCount    = $errCount
 		DurationSec   = $result.scan_duration_sec
 		HtmlFile      = $htmlFile
