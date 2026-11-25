@@ -178,6 +178,87 @@ function Get-sqmDiscoveryHostName
 	return $name
 }
 
+function Resolve-sqmDiscoveryReplicaInstance
+{
+	<#
+	Loest einen Knoten oder Listener einer AlwaysOn-Verfuegbarkeitsgruppe in ALLE Replikate auf.
+	Die Katalogsichten sys.availability_replicas / sys.availability_group_listeners stehen auf
+	jedem Replikat und ueber den Listener zur Verfuegung. Wird ein Listener angegeben, werden nur
+	die Replikate seiner Gruppe zurueckgegeben, sonst alle Gruppen der Instanz.
+	Ohne HADR, ohne Gruppe, mit -SingleNode oder wenn die Abfrage scheitert, kommt die angegebene
+	Instanz unveraendert zurueck (der Aufrufer meldet einen Verbindungsfehler dann wie bisher).
+	Der vom Benutzer angegebene Name bleibt erhalten (FQDN, Port), wenn er ein Replikat bezeichnet.
+	#>
+	[CmdletBinding()]
+	param (
+		[Parameter(Mandatory = $true)][string[]]$SqlInstance,
+		[Parameter(Mandatory = $false)][System.Management.Automation.PSCredential]$SqlCredential,
+		[Parameter(Mandatory = $false)][switch]$SingleNode
+	)
+
+	$result = [System.Collections.Generic.List[string]]::new()
+	$query = @"
+SET NOCOUNT ON;
+IF ISNULL(CAST(SERVERPROPERTY('IsHadrEnabled') AS int), 0) = 1
+SELECT ag.name AS AgName, ar.replica_server_name AS ReplicaServerName, l.dns_name AS ListenerName
+FROM sys.availability_groups ag
+JOIN sys.availability_replicas ar ON ar.group_id = ag.group_id
+LEFT JOIN sys.availability_group_listeners l ON l.group_id = ag.group_id;
+"@
+
+	foreach ($inst in $SqlInstance)
+	{
+		if ([string]::IsNullOrWhiteSpace($inst)) { continue }
+		$inst = $inst.Trim()
+		$expanded = @($inst)
+
+		if (-not $SingleNode)
+		{
+			try
+			{
+				$rows = @(Invoke-DbaQuery -SqlInstance $inst -SqlCredential $SqlCredential -Database master -As PSObject -EnableException -Query $query |
+						Where-Object { $_.PSObject.Properties['ReplicaServerName'] -and -not [string]::IsNullOrWhiteSpace([string]$_.ReplicaServerName) })
+				if ($rows.Count -gt 0)
+				{
+					$givenHost = Get-sqmDiscoveryHostName -SqlInstance $inst
+					$givenInst = ''
+					$tail = ($inst -replace '^(tcp|np|lpc):', '') -split '\\', 2
+					if ($tail.Count -gt 1) { $givenInst = ($tail[1] -split ',')[0] }
+
+					# Listener angegeben: nur die Gruppe dieses Listeners
+					$byListener = @($rows | Where-Object {
+							$_.ListenerName -and ($givenHost -ieq [string]$_.ListenerName -or $givenHost -like ([string]$_.ListenerName + '.*'))
+						})
+					if ($byListener.Count -gt 0) { $rows = $byListener }
+
+					$expanded = @()
+					foreach ($name in @($rows | ForEach-Object { [string]$_.ReplicaServerName } | Select-Object -Unique))
+					{
+						$parts = $name -split '\\', 2
+						$repHost = $parts[0]
+						$repInst = if ($parts.Count -gt 1) { $parts[1] } else { '' }
+						$isGiven = ($givenHost -ieq $repHost -or $givenHost -like "$repHost.*") -and ($givenInst -ieq $repInst)
+						$expanded += $(if ($isGiven) { $inst } else { $name })
+					}
+					if ($expanded.Count -eq 0) { $expanded = @($inst) }
+				}
+			}
+			catch
+			{
+				Write-Verbose "Replikate von '$inst' nicht lesbar, nur diese Instanz wird verwendet: $($_.Exception.Message)"
+				$expanded = @($inst)
+			}
+		}
+
+		foreach ($e in $expanded)
+		{
+			if (-not ($result | Where-Object { $_ -ieq $e })) { $result.Add($e) }
+		}
+	}
+
+	return @($result)
+}
+
 function Get-sqmDiscoveryAccountSid
 {
 	[CmdletBinding()]

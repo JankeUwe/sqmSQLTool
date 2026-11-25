@@ -80,7 +80,15 @@
     ComputerManagement namespaces, Distributed COM Users) is set by Set-sqmDiscoveryWmiAccess -Mode Apply on the
     host of the instance. Auto means: for ServiceNow yes, for Qualys and SCOM no. Apply forces it for any product,
     Skip turns it off. Needs -LoginName and local administrator rights on the host. A failure there is reported in
-    WmiStatus and Warnings and does not undo the SQL rights. For an availability group run it per node.
+    WmiStatus and Warnings and does not undo the SQL rights. On an availability group the step runs on every node
+    (see -SingleNode).
+
+.PARAMETER SingleNode
+    AlwaysOn: by default a node or an availability group listener is expanded to ALL replicas of its group (via
+    sys.availability_replicas; for a listener only the replicas of its group). Role, login, rights, the WMI/DCOM
+    step and the verification then run on every replica, so the discovery keeps working after a failover. One
+    result row per replica. -SingleNode restricts the run to exactly the instance given. Without HADR nothing
+    changes. An unreachable replica is reported as an error row (use -ContinueOnError to go on with the others).
 
 .PARAMETER WmiCredential
     PSCredential for the WMI/DCOM step on a remote host.
@@ -139,6 +147,8 @@ function Install-sqmDiscoveryRole
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$WmiCredential,
 		[Parameter(Mandatory = $false)]
+		[switch]$SingleNode,
+		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
@@ -175,7 +185,15 @@ function Install-sqmDiscoveryRole
 
 	process
 	{
-		foreach ($instance in $SqlInstance)
+		# AlwaysOn: ein Knoten oder der Listener steht fuer die ganze Gruppe. Login, Rolle, Rechte und WMI muessen
+		# auf JEDEM Replikat vorhanden sein, sonst scheitert die Discovery nach einem Failover.
+		$targetInstances = @(Resolve-sqmDiscoveryReplicaInstance -SqlInstance $SqlInstance -SqlCredential $SqlCredential -SingleNode:$SingleNode)
+		if (($targetInstances -join ',') -ne (@($SqlInstance) -join ','))
+		{
+			Invoke-sqmLogging -Message "AlwaysOn erkannt, Einrichtung auf allen Replikaten: $($targetInstances -join ', ')" -FunctionName $functionName -Level "INFO"
+		}
+
+		foreach ($instance in $targetInstances)
 		{
 			if ([string]::IsNullOrWhiteSpace($instance)) { continue }
 			$instance = $instance.Trim()
@@ -405,7 +423,7 @@ WHERE db.database_id <> 2 AND db.user_access = 0 AND db.state = 0 AND db.is_read
 					{
 						$verifyParams = @{
 							SqlInstance = $instance; LoginName = $LoginName; ServerRole = $RoleName; Product = $Product
-							RequiredLevel = 'Full'; NoOpen = $true; Confirm = $false; EnableException = $true
+							RequiredLevel = 'Full'; NoOpen = $true; Confirm = $false; EnableException = $true; SingleNode = $true
 						}
 						if ($SqlCredential) { $verifyParams.SqlCredential = $SqlCredential }
 						if ($wmiRun)

@@ -1,5 +1,18 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.238.0] - 2026-11-25
+
+### Erweitert: Discovery-Konto wird auf einer AlwaysOn-Gruppe automatisch auf allen Replikaten eingerichtet
+
+Bisher wirkten `Install-sqmDiscoveryRole`, `Set-sqmDiscoveryWmiAccess` und `Test-sqmDiscoveryAccess` nur auf die angegebene Instanz. Wurde ein AlwaysOn-Knoten oder der Listener uebergeben, bekam nur der aktuelle Primary Login, Rolle und Rechte; der Sekundaerknoten blieb ohne Konto und die Discovery scheiterte nach einem Failover.
+
+Jetzt wird ein Knoten oder Listener ueber `sys.availability_replicas` auf alle Replikate seiner Gruppe erweitert (privater Helfer `Resolve-sqmDiscoveryReplicaInstance`). Bei einem Listener zaehlen nur die Replikate seiner Gruppe, bei einem Knoten alle Gruppen dieser Instanz. Rolle, Login, Rechte, WMI/DCOM-Schritt und automatische Pruefung laufen je Replikat, das Ergebnis hat eine Zeile je Replikat. Ohne HADR, bei einer Abfrage, die scheitert, oder mit dem neuen Schalter `-SingleNode` bleibt es bei der angegebenen Instanz. Ein nicht erreichbares Replikat ist eine Fehlerzeile (mit `-ContinueOnError` laufen die anderen weiter).
+
+- `Install-sqmDiscoveryRole`, `Test-sqmDiscoveryAccess`: Erweiterung automatisch, `-SingleNode` schaltet sie ab. Die Pruefung innerhalb von Install laeuft je Replikat mit `-SingleNode`, damit nicht doppelt erweitert wird.
+- `Set-sqmDiscoveryWmiAccess`: neue Parameter `-SqlInstance` (Knoten oder Listener) und `-SqlCredential`; die Hosts aller Replikate werden behandelt. `-ComputerName` bleibt unveraendert (nur die genannten Hosts).
+
+Geprueft: 7 neue Unit-Tests (Listener, Knoten mit mehreren Gruppen, -SingleNode/kein HADR/Abfragefehler, Install ueber Listener mit WMI je Knoten, Set-Wmi, Test), alle 72 Tests der Datei gruen. Nicht live geprueft: eine echte AG (im Lab gibt es kein WSFC-Paar), ebenso eine AG auf Failover-Cluster-Instanzen (dort ist der Replikatname der FCI-Netzwerkname, die WMI-Rechte brauchen die physischen Knoten).
+
 ## [1.9.237.0] - 2026-11-23
 
 ### Erweitert: Get-sqmProviderInventory erkennt bei einem Host-Namen automatisch alle Instanzen

@@ -65,8 +65,12 @@
     in "Distributed COM Users", and the state of Remote Registry. This is the part of a discovery
     scan that goes through WMI and that no SQL role can cover. Needs local administrator rights on
     the host. A missing WMI right counts as a failed check, because the server data then stays
-    empty. The host name is taken from the instance name; for AG listeners or cluster network
-    names check the node names.
+    empty. The host name is taken from the instance name. On an availability group the check runs
+    on every replica host (see -SingleNode).
+
+.PARAMETER SingleNode
+    AlwaysOn: by default a node or listener is expanded to all replicas of its availability group
+    and every replica is checked (one result row each). -SingleNode checks only the instance given.
 
 .PARAMETER WmiCredential
     Credential for the WMI check on remote hosts (default: the current user).
@@ -147,6 +151,8 @@ function Test-sqmDiscoveryAccess
 		[string]$OutputPath = (Join-Path (Get-sqmDefaultOutputPath) 'DiscoveryAccess'),
 		[Parameter(Mandatory = $false)]
 		[switch]$NoOpen,
+		[Parameter(Mandatory = $false)]
+		[switch]$SingleNode,
 		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
@@ -271,7 +277,9 @@ SELECT
 
 	process
 	{
-		foreach ($instance in $SqlInstance)
+		# AlwaysOn: Knoten oder Listener werden auf alle Replikate der Gruppe erweitert (-SingleNode schaltet das ab).
+		$targetInstances = @(Resolve-sqmDiscoveryReplicaInstance -SqlInstance $SqlInstance -SqlCredential $SqlCredential -SingleNode:$SingleNode)
+		foreach ($instance in $targetInstances)
 		{
 			if ([string]::IsNullOrWhiteSpace($instance)) { continue }
 			$instance = $instance.Trim()

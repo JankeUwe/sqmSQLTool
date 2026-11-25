@@ -30,7 +30,15 @@
 
 .PARAMETER ComputerName
     One or more hosts. Pipeline-capable. Default: current computer. For a cluster instance or an
-    AG, give the node names, not the listener or the virtual network name.
+    AG, give the node names, not the listener or the virtual network name - or use -SqlInstance.
+
+.PARAMETER SqlInstance
+    AlwaysOn: a node or the listener of an availability group. The hosts of ALL replicas of the group
+    are resolved via sys.availability_replicas and handled. Without -ComputerName they replace the
+    default (current computer); with -ComputerName they are added to it.
+
+.PARAMETER SqlCredential
+    PSCredential for the SQL connection of -SqlInstance.
 
 .PARAMETER Mode
     Check (default), Apply or Remove.
@@ -86,6 +94,10 @@ function Set-sqmDiscoveryWmiAccess
 		[Parameter(Mandatory = $false)]
 		[System.Management.Automation.PSCredential]$Credential,
 		[Parameter(Mandatory = $false)]
+		[string[]]$SqlInstance,
+		[Parameter(Mandatory = $false)]
+		[System.Management.Automation.PSCredential]$SqlCredential,
+		[Parameter(Mandatory = $false)]
 		[switch]$ContinueOnError,
 		[Parameter(Mandatory = $false)]
 		[switch]$EnableException
@@ -105,7 +117,18 @@ function Set-sqmDiscoveryWmiAccess
 
 	process
 	{
-		foreach ($computer in $ComputerName)
+		# -SqlInstance: Knoten oder Listener einer AlwaysOn-Gruppe -> die Hosts ALLER Replikate kommen dazu.
+		# Ohne ausdrueckliches -ComputerName ersetzen sie den Standard (lokaler Rechner).
+		$targetComputers = @($ComputerName)
+		if ($SqlInstance)
+		{
+			$replicaHosts = @(Resolve-sqmDiscoveryReplicaInstance -SqlInstance $SqlInstance -SqlCredential $SqlCredential |
+					ForEach-Object { Get-sqmDiscoveryHostName -SqlInstance $_ })
+			$targetComputers = if ($PSBoundParameters.ContainsKey('ComputerName')) { @($ComputerName) + $replicaHosts } else { $replicaHosts }
+			$targetComputers = @($targetComputers | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+		}
+
+		foreach ($computer in $targetComputers)
 		{
 			if ([string]::IsNullOrWhiteSpace($computer)) { continue }
 			$computer = $computer.Trim()

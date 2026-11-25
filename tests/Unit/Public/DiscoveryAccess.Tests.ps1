@@ -757,3 +757,91 @@ Describe 'Test-sqmDiscoveryAccess - Abgleich mit der Standarddefinition' {
 		}
 	}
 }
+
+Describe 'AlwaysOn: Knoten und Listener werden auf alle Replikate erweitert' {
+	BeforeEach {
+		InModuleScope sqmSQLTool {
+			$script:dbatoolsAvailable = $true
+			$script:queries = [System.Collections.Generic.List[string]]::new()
+			$script:replicaRows = @(
+				[PSCustomObject]@{ AgName = 'AG1'; ReplicaServerName = 'NODE1'; ListenerName = 'LSN1' }
+				[PSCustomObject]@{ AgName = 'AG1'; ReplicaServerName = 'NODE2'; ListenerName = 'LSN1' }
+				[PSCustomObject]@{ AgName = 'AG2'; ReplicaServerName = 'NODE1'; ListenerName = 'LSN2' }
+				[PSCustomObject]@{ AgName = 'AG2'; ReplicaServerName = 'NODE3'; ListenerName = 'LSN2' }
+			)
+			Mock Invoke-sqmLogging { }
+			Mock Invoke-DbaQuery {
+				$script:queries.Add([string]$Query)
+				if ($Query -match 'availability_replicas') { return $script:replicaRows }
+				if ($Query -match 'ProductMajorVersion') { return [PSCustomObject]@{ MajorVersion = 16 } }
+				if ($Query -match 'RoleExists') { return [PSCustomObject]@{ RoleExists = 0; LoginExists = 0; IsMember = 0 } }
+			}
+		}
+	}
+
+	It 'Listener: nur die Replikate seiner Gruppe' {
+		InModuleScope sqmSQLTool {
+			@(Resolve-sqmDiscoveryReplicaInstance -SqlInstance 'LSN1') | Should -Be @('NODE1', 'NODE2')
+			@(Resolve-sqmDiscoveryReplicaInstance -SqlInstance 'lsn2.corp.local') | Should -Be @('NODE1', 'NODE3')
+		}
+	}
+
+	It 'Knoten: alle Gruppen der Instanz, der angegebene Name bleibt erhalten' {
+		InModuleScope sqmSQLTool {
+			@(Resolve-sqmDiscoveryReplicaInstance -SqlInstance 'NODE2.corp.local') | Should -Be @('NODE1', 'NODE2.corp.local', 'NODE3')
+		}
+	}
+
+	It '-SingleNode, kein HADR und Abfragefehler liefern die Instanz unveraendert' {
+		InModuleScope sqmSQLTool {
+			@(Resolve-sqmDiscoveryReplicaInstance -SqlInstance 'LSN1' -SingleNode) | Should -Be @('LSN1')
+			$script:replicaRows = @()
+			@(Resolve-sqmDiscoveryReplicaInstance -SqlInstance 'SQL01') | Should -Be @('SQL01')
+			Mock Invoke-DbaQuery { throw 'nicht erreichbar' }
+			@(Resolve-sqmDiscoveryReplicaInstance -SqlInstance 'SQL01') | Should -Be @('SQL01')
+		}
+	}
+
+	It 'Install ueber den Listener richtet beide Knoten ein, WMI je Knoten' {
+		InModuleScope sqmSQLTool {
+			Mock Get-sqmDiscoveryPolicyBlocker { $null }
+			Mock Set-sqmDiscoveryWmiAccess { [PSCustomObject]@{ Status = 'OK'; Message = 'ok' } }
+			Mock Test-sqmDiscoveryAccess { [PSCustomObject]@{ Status = 'OK'; DiscoveryLevel = 'Full'; MeetsRequirement = $true; Findings = @() } }
+			$r = @(Install-sqmDiscoveryRole -SqlInstance 'LSN1' -LoginName 'CORP\svc_snow')
+			$r.SqlInstance | Should -Be @('NODE1', 'NODE2')
+			Should -Invoke Set-sqmDiscoveryWmiAccess -Times 1 -Exactly -ParameterFilter { $ComputerName -eq 'NODE1' }
+			Should -Invoke Set-sqmDiscoveryWmiAccess -Times 1 -Exactly -ParameterFilter { $ComputerName -eq 'NODE2' }
+			Should -Invoke Test-sqmDiscoveryAccess -Times 2 -Exactly -ParameterFilter { $SingleNode }
+		}
+	}
+
+	It 'Install -SingleNode bleibt bei der angegebenen Instanz' {
+		InModuleScope sqmSQLTool {
+			Mock Get-sqmDiscoveryPolicyBlocker { $null }
+			Mock Set-sqmDiscoveryWmiAccess { [PSCustomObject]@{ Status = 'OK'; Message = 'ok' } }
+			Mock Test-sqmDiscoveryAccess { [PSCustomObject]@{ Status = 'OK'; DiscoveryLevel = 'Full'; MeetsRequirement = $true; Findings = @() } }
+			$r = @(Install-sqmDiscoveryRole -SqlInstance 'NODE1' -LoginName 'CORP\svc_snow' -SingleNode)
+			$r.Count | Should -Be 1
+			$r[0].SqlInstance | Should -Be 'NODE1'
+		}
+	}
+
+	It 'Set-sqmDiscoveryWmiAccess -SqlInstance behandelt die Hosts aller Replikate' {
+		InModuleScope sqmSQLTool {
+			Mock Get-sqmDiscoveryAccountSid { [PSCustomObject]@{ Sid = [System.Security.Principal.SecurityIdentifier]'S-1-5-21-1-2-3-1001'; Binary = [byte[]](1, 2, 3) } }
+			Mock Open-sqmDiscoveryCimSession { $null }
+			Mock Get-sqmDiscoveryWmiState {
+				[PSCustomObject]@{ ComputerName = 'x'; DcomMember = $true; RemoteRegistryState = 'Stopped'; RemoteRegistryStart = 'Disabled'; Namespaces = @(); Ok = $true }
+			}
+			$r = @(Set-sqmDiscoveryWmiAccess -Account 'CORP\svc_snow' -SqlInstance 'LSN1')
+			$r.ComputerName | Should -Be @('NODE1', 'NODE2')
+		}
+	}
+
+	It 'Test-sqmDiscoveryAccess ueber den Listener prueft beide Knoten' {
+		InModuleScope sqmSQLTool -Parameters @{ Out = $script:TestDir } {
+			$r = @(Test-sqmDiscoveryAccess -SqlInstance 'LSN1' -LoginName 'CORP\svc_snow' -OutputPath $Out -NoOpen -ContinueOnError)
+			$r.SqlInstance | Should -Be @('NODE1', 'NODE2')
+		}
+	}
+}
