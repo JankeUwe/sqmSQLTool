@@ -8,7 +8,7 @@
     Get-sqmDiscoveryDefinition, which is also what Test-sqmDiscoveryAccess verifies, so setup and
     check cannot drift apart.
 
-    ServiceNow (role SnowDisco)
+    ServiceNow (role SNOWDISCO)
         Server role with VIEW ANY DEFINITION, VIEW ANY DATABASE and VIEW SERVER [PERFORMANCE] STATE
         (the queries of the "MSSql DB On Windows" pattern; without VIEW ANY DEFINITION sys.master_files
         and the AG catalog views return ZERO rows instead of an error).
@@ -20,7 +20,7 @@
         sys.xp_loginconfig; in msdb EXECUTE on sp_enum_login_for_proxy and sp_enum_proxy_for_subsystem
         and SELECT on sysproxies and sysproxylogin.
 
-    SCOM (role SCOM_Scan)
+    SCOM (role SCOM_HealthService)
         Low-privilege monitoring of the SQL Server management pack (Microsoft Learn, agent script):
         server role with VIEW ANY DATABASE, VIEW ANY DEFINITION, VIEW SERVER STATE; in master EXECUTE on
         xp_readerrorlog and xp_instance_regread and SELECT on sys.indexes, sys.tables and
@@ -28,7 +28,7 @@
         procedures and membership of SQLAgentReaderRole; a user and a database role in every online,
         writable database (on an availability group only where the replica is primary).
 
-    The role name is offered per product (SnowDisco, Qualis_Scan, SCOM_Scan) and can be replaced by any
+    The role name is offered per product (SNOWDISCO, Qualis_Scan, SCOM_HealthService) and can be replaced by any
     name with -RoleName. The same name is used for the server role and for the database roles. If
     -RoleName is one of the three offered names and -Product is not given, the product follows from the
     name; for a free name without -Product the ServiceNow rights apply.
@@ -60,7 +60,10 @@
     ServiceNow, Qualys or SCOM. Default: derived from -RoleName, else ServiceNow.
 
 .PARAMETER RoleName
-    Name of the role. Offered: SnowDisco, Qualis_Scan, SCOM_Scan; any other name is accepted.
+    Name of the role. Offered: SNOWDISCO, Qualis_Scan, SCOM_HealthService; any other name is accepted.
+    The offered names are configurable (Set-sqmConfig -DiscoveryRoleNameServiceNow / -DiscoveryRoleNameQualys /
+    -DiscoveryRoleNameSCOM, stored in config.json). In the GUI the field is pre-filled with the name of the
+    selected product and can be changed.
     Default: the name of the product. One role per service account is recommended.
 
 .PARAMETER SqlCredential
@@ -105,7 +108,7 @@
     Shows what would be created and granted for the Qualys scan account.
 
 .EXAMPLE
-    Install-sqmDiscoveryRole -SqlInstance SQL01 -RoleName SCOM_Scan -LoginName "CORP\svc_scom_sql"
+    Install-sqmDiscoveryRole -SqlInstance SQL01 -RoleName SCOM_HealthService -LoginName "CORP\svc_scom_sql"
 
     The role name selects the SCOM rights.
 
@@ -132,7 +135,7 @@ function Install-sqmDiscoveryRole
 		[ValidateSet('ServiceNow', 'Qualys', 'SCOM')]
 		[string]$Product,
 		[Parameter(Mandatory = $false)]
-		[ArgumentCompleter({ param ($cmd, $param, $word) $null = $cmd, $param; 'SnowDisco', 'Qualis_Scan', 'SCOM_Scan' | Where-Object { $_ -like "$word*" } })]
+		[ArgumentCompleter({ param ($cmd, $param, $word) $null = $cmd, $param; $c = Get-sqmConfig; 'ServiceNow', 'Qualys', 'SCOM' | ForEach-Object { $c["DiscoveryRoleName$_"] } | Where-Object { $_ -and $_ -like "$word*" } })]
 		[ValidatePattern('^[^\[\]\x00-\x1f]+$')]
 		[string]$RoleName,
 		[Parameter(Mandatory = $false)]

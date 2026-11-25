@@ -7,16 +7,21 @@
 
 function Get-sqmDiscoveryProductList
 {
-	<# Die angebotenen Produkte mit ihrem festen Standard-Rollennamen. Eine freie Eingabe von -RoleName
-	   bleibt moeglich, die Namen hier sind nur das Angebot. #>
+	<# Die angebotenen Produkte mit ihrem Standard-Rollennamen. Eine freie Eingabe von -RoleName
+	   bleibt moeglich, die Namen hier sind nur das Angebot. Die Namen sind konfigurierbar
+	   (Set-sqmConfig -DiscoveryRoleNameServiceNow / -Qualys / -SCOM, config.json), Standard:
+	   SNOWDISCO, Qualis_Scan, SCOM_HealthService. #>
 	[CmdletBinding()]
 	param ()
 
-	@(
-		[PSCustomObject]@{ Product = 'ServiceNow'; RoleName = 'SnowDisco' }
-		[PSCustomObject]@{ Product = 'Qualys'; RoleName = 'Qualis_Scan' }
-		[PSCustomObject]@{ Product = 'SCOM'; RoleName = 'SCOM_Scan' }
-	)
+	$defaults = [ordered]@{ ServiceNow = 'SNOWDISCO'; Qualys = 'Qualis_Scan'; SCOM = 'SCOM_HealthService' }
+	foreach ($product in $defaults.Keys)
+	{
+		$name = $null
+		if ($script:sqmModuleConfig) { $name = [string]$script:sqmModuleConfig["DiscoveryRoleName$product"] }
+		if ([string]::IsNullOrWhiteSpace($name)) { $name = $defaults[$product] }
+		[PSCustomObject]@{ Product = $product; RoleName = $name.Trim() }
+	}
 }
 
 function Get-sqmDiscoveryDefinition

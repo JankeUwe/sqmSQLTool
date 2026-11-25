@@ -36,6 +36,16 @@
 .PARAMETER OlaJobNameIntSysDb
     Name of the IntegrityCheck job for system databases.
 
+.PARAMETER DiscoveryRoleNameServiceNow
+    Standard-Rollenname fuer das ServiceNow-Discovery-Konto (Install-sqmDiscoveryRole, GUI-Feld RoleName).
+    Standard: SNOWDISCO.
+
+.PARAMETER DiscoveryRoleNameQualys
+    Standard-Rollenname fuer das Qualys-Scan-Konto. Standard: Qualis_Scan.
+
+.PARAMETER DiscoveryRoleNameSCOM
+    Standard-Rollenname fuer das SCOM-Monitoring-Konto. Standard: SCOM_HealthService.
+
 .PARAMETER OlaJobNameSysDbBackup
     Name of the full backup job for system databases.
 
@@ -195,6 +205,15 @@ function Set-sqmConfig
 		[string]$OlaJobNameIntSysDb,
 		[Parameter(Mandatory = $false)]
 		[string]$OlaJobNameSysDbBackup,
+		[Parameter(Mandatory = $false)]
+		[ValidatePattern('^[^\[\]\x00-\x1f]+$')]
+		[string]$DiscoveryRoleNameServiceNow,
+		[Parameter(Mandatory = $false)]
+		[ValidatePattern('^[^\[\]\x00-\x1f]+$')]
+		[string]$DiscoveryRoleNameQualys,
+		[Parameter(Mandatory = $false)]
+		[ValidatePattern('^[^\[\]\x00-\x1f]+$')]
+		[string]$DiscoveryRoleNameSCOM,
 		[Parameter(Mandatory = $false)]
 		[string]$BackupMaintenanceJobNameFull,
 		[Parameter(Mandatory = $false)]
@@ -392,6 +411,18 @@ function Set-sqmConfig
 			$updated = $true
 		}
 		else { Write-Error "OlaJobNameSysDbBackup darf nicht leer sein."; return }
+	}
+
+	# Standard-Rollennamen der Discovery-Konten (Install-sqmDiscoveryRole, GUI-Feld RoleName)
+	foreach ($discoveryKey in 'DiscoveryRoleNameServiceNow', 'DiscoveryRoleNameQualys', 'DiscoveryRoleNameSCOM')
+	{
+		if ($PSBoundParameters.ContainsKey($discoveryKey))
+		{
+			$discoveryValue = [string](Get-Variable -Name $discoveryKey -ValueOnly)
+			if ([string]::IsNullOrWhiteSpace($discoveryValue)) { Write-Error "$discoveryKey darf nicht leer sein."; return }
+			$globalConfig[$discoveryKey] = $discoveryValue.Trim()
+			$updated = $true
+		}
 	}
 
 	# Backup-Maintenance-Job-Namen (New-sqmBackupMaintenanceJob, je nach -BackupType)

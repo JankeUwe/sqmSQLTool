@@ -56,6 +56,11 @@ $script:sqmModuleConfig = @{
 	OlaJobNameDeleteBackupHistory = "DatabaseMaintenance-sp_delete_backuphistory"
 	# Sync-Job der Backup-Ausschlusstabelle (New-sqmOlaUsrDbBackupJob -UseExcludeTable)
 	OlaJobNameBackupExcludeSync   = "sqm BackupExclude - SYNC"
+	# Standard-Rollennamen der Discovery-Konten (Install-sqmDiscoveryRole / GUI-Feld RoleName),
+	# je Produkt vorbelegt und im Feld aenderbar. Aenderung per Set-sqmConfig -DiscoveryRoleName<Produkt>.
+	DiscoveryRoleNameServiceNow   = "SNOWDISCO"
+	DiscoveryRoleNameQualys       = "Qualis_Scan"
+	DiscoveryRoleNameSCOM         = "SCOM_HealthService"
 	# Registry-Unterschluessel unter HKLM:\<RegistryBase>\ fuer Invoke-sqmMonitoringKey
 	MonitoringRegistrySubKey      = "sqmSQLTool\SystemCenter"
 	BackupDirectory       = $null
@@ -648,7 +653,7 @@ function Test-sqmModuleUpdate
 
 <#
 .SYNOPSIS
-    Kopiert die Moduldateien aus einem Quellordner in den Modulordner (mit optionalem Backup).
+    Kopiert die Moduldateien aus einem Quellordner in den Modulordner (ohne Sicherung).
     Gemeinsame Hilfe fuer UNC-, LocalDir- und GitHub-Updates.
 #>
 function Copy-sqmModuleFiles
@@ -656,15 +661,8 @@ function Copy-sqmModuleFiles
 	[CmdletBinding()]
 	param (
 		[Parameter(Mandatory)][string]$SourcePath,
-		[Parameter(Mandatory)][string]$ModulePath,
-		[switch]$Backup = $true
+		[Parameter(Mandatory)][string]$ModulePath
 	)
-	if ($Backup)
-	{
-		$backupDir = Join-Path $env:TEMP "sqmSQLTool_Backup_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
-		Copy-Item -Path $ModulePath -Destination $backupDir -Recurse -Force -ErrorAction Stop
-		Write-Host "Backup erstellt: $backupDir" -ForegroundColor Gray
-	}
 	Get-ChildItem -Path $SourcePath -Recurse -File | ForEach-Object {
 		$relativePath = $_.FullName.Substring($SourcePath.Length).TrimStart('\')
 		$targetFile   = Join-Path $ModulePath $relativePath
@@ -737,7 +735,6 @@ function Update-sqmFromGitHub
 	[CmdletBinding()]
 	param (
 		[string]$Version,
-		[switch]$Backup = $true,
 		[string]$GitHubRepo = 'JankeUwe/sqmSQLTool'
 	)
 	$tmp = Join-Path $env:TEMP "sqmSQLTool_gh_$(Get-Date -Format 'yyyyMMddHHmmss')"
@@ -760,7 +757,7 @@ function Update-sqmFromGitHub
 		$psd1 = Get-ChildItem -Path $tmp -Recurse -Filter 'sqmSQLTool.psd1' -ErrorAction Stop | Select-Object -First 1
 		if (-not $psd1) { throw "sqmSQLTool.psd1 im heruntergeladenen ZIP nicht gefunden." }
 		$target = Get-sqmModuleUpdateTarget -NewVersion $Version
-		Copy-sqmModuleFiles -SourcePath $psd1.Directory.FullName -ModulePath $target.Path -Backup:($Backup -and -not $target.Versioned)
+		Copy-sqmModuleFiles -SourcePath $psd1.Directory.FullName -ModulePath $target.Path
 		Write-Host "Modul aus GitHub-Release v$Version aktualisiert." -ForegroundColor Green
 		return $true
 	}
@@ -780,9 +777,6 @@ function Update-sqmFromGitHub
     Die neue Version gilt ab dem naechsten Import (neue Sitzung oder Import-Module sqmSQLTool -Force).
 .PARAMETER UpdateInfo
     Optionales Ergebnis von Test-sqmModuleUpdate (Source/Version/Path).
-.PARAMETER Backup
-    Sicherung vor Datei-Update (Standard: $true). Entfaellt bei Versionsordnern, dort bleibt
-    die alte Version ohnehin erhalten.
 .PARAMETER Force
     Update auch ohne erkannte neuere Version erzwingen.
 .EXAMPLE
@@ -795,7 +789,6 @@ function Update-sqmModule
 	param (
 		[hashtable]$UpdateInfo,
 		[System.Management.Automation.PSCredential]$Credential,
-		[switch]$Backup = $true,
 		[switch]$Force
 	)
 	$currentModulePath = $PSScriptRoot
@@ -837,7 +830,7 @@ function Update-sqmModule
 				if ($PSCmdlet.ShouldProcess("sqmSQLTool$verTxt via GitHub-Release", "Download & Update"))
 				{
 					$v = if ($UpdateInfo) { "$($UpdateInfo.Version)" } else { $null }
-					$done = [bool](Update-sqmFromGitHub -Version $v -Backup:$Backup)
+					$done = [bool](Update-sqmFromGitHub -Version $v)
 				}
 			}
 			default {
@@ -861,7 +854,7 @@ function Update-sqmModule
 				$target = Get-sqmModuleUpdateTarget -NewVersion $newVersion
 				if ($PSCmdlet.ShouldProcess("sqmSQLTool$verTxt aus '$repo' nach '$($target.Path)'", "Datei-Update"))
 				{
-					Copy-sqmModuleFiles -SourcePath $repo -ModulePath $target.Path -Backup:($Backup -and -not $target.Versioned)
+					Copy-sqmModuleFiles -SourcePath $repo -ModulePath $target.Path
 					# Standort-Profil, das auf der Freigabe neben/ueber dem Modulordner liegt (nicht
 					# im Ordner selbst), in den neuen Modulordner mitnehmen - sonst verliert ein Update
 					# die Standorterkennung, wenn %ProgramData% kein Profil hat.
@@ -949,7 +942,7 @@ function Invoke-sqmUpdateOffer
 
 	switch ($answer)
 	{
-		0 { Update-sqmModule -UpdateInfo $UpdateInfo -Force -Backup -Confirm:$false }
+		0 { Update-sqmModule -UpdateInfo $UpdateInfo -Force -Confirm:$false }
 		1 { Write-Host "[sqmSQLTool] Spaeter manuell moeglich mit: Update-sqmModule" -ForegroundColor Gray }
 		2 {
 			"$($UpdateInfo.Version)" | Set-Content -Path $SkipFile -Force -ErrorAction SilentlyContinue
@@ -1015,7 +1008,7 @@ if (-not $skipUpdateCheck)
 			{
 				Write-Host "`n[sqmSQLTool] Neuere Version verfuegbar: $($updateInfo.Version) (Quelle: $($updateInfo.Source))" -ForegroundColor Cyan
 				Write-Host "[sqmSQLTool] Fuehre automatisches Update durch..." -ForegroundColor Cyan
-				Update-sqmModule -UpdateInfo $updateInfo -Force -Backup -Confirm:$false
+				Update-sqmModule -UpdateInfo $updateInfo -Force -Confirm:$false
 			}
 			elseif ($updateInfo)
 			{

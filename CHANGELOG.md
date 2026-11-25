@@ -1,5 +1,21 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.239.0] - 2026-11-25
+
+### Erweitert: Rollenname der Discovery-Konten je Produkt vorbelegt und konfigurierbar
+
+Im Feld `RoleName` (GUI, `Install-sqmDiscoveryRole`) steht jetzt je nach gewaehltem Produkt der Standardname: `SNOWDISCO` bei ServiceNow, `Qualis_Scan` bei Qualys, `SCOM_HealthService` bei SCOM (vorher `SnowDisco` und `SCOM_Scan`). Das Feld bleibt aenderbar: ein von Hand geaenderter Name bleibt beim Produktwechsel stehen, nur ein leeres Feld oder der zuletzt vorbelegte Name wird ersetzt. Ohne Produktauswahl gilt wie in der Funktion ServiceNow.
+
+Die drei Namen sind konfigurierbar, in der `config.json` des Moduls: `Set-sqmConfig -DiscoveryRoleNameServiceNow`, `-DiscoveryRoleNameQualys`, `-DiscoveryRoleNameSCOM` (leer ist nicht erlaubt, `[` und `]` auch nicht). Die Namen kommen an einer Stelle (`Get-sqmDiscoveryProductList`) und gelten damit auch fuer die Namenserkennung des Produkts, die Rechtepruefung in `Test-sqmDiscoveryAccess` und die Tab-Vervollstaendigung von `-RoleName`.
+
+Achtung bei bestehenden Einrichtungen: Wer ein SCOM-Konto mit der Rolle `SCOM_Scan` eingerichtet hat, bekommt von `Test-sqmDiscoveryAccess` ohne `-ServerRole 'SCOM_Scan'` einen Befund (Standardrolle nicht gefunden), und `Install-sqmDiscoveryRole` legt `SCOM_HealthService` zusaetzlich an. Die alte Rolle bleibt bestehen. Den alten Namen kann man mit `Set-sqmConfig -DiscoveryRoleNameSCOM SCOM_Scan` beibehalten. Bei `SnowDisco` zu `SNOWDISCO` ist nichts zu tun, solange die Instanz eine case-insensitive Collation hat.
+
+### Geaendert: Modul-Update erstellt kein Backup mehr
+
+Bei einem Update auf eine neue Version (`Update-sqmModule`, GitHub-Release, UNC, LocalDir) wurde bisher eine Kopie des Modulordners nach `%TEMP%\sqmSQLTool_Backup_<Zeitstempel>` angelegt. Das entfaellt. Der Parameter `-Backup` ist aus `Update-sqmModule`, `Update-sqmFromGitHub` und `Copy-sqmModuleFiles` entfernt. Bei Versionsordnern (Install-Module) bleibt die alte Version wie bisher neben der neuen liegen.
+
+Geprueft: 5 neue Unit-Tests (Standardnamen, Konfigurationswert und leerer Wert, Set-sqmConfig-Parameter, kein -Backup-Parameter, Copy ohne Sicherungsordner), alle 77 Tests der Datei gruen, Parser unter Windows PowerShell 5.1 ohne Fehler. Die GUI-Vorbelegung ist nicht im geoeffneten Fenster geprueft.
+
 ## [1.9.238.0] - 2026-11-25
 
 ### Erweitert: Discovery-Konto wird auf einer AlwaysOn-Gruppe automatisch auf allen Replikaten eingerichtet

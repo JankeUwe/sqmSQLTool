@@ -46,12 +46,12 @@
 
 .PARAMETER Product
     ServiceNow, Qualys or SCOM. The role is compared against the rights of this product even if -ServerRole is a free
-    name. Without it the product follows from the standard role names (SnowDisco, Qualis_Scan, SCOM_Scan).
+    name. Without it the product follows from the standard role names (SNOWDISCO, Qualis_Scan, SCOM_HealthService).
 
 .PARAMETER ServerRole
     Expected server role membership, e.g. "SQL_Inventory_RO_Basic". Without this parameter
     the role check is skipped and only permissions are evaluated. If the role is the standard
-    role of Install-sqmDiscoveryRole (SnowDisco, Qualis_Scan or SCOM_Scan), its own permissions are also
+    role of Install-sqmDiscoveryRole (SNOWDISCO, Qualis_Scan or SCOM_HealthService), its own permissions are also
     compared against the standard definition, so a role that someone trimmed afterwards shows up.
 
 .PARAMETER RequiredLevel
@@ -112,7 +112,7 @@
 
 .EXAMPLE
     Test-sqmDiscoveryAccess -SqlInstance SQL01, SQL02 -LoginName "CORP\svc_servicenow" `
-        -ServerRole SnowDisco -RequiredLevel Full -CheckWmi
+        -ServerRole SNOWDISCO -RequiredLevel Full -CheckWmi
 
     Verifies the setup done by Install-sqmDiscoveryRole and Set-sqmDiscoveryWmiAccess:
     login, role membership, the role's own permissions (drift against the standard definition)

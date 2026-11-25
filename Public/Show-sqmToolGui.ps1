@@ -1001,6 +1001,30 @@
 				}.GetNewClosure())
 		}
 
+		# Spezialfall Product/RoleName (Install-sqmDiscoveryRole): das Feld RoleName wird je nach Produkt mit
+		# dem konfigurierten Standardnamen vorbelegt (Set-sqmConfig -DiscoveryRoleName<Produkt>; Standard
+		# SNOWDISCO / Qualis_Scan / SCOM_HealthService). Ein vom Anwender geaenderter Name bleibt stehen:
+		# nur ein leeres Feld oder der zuletzt vorbelegte Name wird beim Produktwechsel ersetzt.
+		if ($script:guiState.Controls.ContainsKey('RoleName') -and $script:guiState.Controls.ContainsKey('Product') -and $cmd.Name -eq 'Install-sqmDiscoveryRole')
+		{
+			$roleCtrl = $script:guiState.Controls['RoleName']
+			$productCtrl = $script:guiState.Controls['Product']
+			$roleByProduct = @{ }
+			foreach ($offer in @(Get-sqmDiscoveryProductList)) { $roleByProduct[[string]$offer.Product] = [string]$offer.RoleName }
+			# Ohne Auswahl gilt wie in der Funktion ServiceNow
+			$roleState = @{ Last = $roleByProduct['ServiceNow'] }
+			$roleCtrl.Text = $roleState.Last
+			$productCtrl.Add_SelectedIndexChanged({
+					$sel = [string]$productCtrl.SelectedItem
+					$new = if ($sel -and $roleByProduct.ContainsKey($sel)) { $roleByProduct[$sel] } else { $roleByProduct['ServiceNow'] }
+					if ([string]::IsNullOrWhiteSpace($roleCtrl.Text) -or $roleCtrl.Text -eq $roleState.Last)
+					{
+						$roleCtrl.Text = $new
+					}
+					$roleState.Last = $new
+				}.GetNewClosure())
+		}
+
 		# Spezialfall Mode/KeepService: Invoke-sqmSplunkConfiguration's -KeepService only has any
 		# effect in -Mode Remove (see the function's own Remove branch) - greyed out otherwise so the
 		# GUI doesn't suggest it does something in Set/Test mode.

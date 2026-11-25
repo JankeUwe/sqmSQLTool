@@ -43,7 +43,7 @@ Describe 'Get-sqmDiscoveryDefinition' {
 			$d.ServerPermissions | Should -Contain 'VIEW ANY DEFINITION'
 			$d.ServerPermissions | Should -Contain 'VIEW ANY DATABASE'
 			($d.ServerPermissions -join ' ') | Should -Not -Match 'CONTROL|ALTER|IMPERSONATE'
-			$d.RoleName | Should -Be 'SnowDisco'
+			$d.RoleName | Should -Be 'SNOWDISCO'
 		}
 	}
 
@@ -77,7 +77,7 @@ Describe 'Get-sqmDiscoveryDefinition - Produkte' {
 	It 'SCOM fordert die drei Serverrechte, die Agent-Rechte in master und msdb und SQLAgentReaderRole' {
 		InModuleScope sqmSQLTool {
 			$d = Get-sqmDiscoveryDefinition -Product SCOM
-			$d.RoleName | Should -Be 'SCOM_Scan'
+			$d.RoleName | Should -Be 'SCOM_HealthService'
 			$d.ServerPermissions | Should -Be @('VIEW ANY DATABASE', 'VIEW ANY DEFINITION', 'VIEW SERVER STATE')
 			$d.DatabaseScope | Should -Be 'Eligible'
 			$d.MsdbRoleMembership | Should -Be @('SQLAgentReaderRole')
@@ -88,7 +88,7 @@ Describe 'Get-sqmDiscoveryDefinition - Produkte' {
 	It 'ServiceNow hat keine Datenbankrechte und bleibt bei den drei Serverrechten' {
 		InModuleScope sqmSQLTool {
 			$d = Get-sqmDiscoveryDefinition -Product ServiceNow -MajorVersion 15
-			$d.RoleName | Should -Be 'SnowDisco'
+			$d.RoleName | Should -Be 'SNOWDISCO'
 			$d.DatabaseGrants.Count | Should -Be 0
 			$d.DatabaseScope | Should -Be 'None'
 		}
@@ -148,10 +148,10 @@ Describe 'Install-sqmDiscoveryRole' {
 			$r.LoginCreated | Should -BeTrue
 			$r.MemberAdded | Should -BeTrue
 			$sql = $script:queries -join "`n"
-			$sql | Should -Match 'CREATE SERVER ROLE \[SnowDisco\]'
-			$sql | Should -Match 'GRANT VIEW ANY DEFINITION TO \[SnowDisco\]'
-			$sql | Should -Match 'GRANT VIEW ANY DATABASE TO \[SnowDisco\]'
-			$sql | Should -Match 'GRANT VIEW SERVER PERFORMANCE STATE TO \[SnowDisco\]'
+			$sql | Should -Match 'CREATE SERVER ROLE \[SNOWDISCO\]'
+			$sql | Should -Match 'GRANT VIEW ANY DEFINITION TO \[SNOWDISCO\]'
+			$sql | Should -Match 'GRANT VIEW ANY DATABASE TO \[SNOWDISCO\]'
+			$sql | Should -Match 'GRANT VIEW SERVER PERFORMANCE STATE TO \[SNOWDISCO\]'
 			$sql | Should -Match 'CREATE LOGIN \[CORP\\svc_snow\] FROM WINDOWS'
 			$sql | Should -Match 'ADD MEMBER \[CORP\\svc_snow\]'
 		}
@@ -212,25 +212,25 @@ Describe 'Install-sqmDiscoveryRole' {
 	It 'bietet die drei Produkte mit festen Rollennamen an' {
 		InModuleScope sqmSQLTool {
 			$p = Get-sqmDiscoveryProductList
-			($p | Where-Object Product -eq 'ServiceNow').RoleName | Should -Be 'SnowDisco'
+			($p | Where-Object Product -eq 'ServiceNow').RoleName | Should -Be 'SNOWDISCO'
 			($p | Where-Object Product -eq 'Qualys').RoleName | Should -Be 'Qualis_Scan'
-			($p | Where-Object Product -eq 'SCOM').RoleName | Should -Be 'SCOM_Scan'
+			($p | Where-Object Product -eq 'SCOM').RoleName | Should -Be 'SCOM_HealthService'
 		}
 	}
 
 	It 'leitet das Produkt aus einem angebotenen Rollennamen ab' {
 		InModuleScope sqmSQLTool {
 			(Install-sqmDiscoveryRole -SqlInstance 'SQL01' -RoleName 'Qualis_Scan' -Confirm:$false).Product | Should -Be 'Qualys'
-			(Install-sqmDiscoveryRole -SqlInstance 'SQL01' -RoleName 'SCOM_Scan' -Confirm:$false).Product | Should -Be 'SCOM'
-			(Install-sqmDiscoveryRole -SqlInstance 'SQL01' -RoleName 'SnowDisco' -Confirm:$false).Product | Should -Be 'ServiceNow'
+			(Install-sqmDiscoveryRole -SqlInstance 'SQL01' -RoleName 'SCOM_HealthService' -Confirm:$false).Product | Should -Be 'SCOM'
+			(Install-sqmDiscoveryRole -SqlInstance 'SQL01' -RoleName 'SNOWDISCO' -Confirm:$false).Product | Should -Be 'ServiceNow'
 		}
 	}
 
-	It 'nimmt ohne Produkt und ohne Rollennamen ServiceNow mit SnowDisco' {
+	It 'nimmt ohne Produkt und ohne Rollennamen ServiceNow mit SNOWDISCO' {
 		InModuleScope sqmSQLTool {
 			$r = Install-sqmDiscoveryRole -SqlInstance 'SQL01' -Confirm:$false
 			$r.Product | Should -Be 'ServiceNow'
-			$r.RoleName | Should -Be 'SnowDisco'
+			$r.RoleName | Should -Be 'SNOWDISCO'
 		}
 	}
 
@@ -277,12 +277,12 @@ Describe 'Install-sqmDiscoveryRole' {
 			$r.Status | Should -Be 'OK'
 			$r.DatabasesConfigured | Should -Be @('master', 'msdb', 'Shop')
 			$sql = $script:queries -join "`n"
-			$sql | Should -Match 'GRANT EXECUTE ON sys.xp_readerrorlog TO \[SCOM_Scan\]'
-			$sql | Should -Match 'GRANT SELECT ON dbo.sysjobhistory TO \[SCOM_Scan\]'
-			$sql | Should -Match 'GRANT EXECUTE ON dbo.sp_help_job TO \[SCOM_Scan\]'
-			$sql | Should -Match 'ALTER ROLE \[SQLAgentReaderRole\] ADD MEMBER \[SCOM_Scan\]'
+			$sql | Should -Match 'GRANT EXECUTE ON sys.xp_readerrorlog TO \[SCOM_HealthService\]'
+			$sql | Should -Match 'GRANT SELECT ON dbo.sysjobhistory TO \[SCOM_HealthService\]'
+			$sql | Should -Match 'GRANT EXECUTE ON dbo.sp_help_job TO \[SCOM_HealthService\]'
+			$sql | Should -Match 'ALTER ROLE \[SQLAgentReaderRole\] ADD MEMBER \[SCOM_HealthService\]'
 			# Shop bekommt Benutzer und Rolle, aber keine der master-/msdb-GRANTs
-			@($script:queries | Where-Object { $_ -match 'CREATE ROLE \[SCOM_Scan\]' }).Count | Should -Be 3
+			@($script:queries | Where-Object { $_ -match 'CREATE ROLE \[SCOM_HealthService\]' }).Count | Should -Be 3
 		}
 	}
 
@@ -436,7 +436,7 @@ Describe 'Install-sqmDiscoveryRole' {
 			$r.VerifyLevel | Should -Be 'Full'
 			$r.Status | Should -Be 'OK'
 			Should -Invoke Test-sqmDiscoveryAccess -Times 1 -Exactly -ParameterFilter {
-				$LoginName -eq 'CORP\svc_snow' -and $ServerRole -eq 'SnowDisco' -and $Product -eq 'ServiceNow' -and $RequiredLevel -eq 'Full' -and $CheckWmi
+				$LoginName -eq 'CORP\svc_snow' -and $ServerRole -eq 'SNOWDISCO' -and $Product -eq 'ServiceNow' -and $RequiredLevel -eq 'Full' -and $CheckWmi
 			}
 		}
 	}
@@ -613,7 +613,7 @@ Describe 'Test-sqmDiscoveryAccess - Abgleich mit der Standarddefinition' {
 				RoleExists = 1; InServerRole = 1; PublicViewAnyDb = 1
 				ViewAnyDatabase = 1; ViewAnyDefinition = 1; ViewServerState = 1
 				RoleGrants = 'VIEW ANY DATABASE, VIEW ANY DEFINITION, VIEW SERVER PERFORMANCE STATE'
-				GrantedPermissions = 'VIEW ANY DATABASE, VIEW ANY DEFINITION, VIEW SERVER PERFORMANCE STATE'; ServerRoles = 'SnowDisco'
+				GrantedPermissions = 'VIEW ANY DATABASE, VIEW ANY DEFINITION, VIEW SERVER PERFORMANCE STATE'; ServerRoles = 'SNOWDISCO'
 			}
 			Mock Invoke-DbaQuery { $script:row }
 		}
@@ -621,7 +621,7 @@ Describe 'Test-sqmDiscoveryAccess - Abgleich mit der Standarddefinition' {
 
 	It 'meldet OK, wenn die Standardrolle vollstaendig ist' {
 		InModuleScope sqmSQLTool -Parameters @{ Out = $script:TestDir } {
-			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow' -ServerRole 'SnowDisco' `
+			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow' -ServerRole 'SNOWDISCO' `
 				-RequiredLevel Full -OutputPath $Out -NoOpen
 			$r.Status | Should -Be 'OK'
 			$r.RoleMissingPermissions.Count | Should -Be 0
@@ -636,7 +636,7 @@ Describe 'Test-sqmDiscoveryAccess - Abgleich mit der Standarddefinition' {
 				if ($Query -match 'RIGHT\(name') { return [PSCustomObject]@{ name = 'CORP\svc_snow' } }
 				$script:row
 			}
-			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'svc_snow ' -ServerRole 'SnowDisco' -OutputPath $Out -NoOpen
+			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'svc_snow ' -ServerRole 'SNOWDISCO' -OutputPath $Out -NoOpen
 			$r.LoginName | Should -Be 'CORP\svc_snow'
 			$r.LoginExists | Should -BeTrue
 			$r.Status | Should -Be 'OK'
@@ -651,7 +651,7 @@ Describe 'Test-sqmDiscoveryAccess - Abgleich mit der Standarddefinition' {
 				if ($Query -match 'RIGHT\(name') { return $null }
 				$script:row
 			}
-			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'svc_snow' -ServerRole 'SnowDisco' -OutputPath $Out -NoOpen
+			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'svc_snow' -ServerRole 'SNOWDISCO' -OutputPath $Out -NoOpen
 			$r.LoginName | Should -Be 'CORP\svc_snow'
 			Should -Invoke Resolve-sqmDiscoveryLoginName -Times 1
 		}
@@ -663,7 +663,7 @@ Describe 'Test-sqmDiscoveryAccess - Abgleich mit der Standarddefinition' {
 				if ($Query -match 'RIGHT\(name') { return @([PSCustomObject]@{ name = 'A\svc_snow' }, [PSCustomObject]@{ name = 'B\svc_snow' }) }
 				$script:row
 			}
-			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'svc_snow' -ServerRole 'SnowDisco' -OutputPath $Out -NoOpen
+			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'svc_snow' -ServerRole 'SNOWDISCO' -OutputPath $Out -NoOpen
 			$r.LoginName | Should -Be 'svc_snow'
 			($r.Findings -join ' ') | Should -Match 'nicht eindeutig'
 		}
@@ -681,7 +681,7 @@ Describe 'Test-sqmDiscoveryAccess - Abgleich mit der Standarddefinition' {
 	It 'findet ein nachtraeglich entzogenes Recht der Standardrolle' {
 		InModuleScope sqmSQLTool -Parameters @{ Out = $script:TestDir } {
 			$script:row.RoleGrants = 'VIEW ANY DATABASE, VIEW SERVER PERFORMANCE STATE'
-			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow' -ServerRole 'SnowDisco' -OutputPath $Out -NoOpen
+			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow' -ServerRole 'SNOWDISCO' -OutputPath $Out -NoOpen
 			$r.RoleMissingPermissions | Should -Contain 'VIEW ANY DEFINITION'
 			($r.Findings -join ' ') | Should -Match 'nicht mehr alle Standardrechte'
 			$r.Status | Should -Be 'Warnung'
@@ -691,7 +691,7 @@ Describe 'Test-sqmDiscoveryAccess - Abgleich mit der Standarddefinition' {
 	It 'akzeptiert VIEW SERVER STATE als Ersatz fuer VIEW SERVER PERFORMANCE STATE' {
 		InModuleScope sqmSQLTool -Parameters @{ Out = $script:TestDir } {
 			$script:row.RoleGrants = 'VIEW ANY DATABASE, VIEW ANY DEFINITION, VIEW SERVER STATE'
-			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow' -ServerRole 'SnowDisco' -OutputPath $Out -NoOpen
+			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow' -ServerRole 'SNOWDISCO' -OutputPath $Out -NoOpen
 			$r.RoleMissingPermissions.Count | Should -Be 0
 		}
 	}
@@ -741,7 +741,7 @@ Describe 'Test-sqmDiscoveryAccess - Abgleich mit der Standarddefinition' {
 					Ok = $true
 				}
 			}
-			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow' -ServerRole 'SnowDisco' -RequiredLevel Full -CheckWmi -OutputPath $Out -NoOpen
+			$r = Test-sqmDiscoveryAccess -SqlInstance 'SQL01' -LoginName 'CORP\svc_snow' -ServerRole 'SNOWDISCO' -RequiredLevel Full -CheckWmi -OutputPath $Out -NoOpen
 			$r.WmiOk | Should -BeTrue
 			$r.Status | Should -Be 'OK'
 		}
@@ -842,6 +842,69 @@ Describe 'AlwaysOn: Knoten und Listener werden auf alle Replikate erweitert' {
 		InModuleScope sqmSQLTool -Parameters @{ Out = $script:TestDir } {
 			$r = @(Test-sqmDiscoveryAccess -SqlInstance 'LSN1' -LoginName 'CORP\svc_snow' -OutputPath $Out -NoOpen -ContinueOnError)
 			$r.SqlInstance | Should -Be @('NODE1', 'NODE2')
+		}
+	}
+}
+
+Describe 'Rollennamen je Produkt aus der Konfiguration' {
+	It 'Standard: SNOWDISCO, Qualis_Scan, SCOM_HealthService' {
+		InModuleScope sqmSQLTool {
+			$p = @(Get-sqmDiscoveryProductList)
+			($p | Where-Object Product -eq 'ServiceNow').RoleName | Should -Be 'SNOWDISCO'
+			($p | Where-Object Product -eq 'Qualys').RoleName | Should -Be 'Qualis_Scan'
+			($p | Where-Object Product -eq 'SCOM').RoleName | Should -Be 'SCOM_HealthService'
+		}
+	}
+
+	It 'ein Wert aus der Konfiguration ersetzt den Standard, leer faellt auf den Standard zurueck' {
+		InModuleScope sqmSQLTool {
+			$old = $script:sqmModuleConfig['DiscoveryRoleNameSCOM']
+			try
+			{
+				$script:sqmModuleConfig['DiscoveryRoleNameSCOM'] = 'MeinScom'
+				(Get-sqmDiscoveryDefinition -Product SCOM).RoleName | Should -Be 'MeinScom'
+				$script:sqmModuleConfig['DiscoveryRoleNameSCOM'] = ' '
+				(Get-sqmDiscoveryDefinition -Product SCOM).RoleName | Should -Be 'SCOM_HealthService'
+			}
+			finally { $script:sqmModuleConfig['DiscoveryRoleNameSCOM'] = $old }
+		}
+	}
+
+	It 'Set-sqmConfig kennt die drei Parameter, die Konfiguration die drei Schluessel' {
+		InModuleScope sqmSQLTool {
+			$params = (Get-Command Set-sqmConfig).Parameters.Keys
+			$params | Should -Contain 'DiscoveryRoleNameServiceNow'
+			$params | Should -Contain 'DiscoveryRoleNameQualys'
+			$params | Should -Contain 'DiscoveryRoleNameSCOM'
+			$script:sqmModuleConfig.Keys | Should -Contain 'DiscoveryRoleNameServiceNow'
+		}
+	}
+}
+
+Describe 'Modul-Update erstellt kein Backup mehr' {
+	It 'Copy-sqmModuleFiles, Update-sqmFromGitHub und Update-sqmModule haben keinen -Backup-Parameter' {
+		InModuleScope sqmSQLTool {
+			foreach ($name in 'Copy-sqmModuleFiles', 'Update-sqmFromGitHub', 'Update-sqmModule')
+			{
+				(Get-Command $name).Parameters.Keys | Should -Not -Contain 'Backup'
+			}
+		}
+	}
+
+	It 'Copy-sqmModuleFiles legt keinen Sicherungsordner an' {
+		InModuleScope sqmSQLTool {
+			$src = Join-Path ([IO.Path]::GetTempPath()) "sqmcopy_src_$(Get-Random)"
+			$dst = Join-Path ([IO.Path]::GetTempPath()) "sqmcopy_dst_$(Get-Random)"
+			New-Item -ItemType Directory -Path $src, $dst -Force | Out-Null
+			Set-Content -Path (Join-Path $src 'a.txt') -Value 'neu'
+			$before = @(Get-ChildItem ([IO.Path]::GetTempPath()) -Filter 'sqmSQLTool_Backup_*' -ErrorAction SilentlyContinue).Count
+			try
+			{
+				Copy-sqmModuleFiles -SourcePath $src -ModulePath $dst
+				(Get-Content (Join-Path $dst 'a.txt')) | Should -Be 'neu'
+				@(Get-ChildItem ([IO.Path]::GetTempPath()) -Filter 'sqmSQLTool_Backup_*' -ErrorAction SilentlyContinue).Count | Should -Be $before
+			}
+			finally { Remove-Item $src, $dst -Recurse -Force -ErrorAction SilentlyContinue }
 		}
 	}
 }
