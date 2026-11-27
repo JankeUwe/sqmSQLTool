@@ -25,6 +25,20 @@ Describe 'Get-sqmProviderInventory' {
         }
         $c.Parameters['SqlCredential'].ParameterType.Name | Should -Be 'PSCredential'
     }
+
+    It 'schreibt bei Fehler (Instanz nicht erreichbar) keine HTML- und keine JSON-Datei' {
+        Mock -ModuleName sqmSQLTool Invoke-sqmOpenReport { }
+        $out = Join-Path $TestDrive 'pi-error'
+        # Port 1 auf localhost: Verbindung wird sofort abgelehnt, kein Timeout
+        $r = Get-sqmProviderInventory -SqlInstance '127.0.0.1,1' -OutputPath $out -NoOpen -SaveJson -SampleSeconds 0 `
+            -ErrorVariable ev -ErrorAction SilentlyContinue -WarningAction SilentlyContinue -InformationAction SilentlyContinue
+        $r.HtmlFile | Should -BeNullOrEmpty
+        $r.JsonFile | Should -BeNullOrEmpty
+        $r.ErrorCount | Should -BeGreaterThan 0
+        @(Get-ChildItem -Path $out -ErrorAction SilentlyContinue).Count | Should -Be 0
+        ($ev | Where-Object { "$_" -like '*No HTML file written*' }) | Should -Not -BeNullOrEmpty
+        Should -Invoke -ModuleName sqmSQLTool Invoke-sqmOpenReport -Times 0 -Exactly
+    }
 }
 
 Describe 'ConvertTo-sqmProviderInventoryHtml' {

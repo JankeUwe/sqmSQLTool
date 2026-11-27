@@ -18,8 +18,11 @@
     tables are scanned. Job step commands are NOT stored (they may contain secrets); only detected
     external references (UNC paths, linked servers, OPENQUERY) are stored.
 
-    Sections that cannot be read (missing permission, old SQL version) do not abort the scan. They
-    are listed in the viewer on the 'Pruefbericht' tab.
+    Sections that cannot be read (missing permission, old SQL version) do not abort the scan, but
+    if ANY error occurs (section not readable, instance not reachable, no instance found) NO HTML
+    file (and no JSON file) is written. The errors are shown as warnings, followed by one
+    non-terminating error; the returned object has HtmlFile = $null and ErrorCount > 0. Fix the
+    cause and scan again, so that only complete inventories are passed on.
 
     IMPORTANT: the HTML file written by this function contains the security data (login names,
     permissions). Do not hand it to third parties. Use the viewer's provider export instead.
@@ -974,24 +977,43 @@ function Get-sqmProviderInventory
 		instances = @($instances)
 	}
 
-	if (-not (Test-Path -LiteralPath $OutputPath)) { New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null }
-	$baseName = '{0}_{1}' -f $env:COMPUTERNAME, $started.ToString('yyyyMMdd-HHmmss')
-	$json = $result | ConvertTo-Json -Depth 10
-	$utf8 = New-Object System.Text.UTF8Encoding($false)
-	$htmlFile = Join-Path $OutputPath "ProviderInventory_$baseName.html"
-	[System.IO.File]::WriteAllText($htmlFile, (ConvertTo-sqmProviderInventoryHtml -ScanJson @($json)), $utf8)
-	$jsonFile = $null
-	if ($SaveJson)
+	# collect all errors: host sections, instance sections, unreachable instances, no instance at all
+	$scanErrors = New-Object System.Collections.ArrayList
+	foreach ($e in @($hostData.errors)) { if ($e) { [void]$scanErrors.Add("host/$($e.section): $($e.message)") } }
+	foreach ($i in $instances)
 	{
-		$jsonFile = Join-Path $OutputPath "$baseName.json"
-		[System.IO.File]::WriteAllText($jsonFile, $json, $utf8)
+		if (-not $i.connected) { [void]$scanErrors.Add("Instance $($i.connect_target) not reachable: $($i.connect_error)") }
+		foreach ($e in @($i.errors)) { if ($e) { [void]$scanErrors.Add("$($i.instance_name)/$($e.section): $($e.message)") } }
 	}
+	if (@($instances).Count -eq 0) { [void]$scanErrors.Add('No SQL Server instance scanned.') }
+	$errCount = $scanErrors.Count
 
-	$errCount = @($hostData.errors).Count
-	foreach ($i in $instances) { $errCount += @($i.errors).Count; if (-not $i.connected) { $errCount++ } }
-	if ($errCount -gt 0) { Write-Warning "$errCount section(s) could not be read. See the 'Pruefbericht' tab in the HTML file." }
-	foreach ($i in $instances) { if (-not $i.connected) { Write-Warning "Instance $($i.connect_target) not reachable: $($i.connect_error)" } }
-	Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
+	$htmlFile = $null
+	$jsonFile = $null
+	if ($errCount -gt 0)
+	{
+		# incomplete scan: no HTML (and no JSON), so that no partial inventory is passed on
+		foreach ($msg in $scanErrors) { Write-Warning $msg }
+		# $ErrorActionPreference is 'Stop' inside this function: honour the caller's -ErrorAction instead (default Continue)
+		$callerErrorAction = 'Continue'
+		if ($PSBoundParameters.ContainsKey('ErrorAction')) { $callerErrorAction = $PSBoundParameters['ErrorAction'] }
+		Write-Error "Provider inventory of $env:COMPUTERNAME incomplete: $errCount error(s). No HTML file written. Fix the errors above and run the scan again." -ErrorAction $callerErrorAction
+	}
+	else
+	{
+		if (-not (Test-Path -LiteralPath $OutputPath)) { New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null }
+		$baseName = '{0}_{1}' -f $env:COMPUTERNAME, $started.ToString('yyyyMMdd-HHmmss')
+		$json = $result | ConvertTo-Json -Depth 10
+		$utf8 = New-Object System.Text.UTF8Encoding($false)
+		$htmlFile = Join-Path $OutputPath "ProviderInventory_$baseName.html"
+		[System.IO.File]::WriteAllText($htmlFile, (ConvertTo-sqmProviderInventoryHtml -ScanJson @($json)), $utf8)
+		if ($SaveJson)
+		{
+			$jsonFile = Join-Path $OutputPath "$baseName.json"
+			[System.IO.File]::WriteAllText($jsonFile, $json, $utf8)
+		}
+		Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
+	}
 
 	return [pscustomobject][ordered]@{
 		ComputerName  = $env:COMPUTERNAME

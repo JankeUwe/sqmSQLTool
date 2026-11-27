@@ -1,5 +1,15 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.240.0] - 2026-11-27
+
+### Geaendert: Get-sqmProviderInventory schreibt bei Fehlern keine HTML-Datei mehr
+
+Bisher entstand die HTML-Datei auch dann, wenn Abschnitte nicht lesbar waren oder eine Instanz nicht erreichbar war; die Fehler standen nur im Viewer auf dem Tab 'Pruefbericht'. So konnte ein unvollstaendiges Inventar unbemerkt an den Provider gehen. Jetzt gilt: sobald ein Fehler auftritt (Abschnitt nicht lesbar, Instanz nicht erreichbar, keine Instanz gefunden), wird keine HTML-Datei und auch keine JSON-Datei (`-SaveJson`) geschrieben. Jeder Fehler erscheint als Warnung in der Konsole, danach folgt ein nicht abbrechender Fehler ("No HTML file written"). Das Rueckgabeobjekt hat `HtmlFile = $null` und `ErrorCount` > 0. `-ErrorAction Stop` des Aufrufers macht daraus einen abbrechenden Fehler.
+
+Zu beachten: Ohne lokale Administratorrechte scheitern Teile der OS-Daten (zum Beispiel der Energieplan). Der Scan liefert dann keine HTML-Datei mehr, er muss als Administrator laufen.
+
+Geprueft: neuer Unit-Test (nicht erreichbare Instanz: keine Datei, kein Oeffnen, Fehlermeldung), alle 12 Tests der Datei gruen. Live unter Windows PowerShell 5.1: nicht erreichbare Instanz und Lauf ohne Instanz liefern keine Datei; Scan von DEV01 (21 Datenbanken) ohne Fehler schreibt HTML und JSON wie bisher (Energieplan im nicht-administrativen Testlauf simuliert).
+
 ## [1.9.239.0] - 2026-11-25
 
 ### Erweitert: Rollenname der Discovery-Konten je Produkt vorbelegt und konfigurierbar
