@@ -345,7 +345,7 @@ function build() {
       dbs.forEach(function (d) {
         var b = d.backup || {}, bf = b.full || {}, bd = b.diff || {}, bl = b.log || {};
         db.push({
-          'Server': hn, 'Anwendung': app, 'Obergruppe': grp, 'Instanz': i.instance_name, 'Datenbank': d.name, 'Availability Group': agDb[d.name] || null, 'Status': d.state,
+          'Server': hn, 'Anwendung': app, 'Obergruppe': grp, 'Instanz': i.instance_name, 'Datenbank': d.name, 'Availability Group': agDb[d.name] || d.ag_name || null, 'AG-Rolle': d.ag_role || null, 'Sekundaer-DB': d.is_secondary ? 'ja (nicht gescannt)' : null, 'Status': d.state,
           'Compat': d.compatibility_level, 'Recovery': d.recovery_model, 'Collation': d.collation, 'Owner': d.owner,
           'Daten GB': gb(d.data_size_mb, 2), 'Daten belegt GB': gb(d.data_used_mb, 2), 'Log GB': gb(d.log_size_mb, 2), 'Log belegt %': d.log_used_pct,
           'Dateien': d.file_count, 'Tabellen': d.table_count, 'Wachstum MB/Monat': d.growth_mb_per_month, 'Full-Groessen MB/Monat': d.full_backup_size_history_mb,

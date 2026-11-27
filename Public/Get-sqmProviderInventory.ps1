@@ -18,6 +18,10 @@
     tables are scanned. Job step commands are NOT stored (they may contain secrets); only detected
     external references (UNC paths, linked servers, OPENQUERY) are stored.
 
+    On an AlwaysOn secondary replica the secondary databases are not opened (no used space, users,
+    cross-database references); they are listed with ag_role = SECONDARY / is_secondary = true and
+    do not count as error, so a secondary node still gets its HTML file.
+
     Sections that cannot be read (missing permission, old SQL version) do not abort the scan, but
     if ANY error occurs (section not readable, instance not reachable, no instance found) NO HTML
     file (and no JSON file) is written. The errors are shown as warnings, followed by one
@@ -518,6 +522,21 @@ function Get-sqmProviderInventory
 	FROM sys.master_files mf WHERE mf.database_id > 4 OR mf.database_id = 2
 '@
 				})
+			# AlwaysOn: local replica role per database. Secondary databases are not scanned per database
+			# (not accessible, or only read-only); they are marked as secondary instead of counting as error.
+			$agRoleByDb = @{ }
+			if ($srvRow -and $srvRow.is_hadr_enabled)
+			{
+				Invoke-Section 'database.agrole' {
+					Invoke-Q $conn @'
+	SELECT DB_NAME(drs.database_id) AS database_name, ag.name AS ag_name, ars.role_desc
+	FROM sys.dm_hadr_database_replica_states drs
+	JOIN sys.dm_hadr_availability_replica_states ars ON ars.replica_id = drs.replica_id
+	JOIN sys.availability_groups ag ON ag.group_id = drs.group_id
+	WHERE drs.is_local = 1
+'@
+				} | ForEach-Object { if ($_.database_name) { $agRoleByDb[[string]$_.database_name] = $_ } }
+			}
 			$logSpace = @(Invoke-Section 'database.logspace' { Invoke-Q $conn 'DBCC SQLPERF(LOGSPACE) WITH NO_INFOMSGS' })
 			$tde = @(Invoke-Section 'database.tde' {
 					Invoke-Q $conn 'SELECT DB_NAME(database_id) AS database_name, encryption_state, encryptor_type, key_algorithm, key_length FROM sys.dm_database_encryption_keys'
@@ -571,6 +590,12 @@ function Get-sqmProviderInventory
 				{
 					if ($d.database_id -le 4 -or $d.state_desc -ne 'ONLINE') { continue }
 					$dn = [string]$d.name
+					$agr = $agRoleByDb[$dn]
+					if ($agr -and $agr.role_desc -eq 'SECONDARY')
+					{
+						Write-Verbose "Database $dn is an AlwaysOn secondary: per-database data skipped."
+						continue
+					}
 					try
 					{
 						$conn.ChangeDatabase($dn)
@@ -647,6 +672,7 @@ function Get-sqmProviderInventory
 				$sp = $spaceByDb[$dn]
 				$ls = $logSpace | Where-Object { $_.'Database Name' -eq $dn } | Select-Object -First 1
 				$tdeRow = $tde | Where-Object { $_.database_name -eq $dn } | Select-Object -First 1
+				$agr = $agRoleByDb[$dn]
 				# backups
 				$bk = [ordered]@{ }
 				foreach ($t in @('D', 'I', 'L'))
@@ -682,6 +708,9 @@ function Get-sqmProviderInventory
 						name = $dn
 						database_id = $d.database_id
 						state = $d.state_desc
+						ag_name = Get-Prop $agr 'ag_name'
+						ag_role = Get-Prop $agr 'role_desc'
+						is_secondary = [bool]($agr -and $agr.role_desc -eq 'SECONDARY')
 						compatibility_level = Get-Prop $d 'compatibility_level'
 						recovery_model = Get-Prop $d 'recovery_model_desc'
 						collation = Get-Prop $d 'collation_name'

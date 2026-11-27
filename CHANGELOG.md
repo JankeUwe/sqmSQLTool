@@ -1,5 +1,13 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.241.0] - 2026-11-27
+
+### Behoben: Get-sqmProviderInventory liefert auf einem AlwaysOn-Sekundaerknoten wieder eine HTML-Datei
+
+Auf einem sekundaeren Replikat sind die Datenbanken der Availability Group nicht zugreifbar (ohne lesbaren Sekundaerknoten). Der Scan je Datenbank (belegter Platz, Benutzer, Rollen, Rechte, Cross-DB-Referenzen) scheiterte dort, das galt seit 1.9.240.0 als Fehler und es entstand keine HTML-Datei. Jetzt fragt der Scan die lokale Rolle je Datenbank ab (`sys.dm_hadr_database_replica_states`). Sekundaere Datenbanken werden nicht geoeffnet und nicht als Fehler gezaehlt, sondern markiert: neue Felder `ag_name`, `ag_role` (PRIMARY/SECONDARY) und `is_secondary` je Datenbank. Im Viewer zeigt der Tab 'Datenbanken' die Spalten 'AG-Rolle' und 'Sekundaer-DB' ("ja (nicht gescannt)"). Groesse der Dateien, Status, Recovery-Modell und Backup-Historie stehen weiter drin. Belegter Platz, Tabellen und die Security-Daten dieser Datenbanken liefert der Scan des Primary.
+
+Geprueft live unter Windows PowerShell 5.1 an einer echten AG ohne Cluster (CLUSTER_TYPE = NONE, zwei SQL-2022-Container, Sekundaerknoten ohne Lesezugriff): Version 1.9.240.0 brach auf dem Sekundaerknoten mit 2 Fehlern ohne HTML ab, die neue Version schreibt die HTML mit 0 Fehlern, AgDb1/AgDb2 als SECONDARY markiert, die lokale Datenbank normal gescannt; auf dem Primary alle Datenbanken mit PRIMARY und belegtem Platz. Der Datenbanken-Tab im Viewer ist im Browser (Edge headless) geprueft. Nicht geprueft: AG auf einem Windows-Failover-Cluster und ein lesbarer Sekundaerknoten (wird ebenfalls nur markiert, nicht gescannt).
+
 ## [1.9.240.0] - 2026-11-27
 
 ### Geaendert: Get-sqmProviderInventory schreibt bei Fehlern keine HTML-Datei mehr
