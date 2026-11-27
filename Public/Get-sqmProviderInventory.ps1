@@ -18,6 +18,10 @@
     tables are scanned. Job step commands are NOT stored (they may contain secrets); only detected
     external references (UNC paths, linked servers, OPENQUERY) are stored.
 
+    AlwaysOn: with -AllReplicas (default) the partner nodes of every availability group found are
+    scanned in the same run, one HTML file per node (host data remotely via CIM). The function then
+    returns one summary object per node.
+
     On an AlwaysOn secondary replica the secondary databases are not opened (no used space, users,
     cross-database references); they are listed with ag_role = SECONDARY / is_secondary = true and
     do not count as error, so a secondary node still gets its HTML file.
@@ -78,11 +82,23 @@
 .PARAMETER NoOpen
     Do not open the HTML file after the scan.
 
+.PARAMETER AllReplicas
+    Default $true. Applies only when an instance is part of an AlwaysOn availability group: the
+    hosts of all partner replicas are scanned in the same run, each with its own HTML file. Host data
+    of a partner node is read remotely via CIM (WSMan, fallback DCOM); this needs local administrator
+    rights and WinRM or DCOM access on that node. All running instances of the partner host are
+    scanned. A partner node with an error gets no file; the other nodes are not affected.
+    -AllReplicas $false scans only this computer. Without AlwaysOn the parameter has no effect.
+
 .EXAMPLE
     Get-sqmProviderInventory -OutputPath D:\Inventory
 
 .EXAMPLE
     Get-sqmProviderInventory -SqlInstance SQLCL01 -Application "SAP|DWH" -ParentGroup "Finance" -IncludeAgentJobs -NoOpen
+
+.EXAMPLE
+    Get-sqmProviderInventory -AllReplicas $false
+    On an AlwaysOn node: scan only this computer, not the partner replicas.
 
 .NOTES
     Run as local administrator for complete OS data (volumes, services, power plan).
@@ -119,7 +135,9 @@ function Get-sqmProviderInventory
 		[Parameter(Mandatory = $false)]
 		[switch]$SaveJson,
 		[Parameter(Mandatory = $false)]
-		[switch]$NoOpen
+		[switch]$NoOpen,
+		[Parameter(Mandatory = $false)]
+		[bool]$AllReplicas = $true
 	)
 
 	$ToolVersion = '0.2.0'
@@ -247,16 +265,46 @@ function Get-sqmProviderInventory
 	#endregion
 
 	#region host data
+	# Windows version values from HKLM. Local: registry provider. Remote: StdRegProv over the CIM session.
+	function Get-HostRegistryInfo
+	{
+		param ($CimSession)
+		$key = 'SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+		if (-not $CimSession) { return (Get-ItemProperty "HKLM:\$key") }
+		$o = [ordered]@{ }
+		foreach ($n in @('EditionID', 'InstallationType', 'DisplayVersion', 'ProductName'))
+		{
+			$r = Invoke-CimMethod -CimSession $CimSession -Namespace 'root\default' -ClassName StdRegProv -MethodName GetStringValue -Arguments @{ hDefKey = [uint32]2147483650; sSubKeyName = $key; sValueName = $n }
+			if ($r.ReturnValue -eq 0) { $o[$n] = $r.sValue }
+		}
+		$r = Invoke-CimMethod -CimSession $CimSession -Namespace 'root\default' -ClassName StdRegProv -MethodName GetDWORDValue -Arguments @{ hDefKey = [uint32]2147483650; sSubKeyName = $key; sValueName = 'UBR' }
+		if ($r.ReturnValue -eq 0) { $o['UBR'] = $r.uValue }
+		return [pscustomobject]$o
+	}
+
+	# Host data of this computer, or of a remote computer via an open CIM session (AlwaysOn partner nodes).
 	function Get-HostData
 	{
+		param ([string]$ComputerName, $CimSession)
+		$cimArgs = @{ }
+		if ($CimSession) { $cimArgs.CimSession = $CimSession }
 		$h = [ordered]@{ }
-		$cs = Invoke-Section 'host.computersystem' { Get-CimInstance -ClassName Win32_ComputerSystem }
-		$os = Invoke-Section 'host.operatingsystem' { Get-CimInstance -ClassName Win32_OperatingSystem }
-		$cpu = @(Invoke-Section 'host.processor' { Get-CimInstance -ClassName Win32_Processor })
-		$reg = Invoke-Section 'host.registry' { Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' }
+		$cs = Invoke-Section 'host.computersystem' { Get-CimInstance @cimArgs -ClassName Win32_ComputerSystem }
+		$os = Invoke-Section 'host.operatingsystem' { Get-CimInstance @cimArgs -ClassName Win32_OperatingSystem }
+		$cpu = @(Invoke-Section 'host.processor' { Get-CimInstance @cimArgs -ClassName Win32_Processor })
+		$reg = Invoke-Section 'host.registry' { Get-HostRegistryInfo -CimSession $CimSession }
 
 		$h.computer_name = $env:COMPUTERNAME
-		$h.fqdn = Invoke-Section 'host.fqdn' { [System.Net.Dns]::GetHostEntry($env:COMPUTERNAME).HostName }
+		if ($CimSession) { $h.computer_name = if ($cs -and $cs.Name) { [string]$cs.Name } else { $ComputerName } }
+		if ($CimSession)
+		{
+			# remote: from the node's own view (no DNS lookup on this computer needed)
+			$h.fqdn = if ($cs -and $cs.DNSHostName) { if ($cs.PartOfDomain -and $cs.Domain) { "$($cs.DNSHostName).$($cs.Domain)" } else { [string]$cs.DNSHostName } } else { $ComputerName }
+		}
+		else
+		{
+			$h.fqdn = Invoke-Section 'host.fqdn' { [System.Net.Dns]::GetHostEntry($env:COMPUTERNAME).HostName }
+		}
 		if ($cs)
 		{
 			$h.domain = $cs.Domain
@@ -283,7 +331,7 @@ function Get-sqmProviderInventory
 			$osInfo.service_pack = $os.CSDVersion
 			$osInfo.install_date = if ($os.InstallDate) { $os.InstallDate.ToString('yyyy-MM-dd') } else { $null }
 			$h.last_boot = if ($os.LastBootUpTime) { $os.LastBootUpTime.ToString('yyyy-MM-ddTHH:mm:ss') } else { $null }
-			$h.pagefile_configured_mb = Invoke-Section 'host.pagefile' { ((Get-CimInstance -ClassName Win32_PageFileUsage) | Measure-Object -Property AllocatedBaseSize -Sum).Sum }
+			$h.pagefile_configured_mb = Invoke-Section 'host.pagefile' { ((Get-CimInstance @cimArgs -ClassName Win32_PageFileUsage) | Measure-Object -Property AllocatedBaseSize -Sum).Sum }
 		}
 		if ($reg)
 		{
@@ -294,20 +342,20 @@ function Get-sqmProviderInventory
 			$osInfo.product_name = Get-Prop $reg 'ProductName'
 		}
 		$h.os = $osInfo
-		$h.time_zone = Invoke-Section 'host.timezone' { (Get-CimInstance -ClassName Win32_TimeZone).Caption }
-		$h.power_plan = Invoke-Section 'host.powerplan' { (Get-CimInstance -Namespace 'root\cimv2\power' -ClassName Win32_PowerPlan -Filter 'IsActive=True').ElementName }
+		$h.time_zone = Invoke-Section 'host.timezone' { (Get-CimInstance @cimArgs -ClassName Win32_TimeZone).Caption }
+		$h.power_plan = Invoke-Section 'host.powerplan' { (Get-CimInstance @cimArgs -Namespace 'root\cimv2\power' -ClassName Win32_PowerPlan -Filter 'IsActive=True').ElementName }
 		$h.last_hotfix = Invoke-Section 'host.hotfix' {
-			$hf = Get-HotFix | Where-Object { $_.InstalledOn } | Sort-Object InstalledOn -Descending | Select-Object -First 1
+			$hf = Get-CimInstance @cimArgs -ClassName Win32_QuickFixEngineering | Where-Object { $_.InstalledOn } | Sort-Object InstalledOn -Descending | Select-Object -First 1
 			if ($hf) { [ordered]@{ id = $hf.HotFixID; installed_on = $hf.InstalledOn.ToString('yyyy-MM-dd') } }
 		}
 		$h.ip_addresses = @(Invoke-Section 'host.network' {
-				Get-CimInstance -ClassName Win32_NetworkAdapterConfiguration -Filter 'IPEnabled=True' | ForEach-Object {
+				Get-CimInstance @cimArgs -ClassName Win32_NetworkAdapterConfiguration -Filter 'IPEnabled=True' | ForEach-Object {
 					[ordered]@{ description = $_.Description; ip = @($_.IPAddress); dns_domain = $_.DNSDomain; dns_servers = @($_.DNSServerSearchOrder) }
 				}
 			})
 
 		$h.volumes = @(Invoke-Section 'host.volumes' {
-				Get-CimInstance -ClassName Win32_Volume -Filter 'DriveType=3' | Where-Object { $_.Name -match '^[A-Za-z]:\\' } | ForEach-Object {
+				Get-CimInstance @cimArgs -ClassName Win32_Volume -Filter 'DriveType=3' | Where-Object { $_.Name -match '^[A-Za-z]:\\' } | ForEach-Object {
 					[ordered]@{
 						name = $_.Name
 						label = $_.Label
@@ -320,17 +368,17 @@ function Get-sqmProviderInventory
 				}
 			})
 		$h.disk_drives = @(Invoke-Section 'host.diskdrives' {
-				Get-CimInstance -ClassName Win32_DiskDrive | ForEach-Object {
+				Get-CimInstance @cimArgs -ClassName Win32_DiskDrive | ForEach-Object {
 					[ordered]@{ model = $_.Model; size_gb = [math]::Round($_.Size / 1GB, 1); interface = $_.InterfaceType; media_type = $_.MediaType }
 				}
 			})
 		$h.physical_disks = @(Invoke-Section 'host.physicaldisks' {
-				Get-PhysicalDisk | ForEach-Object {
+				Get-PhysicalDisk @cimArgs | ForEach-Object {
 					[ordered]@{ friendly_name = $_.FriendlyName; media_type = [string]$_.MediaType; bus_type = [string]$_.BusType; size_gb = [math]::Round($_.Size / 1GB, 1) }
 				}
 			})
 
-		$svcs = @(Invoke-Section 'host.services' { Get-CimInstance -ClassName Win32_Service })
+		$svcs = @(Invoke-Section 'host.services' { Get-CimInstance @cimArgs -ClassName Win32_Service })
 		$sqlRegex = '^(MSSQL|SQLAgent|SQLBrowser|ReportServer|MsDtsServer|MSOLAP|SQLTELEMETRY|SSASTELEMETRY|SSISTELEMETRY|SQLWriter|SQLSERVERAGENT|PowerBIReportServer|MSSQLFDLauncher|MSSQLLaunchpad)'
 		$h.sql_services = @($svcs | Where-Object { $_.Name -match $sqlRegex } | ForEach-Object {
 				[ordered]@{ name = $_.Name; display_name = $_.DisplayName; state = $_.State; start_mode = $_.StartMode; account = $_.StartName }
@@ -938,14 +986,124 @@ function Get-sqmProviderInventory
 	#endregion
 
 	#region main
-	$started = Get-Date
 	$identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
 	$isAdmin = (New-Object System.Security.Principal.WindowsPrincipal($identity)).IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
 	if (-not $isAdmin) { Write-Warning 'Not running as administrator: volume, service and power plan data may be incomplete.' }
+	# $ErrorActionPreference is 'Stop' inside this function: honour the caller's -ErrorAction for the final error (default Continue)
+	$callerErrorAction = 'Continue'
+	if ($PSBoundParameters.ContainsKey('ErrorAction')) { $callerErrorAction = $PSBoundParameters['ErrorAction'] }
+
+	# Scans one computer: host data (local, or remote via CIM session) plus the given SQL instances.
+	function Invoke-NodeScan
+	{
+		param ([string]$RemoteHost, [object[]]$Targets)
+		$nodeStarted = Get-Date
+		$script:Errs = New-Object System.Collections.ArrayList
+		$hostData = $null
+		if ($RemoteHost)
+		{
+			$session = $null
+			$lastError = $null
+			foreach ($proto in @('Wsman', 'Dcom'))
+			{
+				try
+				{
+					$session = New-CimSession -ComputerName $RemoteHost -SessionOption (New-CimSessionOption -Protocol $proto) -OperationTimeoutSec 60 -ErrorAction Stop
+					break
+				}
+				catch { $lastError = $_.Exception.Message }
+			}
+			if ($session)
+			{
+				try { $hostData = Get-HostData -ComputerName $RemoteHost -CimSession $session }
+				finally { Remove-CimSession -CimSession $session -ErrorAction SilentlyContinue }
+			}
+			else
+			{
+				Add-ScanError -Section 'host.cimsession' -Message "CIM session to $RemoteHost failed (WSMan and DCOM; local administrator rights and WinRM or DCOM access needed): $lastError"
+				$hostData = [ordered]@{ computer_name = $RemoteHost; errors = @($script:Errs) }
+			}
+		}
+		else
+		{
+			$hostData = Get-HostData
+		}
+
+		$nodeInstances = @()
+		foreach ($t in @($Targets))
+		{
+			if (-not $t) { continue }
+			Write-Information "  scanning instance $($t.target) ..." -InformationAction Continue
+			$nodeInstances += Get-InstanceData -Target $t.target -InstanceName $t.name -HostVolumes $hostData.volumes
+		}
+		$nodeFinished = Get-Date
+		$result = [ordered]@{
+			schema_version = $SchemaVersion
+			tool_version = $ToolVersion
+			scan_started = $nodeStarted.ToString('yyyy-MM-ddTHH:mm:ss')
+			scan_finished = $nodeFinished.ToString('yyyy-MM-ddTHH:mm:ss')
+			scan_duration_sec = [math]::Round(($nodeFinished - $nodeStarted).TotalSeconds, 0)
+			scanned_by = $identity.Name
+			scanned_from = $env:COMPUTERNAME
+			powershell_version = $PSVersionTable.PSVersion.ToString()
+			options = [ordered]@{ include_agent_jobs = [bool]$IncludeAgentJobs; skip_security = [bool]$SkipSecurity; skip_per_database = [bool]$SkipPerDatabase; sample_seconds = $SampleSeconds; backup_history_days = $BackupHistoryDays; all_replicas = [bool]$AllReplicas }
+			mapping = [ordered]@{ application = $Application; parent_group = $ParentGroup }
+			host = $hostData
+			instances = @($nodeInstances)
+		}
+		return [pscustomobject]@{ ComputerName = [string]$hostData.computer_name; Started = $nodeStarted; Result = $result; HostData = $hostData; Instances = @($nodeInstances) }
+	}
+
+	# Writes the HTML (and JSON) of one node, or nothing if the node has any error. Returns the summary object.
+	function Write-NodeResult
+	{
+		param ($Node)
+		$scanErrors = New-Object System.Collections.ArrayList
+		foreach ($e in @($Node.HostData.errors)) { if ($e) { [void]$scanErrors.Add("host/$($e.section): $($e.message)") } }
+		foreach ($i in $Node.Instances)
+		{
+			if (-not $i.connected) { [void]$scanErrors.Add("Instance $($i.connect_target) not reachable: $($i.connect_error)") }
+			foreach ($e in @($i.errors)) { if ($e) { [void]$scanErrors.Add("$($i.instance_name)/$($e.section): $($e.message)") } }
+		}
+		if (@($Node.Instances).Count -eq 0) { [void]$scanErrors.Add('No SQL Server instance scanned.') }
+		$errCount = $scanErrors.Count
+
+		$htmlFile = $null
+		$jsonFile = $null
+		if ($errCount -gt 0)
+		{
+			# incomplete scan: no HTML (and no JSON), so that no partial inventory is passed on
+			foreach ($msg in $scanErrors) { Write-Warning "$($Node.ComputerName): $msg" }
+			Write-Error "Provider inventory of $($Node.ComputerName) incomplete: $errCount error(s). No HTML file written. Fix the errors above and run the scan again." -ErrorAction $callerErrorAction
+		}
+		else
+		{
+			if (-not (Test-Path -LiteralPath $OutputPath)) { New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null }
+			$baseName = '{0}_{1}' -f $Node.ComputerName, $Node.Started.ToString('yyyyMMdd-HHmmss')
+			$json = $Node.Result | ConvertTo-Json -Depth 10
+			$utf8 = New-Object System.Text.UTF8Encoding($false)
+			$htmlFile = Join-Path $OutputPath "ProviderInventory_$baseName.html"
+			[System.IO.File]::WriteAllText($htmlFile, (ConvertTo-sqmProviderInventoryHtml -ScanJson @($json)), $utf8)
+			if ($SaveJson)
+			{
+				$jsonFile = Join-Path $OutputPath "$baseName.json"
+				[System.IO.File]::WriteAllText($jsonFile, $json, $utf8)
+			}
+			Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
+		}
+
+		return [pscustomobject][ordered]@{
+			ComputerName  = $Node.ComputerName
+			Instances     = @($Node.Instances).Count
+			DatabaseCount = @($Node.Instances | Where-Object { $_.connected } | ForEach-Object { @($_.databases | Where-Object { $_ }).Count } | Measure-Object -Sum).Sum
+			ErrorCount    = $errCount
+			DurationSec   = $Node.Result.scan_duration_sec
+			HtmlFile      = $htmlFile
+			JsonFile      = $jsonFile
+		}
+	}
 
 	Write-Information "sqmProviderInventory $ToolVersion on $env:COMPUTERNAME" -InformationAction Continue
-	$script:Errs = New-Object System.Collections.ArrayList
-	$hostData = Get-HostData
 
 	# determine instances
 	$targets = @()
@@ -984,74 +1142,36 @@ function Get-sqmProviderInventory
 	}
 	if ($targets.Count -eq 0) { Write-Warning 'No SQL Server instance found. Use -SqlInstance for clustered instances.' }
 
-	$instances = @()
-	foreach ($t in $targets)
-	{
-		Write-Information "  scanning instance $($t.target) ..." -InformationAction Continue
-		$instances += Get-InstanceData -Target $t.target -InstanceName $t.name -HostVolumes $hostData.volumes
-	}
+	$nodes = New-Object System.Collections.ArrayList
+	$localNode = Invoke-NodeScan -Targets $targets
+	[void]$nodes.Add($localNode)
+	Write-NodeResult -Node $localNode
 
-	$finished = Get-Date
-	$result = [ordered]@{
-		schema_version = $SchemaVersion
-		tool_version = $ToolVersion
-		scan_started = $started.ToString('yyyy-MM-ddTHH:mm:ss')
-		scan_finished = $finished.ToString('yyyy-MM-ddTHH:mm:ss')
-		scan_duration_sec = [math]::Round(($finished - $started).TotalSeconds, 0)
-		scanned_by = $identity.Name
-		powershell_version = $PSVersionTable.PSVersion.ToString()
-		options = [ordered]@{ include_agent_jobs = [bool]$IncludeAgentJobs; skip_security = [bool]$SkipSecurity; skip_per_database = [bool]$SkipPerDatabase; sample_seconds = $SampleSeconds; backup_history_days = $BackupHistoryDays }
-		mapping = [ordered]@{ application = $Application; parent_group = $ParentGroup }
-		host = $hostData
-		instances = @($instances)
-	}
-
-	# collect all errors: host sections, instance sections, unreachable instances, no instance at all
-	$scanErrors = New-Object System.Collections.ArrayList
-	foreach ($e in @($hostData.errors)) { if ($e) { [void]$scanErrors.Add("host/$($e.section): $($e.message)") } }
-	foreach ($i in $instances)
+	if ($AllReplicas)
 	{
-		if (-not $i.connected) { [void]$scanErrors.Add("Instance $($i.connect_target) not reachable: $($i.connect_error)") }
-		foreach ($e in @($i.errors)) { if ($e) { [void]$scanErrors.Add("$($i.instance_name)/$($e.section): $($e.message)") } }
-	}
-	if (@($instances).Count -eq 0) { [void]$scanErrors.Add('No SQL Server instance scanned.') }
-	$errCount = $scanErrors.Count
-
-	$htmlFile = $null
-	$jsonFile = $null
-	if ($errCount -gt 0)
-	{
-		# incomplete scan: no HTML (and no JSON), so that no partial inventory is passed on
-		foreach ($msg in $scanErrors) { Write-Warning $msg }
-		# $ErrorActionPreference is 'Stop' inside this function: honour the caller's -ErrorAction instead (default Continue)
-		$callerErrorAction = 'Continue'
-		if ($PSBoundParameters.ContainsKey('ErrorAction')) { $callerErrorAction = $PSBoundParameters['ErrorAction'] }
-		Write-Error "Provider inventory of $env:COMPUTERNAME incomplete: $errCount error(s). No HTML file written. Fix the errors above and run the scan again." -ErrorAction $callerErrorAction
-	}
-	else
-	{
-		if (-not (Test-Path -LiteralPath $OutputPath)) { New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null }
-		$baseName = '{0}_{1}' -f $env:COMPUTERNAME, $started.ToString('yyyyMMdd-HHmmss')
-		$json = $result | ConvertTo-Json -Depth 10
-		$utf8 = New-Object System.Text.UTF8Encoding($false)
-		$htmlFile = Join-Path $OutputPath "ProviderInventory_$baseName.html"
-		[System.IO.File]::WriteAllText($htmlFile, (ConvertTo-sqmProviderInventoryHtml -ScanJson @($json)), $utf8)
-		if ($SaveJson)
+		# AlwaysOn: scan the hosts of all partner replicas as well (one HTML file per host).
+		# Hosts already covered: this computer and the machines of the instances scanned so far.
+		$doneHosts = New-Object System.Collections.ArrayList
+		[void]$doneHosts.Add($env:COMPUTERNAME)
+		do
 		{
-			$jsonFile = Join-Path $OutputPath "$baseName.json"
-			[System.IO.File]::WriteAllText($jsonFile, $json, $utf8)
+			$allInstances = @($nodes | ForEach-Object { $_.Instances })
+			foreach ($i in $allInstances) { if ($i.server -and $i.server.machine_name) { [void]$doneHosts.Add([string]$i.server.machine_name) } }
+			$pending = @(Get-sqmProviderInventoryReplicaHost -Instance $allInstances -ExcludeHost @($doneHosts))
+			foreach ($p in $pending)
+			{
+				[void]$doneHosts.Add($p.host)
+				Write-Information "AlwaysOn partner node $($p.host) (replica $($p.replicas -join ', ')) ..." -InformationAction Continue
+				$nodeTargets = @()
+				$discovered = Get-sqmProviderInventoryHostInstance -HostName $p.host
+				if ($discovered -and @($discovered).Count -gt 0) { $nodeTargets = @($discovered) }
+				else { $nodeTargets = @($p.replicas | ForEach-Object { [pscustomobject]@{ target = $_; name = $_ } }) }
+				$node = Invoke-NodeScan -RemoteHost $p.host -Targets $nodeTargets
+				[void]$nodes.Add($node)
+				Write-NodeResult -Node $node
+			}
 		}
-		Invoke-sqmOpenReport -HtmlFile $htmlFile -NoOpen:$NoOpen
-	}
-
-	return [pscustomobject][ordered]@{
-		ComputerName  = $env:COMPUTERNAME
-		Instances     = @($instances).Count
-		DatabaseCount = @($instances | Where-Object { $_.connected } | ForEach-Object { @($_.databases | Where-Object { $_ }).Count } | Measure-Object -Sum).Sum
-		ErrorCount    = $errCount
-		DurationSec   = $result.scan_duration_sec
-		HtmlFile      = $htmlFile
-		JsonFile      = $jsonFile
+		while ($pending.Count -gt 0)
 	}
 	#endregion
 }

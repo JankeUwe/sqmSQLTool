@@ -26,6 +26,14 @@ Describe 'Get-sqmProviderInventory' {
         $c.Parameters['SqlCredential'].ParameterType.Name | Should -Be 'PSCredential'
     }
 
+    It 'hat -AllReplicas als bool mit Standard $true' {
+        $p = (Get-Command Get-sqmProviderInventory).Parameters['AllReplicas']
+        $p.ParameterType.Name | Should -Be 'Boolean'
+        $ast = (Get-Command Get-sqmProviderInventory).ScriptBlock.Ast
+        $def = $ast.FindAll({ param ($n) $n -is [System.Management.Automation.Language.ParameterAst] -and $n.Name.VariablePath.UserPath -eq 'AllReplicas' }, $true) | Select-Object -First 1
+        $def.DefaultValue.Extent.Text | Should -Be '$true'
+    }
+
     It 'schreibt bei Fehler (Instanz nicht erreichbar) keine HTML- und keine JSON-Datei' {
         Mock -ModuleName sqmSQLTool Invoke-sqmOpenReport { }
         $out = Join-Path $TestDrive 'pi-error'
@@ -164,5 +172,46 @@ Describe 'Get-sqmProviderInventoryHostInstance' {
             $r.target | Should -Contain ($env:COMPUTERNAME + '\INST1')
             Should -Invoke New-CimSession -Times 0
         }
+    }
+}
+
+Describe 'Get-sqmProviderInventoryReplicaHost' {
+    BeforeAll {
+        function New-TestInstance
+        {
+            param ([object[]]$Replicas)
+            [pscustomobject]@{ connected = $true; high_availability = [pscustomobject]@{ is_hadr_enabled = $true; availability_replicas = $Replicas } }
+        }
+        function New-TestReplica { param ([string]$Name, $IsLocal) [pscustomobject]@{ ag_name = 'ag1'; replica_server_name = $Name; is_local = $IsLocal } }
+    }
+
+    It 'liefert die Partner-Hosts ohne das lokale Replikat' {
+        $i = New-TestInstance @((New-TestReplica 'SQL01' $true), (New-TestReplica 'SQL02' $false), (New-TestReplica 'SQL03\INST1' $false))
+        $r = @(InModuleScope sqmSQLTool -Parameters @{ I = $i } { param ($I) Get-sqmProviderInventoryReplicaHost -Instance @($I) -ExcludeHost 'SQL01' })
+        $r.Count | Should -Be 2
+        $r[0].host | Should -Be 'SQL02'
+        $r[1].host | Should -Be 'SQL03'
+        $r[1].replicas | Should -Be @('SQL03\INST1')
+    }
+
+    It 'ueberspringt bereits gescannte Hosts ohne Domain-Suffix und Gross-/Kleinschreibung' {
+        $i = New-TestInstance @((New-TestReplica 'sql02.corp.local' $false), (New-TestReplica 'SQL04' $false))
+        $r = @(InModuleScope sqmSQLTool -Parameters @{ I = $i } { param ($I) Get-sqmProviderInventoryReplicaHost -Instance @($I) -ExcludeHost 'SQL02' })
+        $r.Count | Should -Be 1
+        $r[0].host | Should -Be 'SQL04'
+    }
+
+    It 'fasst mehrere AGs und Instanzen je Host zusammen' {
+        $a = New-TestInstance @((New-TestReplica 'SQL02\A' $false), (New-TestReplica 'SQL02\A' $false))
+        $b = New-TestInstance @((New-TestReplica 'SQL02\B' $false))
+        $r = @(InModuleScope sqmSQLTool -Parameters @{ A = $a; B = $b } { param ($A, $B) Get-sqmProviderInventoryReplicaHost -Instance @($A, $B) })
+        $r.Count | Should -Be 1
+        $r[0].replicas | Should -Be @('SQL02\A', 'SQL02\B')
+    }
+
+    It 'liefert nichts ohne AlwaysOn oder ohne Replikate' {
+        $noHa = [pscustomobject]@{ connected = $true; high_availability = [pscustomobject]@{ is_hadr_enabled = $false } }
+        $r = @(InModuleScope sqmSQLTool -Parameters @{ I = $noHa } { param ($I) Get-sqmProviderInventoryReplicaHost -Instance @($I, $null) })
+        $r.Count | Should -Be 0
     }
 }

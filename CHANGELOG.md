@@ -1,5 +1,15 @@
 ﻿# sqmSQLTool — Changelog
 
+## [1.9.242.0] - 2026-11-27
+
+### Erweitert: Get-sqmProviderInventory scannt bei AlwaysOn alle Knoten in einem Lauf
+
+Neuer Parameter `-AllReplicas` (bool, Standard `$true`). Er wirkt nur, wenn eine gescannte Instanz Teil einer Availability Group ist: Die Hosts aller Partnerreplikate werden im selben Lauf mitgescannt, jeder mit einer eigenen HTML-Datei. Die Host-Daten (Betriebssystem, Hardware, Volumes, Platten, Dienste, Hotfix, Energieplan, Windows-Version aus der Registry) liest der Scan auf einem Partnerknoten remote per CIM-Session (WSMan, bei Fehler DCOM; die Registry ueber `StdRegProv`, der FQDN aus der Sicht des Knotens). Auf dem Partnerhost werden alle laufenden SQL-Instanzen gescannt; ist der Host per CIM nicht erreichbar, wird der Replikatname direkt verwendet. Weitere AGs, die erst auf einem Partnerknoten auftauchen, werden ebenfalls verfolgt, jeder Host nur einmal.
+
+Ein Partnerknoten mit Fehler (zum Beispiel keine Adminrechte, WinRM/DCOM gesperrt) bekommt keine Datei, die anderen Knoten sind davon nicht betroffen. Die Funktion liefert jetzt ein Ergebnisobjekt je Knoten. `-AllReplicas $false` scannt nur den eigenen Rechner. Die JSON-Daten haben das neue Feld `scanned_from` (der Rechner, auf dem der Scan lief). Der letzte Hotfix kommt jetzt lokal wie remote aus `Win32_QuickFixEngineering` statt aus `Get-HotFix`.
+
+Geprueft: 5 neue Unit-Tests (Parameter-Standard, Partner-Hosts ohne lokales Replikat, Ausschluss ohne Domain-Suffix und Gross-/Kleinschreibung, mehrere AGs je Host, ohne AlwaysOn), alle 17 Tests der Datei gruen. Live unter Windows PowerShell 5.1 an einer AG ohne Cluster aus zwei SQL-2022-Containern, Scan auf dem Sekundaerknoten: Partnerknoten nicht aufloesbar ergibt eine HTML fuer den eigenen Knoten und fuer den Partner zwei Fehler ohne Datei; mit dem Partnernamen auf diesen Rechner umgeleitet (echte CIM-Session ueber WSMan auf 127.0.0.1, SQL auf den Primary-Container) entstehen zwei HTML-Dateien, der Partner mit AgDb1/AgDb2 als PRIMARY und vollstaendigen Host-Daten; `-AllReplicas $false` liefert nur eine Datei. Nicht geprueft: ein echtes Windows-AG-Paar (Remote-CIM auf einen anderen Rechner, Adminrechte dort, AG auf Failover-Cluster-Instanzen). Der Energieplan war im nicht-administrativen Testlauf simuliert.
+
 ## [1.9.241.0] - 2026-11-27
 
 ### Behoben: Get-sqmProviderInventory liefert auf einem AlwaysOn-Sekundaerknoten wieder eine HTML-Datei
